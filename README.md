@@ -4,6 +4,9 @@
 
 권장 개발환경: Node.js (React + Vite 추천 - 초기 세팅이 매우 빠름)
 
+- node 버전 : v24.14.0
+- npm 버전 : 11.11.1
+
 실행 방법: npm run dev
 
 프로젝트 구조:
