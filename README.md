@@ -20,8 +20,8 @@ we-ai-client/
 │   ├── components/  # 채팅창, 에이전트 리스트 등 UI 부품
 
 │   ├── hooks/       # API 통신 로직 (React Query 등)
-
-│   ├── pages/       # 메인 화면, 설정 화면 등
+no
+│   ├── pages/       # 로그인, 회원가입, 메인 화면, 설정 화면 등
 
 │   └── assets/      # 이미지, 스타일 파일
 
