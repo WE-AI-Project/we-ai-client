@@ -25,6 +25,4 @@ we-ai-client/
 
 │   └── assets/      # 이미지, 스타일 파일
 
-├── .env             # 서버 주소 설정 (LOCAL_URL 등)
-
 └── index.html
