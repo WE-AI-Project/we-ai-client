@@ -1,0 +1,98 @@
+.login-wrapper {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-wrapper form {
+    width: 378px;
+}
+
+label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+.input-group {
+    margin-bottom: 5px;
+    display: flex;
+    flex-direction: column;
+}
+
+.input-group input {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    width: 378px;
+    height: 34px;
+    box-sizing: border-box;
+}
+
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.button-group button {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    height: 34px;
+    width: 378px;
+    box-sizing: border-box;
+    letter-spacing: 1px
+}
+
+.button-group button[type="submit"] {
+    margin-top: 20px;
+    align-self: center;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  background: rgba(0, 0, 0, 0.2);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #ffffff;
+  padding: 20px 30px;
+  border-radius: 10px;
+  min-width: 250px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-content p {
+  text-align: left;
+}
+
+.modal-button {
+  margin-top: 20px;
+  width: 80px; 
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background-color: #7e7e7e;
+  color: white;
+  cursor: pointer;
+  display: flex; 
+  justify-content: center;
+  align-items: center;
+  align-self: flex-end;
+}
