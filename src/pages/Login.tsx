@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
+import logo from '../pages/test_logo.png';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +55,7 @@ const Login: React.FC = () => {
       )}
 
       <div className="login-card">
+        <img src={logo} className="logo" />
         <p className="maintitle">ProjectHub</p>
         <p className="subtitle">계정에 로그인하세요</p>
 
