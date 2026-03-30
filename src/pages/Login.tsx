@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
 const Login: React.FC = () => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -42,39 +45,51 @@ const Login: React.FC = () => {
             <p>아이디 또는 비밀번호가 틀렸습니다</p>
             <button
               className="modal-button"
-              onClick={() => setShowError(false)}>
+              onClick={() => setShowError(false)}
+            >
               확인
             </button>
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <div className="input-group">
-          <label>아이디</label>
-          <input
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-          />
-        </div>
+      <div className="login-card">
+        <p className="maintitle">ProjectHub</p>
+        <p className="subtitle">계정에 로그인하세요</p>
 
-        <div className="input-group">
-          <label>비밀번호</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-          />
-        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="input-group">
+            <label>아이디</label>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              placeholder="your@email.com"
+            />
+          </div>
 
-        <div className="button-group">
-          <button type="submit">로그인</button>
-          <button type="button">회원가입</button>
-        </div>
-      </form>
+          <div className="input-group">
+            <label>비밀번호</label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="••••••••"
+            />
+          </div>
+
+          <button type="submit" className="login-btn">
+            로그인
+          </button>
+
+          <div className="signup-text">
+            계정이 없으신가요?{' '}
+            <span onClick={() => navigate('/signup')}>회원가입</span>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

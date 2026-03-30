@@ -1,66 +1,108 @@
+body {
+  margin: 0;
+  height: 100vh;
+  background: linear-gradient(
+    135deg,
+    #E0E7FF,
+    #DDD6FE,
+    #E8D5F5,
+    #FCE7F3,
+    #FDE6D5,
+    #FEF3C7
+  );
+}
+
+#root {
+  height: 100%;
+}
+
 .login-wrapper {
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-card {
+  background: white;
+  padding: 40px 26px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  width: 378px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.maintitle {
+  margin: 0;
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.subtitle {
+  margin: 0;
+  margin-bottom: 24px;
+  font-size: 11px;
+  color: #9B9B9B;
 }
 
 .login-wrapper form {
-    width: 378px;
-}
-
-label {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 14px;
+  width: 326px;
 }
 
 .input-group {
-    margin-bottom: 5px;
-    display: flex;
-    flex-direction: column;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+label {
+  margin-bottom: 4px;
+  font-size: 14px;
 }
 
 .input-group input {
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    width: 378px;
-    height: 34px;
-    box-sizing: border-box;
+  width: 326px;
+  height: 36px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  box-sizing: border-box;
 }
 
-
-.button-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+.login-btn {
+  width: 326px;
+  height: 36px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 10px;
+  background: #111;
+  color: white;
+  cursor: pointer;
 }
 
-.button-group button {
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    background: white;
-    border-radius: 6px;
-    cursor: pointer;
-    height: 34px;
-    width: 378px;
-    box-sizing: border-box;
-    letter-spacing: 1px
+.signup-text {
+  margin-top: 14px;
+  font-size: 13px;
+  color: gray;
+  text-align: center;
 }
 
-.button-group button[type="submit"] {
-    margin-top: 20px;
-    align-self: center;
+.signup-text span {
+  color: #6366f1;
+  cursor: pointer;
+  margin-left: 4px;
 }
 
+/* 모달 */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-
   background: rgba(0, 0, 0, 0.2);
 
   display: flex;
@@ -82,17 +124,16 @@ label {
   text-align: left;
 }
 
+/* 버튼 */
 .modal-button {
   margin-top: 20px;
-  width: 80px; 
+  width: 80px;
   height: 36px;
   border: none;
   border-radius: 8px;
   background-color: #7e7e7e;
   color: white;
   cursor: pointer;
-  display: flex; 
-  justify-content: center;
-  align-items: center;
+
   align-self: flex-end;
 }
