@@ -1,28 +1,11 @@
-# we-ai-client
 
-사용자가 에이전트들의 활동을 실시간으로 보는 '얼굴'입니다.
+  # 제목 없음
 
-권장 개발환경: React + Vite
+  This is a code bundle for 제목 없음. The original project is available at https://www.figma.com/design/CxUYhmAP6knFj00oRkMr12/%EC%A0%9C%EB%AA%A9-%EC%97%86%EC%9D%8C.
 
-- node 버전 : v24.14.0
-- npm 버전 : 11.11.1
-- 백엔드로 요청하는 데이터 규격 : Axios
+  ## Running the code
 
-실행 방법: npm run dev
+  Run `npm i` to install the dependencies.
 
-프로젝트 구조:
-
-Plaintext
-we-ai-client/
-
-├── src/
-
-│   ├── assets/  # 채팅창, 에이전트 리스트 등 UI 부품
-
-│   ├── hooks/       # API 통신 로직 (React Query 등)
-no
-│   ├── pages/       # 로그인, 회원가입, 메인 화면, 설정 화면 등
-
-│   └── pages/      # 이미지, 스타일 파일
-
-└── index.html
+  Run `npm run dev` to start the development server.
+  
