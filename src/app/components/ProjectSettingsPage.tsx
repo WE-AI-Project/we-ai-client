@@ -21,8 +21,8 @@ import {
 } from "../colors";
 
 const DEPARTMENTS: Department[] = ["Backend", "Frontend", "Agent", "DevOps", "Design", "QA"];
-const ROLES: MemberRole[]       = ["파트장", "파트원", "게스트"];
-const TECH_CATEGORIES           = ["Backend", "Frontend", "DevOps", "Agent"];
+const ROLES: MemberRole[] = ["파트장", "파트원", "게스트"];
+const TECH_CATEGORIES = ["Backend", "Frontend", "DevOps", "Agent"];
 
 // ── 인풋 컴포넌트 ──
 function Field({
@@ -47,8 +47,8 @@ function Field({
           border: `1px solid ${BORDER}`,
           color: TEXT_PRIMARY,
         }}
-        onFocus={e  => (e.currentTarget.style.borderColor = ACCENT + "50")}
-        onBlur={e   => (e.currentTarget.style.borderColor = BORDER)}
+        onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
+        onBlur={e => (e.currentTarget.style.borderColor = BORDER)}
       />
     </div>
   );
@@ -56,11 +56,12 @@ function Field({
 
 // ── 멤버 행 ──
 function MemberRow({
-  member, onEdit, onDelete,
+  member, onEdit, onDelete, onClick,  //추가
 }: {
   member: TeamMember;
   onEdit: (m: TeamMember) => void;
   onDelete: (id: string) => void;
+  onClick: (m: TeamMember) => void;  //추가
 }) {
   const dc = DEPT_COLORS[member.department];
   const rc = ROLE_COLORS[member.role];
@@ -68,9 +69,10 @@ function MemberRow({
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 transition-all"
-      style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
+      style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, cursor: "pointer" }}  //추가
       onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.015)")}
       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+      onClick={() => onClick(member)}  // 추가 
     >
       {/* 아바타 */}
       <div
@@ -115,21 +117,28 @@ function MemberRow({
       {/* 액션 버튼 */}
       <div className="flex items-center gap-1 shrink-0">
         <button
-          onClick={() => onEdit(member)}
           className="p-1.5 rounded-lg transition-all hover:bg-black/[0.06]"
           title="편집"
+          onClick={(e) => {
+            e.stopPropagation(); //onClick 호출 방지
+            onEdit(member);
+          }}
         >
           <Edit2 className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
         </button>
         <button
-          onClick={() => onDelete(member.id)}
-          className="p-1.5 rounded-lg transition-all hover:bg-red-50"
+          className="p-1.5 rounded-lg transition-all hover:bg-black/[0.06]"
           title="삭제"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation(); // 부모 div의 onClick 뜨는 것을 막음
+            onDelete(member.id);
+          }}
         >
           <Trash2 className="w-3 h-3" style={{ color: "#ef4444" }} />
         </button>
       </div>
-    </div>
+    </div >
   );
 }
 
@@ -144,61 +153,76 @@ function MemberModal({
   const [form, setForm] = useState<Partial<TeamMember>>(
     member ?? { role: "파트원", department: "Backend", isOnline: true, joinedAt: new Date().toISOString().slice(0, 10) }
   );
+  
+  const isEdit = !!form.id;
   const set = (k: keyof TeamMember, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = () => {
     if (!form.name?.trim() || !form.email?.trim()) return;
     onSave({
-      id:         form.id ?? genMemberId(),
-      name:       form.name!.trim(),
-      email:      form.email!.trim(),
-      avatar:     form.name!.trim()[0],
-      role:       form.role as MemberRole ?? "파트원",
-      department: form.department as Department ?? "Backend",
-      joinedAt:   form.joinedAt ?? new Date().toISOString().slice(0, 10),
-      isOnline:   form.isOnline ?? false,
+      id: form.id ?? genMemberId(),
+      name: form.name!.trim(),
+      email: form.email!.trim(),
+      avatar: form.name!.trim()[0],
+      role: (form.role as MemberRole) ?? "파트원",
+      department: (form.department as Department) ?? "Backend",
+      joinedAt: form.joinedAt ?? new Date().toISOString().slice(0, 10),
+      isOnline: form.isOnline ?? false,
     });
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,0.30)", backdropFilter: "blur(8px)" }}
+      className="absolute inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 "
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl overflow-hidden"
-        style={{
-          background: "rgba(252,252,251,0.98)",
-          border: `1px solid ${BORDER}`,
-          boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-        }}
+        // 모달 틀 크기를 상세 모달과 동일하게 고정
+        className="bg-white p-4 rounded-[20px] shadow-2xl max-w-[320px] w-full relative flex flex-col"
+        style={{ maxHeight: "90%" }}
+        onClick={e => e.stopPropagation()}
       >
-        {/* 헤더 */}
-        <div
-          className="flex items-center gap-3 px-5 py-4"
-          style={{
-            background: ACCENT_BG,
-            borderBottom: `1px solid ${BORDER_SUBTLE}`,
-          }}
-        >
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(65,67,27,0.12)" }}>
-            <UserIcon className="w-4 h-4" style={{ color: ACCENT }} />
-          </div>
-          <p className="text-sm font-bold flex-1" style={{ color: TEXT_PRIMARY }}>
-            {form.id ? "멤버 편집" : "멤버 추가"}
-          </p>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/[0.06]">
-            <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
+        <div className="flex justify-between items-center mb-5 shrink-0">
+          <h3 className="font-bold text-sm" style={{ color: TEXT_PRIMARY }}>
+            {isEdit ? "멤버 편집" : "멤버 추가"}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-black/5 rounded-full transition-colors"
+          >
+            <X className="w-4 h-4" style={{ color: TEXT_TERTIARY }} />
           </button>
         </div>
 
-        <div className="p-5 space-y-3.5">
-          <Field label="이름" value={form.name ?? ""} onChange={v => set("name", v)} placeholder="홍길동" />
-          <Field label="이메일" value={form.email ?? ""} onChange={v => set("email", v)} placeholder="user@weai.dev" />
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+          <div className="space-y-4">
+            {/* 이름 필드: 편집 시 테두리 제거 */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>이름</label>
+              {isEdit ? (
+                <div className="px-1 py-1 text-sm font-medium" style={{ color: TEXT_PRIMARY }}>
+                  {form.name}
+                </div>
+              ) : (
+                <Field value={form.name ?? ""} onChange={v => set("name", v)} placeholder="홍길동" label="" />
+              )}
+            </div>
 
-          {/* 부서 */}
-          <div className="space-y-1">
+            {/* 이메일 필드: 편집 시 테두리 제거 */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>이메일</label>
+              {isEdit ? (
+                <div className="px-1 py-1 text-sm font-medium" style={{ color: TEXT_SECONDARY }}>
+                  {form.email}
+                </div>
+              ) : (
+                <Field value={form.email ?? ""} onChange={v => set("email", v)} placeholder="user@weai.dev" label="" />
+              )}
+            </div>
+          </div>
+
+          {/* 부서 선택: 기존 그리드 디자인 유지 */}
+          <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>부서</label>
             <div className="grid grid-cols-3 gap-1.5">
               {DEPARTMENTS.map(d => {
@@ -211,8 +235,8 @@ function MemberModal({
                     className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
                       background: sel ? dc.bg : "rgba(0,0,0,0.04)",
-                      color:      sel ? dc.color : TEXT_TERTIARY,
-                      border:     `1px solid ${sel ? dc.color + "40" : "transparent"}`,
+                      color: sel ? dc.color : TEXT_TERTIARY,
+                      border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
                     }}
                   >
                     {d}
@@ -222,8 +246,8 @@ function MemberModal({
             </div>
           </div>
 
-          {/* 역할 */}
-          <div className="space-y-1">
+          {/* 역할 선택: 기존 가로 나열 디자인 유지 */}
+          <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>역할</label>
             <div className="flex gap-1.5">
               {ROLES.map(r => {
@@ -236,8 +260,8 @@ function MemberModal({
                     className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all flex items-center justify-center gap-1"
                     style={{
                       background: sel ? rc.bg : "rgba(0,0,0,0.04)",
-                      color:      sel ? rc.color : TEXT_TERTIARY,
-                      border:     `1px solid ${sel ? rc.color + "40" : "transparent"}`,
+                      color: sel ? rc.color : TEXT_TERTIARY,
+                      border: `1px solid ${sel ? rc.color + "40" : "transparent"}`,
                     }}
                   >
                     {r === "파트장" && <Crown className="w-2.5 h-2.5" />}
@@ -248,43 +272,40 @@ function MemberModal({
             </div>
           </div>
 
-          {/* 온라인 여부 */}
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>온라인 상태</span>
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>온라인 상태</span>
             <button
               onClick={() => set("isOnline", !form.isOnline)}
-              className="w-9 h-5 rounded-full transition-all relative"
+              className="w-8 h-4.5 rounded-full transition-all relative"
               style={{ background: form.isOnline ? "#10b981" : "rgba(0,0,0,0.15)" }}
             >
               <div
-                className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
-                style={{ left: form.isOnline ? "calc(100% - 18px)" : "2px", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }}
+                className="absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-all"
+                style={{ left: form.isOnline ? "calc(100% - 16px)" : "2px" }}
               />
             </button>
           </div>
+        </div>
 
-          {/* 버튼 */}
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-xs font-semibold"
-              style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
-            >
-              취소
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!form.name?.trim() || !form.email?.trim()}
-              className="flex-1 py-2.5 rounded-xl text-xs font-semibold"
-              style={{
-                background: form.name?.trim() ? ACCENT : "rgba(0,0,0,0.07)",
-                color: form.name?.trim() ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-                boxShadow: form.name?.trim() ? "0 4px 14px rgba(65,67,27,0.28)" : "none",
-              }}
-            >
-              저장
-            </button>
-          </div>
+        <div className="flex gap-2 mt-6 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 rounded-2xl text-[11px] font-bold"
+            style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+          >
+            취소
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!form.name?.trim() || !form.email?.trim()}
+            className="flex-1 py-3 rounded-2xl text-[11px] font-bold transition-all active:scale-[0.98]"
+            style={{
+              background: form.name?.trim() ? ACCENT : "rgba(0,0,0,0.07)",
+              color: form.name?.trim() ? "white" : TEXT_TERTIARY,
+            }}
+          >
+            저장하기
+          </button>
         </div>
       </div>
     </div>
@@ -300,7 +321,7 @@ function TechRow({
   onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft,   setDraft]   = useState(item.version);
+  const [draft, setDraft] = useState(item.version);
   const color = TECH_CATEGORY_COLOR[item.category] ?? ACCENT;
 
   const save = () => {
@@ -373,12 +394,17 @@ function TechRow({
 // 메인 ProjectSettingsPage
 // ══════════════════════════════════════════
 export function ProjectSettingsPage() {
-  const [settings,    setSettings]    = useState<ProjectSettings>(() => loadSettings());
-  const [activeTab,   setActiveTab]   = useState<"info" | "team" | "tech">("info");
-  const [saved,       setSaved]       = useState(false);
-  const [editMember,  setEditMember]  = useState<Partial<TeamMember> | null | "new">(null);
-  const [deptFilter,  setDeptFilter]  = useState<Department | "all">("all");
+  const [settings, setSettings] = useState<ProjectSettings>(() => loadSettings());
+  const [activeTab, setActiveTab] = useState<"info" | "team" | "tech">("info");
+  const [saved, setSaved] = useState(false);
+  const [editMember, setEditMember] = useState<Partial<TeamMember> | null | "new">(null);
+  const [deptFilter, setDeptFilter] = useState<Department | "all">("all");
   const [techCatFilter, setTechCatFilter] = useState<string>("all");
+
+  //모달
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
+
 
   // ── 저장 ──
   const handleSave = () => {
@@ -402,7 +428,18 @@ export function ProjectSettingsPage() {
     setEditMember(null);
   };
   const handleDeleteMember = (id: string) => {
-    setSettings(s => ({ ...s, members: s.members.filter(m => m.id !== id) }));
+    setMemberToDelete(id);
+  };
+
+  //추가
+  const confirmDelete = () => {
+    if (memberToDelete) {
+      setSettings(s => ({
+        ...s,
+        members: s.members.filter(m => m.id !== memberToDelete)
+      }));
+      setMemberToDelete(null);
+    }
   };
 
   // ── 기술 스택 CRUD ──
@@ -424,16 +461,16 @@ export function ProjectSettingsPage() {
 
   // ── 부서별 통계 ──
   const deptStats = DEPARTMENTS.map(d => ({
-    dept:   d,
-    count:  settings.members.filter(m => m.department === d).length,
+    dept: d,
+    count: settings.members.filter(m => m.department === d).length,
     leader: settings.members.find(m => m.department === d && m.role === "파트장"),
-    color:  DEPT_COLORS[d],
+    color: DEPT_COLORS[d],
   }));
 
   const tabs = [
-    { id: "info",  icon: Settings, label: "프로젝트 정보" },
-    { id: "team",  icon: Users,    label: "팀 구성"       },
-    { id: "tech",  icon: Layers,   label: "기술 스택"     },
+    { id: "info", icon: Settings, label: "프로젝트 정보" },
+    { id: "team", icon: Users, label: "팀 구성" },
+    { id: "tech", icon: Layers, label: "기술 스택" },
   ];
 
   return (
@@ -464,8 +501,8 @@ export function ProjectSettingsPage() {
                 background: saved
                   ? "rgba(16,185,129,0.10)"
                   : ACCENT,
-                color:      saved ? "#10b981" : "rgba(255,255,255,0.95)",
-                boxShadow:  saved ? "none"    : "0 4px 14px rgba(65,67,27,0.28)",
+                color: saved ? "#10b981" : "rgba(255,255,255,0.95)",
+                boxShadow: saved ? "none" : "0 4px 14px rgba(65,67,27,0.28)",
               }}
             >
               {saved ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
@@ -544,13 +581,15 @@ export function ProjectSettingsPage() {
                 {/* 요약 카드 */}
                 <div className="col-span-2 grid grid-cols-3 gap-3 mt-2">
                   {[
-                    { icon: Users,     label: "팀원",         value: `${settings.members.length}명`  },
-                    { icon: Layers,    label: "기술 스택",     value: `${settings.techStack.length}개` },
-                    { icon: Calendar,  label: "남은 기간",     value: (() => {
-                      const diff = new Date(settings.targetDate).getTime() - Date.now();
-                      const days = Math.max(0, Math.floor(diff / 86400000));
-                      return `${days}일`;
-                    })() },
+                    { icon: Users, label: "팀원", value: `${settings.members.length}명` },
+                    { icon: Layers, label: "기술 스택", value: `${settings.techStack.length}개` },
+                    {
+                      icon: Calendar, label: "남은 기간", value: (() => {
+                        const diff = new Date(settings.targetDate).getTime() - Date.now();
+                        const days = Math.max(0, Math.floor(diff / 86400000));
+                        return `${days}일`;
+                      })()
+                    },
                   ].map(c => (
                     <div
                       key={c.label}
@@ -602,7 +641,9 @@ export function ProjectSettingsPage() {
               </div>
 
               {/* 멤버 목록 */}
-              <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+              <div
+                className="rounded-2xl overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)", minHeight: "441px" }}>
                 <div
                   className="flex items-center gap-3 px-4 py-3"
                   style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}
@@ -638,7 +679,7 @@ export function ProjectSettingsPage() {
                     className="text-[9px] font-semibold px-2.5 py-1 rounded-full transition-all shrink-0"
                     style={{
                       background: deptFilter === "all" ? ACCENT : "rgba(0,0,0,0.05)",
-                      color:      deptFilter === "all" ? "white"  : TEXT_SECONDARY,
+                      color: deptFilter === "all" ? "white" : TEXT_SECONDARY,
                     }}
                   >
                     전체
@@ -651,9 +692,9 @@ export function ProjectSettingsPage() {
                         onClick={() => setDeptFilter(d)}
                         className="text-[9px] font-semibold px-2.5 py-1 rounded-full transition-all shrink-0"
                         style={{
-                          background: deptFilter === d ? dc.bg   : "rgba(0,0,0,0.04)",
-                          color:      deptFilter === d ? dc.color : TEXT_TERTIARY,
-                          border:     deptFilter === d ? `1px solid ${dc.color}40` : "1px solid transparent",
+                          background: deptFilter === d ? dc.bg : "rgba(0,0,0,0.04)",
+                          color: deptFilter === d ? dc.color : TEXT_TERTIARY,
+                          border: deptFilter === d ? `1px solid ${dc.color}40` : "1px solid transparent",
                         }}
                       >
                         {d}
@@ -662,8 +703,7 @@ export function ProjectSettingsPage() {
                   })}
                 </div>
 
-                {/* 행 목록 */}
-                <div>
+                <div>  {/* 모달 */}
                   {filteredMembers.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10">
                       <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>이 부서에 멤버가 없습니다</p>
@@ -675,8 +715,138 @@ export function ProjectSettingsPage() {
                         member={m}
                         onEdit={m => setEditMember(m)}
                         onDelete={handleDeleteMember}
+                        onClick={(m) => setSelectedMember(m)}  //추가
                       />
                     ))
+                  )}
+
+                  {/* 멤버 모달 */}
+                  {editMember !== null && (
+                    <MemberModal
+                      member={editMember === "new" ? null : editMember}
+                      onSave={handleSaveMember}
+                      onClose={() => setEditMember(null)}
+                    />
+                  )}
+
+                  {/* ── 멤버 상세 정보 모달 ── */}
+                  {selectedMember && (
+                    <div
+                      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 "
+                      onClick={() => setSelectedMember(null)}
+                    >
+                      <div
+                        className="bg-white p-4 rounded-[20px] shadow-2xl max-w-[320px] w-full relative"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="font-bold text-sm" style={{ color: TEXT_PRIMARY }}>
+                            멤버 상세 정보 </h3>
+                          <button
+                            onClick={() => setSelectedMember(null)}
+                            className="p-1 hover:bg-black/5 rounded-full transition-colors"
+                          >
+                            <X className="w-4 h-4" style={{ color: TEXT_TERTIARY }} />
+                          </button>
+                        </div>
+
+                        {/* 프로필 섹션 */}
+                        <div className="flex flex-col items-center mb-7">
+                          <div
+                            className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3 shadow-inner"
+                            style={{
+                              backgroundColor: 'rgba(65,67,27,0.08)',
+                              color: ACCENT
+                            }}
+                          >
+                            {selectedMember.avatar || selectedMember.name?.charAt(0)}
+                          </div>
+                          <h4 className="font-bold text-base" style={{ color: TEXT_PRIMARY }}>
+                            {selectedMember.name}
+                          </h4>
+                          <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                            {selectedMember.email}
+                          </p>
+                        </div>
+
+                        {/* 정보 리스트 */}
+                        <div className="space-y-3 mb-8 px-1">
+                          <div className="flex justify-between items-center pb-2.5" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+                            <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>부서</span>
+                            <span
+                              className="px-2.5 py-0.5 rounded-full text-[9px] font-bold"
+                              style={{
+                                backgroundColor: DEPT_COLORS[selectedMember.department as Department].bg,
+                                color: DEPT_COLORS[selectedMember.department as Department].color
+                              }}
+                            >
+                              {selectedMember.department}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center pb-2.5" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+                            <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>역할</span>
+                            <span
+                              className="px-2.5 py-0.5 rounded-full text-[9px] font-bold"
+                              style={{
+                                backgroundColor: ROLE_COLORS[selectedMember.role as MemberRole].bg,
+                                color: ROLE_COLORS[selectedMember.role as MemberRole].color
+                              }}
+                            >
+                              {selectedMember.role}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>합류일</span>
+                            <span className="text-[11px] font-medium" style={{ color: TEXT_SECONDARY }}>
+                              {selectedMember.joinedAt}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedMember(null)}
+                          className="w-full py-3.5 rounded-2xl text-[12px] font-bold transition-all active:scale-[0.98]"
+                          style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+                        >
+                          닫기
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {memberToDelete && (
+                    <div
+                      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 "
+                      onClick={() => setMemberToDelete(null)}
+                    >
+                      <div
+                        className="bg-white p-8 rounded-[32px] shadow-2xl max-w-sm w-full relative text-center"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                          <Trash2 className="w-7 h-7 text-red-500" />
+                        </div>
+                        <h3 className="font-bold text-lg mb-2" style={{ color: TEXT_PRIMARY }}>정말 삭제할까요?</h3>
+                        <p className="text-sm mb-8 leading-relaxed" style={{ color: TEXT_TERTIARY }}>
+                          해당 멤버를 팀에서 삭제하며,<br />이 작업은 되돌릴 수 없습니다.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setMemberToDelete(null)}
+                            className="flex-1 py-4 rounded-2xl text-[13px] font-bold"
+                            style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+                          >
+                            취소
+                          </button>
+                          <button
+                            onClick={confirmDelete}
+                            className="flex-1 py-4 rounded-2xl text-[13px] font-bold text-white bg-red-500 transition-all active:scale-[0.98]"
+                          >
+                            삭제하기
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -698,7 +868,7 @@ export function ProjectSettingsPage() {
                       className="rounded-xl p-3 text-left transition-all"
                       style={{
                         background: techCatFilter === cat ? `${color}12` : "rgba(255,255,255,0.80)",
-                        border:     `1px solid ${techCatFilter === cat ? color + "40" : BORDER}`,
+                        border: `1px solid ${techCatFilter === cat ? color + "40" : BORDER}`,
                       }}
                     >
                       <p className="text-xl font-bold mb-0.5" style={{ color }}>{count}</p>
@@ -742,8 +912,8 @@ export function ProjectSettingsPage() {
                         className="text-[9px] font-semibold px-2.5 py-1 rounded-full transition-all shrink-0"
                         style={{
                           background: techCatFilter === cat ? `${color}15` : "rgba(0,0,0,0.04)",
-                          color:      techCatFilter === cat ? color         : TEXT_TERTIARY,
-                          border:     techCatFilter === cat ? `1px solid ${color}40` : "1px solid transparent",
+                          color: techCatFilter === cat ? color : TEXT_TERTIARY,
+                          border: techCatFilter === cat ? `1px solid ${color}40` : "1px solid transparent",
                         }}
                       >
                         {cat}
@@ -775,15 +945,6 @@ export function ProjectSettingsPage() {
 
         </div>
       </div>
-
-      {/* 멤버 모달 */}
-      {editMember !== null && (
-        <MemberModal
-          member={editMember === "new" ? null : editMember}
-          onSave={handleSaveMember}
-          onClose={() => setEditMember(null)}
-        />
-      )}
     </div>
   );
 }
