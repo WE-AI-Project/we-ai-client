@@ -1,35 +1,48 @@
-// ── WE&AI 채팅 & 문서 저장소 ──
-// localStorage 기반 채팅 메시지 & 회의 문서 관리
+// ── WE&AI 채팅 & 문서 & 채널 저장소 ──
+// localStorage 기반 채팅 메시지, 회의 문서, 채널(채팅방) 관리
 
 // ── ID 생성 ──
 export function genId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export type ChatMessage = {
-  id:        string;
-  sender:    string;
-  avatar:    string;
-  role:      "me" | "other";
-  content:   string;
-  time:      string;
-  type:      "text" | "file" | "system" | "briefing";
-  fileName?: string;
-  fileType?: string;
-  briefing?: BriefingData;   // type="briefing" 일 때
+// ── 타입 정의 ──────────────────────────────────────────
+
+/** 채팅방(채널) 타입 */
+export type Channel = {
+  id: string;
+  label: string;
+  memberIds: string[]; // 초대된 팀원 ID 목록
+  createdAt: string;
+  isCustom: boolean;   // 기본 채널 여부
 };
 
+/** 채팅 메시지 타입 */
+export type ChatMessage = {
+  id:         string;
+  sender:     string;
+  avatar:     string;
+  role:       "me" | "other";
+  content:    string;
+  time:       string;
+  type:       "text" | "file" | "system" | "briefing";
+  fileName?:  string;
+  fileType?:  string;
+  briefing?:  BriefingData;   // type="briefing" 일 때
+};
+
+/** 회의 문서 타입 */
 export type MeetingDoc = {
-  id:        string;
-  title:     string;
-  createdAt: string;
-  summary:   string;
-  messages:  ChatMessage[];
-  tags:      string[];
+  id:         string;
+  title:      string;
+  createdAt:  string;
+  summary:    string;
+  messages:   ChatMessage[];
+  tags:       string[];
   sourceFile?: string;        // 원본 파일명 (AI 분석 결과)
 };
 
-// ── AI 문서 브리핑 데이터 타입 ──────────────────────────────
+/** AI 브리핑 데이터 타입 */
 export type BriefingKeyPoint = {
   icon:  string;   // 이모지
   label: string;   // 한글 레이블
@@ -49,7 +62,131 @@ export type BriefingData = {
   savedDocId?: string;    // 저장된 MeetingDoc ID
 };
 
+// ── 로컬 스토리지 키 ────────────────────────────────────
+const CHAT_KEY = "weai_chat_messages_v1";
+const DOCS_KEY = "weai_meeting_docs_v1";
+const CHANNELS_KEY = "weai_channels_v1";
+
+// ── 초기 데이터 (더미) ───────────────────────────────────
+
+/** 초기 기본 채널 목록 */
+const INITIAL_CHANNELS: Channel[] = [
+  { id: "all", label: "전체", memberIds: [], createdAt: new Date().toISOString(), isCustom: false },
+  { id: "frontend", label: "프론트엔드", memberIds: ["m2", "m4"], createdAt: new Date().toISOString(), isCustom: false },
+  { id: "backend", label: "백엔드", memberIds: ["m1", "m3"], createdAt: new Date().toISOString(), isCustom: false },
+  { id: "qa", label: "QA", memberIds: ["m5"], createdAt: new Date().toISOString(), isCustom: false },
+  { id: "devops", label: "DevOps", memberIds: [], createdAt: new Date().toISOString(), isCustom: false },
+];
+
+/** 초기 채팅 메시지 */
+export const INITIAL_MESSAGES: ChatMessage[] = [
+  {
+    id: "m1", sender: "Admin", avatar: "A", role: "other",
+    content: "안녕하세요! WE&AI 프로젝트 킥오프 회의 시작합니다.",
+    time: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), type: "text",
+  },
+  {
+    id: "m2", sender: "병권", avatar: "병", role: "me",
+    content: "네! Spring Boot 3.2 세팅 완료했습니다. 멀티에이전트 구조 공유할게요.",
+    time: new Date(Date.now() - 1000 * 60 * 60 * 2.8).toISOString(), type: "text",
+  },
+  {
+    id: "m3", sender: "Admin", avatar: "A", role: "other",
+    content: "MultiAgentController 설계 리뷰 부탁드립니다. 동시성 이슈가 걱정돼요.",
+    time: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), type: "text",
+  },
+  {
+    id: "m4", sender: "병권", avatar: "병", role: "me",
+    content: "확인했습니다. synchronized 블록 추가해서 처리하겠습니다.",
+    time: new Date(Date.now() - 1000 * 60 * 60 * 1.5).toISOString(), type: "text",
+  },
+  {
+    id: "m5", sender: "Admin", avatar: "A", role: "other",
+    content: "DataSyncAgent.java 공유합니다.",
+    time: new Date(Date.now() - 1000 * 60 * 45).toISOString(), type: "file",
+    fileName: "DataSyncAgent.java", fileType: "java",
+  },
+  {
+    id: "m6", sender: "병권", avatar: "병", role: "me",
+    content: "고마워요! retryOnFailure 로직 참고해서 구현할게요.",
+    time: new Date(Date.now() - 1000 * 60 * 30).toISOString(), type: "text",
+  },
+];
+
+/** 초기 더미 문서 */
+const INITIAL_DOCS: MeetingDoc[] = [
+  {
+    id: "doc1",
+    title: "2025-03-29 킥오프 회의",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    summary: "WE&AI 프로젝트 킥오프. Java 17 + Spring Boot 3 + Gradle 8.7 기술 스택 확정. 멀티에이전트 아키텍처 초안 공유.",
+    messages: INITIAL_MESSAGES.slice(0, 4),
+    tags: ["킥오프", "아키텍처"],
+  },
+];
+
+// ── 채널(채팅방) 관리 함수 ───────────────────────────────
+
+export function loadChannels(): Channel[] {
+  try {
+    const s = localStorage.getItem(CHANNELS_KEY);
+    if (s) return JSON.parse(s);
+  } catch {}
+  return INITIAL_CHANNELS;
+}
+
+export function saveChannels(channels: Channel[]): void {
+  localStorage.setItem(CHANNELS_KEY, JSON.stringify(channels));
+}
+
+export function addChannel(name: string, memberIds: string[]): Channel {
+  const channels = loadChannels();
+  const newChannel: Channel = {
+    id: name.toLowerCase().replace(/\s+/g, "-") + "-" + genId().slice(0, 4),
+    label: name,
+    memberIds: memberIds,
+    createdAt: new Date().toISOString(),
+    isCustom: true,
+  };
+  saveChannels([...channels, newChannel]);
+  return newChannel;
+}
+
+/** 채팅방 삭제 함수 추가 */
+export function deleteChannel(id: string): void {
+  const channels = loadChannels();
+  const filtered = channels.filter(c => c.id !== id);
+  saveChannels(filtered);
+}
+
+// ── 메시지 & 문서 관리 함수 ─────────────────────────────
+
+export function loadMessages(): ChatMessage[] {
+  try {
+    const s = localStorage.getItem(CHAT_KEY);
+    if (s) return JSON.parse(s);
+  } catch {}
+  return INITIAL_MESSAGES.map(m => ({ ...m }));
+}
+
+export function saveMessages(msgs: ChatMessage[]): void {
+  localStorage.setItem(CHAT_KEY, JSON.stringify(msgs));
+}
+
+export function loadDocs(): MeetingDoc[] {
+  try {
+    const s = localStorage.getItem(DOCS_KEY);
+    if (s) return JSON.parse(s);
+  } catch {}
+  return INITIAL_DOCS.map(d => ({ ...d }));
+}
+
+export function saveDocs(docs: MeetingDoc[]): void {
+  localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+}
+
 // ── 파일별 브리핑 템플릿 ──────────────────────────────────────
+
 function matchTemplate(fileName: string, ext: string): BriefingData {
   const name = fileName.toLowerCase().replace(/\.[^.]+$/, "");
   const id   = genId();
@@ -94,7 +231,7 @@ function matchTemplate(fileName: string, ext: string): BriefingData {
     keyPoints: [
       { icon: "🔄", label: "트랜잭션",      text: "@Transactional 어노테이션으로 데이터 일관성 보장" },
       { icon: "🏗️", label: "아키텍처",      text: "Repository 패턴으로 데이터 접근 추상화 — 테스트 용이성 향상" },
-      { icon: "✅", label: "유효성 검사",   text: "입력 데이터 Bean Validation 적용 (@Valid, @NotNull)" },
+      { icon: "✅", label: "유효성 검사",    text: "입력 데이터 Bean Validation 적용 (@Valid, @NotNull)" },
       { icon: "📌", label: "DI 구조",       text: "생성자 주입 방식으로 불변성 및 테스트 가능성 확보" },
     ],
     techStack:   ["Spring Boot", "@Service", "@Transactional", "JPA", "Bean Validation"],
@@ -187,8 +324,8 @@ function matchTemplate(fileName: string, ext: string): BriefingData {
     purpose:  `${name} — 프로젝트 관련 기술 사양 또는 아키텍처 문서입니다. 팀 전체가 참고해야 할 공식 문서입니다.`,
     keyPoints: [
       { icon: "📐", label: "아키텍처",     text: "멀티에이전트 시스템 전체 구조 및 컴포넌트 간 인터페이스 정의" },
-      { icon: "📊", label: "성능 지표",    text: "에이전트별 처리 용량 및 SLA 기준 — 응답 시간 < 200ms (p95)" },
-      { icon: "🔗", label: "인터페이스",   text: "REST API 엔드포인트 스펙 — OpenAPI 3.0 기준 정의" },
+      { icon: "📊", label: "성능 지표",     text: "에이전트별 처리 용량 및 SLA 기준 — 응답 시간 < 200ms (p95)" },
+      { icon: "🔗", label: "인터페이스",    text: "REST API 엔드포인트 스펙 — OpenAPI 3.0 기준 정의" },
       { icon: "🗓️", label: "마일스톤",     text: "v1.0 릴리즈: 에이전트 기본 기능 / v1.5: AI 파이프라인 통합" },
     ],
     techStack:   ["Spring Boot", "REST API", "OpenAPI 3.0", "PostgreSQL", "Redis"],
@@ -202,10 +339,10 @@ function matchTemplate(fileName: string, ext: string): BriefingData {
     docType:  "마크다운 문서",
     purpose:  `${name} 관련 개발 가이드 또는 README 문서입니다. 설치 방법, 사용법, 기여 가이드를 포함합니다.`,
     keyPoints: [
-      { icon: "📖", label: "개요",         text: "프로젝트 목적, 주요 기능, 기술 스택 소개 섹션 포함" },
+      { icon: "📖", label: "개요",          text: "프로젝트 목적, 주요 기능, 기술 스택 소개 섹션 포함" },
       { icon: "🚀", label: "시작하기",     text: "로컬 개발 환경 셋업 단계별 가이드 (Prerequisites → Install → Run)" },
-      { icon: "🤝", label: "기여 가이드",  text: "브랜치 전략, PR 규칙, 코드 리뷰 프로세스 정의" },
-      { icon: "📝", label: "변경 이력",    text: "CHANGELOG 섹션 — 버전별 주요 변경사항 기록" },
+      { icon: "🤝", label: "기여 가이드",   text: "브랜치 전략, PR 규칙, 코드 리뷰 프로세스 정의" },
+      { icon: "📝", label: "변경 이력",     text: "CHANGELOG 섹션 — 버전별 주요 변경사항 기록" },
     ],
     techStack:   ["Markdown", "GitHub", "Confluence", "Documentation"],
     actionItems: ["지수님 — Storybook 링크 및 UI 가이드 추가", "병권님 — API 문서 링크 업데이트"],
@@ -219,7 +356,7 @@ function matchTemplate(fileName: string, ext: string): BriefingData {
     purpose:  "전역 스타일 또는 컴포넌트별 스타일 정의 파일입니다. 다크 모드 지원 및 CSS 변수 기반 테마 시스템이 포함되어 있습니다.",
     keyPoints: [
       { icon: "🎨", label: "CSS 변수",     text: "--color-* 커스텀 속성으로 테마 토큰 중앙 관리" },
-      { icon: "🌙", label: "다크 모드",    text: "@media (prefers-color-scheme: dark) 미디어 쿼리 기반 자동 전환" },
+      { icon: "🌙", label: "다크 모드",     text: "@media (prefers-color-scheme: dark) 미디어 쿼리 기반 자동 전환" },
       { icon: "📐", label: "레이아웃",     text: "CSS Grid / Flexbox 기반 반응형 레이아웃 시스템" },
       { icon: "✨", label: "트랜지션",     text: "초기 로드 시 깜빡임 방지 로직 적용 — transition 타이밍 최적화" },
     ],
@@ -289,90 +426,8 @@ export function briefingToMeetingDoc(briefing: BriefingData): MeetingDoc {
   };
 }
 
-const CHAT_KEY = "weai_chat_messages_v1";
-const DOCS_KEY = "weai_meeting_docs_v1";
+// ── 유틸리티 함수 ───────────────────────────────────────
 
-// ── 초기 더미 채팅 메시지 ──
-export const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: "m1", sender: "Admin", avatar: "A", role: "other",
-    content: "안녕하세요! WE&AI 프로젝트 킥오프 회의 시작합니다.",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), type: "text",
-  },
-  {
-    id: "m2", sender: "병권", avatar: "병", role: "me",
-    content: "네! Spring Boot 3.2 세팅 완료했습니다. 멀티에이전트 구조 공유할게요.",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 2.8).toISOString(), type: "text",
-  },
-  {
-    id: "m3", sender: "Admin", avatar: "A", role: "other",
-    content: "MultiAgentController 설계 리뷰 부탁드립니다. 동시성 이슈가 걱정돼요.",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), type: "text",
-  },
-  {
-    id: "m4", sender: "병권", avatar: "병", role: "me",
-    content: "확인했습니다. synchronized 블록 추가해서 처리하겠습니다.",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 1.5).toISOString(), type: "text",
-  },
-  {
-    id: "m5", sender: "Admin", avatar: "A", role: "other",
-    content: "DataSyncAgent.java 공유합니다.",
-    time: new Date(Date.now() - 1000 * 60 * 45).toISOString(), type: "file",
-    fileName: "DataSyncAgent.java", fileType: "java",
-  },
-  {
-    id: "m6", sender: "병권", avatar: "병", role: "me",
-    content: "고마워요! retryOnFailure 로직 참고해서 구현할게요.",
-    time: new Date(Date.now() - 1000 * 60 * 30).toISOString(), type: "text",
-  },
-];
-
-// ── 초기 더미 문서 ──
-const INITIAL_DOCS: MeetingDoc[] = [
-  {
-    id: "doc1",
-    title: "2025-03-29 킥오프 회의",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    summary: "WE&AI 프로젝트 킥오프. Java 17 + Spring Boot 3 + Gradle 8.7 기술 스택 확정. 멀티에이전트 아키텍처 초안 공유. 역할 분담 결정.",
-    messages: INITIAL_MESSAGES.slice(0, 4),
-    tags: ["킥오프", "아키텍처", "역할분담"],
-  },
-  {
-    id: "doc2",
-    title: "2025-03-31 DataSync 리뷰",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    summary: "DataSyncAgent 배치 페치 로직 리뷰. retryOnFailure 구현 방향 결정. ParserAgent JSON 파싱 오류 이슈 파악 및 수정 계획 수립.",
-    messages: INITIAL_MESSAGES.slice(4),
-    tags: ["DataSync", "버그리뷰", "파서"],
-  },
-];
-
-// ── CRUD ──
-export function loadMessages(): ChatMessage[] {
-  try {
-    const s = localStorage.getItem(CHAT_KEY);
-    if (s) return JSON.parse(s);
-  } catch {}
-  return INITIAL_MESSAGES.map(m => ({ ...m }));
-}
-
-export function saveMessages(msgs: ChatMessage[]): void {
-  localStorage.setItem(CHAT_KEY, JSON.stringify(msgs));
-}
-
-export function loadDocs(): MeetingDoc[] {
-  try {
-    const s = localStorage.getItem(DOCS_KEY);
-    if (s) return JSON.parse(s);
-  } catch {}
-  return INITIAL_DOCS.map(d => ({ ...d }));
-}
-
-export function saveDocs(docs: MeetingDoc[]): void {
-  localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
-}
-
-// ── 회의 요약 생성 ──
 export function generateMeetingSummary(messages: ChatMessage[]): string {
   if (messages.length === 0) return "회의 내용 없음";
   const files   = messages.filter(m => m.type === "file").map(m => m.fileName);
@@ -384,7 +439,6 @@ export function generateMeetingSummary(messages: ChatMessage[]): string {
   return summary;
 }
 
-// ── 시간 포맷 ──
 export function formatTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
