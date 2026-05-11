@@ -12,7 +12,6 @@ import {
   isInRange, formatDateKR, today as getTodayStr,
 } from "../data/scheduleStore";
 
-// ── 디자인 토큰 (colors.ts 팔레트 기준) ──
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
@@ -22,46 +21,114 @@ import {
 
 const DEPTS: Dept[] = ["전체", "Frontend", "Backend", "Agent", "DevOps", "QA", "Design"];
 const PRIORITIES: SchedulePriority[] = ["high", "medium", "low"];
-const STATUSES: ScheduleStatus[]     = ["todo", "in-progress", "done"];
+const STATUSES: ScheduleStatus[] = ["todo", "in-progress", "done"];
 const WEEK_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-// ── 일정 추가/편집 모달 ──
-function ScheduleModal({
-  initial, onSave, onClose,
-}: {
+//추가
+interface ScheduleModalProps {
   initial?: Partial<Schedule> | null;
-  onSave:   (s: Schedule) => void;
-  onClose:  () => void;
-}) {
+  onSave: (s: Schedule) => void;
+  onClose: () => void;
+  //추가
+  onColorChange: (dept: string, color: { bg: string; color: string }) => void;
+  deptColors: Record<string, { bg: string; color: string; light: string }>;
+}
+
+function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: ScheduleModalProps) {
   const [form, setForm] = useState<Partial<Schedule>>({
-    title:      "",
-    assignee:   "",             // 기본값 공란
+    title: "",
+    assignee: "",
     department: "Backend",
-    startDate:  getTodayStr(),
-    endDate:    getTodayStr(),
-    priority:   "medium",
-    status:     "todo",
-    desc:       "",
+    startDate: getTodayStr(),
+    endDate: getTodayStr(),
+    priority: "medium",
+    status: "todo",
+    desc: "",
     ...initial,
   });
+
+  const [isCustomDept, setIsCustomDept] = useState(false);
+  const [customDept, setCustomDept] = useState("");
+  const [addedDepts, setAddedDepts] = useState<string[]>([]);
+
+  // [수정] 기본 선택 색상을 팔레트의 첫 번째 진한 색으로 설정
+  const [customColor, setCustomColor] = useState({ bg: "#2B6CB0", color: "#ffffff" });
+  const COLOR_PALETTE = [
+    { bg: "#2B6CB0", color: "#ffffff" },
+    { bg: "#2F855A", color: "#ffffff" },
+    { bg: "#C53030", color: "#ffffff" },
+    { bg: "#C05621", color: "#ffffff" },
+  ];
+
   const set = (k: keyof Schedule, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  // [수정] 부서 추가 로직: 색상을 선명하게 주입하고 중복 방지
+  const handleAddCustomDept = () => {
+    const trimmed = customDept.trim();
+    if (!trimmed) return;
+
+    // 1. 전역 색상 객체에 사용자가 고른 진한 배경색 적용
+    const newColor = {
+      bg: customColor.bg,
+      color: customColor.color,
+      light: customColor.bg
+    };
+
+    onColorChange(trimmed, {
+      bg: customColor.bg,
+      color: customColor.color
+    });
+
+    // 2. 목록에 추가 (이미 있으면 추가 안함)
+    if (!DEPTS.includes(trimmed as Dept) && !addedDepts.includes(trimmed)) {
+      setAddedDepts(prev => [...prev, trimmed]);
+    }
+
+    // 3. 상태 변경 및 입력창 닫기
+    set("department", trimmed as Dept);
+    setIsCustomDept(false);
+    setCustomDept("");
+  };
 
   const handleSave = () => {
     if (!form.title?.trim() || !form.startDate || !form.endDate) return;
+
+    const finalDept = isCustomDept ? customDept.trim() : form.department;
+    if (!finalDept) {
+      alert("추가하실 부서명을 입력해주세요.");
+      return;
+    }
+
+    //색상 변경 반영
+    // const isNewDept = !deptColors[finalDept];
+
+    // if (isNewDept) {
+    //   onColorChange(finalDept, {
+    //     bg: customColor.bg,
+    //     color: customColor.color
+    //   });
+    // }
+
+    onColorChange(finalDept, {
+      bg: customColor.bg,
+      color: customColor.color
+    });
+
     onSave({
-      id:         form.id ?? genId(),
-      title:      form.title.trim(),
-      assignee:   form.assignee?.trim() ?? "",
-      department: form.department as Dept ?? "Backend",
-      startDate:  form.startDate!,
-      endDate:    form.endDate!,
-      priority:   form.priority as SchedulePriority ?? "medium",
-      status:     form.status as ScheduleStatus ?? "todo",
-      desc:       form.desc?.trim() ?? "",
+      id: form.id ?? genId(),
+      department: finalDept as Dept,
+      title: form.title.trim(),
+      assignee: form.assignee?.trim() ?? "",
+      startDate: form.startDate!,
+      endDate: form.endDate!,
+      priority: form.priority as SchedulePriority ?? "medium",
+      status: form.status as ScheduleStatus ?? "todo",
+      desc: form.desc?.trim() ?? "",
     });
   };
 
-  const dc = DEPT_COLOR[form.department as Dept ?? "Backend"];
+  // 상단 헤더 색상 (선택된 부서의 색 반영)
+  const dc = deptColors[form.department as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
 
   return (
     <div
@@ -82,7 +149,7 @@ function ScheduleModal({
         <div
           className="flex items-center gap-3 px-5 py-4 shrink-0"
           style={{
-            background: `linear-gradient(135deg, ${dc.light}60, rgba(174,183,132,0.18))`,
+            background: dc.bg,
             borderBottom: `1px solid ${BORDER_SUBTLE}`,
           }}
         >
@@ -113,7 +180,7 @@ function ScheduleModal({
             />
           </div>
 
-          {/* 담당자 (기본값 공란) */}
+          {/* 담당자 */}
           <div className="space-y-1">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>
               담당자 <span style={{ color: TEXT_TERTIARY }}>(선택)</span>
@@ -130,29 +197,89 @@ function ScheduleModal({
             </div>
           </div>
 
-          {/* 부서 */}
+          {/* 부서 선택 영역 */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>부서</label>
             <div className="grid grid-cols-4 gap-1.5">
-              {DEPTS.filter(d => d !== "전체").map(d => {
-                const c = DEPT_COLOR[d];
-                const sel = form.department === d;
+              {[...DEPTS.filter(d => d !== "전체"), ...addedDepts].map(d => {
+                const c = deptColors[d as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
+                const sel = !isCustomDept && form.department === d;
                 return (
                   <button
                     key={d}
-                    onClick={() => set("department", d)}
+                    onClick={() => { setIsCustomDept(false); set("department", d); }}
                     className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
-                      background: sel ? c.bg  : "rgba(0,0,0,0.04)",
-                      color:      sel ? c.color: TEXT_TERTIARY,
-                      border:     `1px solid ${sel ? c.color + "40" : "transparent"}`,
+                      background: sel ? c.bg : "rgba(0,0,0,0.04)",
+                      color: sel ? c.color : TEXT_TERTIARY,
+                      border: `1px solid ${sel ? c.color + "40" : "transparent"}`,
                     }}
                   >
                     {d}
                   </button>
                 );
               })}
+              <button
+                onClick={() => { setIsCustomDept(true); set("department", "" as Dept); }}
+                className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                style={{
+                  background: isCustomDept ? ACCENT_BG : "rgba(0,0,0,0.04)",
+                  color: isCustomDept ? ACCENT : TEXT_TERTIARY,
+                  border: `1px solid ${isCustomDept ? ACCENT + "40" : "transparent"}`,
+                }}
+              >
+                기타
+              </button>
             </div>
+
+            {/* [추가] 새 부서 입력창 + 색상 팔레트 */}
+            {isCustomDept && (
+              <div className="mt-2 p-3 rounded-xl border animate-in fade-in slide-in-from-top-1" style={{ background: "#FFFFFF", borderColor: BORDER_SUBTLE }}>
+                <div className="relative flex items-center">
+                  <input
+                    value={customDept}
+                    onChange={e => setCustomDept(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomDept(); } }}
+                    placeholder="새 부서명 입력"
+                    className="w-full px-3 pr-10 py-2 rounded-xl text-xs outline-none"
+                    style={{
+                      background: "rgba(0,0,0,0.02)",
+                      border: `1px solid ${customDept ? customColor.bg : BORDER}`,
+                      color: TEXT_PRIMARY
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomDept}
+                    className="absolute right-1 p-1.5 rounded-lg transition-all"
+                    style={{
+                      background: customDept.trim() ? customColor.bg : "transparent",
+                      color: customDept.trim() ? "#fff" : TEXT_TERTIARY,
+                    }}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">색상 선택</span>
+                  <div className="flex gap-2">
+                    {COLOR_PALETTE.map((cp, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCustomColor(cp)}
+                        className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
+                        style={{
+                          background: cp.bg,
+                          borderColor: customColor.bg === cp.bg ? "#00000030" : "transparent"
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 날짜 */}
@@ -195,8 +322,8 @@ function ScheduleModal({
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                       style={{
                         background: sel ? `${pm.color}15` : "rgba(0,0,0,0.03)",
-                        color:      sel ? pm.color : TEXT_TERTIARY,
-                        border:     `1px solid ${sel ? pm.color + "40" : "transparent"}`,
+                        color: sel ? pm.color : TEXT_TERTIARY,
+                        border: `1px solid ${sel ? pm.color + "40" : "transparent"}`,
                       }}
                     >
                       <Flag className="w-2.5 h-2.5" />
@@ -210,7 +337,7 @@ function ScheduleModal({
               <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>상태</label>
               <div className="flex flex-col gap-1">
                 {STATUSES.map(s => {
-                  const sm  = STATUS_META[s];
+                  const sm = STATUS_META[s];
                   const sel = form.status === s;
                   return (
                     <button
@@ -219,8 +346,8 @@ function ScheduleModal({
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                       style={{
                         background: sel ? `${sm.color}15` : "rgba(0,0,0,0.03)",
-                        color:      sel ? sm.color : TEXT_TERTIARY,
-                        border:     `1px solid ${sel ? sm.color + "40" : "transparent"}`,
+                        color: sel ? sm.color : TEXT_TERTIARY,
+                        border: `1px solid ${sel ? sm.color + "40" : "transparent"}`,
                       }}
                     >
                       <Circle className="w-2.5 h-2.5" />
@@ -257,8 +384,8 @@ function ScheduleModal({
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold"
             style={{
               background: form.title?.trim() ? "linear-gradient(135deg, #41431B, #6B7040)" : BEIGE,
-              color:      form.title?.trim() ? "rgba(254,252,245,0.95)" : TEXT_TERTIARY,
-              boxShadow:  form.title?.trim() ? "0 4px 14px rgba(65,67,27,0.22)" : "none",
+              color: form.title?.trim() ? "rgba(254,252,245,0.95)" : TEXT_TERTIARY,
+              boxShadow: form.title?.trim() ? "0 4px 14px rgba(65,67,27,0.22)" : "none",
             }}
           >
             <Save className="w-3.5 h-3.5" />
@@ -270,30 +397,20 @@ function ScheduleModal({
   );
 }
 
-// ── 일정 바 (캘린더 셀 내) ──
-function EventBar({ schedule, compact = false }: { schedule: Schedule; compact?: boolean }) {
-  const dc = DEPT_COLOR[schedule.department];
-  return (
-    <div
-      className="truncate rounded px-1 py-0.5 text-[8px] font-semibold cursor-pointer hover:opacity-80 transition-all"
-      style={{ background: dc.bg, color: dc.color, fontSize: compact ? 7 : 8 }}
-      title={`${schedule.title}${schedule.assignee ? ` — ${schedule.assignee}` : ""}`}
-    >
-      {schedule.assignee && <span className="opacity-70 mr-1">{schedule.assignee[0]}.</span>}
-      {schedule.title}
-    </div>
-  );
-}
-
 // ── 일정 카드 (사이드 리스트) ──
 function ScheduleCard({
-  schedule, onEdit, onDelete,
+  schedule, onEdit, onDelete, deptColors,
 }: {
   schedule: Schedule;
-  onEdit:   (s: Schedule) => void;
-  onDelete: (id: string) => void;
+  onEdit: (s: Schedule) => void;
+  onDelete: (s: Schedule) => void;
+  deptColors: Record<string, { bg: string; color: string; light: string }>;
 }) {
-  const dc = DEPT_COLOR[schedule.department];
+  const dc = deptColors[schedule.department as Dept] || {
+    bg: "#f3f4f6",
+    color: "#4b5563",
+    light: "#f3f4f6"
+  };
   const sm = STATUS_META[schedule.status];
   const pm = PRIORITY_META[schedule.priority];
 
@@ -340,7 +457,7 @@ function ScheduleCard({
           <button onClick={() => onEdit(schedule)} className="p-1 rounded hover:bg-black/[0.06]">
             <Edit2 className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
           </button>
-          <button onClick={() => onDelete(schedule.id)} className="p-1 rounded hover:bg-red-50">
+          <button onClick={() => onDelete(schedule)} className="p-1 rounded hover:bg-red-50">
             <Trash2 className="w-3 h-3" style={{ color: "#ef4444" }} />
           </button>
         </div>
@@ -363,19 +480,27 @@ function ScheduleCard({
   );
 }
 
-// ══════════════════════════════════════════
 // 메인 CalendarPage
-// ══════════════════════════════════════════
 export function CalendarPage() {
-  const [schedules,    setSchedules]    = useState<Schedule[]>(() => loadSchedules());
-  const [year,         setYear]         = useState(() => new Date().getFullYear());
-  const [month,        setMonth]        = useState(() => new Date().getMonth() + 1);
-  const [deptFilter,   setDeptFilter]   = useState<Dept>("전체");
-  const [selectedDay,  setSelectedDay]  = useState<string | null>(null);
+  const [schedules, setSchedules] = useState<Schedule[]>(() => loadSchedules());
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const [month, setMonth] = useState(() => new Date().getMonth() + 1);
+  const [deptFilter, setDeptFilter] = useState<Dept>("전체");
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
-  const [view,         setView]         = useState<"month" | "list">("month");
-
+  const [view, setView] = useState<"month" | "list">("month");
+  const [deptColors, setDeptColors] = useState<DeptColorType>(DEPT_COLOR);
   const todayStr = getTodayStr();
+  const [scheduleToDelete, setScheduleToDelete] = useState<Schedule | null>(null);  //삭제 모달
+
+
+  //추가
+  type DeptColorType = Record<string, {
+    bg: string;
+    color: string;
+    light: string;
+  }>;
+
 
   // ── 일정 필터 ──
   const filtered = useMemo(() =>
@@ -386,16 +511,16 @@ export function CalendarPage() {
   );
 
   // ── 이번 달 날짜 계산 ──
-  const daysInMonth  = getDaysInMonth(year, month);
+  const daysInMonth = getDaysInMonth(year, month);
   const firstWeekDay = getFirstDayOfMonth(year, month);
-  const totalCells   = Math.ceil((firstWeekDay + daysInMonth) / 7) * 7;
+  const totalCells = Math.ceil((firstWeekDay + daysInMonth) / 7) * 7;
 
   // ── 날짜별 일정 맵 ──
   const daySchedules = useMemo(() => {
     const map: Record<string, Schedule[]> = {};
     for (let day = 1; day <= daysInMonth; day++) {
       const ds = dateStr(year, month, day);
-      map[ds]  = filtered.filter(s => isInRange(ds, s.startDate, s.endDate));
+      map[ds] = filtered.filter(s => isInRange(ds, s.startDate, s.endDate));
     }
     return map;
   }, [filtered, year, month, daysInMonth]);
@@ -426,21 +551,56 @@ export function CalendarPage() {
   // ── 월 이동 ──
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
-    else             { setMonth(m => m - 1); }
+    else { setMonth(m => m - 1); }
     setSelectedDay(null);
   };
   const nextMonth = () => {
     if (month === 12) { setYear(y => y + 1); setMonth(1); }
-    else              { setMonth(m => m + 1); }
+    else { setMonth(m => m + 1); }
     setSelectedDay(null);
   };
 
   // ── 통계 ──
   const stats = {
-    total:      filtered.length,
-    done:       filtered.filter(s => s.status === "done").length,
+    total: filtered.length,
+    done: filtered.filter(s => s.status === "done").length,
     inProgress: filtered.filter(s => s.status === "in-progress").length,
-    todo:       filtered.filter(s => s.status === "todo").length,
+    todo: filtered.filter(s => s.status === "todo").length,
+  };
+
+  // ── 일정 바 (캘린더 셀 내) ──
+  function EventBar({ schedule, compact = false }: { schedule: Schedule; compact?: boolean }) {
+    const dc = deptColors[schedule.department as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
+    return (
+      <div
+        className="truncate rounded px-1 py-0.5 text-[8px] font-semibold cursor-pointer hover:opacity-80 transition-all"
+        style={{ background: dc.bg, color: dc.color, fontSize: compact ? 7 : 8 }}
+        title={`${schedule.title}${schedule.assignee ? ` — ${schedule.assignee}` : ""}`}
+      >
+        {schedule.assignee && <span className="opacity-70 mr-1">{schedule.assignee[0]}.</span>}
+        {schedule.title}
+      </div>
+    );
+  }
+
+  //추가
+  const dynamicDepts = useMemo(() => {
+    const fromSchedules = schedules.map(s => s.department);
+    const combined = ["전체", ...DEPTS.filter(d => d !== "전체"), ...fromSchedules];
+    return Array.from(new Set(combined)) as Dept[]; // 중복 제거된 유니크한 부서 리스트
+  }, [schedules]);
+
+  //추가
+  const getDeptColor = (dept: string) => {
+    return deptColors[dept as Dept] || { bg: "#F1F2E9", color: "#6B7040", light: "#F1F2E9" };
+  };
+
+  //추가
+  const handleDeptColorChange = (dept: string, color: { bg: string; color: string }) => {
+    setDeptColors(prev => ({
+      ...prev,
+      [dept]: { ...color, light: color.bg }
+    }));
   };
 
   return (
@@ -466,13 +626,6 @@ export function CalendarPage() {
           >
             <Calendar className="w-3.5 h-3.5" style={{ color: ACCENT }} />
             <p className="text-xs font-semibold flex-1" style={{ color: TEXT_PRIMARY }}>개발 일정</p>
-            <button
-              onClick={() => setEditSchedule("new")}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold transition-all"
-              style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
-            >
-              <Plus className="w-3 h-3" /> 추가
-            </button>
           </div>
 
           {/* 부서 필터 */}
@@ -480,8 +633,8 @@ export function CalendarPage() {
             className="flex flex-col gap-1 p-2.5 overflow-y-auto shrink-0"
             style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
           >
-            {DEPTS.map(d => {
-              const dc  = DEPT_COLOR[d];
+            {dynamicDepts.map(d => {
+              const dc = getDeptColor(d);
               const cnt = d === "전체" ? schedules.length : schedules.filter(s => s.department === d).length;
               const sel = deptFilter === d;
               return (
@@ -491,10 +644,10 @@ export function CalendarPage() {
                   className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all"
                   style={{
                     background: sel ? dc.bg : "transparent",
-                    border:     `1px solid ${sel ? dc.color + "40" : "transparent"}`,
+                    border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
                   }}
                 >
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.color }} />
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
                   <span className="text-[11px] font-semibold flex-1" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
                   <span className="text-[9px] font-mono" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>{cnt}</span>
                 </button>
@@ -506,9 +659,9 @@ export function CalendarPage() {
           <div className="px-3 py-2.5 shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
             <div className="grid grid-cols-3 gap-1.5">
               {[
-                { label: "완료",    value: stats.done,       color: "#5A8A4A" },
-                { label: "진행",    value: stats.inProgress, color: "#C09840" },
-                { label: "예정",    value: stats.todo,       color: "#9A9B72" },
+                { label: "완료", value: stats.done, color: "#5A8A4A" },
+                { label: "진행", value: stats.inProgress, color: "#C09840" },
+                { label: "예정", value: stats.todo, color: "#9A9B72" },
               ].map(s => (
                 <div key={s.label} className="rounded-lg p-2 text-center" style={{ background: `${s.color}12` }}>
                   <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
@@ -544,7 +697,13 @@ export function CalendarPage() {
                   </div>
                 ) : (
                   selectedDaySchedules.map(s => (
-                    <ScheduleCard key={s.id} schedule={s} onEdit={s => setEditSchedule(s)} onDelete={handleDelete} />
+                    <ScheduleCard
+                      key={s.id}
+                      schedule={s}
+                      deptColors={deptColors}
+                      onEdit={s => setEditSchedule(s)}
+                      onDelete={(s) => setScheduleToDelete(s)}
+                    />
                   ))
                 )}
               </>
@@ -562,7 +721,13 @@ export function CalendarPage() {
                     .slice()
                     .sort((a, b) => a.startDate.localeCompare(b.startDate))
                     .map(s => (
-                      <ScheduleCard key={s.id} schedule={s} onEdit={s => setEditSchedule(s)} onDelete={handleDelete} />
+                      <ScheduleCard
+                        key={s.id}
+                        schedule={s}
+                        deptColors={deptColors}
+                        onEdit={s => setEditSchedule(s)}
+                        onDelete={(s) => setScheduleToDelete(s)}
+                      />
                     ))
                 )}
               </>
@@ -605,14 +770,29 @@ export function CalendarPage() {
 
             {/* 범례 */}
             <div className="ml-auto flex items-center gap-3 flex-wrap">
-              {DEPTS.filter(d => d !== "전체").map(d => {
-                const dc = DEPT_COLOR[d];
-                const cnt = filtered.filter(s => s.department === d && s.startDate.startsWith(`${year}-${String(month).padStart(2,"0")}`)).length;
+              {dynamicDepts.filter(d => d !== "전체").map(d => {
+                const dc = deptColors[d] || {
+                  bg: "#f3f4f6",
+                  color: "#4b5563",
+                  light: "#f3f4f6"
+                };
+
+                const cnt = filtered.filter(
+                  s => s.department === d &&
+                    s.startDate.startsWith(`${year}-${String(month).padStart(2, "0")}`)
+                ).length;
+
                 if (cnt === 0 && deptFilter !== "전체" && deptFilter !== d) return null;
+
                 return (
                   <div key={d} className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full" style={{ background: dc.color }} />
-                    <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{d}</span>
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: dc.bg }}
+                    />
+                    <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                      {d}
+                    </span>
                   </div>
                 );
               })}
@@ -646,17 +826,17 @@ export function CalendarPage() {
               {/* 날짜 셀 그리드 */}
               <div className="grid grid-cols-7 flex-1 gap-px" style={{ background: BORDER }}>
                 {Array.from({ length: totalCells }).map((_, idx) => {
-                  const dayNum  = idx - firstWeekDay + 1;
+                  const dayNum = idx - firstWeekDay + 1;
                   const isValid = dayNum >= 1 && dayNum <= daysInMonth;
-                  const ds      = isValid ? dateStr(year, month, dayNum) : "";
+                  const ds = isValid ? dateStr(year, month, dayNum) : "";
                   const dayEvts = isValid ? (daySchedules[ds] ?? []) : [];
                   const isToday = ds === todayStr;
-                  const isSel   = ds === selectedDay;
-                  const isSun   = idx % 7 === 0;
-                  const isSat   = idx % 7 === 6;
+                  const isSel = ds === selectedDay;
+                  const isSun = idx % 7 === 0;
+                  const isSat = idx % 7 === 6;
 
                   const startsToday = dayEvts.filter(s => s.startDate === ds);
-                  const continues   = dayEvts.filter(s => s.startDate !== ds);
+                  const continues = dayEvts.filter(s => s.startDate !== ds);
 
                   return (
                     <div
@@ -665,8 +845,8 @@ export function CalendarPage() {
                       className="relative p-1 transition-all overflow-hidden"
                       style={{
                         background: !isValid ? `rgba(254,252,245,0.45)`
-                          : isSel   ? ACCENT_BG
-                          : BRIGHT_BEIGE,
+                          : isSel ? ACCENT_BG
+                            : BRIGHT_BEIGE,
                         cursor: isValid ? "pointer" : "default",
                         minHeight: 80,
                       }}
@@ -680,7 +860,7 @@ export function CalendarPage() {
                             <span
                               className="text-[11px] font-semibold w-6 h-6 flex items-center justify-center rounded-full"
                               style={{
-                                color:      isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
+                                color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
                                 background: isToday ? ACCENT : "transparent",
                               }}
                             >
@@ -700,7 +880,7 @@ export function CalendarPage() {
                               <div
                                 key={s.id}
                                 className="h-1.5 rounded-full opacity-40"
-                                style={{ background: DEPT_COLOR[s.department].color }}
+                                style={{ background: deptColors[s.department].color }}
                               />
                             ))}
                             {dayEvts.length > 3 && (
@@ -748,8 +928,8 @@ export function CalendarPage() {
                 </div>
                 {/* 부서별 바 */}
                 {DEPTS.filter(d => d !== "전체").map(d => {
-                  const dc       = DEPT_COLOR[d];
-                  const dScheds  = filtered.filter(s => s.department === d);
+                  const dc = deptColors[d];
+                  const dScheds = filtered.filter(s => s.department === d);
                   if (dScheds.length === 0) return null;
                   return (
                     <div key={d} className="flex items-center gap-2 mb-1" style={{ height: 14 }}>
@@ -769,8 +949,8 @@ export function CalendarPage() {
                           const sDay = new Date(s.startDate).getDate();
                           const eDay = Math.min(daysInMonth, new Date(s.endDate).getDate());
                           const left = (sDay - 1) * 20;
-                          const width= Math.max(20, (eDay - sDay + 1) * 20);
-                          const sm   = STATUS_META[s.status];
+                          const width = Math.max(20, (eDay - sDay + 1) * 20);
+                          const sm = STATUS_META[s.status];
                           return (
                             <div
                               key={s.id}
@@ -778,7 +958,7 @@ export function CalendarPage() {
                               style={{
                                 left, width, height: 12, top: 0,
                                 background: dc.bg,
-                                border:     `1px solid ${dc.color}40`,
+                                border: `1px solid ${dc.color}40`,
                               }}
                               title={`${s.title}${s.assignee ? ` — ${s.assignee}` : ""}`}
                             >
@@ -804,7 +984,50 @@ export function CalendarPage() {
           initial={editSchedule === "new" ? undefined : editSchedule}
           onSave={handleSave}
           onClose={() => setEditSchedule(null)}
+          onColorChange={handleDeptColorChange}
+          deptColors={deptColors}
         />
+      )}
+
+      {/* 삭제 모달 */}
+      {scheduleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+
+          {/* 배경 */}
+          <div
+            className="fixed inset-0 bg-black/30"
+            onClick={() => setScheduleToDelete(null)}
+          />
+
+          {/* 모달 박스 */}
+          <div className="relative bg-white w-[320px] min-h-[180px] px-5 py-6 rounded-2xl shadow-lg flex flex-col justify-center">
+
+            <div className="text-sm font-semibold mb-4 text-center">
+              "{scheduleToDelete.title}" 삭제하시겠습니까?
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setScheduleToDelete(null)}
+                className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold"
+                style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+              >
+                취소
+              </button>
+
+              <button
+                onClick={() => {
+                  handleDelete(scheduleToDelete.id);
+                  setScheduleToDelete(null);
+                }}
+                className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold text-white bg-red-500"
+              >
+                삭제하기
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
     </div>
   );
