@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Bot, ArrowRight, Hash, FolderPlus,
   ChevronRight, X, Play, Plus, Folder, FolderOpen,
@@ -20,40 +20,40 @@ const PATH_EXAMPLES = [
 
 // ── 자동 감지 시뮬레이션 결과 ──
 type DetectedInfo = {
-  stack:     string[];
+  stack: string[];
   framework: string;
-  language:  string;
-  build:     string;
+  language: string;
+  build: string;
 };
 
 function detectFromPath(path: string): DetectedInfo {
   // 경로 힌트로 기술 스택 추론 시뮬레이션
   const lower = path.toLowerCase();
-  const isJava  = lower.includes("java") || lower.includes("spring") || lower.includes("weai");
-  const isNode  = lower.includes("node") || lower.includes("react") || lower.includes("frontend");
-  const isPython= lower.includes("python") || lower.includes("py");
+  const isJava = lower.includes("java") || lower.includes("spring") || lower.includes("weai");
+  const isNode = lower.includes("node") || lower.includes("react") || lower.includes("frontend");
+  const isPython = lower.includes("python") || lower.includes("py");
 
   if (isJava || (!isNode && !isPython)) {
     return {
-      stack:     ["Java 17", "Spring Boot 3.2.5", "Gradle 8.7", "PostgreSQL 16", "React 18", "TypeScript 5.4"],
+      stack: ["Java 17", "Spring Boot 3.2.5", "Gradle 8.7", "PostgreSQL 16", "React 18", "TypeScript 5.4"],
       framework: "Spring Boot",
-      language:  "Java / TypeScript",
-      build:     "Gradle",
+      language: "Java / TypeScript",
+      build: "Gradle",
     };
   }
   if (isNode) {
     return {
-      stack:     ["Node.js 20", "React 18", "TypeScript 5.4", "Vite 5", "Tailwind CSS 4"],
+      stack: ["Node.js 20", "React 18", "TypeScript 5.4", "Vite 5", "Tailwind CSS 4"],
       framework: "React",
-      language:  "TypeScript",
-      build:     "Vite",
+      language: "TypeScript",
+      build: "Vite",
     };
   }
   return {
-    stack:     ["Python 3.12", "FastAPI 0.110", "PostgreSQL 16", "Docker", "Redis"],
+    stack: ["Python 3.12", "FastAPI 0.110", "PostgreSQL 16", "Docker", "Redis"],
     framework: "FastAPI",
-    language:  "Python",
-    build:     "pip / Poetry",
+    language: "Python",
+    build: "pip / Poetry",
   };
 }
 
@@ -70,6 +70,30 @@ function LocalPathInput({
   value: string; onChange: (v: string) => void; label?: string;
 }) {
   const [focused, setFocused] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);  //추가
+
+  // 영역 클릭 시 숨겨진 탐색기 창 열기 트리거
+  const handleOpenExplorer = () => {
+    fileInputRef.current?.click();
+  };
+
+  // 폴더 선택 완료 시 경로 추출
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // 일반 웹 브라우저 보안 정책상 파일의 상대 경로 정보를 기반으로 상위 경로 힌트를 제공
+      const file = files[0] as any;
+      if (file.path) {
+        const folderPath = file.path.replace(/(\\|\/)[^\/\\]+$/, '');
+        onChange(folderPath);
+      } else if (file.webkitRelativePath) {
+        const topFolder = file.webkitRelativePath.split('/')[0];
+        onChange(`C:\\Projects\\${topFolder}`);
+      }
+    }
+    // 동일한 폴더를 다시 선택할 수 있도록 input 초기화
+    e.target.value = "";
+  };
 
   return (
     <div className="space-y-1.5">
@@ -77,7 +101,8 @@ function LocalPathInput({
         {label} <span style={{ color: "#B85450" }}>*</span>
       </label>
       <div
-        className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all"
+        onClick={handleOpenExplorer}
+        className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all cursor-pointer hover:bg-black/[0.02]"
         style={{
           background: "rgba(65,67,27,0.04)",
           border: `1.5px solid ${focused ? "rgba(65,67,27,0.35)" : BORDER}`,
@@ -85,6 +110,7 @@ function LocalPathInput({
       >
         <Folder className="w-4 h-4 shrink-0" style={{ color: value ? ACCENT : TEXT_TERTIARY }} />
         <input
+          readOnly
           value={value}
           onChange={e => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -93,8 +119,25 @@ function LocalPathInput({
           className="flex-1 text-sm outline-none font-mono"
           style={{ background: "transparent", color: TEXT_PRIMARY }}
         />
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          // @ts-ignore: React 표준 타입 선언 누락 방지용 예외 처리
+          webkitdirectory=""
+          directory=""
+          onChange={handleFolderSelect}
+        />
+        
         {value && (
-          <button onClick={() => onChange("")} className="shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // 지우기 버튼 클릭 시 탐색기가 함께 열리지 않도록
+              onChange("");
+            }}
+            className="shrink-0 p-1 hover:bg-black/[0.05] rounded"
+          >
             <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
           </button>
         )}
@@ -121,8 +164,8 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
       <div className="grid grid-cols-2 gap-2 text-[9px]">
         {[
           { label: "프레임워크", value: info.framework },
-          { label: "언어",      value: info.language   },
-          { label: "빌드 툴",   value: info.build      },
+          { label: "언어", value: info.language },
+          { label: "빌드 툴", value: info.build },
           { label: "감지 스택", value: `${info.stack.length}개` },
         ].map(r => (
           <div key={r.label}>
@@ -149,18 +192,18 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
 function CreateProjectModal({
   onClose, onCreate,
 }: {
-  onClose:  () => void;
+  onClose: () => void;
   onCreate: (name: string, code: string, localPath: string) => void;
 }) {
-  const [step,       setStep]      = useState<1 | 2 | 3>(1);
-  const [name,       setName]      = useState("");
-  const [desc,       setDesc]      = useState("");
-  const [deadline,   setDeadline]  = useState("");
-  const [localPath,  setLocalPath] = useState("");
-  const [detecting,  setDetecting] = useState(false);
-  const [detected,   setDetected]  = useState<DetectedInfo | null>(null);
-  const [code]                     = useState(genCode());
-  const [creating,   setCreating]  = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [localPath, setLocalPath] = useState("");
+  const [detecting, setDetecting] = useState(false);
+  const [detected, setDetected] = useState<DetectedInfo | null>(null);
+  const [code] = useState(genCode());
+  const [creating, setCreating] = useState(false);
 
   const TOTAL_STEPS = 3;
 
@@ -322,8 +365,8 @@ function CreateProjectModal({
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all"
                 style={{
                   background: localPath.trim() && !detecting ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
-                  color:      localPath.trim() && !detecting ? ACCENT : TEXT_TERTIARY,
-                  border:     `1px solid ${localPath.trim() && !detecting ? ACCENT_BORDER : "transparent"}`,
+                  color: localPath.trim() && !detecting ? ACCENT : TEXT_TERTIARY,
+                  border: `1px solid ${localPath.trim() && !detecting ? ACCENT_BORDER : "transparent"}`,
                 }}
               >
                 {detecting
@@ -367,10 +410,10 @@ function CreateProjectModal({
               <div className="rounded-xl p-3.5 space-y-2" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
                 <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: ACCENT }}>생성 요약</p>
                 {[
-                  { label: "프로젝트명",   value: name },
-                  { label: "저장 위치",    value: localPath || "—" },
-                  { label: "마감일",       value: deadline ? `${deadline}${deadlineDays !== null ? ` (${deadlineDays > 0 ? `${deadlineDays}일 후` : deadlineDays === 0 ? "오늘" : "기간 초과"})` : ""}` : "미설정" },
-                  { label: "감지된 스택",  value: detected ? `${detected.stack.length}개 자동 감지됨` : "수동 설정 필요" },
+                  { label: "프로젝트명", value: name },
+                  { label: "저장 위치", value: localPath || "—" },
+                  { label: "마감일", value: deadline ? `${deadline}${deadlineDays !== null ? ` (${deadlineDays > 0 ? `${deadlineDays}일 후` : deadlineDays === 0 ? "오늘" : "기간 초과"})` : ""}` : "미설정" },
+                  { label: "감지된 스택", value: detected ? `${detected.stack.length}개 자동 감지됨` : "수동 설정 필요" },
                 ].map(r => (
                   <div key={r.label} className="flex items-start justify-between gap-3 text-[10px]">
                     <span style={{ color: TEXT_TERTIARY, flexShrink: 0 }}>{r.label}</span>
@@ -412,8 +455,8 @@ function CreateProjectModal({
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all"
               style={{
                 background: (step === 1 ? canNext1 : canNext2) ? ACCENT : "rgba(0,0,0,0.07)",
-                color:      (step === 1 ? canNext1 : canNext2) ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-                boxShadow:  (step === 1 ? canNext1 : canNext2) ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
+                color: (step === 1 ? canNext1 : canNext2) ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
+                boxShadow: (step === 1 ? canNext1 : canNext2) ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
               }}
             >
               다음 <ChevronRight className="w-3 h-3" />
@@ -439,20 +482,20 @@ function CreateProjectModal({
 
 // ── 기존 프로젝트 시작 모달 ──
 const EXISTING_PROJECTS = [
-  { id: "weai-backend",    name: "WE&AI Backend Server",   code: "WEAI2025", path: "D:\\WE_AI\\enterprise"         },
-  { id: "ma-simulator",    name: "Multi-Agent Simulator",  code: "SIM2B3XX", path: "D:\\WE_AI\\ma-simulator"       },
-  { id: "devops-pipeline", name: "DevOps Pipeline",         code: "DEV9XZAB", path: "/home/dev/devops-pipeline"    },
+  { id: "weai-backend", name: "WE&AI Backend Server", code: "WEAI2025", path: "D:\\WE_AI\\enterprise" },
+  { id: "ma-simulator", name: "Multi-Agent Simulator", code: "SIM2B3XX", path: "D:\\WE_AI\\ma-simulator" },
+  { id: "devops-pipeline", name: "DevOps Pipeline", code: "DEV9XZAB", path: "/home/dev/devops-pipeline" },
 ];
 
 function StartModal({ onClose, onSelect }: {
-  onClose:  () => void;
+  onClose: () => void;
   onSelect: (id: string, name: string, localPath: string) => void;
 }) {
-  const [selected,   setSelected]   = useState<string | null>(null);
-  const [localPath,  setLocalPath]  = useState("");
-  const [joining,    setJoining]    = useState(false);
-  const [detecting,  setDetecting]  = useState(false);
-  const [detected,   setDetected]   = useState<DetectedInfo | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [localPath, setLocalPath] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detected, setDetected] = useState<DetectedInfo | null>(null);
 
   const selectedProj = EXISTING_PROJECTS.find(p => p.id === selected);
 
@@ -564,8 +607,8 @@ function StartModal({ onClose, onSelect }: {
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all"
             style={{
               background: selected ? ACCENT : "rgba(0,0,0,0.07)",
-              color:      selected ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-              boxShadow:  selected ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
+              color: selected ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
+              boxShadow: selected ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
             }}
           >
             {joining ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Loading...</> : <>시작하기 <ArrowRight className="w-3 h-3" /></>}
@@ -578,9 +621,9 @@ function StartModal({ onClose, onSelect }: {
 
 // ── 코드로 참여 ──
 const PROJECTS_BY_CODE: Record<string, { id: string; name: string; path: string }> = {
-  "WEAI2025": { id: "weai-backend",    name: "WE&AI Backend Server",  path: "D:\\WE_AI\\enterprise"   },
-  "SIM2B3XX": { id: "ma-simulator",    name: "Multi-Agent Simulator", path: "D:\\WE_AI\\ma-simulator" },
-  "DEV9XZAB": { id: "devops-pipeline", name: "DevOps Pipeline",        path: "/home/dev/devops-pipeline" },
+  "WEAI2025": { id: "weai-backend", name: "WE&AI Backend Server", path: "D:\\WE_AI\\enterprise" },
+  "SIM2B3XX": { id: "ma-simulator", name: "Multi-Agent Simulator", path: "D:\\WE_AI\\ma-simulator" },
+  "DEV9XZAB": { id: "devops-pipeline", name: "DevOps Pipeline", path: "/home/dev/devops-pipeline" },
 };
 
 // ────────────────────────────────────────────
@@ -591,13 +634,13 @@ type Props = {
 };
 
 export function JoinProjectScreen({ onJoin }: Props) {
-  const [modal,       setModal]       = useState<"none" | "start" | "create">("none");
-  const [codeInput,   setCode]        = useState("");
-  const [codeError,   setCodeError]   = useState(false);
+  const [modal, setModal] = useState<"none" | "start" | "create">("none");
+  const [codeInput, setCode] = useState("");
+  const [codeError, setCodeError] = useState(false);
   const [codeJoining, setCodeJoining] = useState(false);
-  const [codePath,    setCodePath]    = useState("");
-  const [codeDetect,  setCodeDetect]  = useState<DetectedInfo | null>(null);
-  const [codeStep,    setCodeStep]    = useState<"input" | "path">("input");
+  const [codePath, setCodePath] = useState("");
+  const [codeDetect, setCodeDetect] = useState<DetectedInfo | null>(null);
+  const [codeStep, setCodeStep] = useState<"input" | "path">("input");
 
   const handleCodeJoin = () => {
     const c = codeInput.trim().toUpperCase();
@@ -634,7 +677,7 @@ export function JoinProjectScreen({ onJoin }: Props) {
 
   return (
     <>
-      {modal === "start"  && <StartModal  onClose={() => setModal("none")} onSelect={handleSelect} />}
+      {modal === "start" && <StartModal onClose={() => setModal("none")} onSelect={handleSelect} />}
       {modal === "create" && <CreateProjectModal onClose={() => setModal("none")} onCreate={handleCreate} />}
 
       {/* ── 단색 배경 (login과 동일한 #F5F4F1) ── */}
@@ -727,7 +770,7 @@ export function JoinProjectScreen({ onJoin }: Props) {
                     className="flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0"
                     style={{
                       background: codeInput.length >= 6 ? "#41431B" : "rgba(0,0,0,0.07)",
-                      color:      codeInput.length >= 6 ? "white" : TEXT_TERTIARY,
+                      color: codeInput.length >= 6 ? "white" : TEXT_TERTIARY,
                     }}
                   >
                     {codeJoining ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
