@@ -37,8 +37,8 @@ const MOCK_REGISTERED = new Set(["test@weai.com", "admin@weai.com"]);
 
 // ── 소셜 공급자 목 이메일 (신규 유저 → 회원가입으로 이동) ──
 const SOCIAL_EMAILS: Record<"kakao" | "naver" | "google", string> = {
-  kakao:  "me@kakao.com",
-  naver:  "me@naver.com",
+  kakao: "me@kakao.com",
+  naver: "me@naver.com",
   google: "me@gmail.com",
 };
 
@@ -65,10 +65,10 @@ function NaverIcon({ size = 20 }: { size?: number }) {
 function GoogleIcon({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
     </svg>
   );
 }
@@ -79,9 +79,9 @@ function OtpInput({ onComplete, disabled }: { onComplete: (code: string) => void
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleChange = (i: number, v: string) => {
-    if (!/^\d*$/.test(v)) return;
+    if (!/^[a-zA-Z0-9]*$/.test(v)) return;
     const next = [...digits];
-    next[i] = v.slice(-1);
+    next[i] = v.slice(-1).toUpperCase();
     setDigits(next);
     if (v && i < 5) refs.current[i + 1]?.focus();
     const code = next.join("");
@@ -95,12 +95,12 @@ function OtpInput({ onComplete, disabled }: { onComplete: (code: string) => void
       setDigits(next);
       refs.current[i - 1]?.focus();
     }
-    if (e.key === "ArrowLeft"  && i > 0) refs.current[i - 1]?.focus();
+    if (e.key === "ArrowLeft" && i > 0) refs.current[i - 1]?.focus();
     if (e.key === "ArrowRight" && i < 5) refs.current[i + 1]?.focus();
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData.getData("text").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6);
     if (pasted.length === 6) {
       setDigits(pasted.split(""));
       refs.current[5]?.focus();
@@ -121,7 +121,7 @@ function OtpInput({ onComplete, disabled }: { onComplete: (code: string) => void
           onPaste={i === 0 ? handlePaste : undefined}
           maxLength={1}
           disabled={disabled}
-          inputMode="numeric"
+          inputMode="text"
           className="outline-none text-center rounded-xl font-bold"
           style={{
             width: 42, height: 50,
@@ -189,7 +189,7 @@ function AgreeRow({ label, checked, onChange, accent, showArrow }: {
     <button onClick={() => onChange(!checked)} className="w-full flex items-center gap-2.5 py-1.5 text-left">
       {checked
         ? <CheckSquare className="w-4 h-4 shrink-0" style={{ color: OLIVE_DARK }} />
-        : <Square      className="w-4 h-4 shrink-0" style={{ color: LOGIN_CHECKBOX }} />}
+        : <Square className="w-4 h-4 shrink-0" style={{ color: LOGIN_CHECKBOX }} />}
       <span className="flex-1 text-[11px]" style={{ color: accent ? STATUS_ERROR : OLIVE_DARK }}>{label}</span>
       {showArrow && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: LOGIN_CHEVRON }} />}
     </button>
@@ -207,9 +207,9 @@ function SocialBtn({
   const [hov, setHov] = useState(false);
 
   const cfg = {
-    kakao:  { label: "카카오",  bg: "#FEE500", hover: "#F5DC00", color: "#3C1E1E", icon: <KakaoIcon /> },
-    naver:  { label: "네이버",  bg: "#03C75A", hover: "#02B04E", color: "#FFFFFF", icon: <NaverIcon /> },
-    google: { label: "Google", bg: "#FFFFFF",  hover: "#F5F5F5", color: "#3C4043", icon: <GoogleIcon />, border: "1px solid rgba(0,0,0,0.12)" },
+    kakao: { label: "카카오", bg: "#FEE500", hover: "#F5DC00", color: "#3C1E1E", icon: <KakaoIcon /> },
+    naver: { label: "네이버", bg: "#03C75A", hover: "#02B04E", color: "#FFFFFF", icon: <NaverIcon /> },
+    google: { label: "Google", bg: "#FFFFFF", hover: "#F5F5F5", color: "#3C4043", icon: <GoogleIcon />, border: "1px solid rgba(0,0,0,0.12)" },
   }[provider];
 
   return (
@@ -244,11 +244,11 @@ function LoginForm({
   onSwitchToSignup: (email?: string) => void;
   onSocialLogin: (provider: "kakao" | "naver" | "google") => void;
 }) {
-  const [email,    setEmail]    = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [error,    setError]    = useState("");
-  const [loading,  setLoading]  = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<"kakao" | "naver" | "google" | null>(null);
 
   const handleLogin = () => {
@@ -325,10 +325,10 @@ function LoginForm({
         style={{ background: OLIVE_DARK, color: "white", opacity: loading ? 0.75 : 1, transition: "opacity 0.15s" }}>
         {loading
           ? <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 rounded-full animate-spin"
-                style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }} />
-              로그인 중...
-            </span>
+            <span className="w-4 h-4 border-2 rounded-full animate-spin"
+              style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }} />
+            로그인 중...
+          </span>
           : "로그인"}
       </button>
 
@@ -354,27 +354,30 @@ function SignupForm({
   initialEmail?: string;
   socialProvider?: "kakao" | "naver" | "google";
 }) {
-  const [name,           setName]           = useState("");
-  const [email,          setEmail]          = useState(initialEmail);
-  const [pw,             setPw]             = useState("");
-  const [pwConfirm,      setPwConfirm]      = useState("");
-  const [showPw,         setShowPw]         = useState(false);
-  const [showPwC,        setShowPwC]        = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  const [pw, setPw] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [showPwC, setShowPwC] = useState(false);
 
   // ── 이메일 인증 상태 ──
-  const [otpSent,        setOtpSent]        = useState(false);
-  const [sending,        setSending]        = useState(false);
-  const [otpVerifying,   setOtpVerifying]   = useState(false);
-  const [verified,       setVerified]       = useState(false);
-  const [otpError,       setOtpError]       = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [otpError, setOtpError] = useState("");
 
-  const [agreeAll,       setAgreeAll]       = useState(false);
-  const [agreePrivacy,   setAgreePrivacy]   = useState(false);
+  const [agreeAll, setAgreeAll] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeMarketing, setAgreeMarketing] = useState(false);
-  const [agreePush,      setAgreePush]      = useState(false);
-  const [loading,        setLoading]        = useState(false);
+  const [agreePush, setAgreePush] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const setAll  = (v: boolean) => { setAgreeAll(v); setAgreePrivacy(v); setAgreeMarketing(v); setAgreePush(v); };
+  // 백엔드 처리
+  const [signupError, setSignupError] = useState("");
+
+  const setAll = (v: boolean) => { setAgreeAll(v); setAgreePrivacy(v); setAgreeMarketing(v); setAgreePush(v); };
   const syncAll = (p: boolean, m: boolean, pu: boolean) => {
     setAgreePrivacy(p); setAgreeMarketing(m); setAgreePush(pu); setAgreeAll(p && m && pu);
   };
@@ -404,10 +407,42 @@ function SignupForm({
     }, 900);
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!agreePrivacy || !verified) return;
+    if (pw !== pwConfirm) {
+      setSignupError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => { setLoading(false); onSwitchToLogin(); }, 800);
+    setSignupError("");
+
+    try {
+      const response = await fetch("/api/v1/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password: pw,
+          socialProvider: socialProvider || null,
+          agreedMarketing: agreeMarketing,
+          agreedPush: agreePush,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "회원가입 중 오류가 발생했습니다.");
+      }
+
+      // 가입 성공 시 로그인 화면으로 이동
+      onSwitchToLogin();
+    } catch (err: any) {
+      setSignupError(err.message || "서버 통신에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const socialLabel: Record<string, string> = { kakao: "카카오", naver: "네이버", google: "Google" };
@@ -482,33 +517,33 @@ function SignupForm({
             />
             {verified
               ? <span className="text-[9px] px-2 py-1 rounded-lg font-semibold shrink-0"
-                  style={{ background: "rgba(90,138,74,0.10)", color: STATUS_SUCCESS }}>인증됨 ✓</span>
+                style={{ background: "rgba(90,138,74,0.10)", color: STATUS_SUCCESS }}>인증됨 ✓</span>
               : !otpSent
                 ? <button
-                    onClick={handleSendOtp}
-                    disabled={!email.trim() || sending}
-                    className="shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-semibold"
-                    style={{
-                      background: !email.trim() || sending ? LOGIN_DISABLED_BG : OLIVE_DARK,
-                      color: !email.trim() || sending ? LOGIN_ICON_MUTED : "white",
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    {sending
-                      ? <span className="flex items-center gap-1">
-                          <span className="w-2.5 h-2.5 border-2 rounded-full animate-spin"
-                            style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: LOGIN_ICON_MUTED }} />
-                          전송 중
-                        </span>
-                      : "인증하기"}
-                  </button>
+                  onClick={handleSendOtp}
+                  disabled={!email.trim() || sending}
+                  className="shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-semibold"
+                  style={{
+                    background: !email.trim() || sending ? LOGIN_DISABLED_BG : OLIVE_DARK,
+                    color: !email.trim() || sending ? LOGIN_ICON_MUTED : "white",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {sending
+                    ? <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 border-2 rounded-full animate-spin"
+                        style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: LOGIN_ICON_MUTED }} />
+                      전송 중
+                    </span>
+                    : "인증하기"}
+                </button>
                 : <button
-                    onClick={() => { setOtpSent(false); setOtpError(""); }}
-                    className="shrink-0 px-2.5 py-1 rounded-lg text-[9px] font-medium"
-                    style={{ color: LOGIN_MUTED, background: "transparent" }}
-                  >
-                    재전송
-                  </button>
+                  onClick={() => { setOtpSent(false); setOtpError(""); }}
+                  className="shrink-0 px-2.5 py-1 rounded-lg text-[9px] font-medium"
+                  style={{ color: LOGIN_MUTED, background: "transparent" }}
+                >
+                  재전송
+                </button>
             }
           </div>
 
@@ -581,7 +616,7 @@ function SignupForm({
             <button onClick={() => setAll(!agreeAll)}>
               {agreeAll
                 ? <CheckSquare className="w-4 h-4" style={{ color: OLIVE_DARK }} />
-                : <Square      className="w-4 h-4" style={{ color: LOGIN_CHECKBOX }} />}
+                : <Square className="w-4 h-4" style={{ color: LOGIN_CHECKBOX }} />}
             </button>
             <span className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>전체 동의</span>
           </div>
@@ -592,6 +627,10 @@ function SignupForm({
           <AgreeRow label="푸시 알림 수신 동의 (선택)" checked={agreePush} showArrow
             onChange={v => syncAll(agreePrivacy, agreeMarketing, v)} />
         </div>
+        
+        {signupError && (
+          <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>{signupError}</p>
+        )}
 
         <button
           onClick={handleSignup}
@@ -605,10 +644,10 @@ function SignupForm({
         >
           {loading
             ? <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 rounded-full animate-spin"
-                  style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }} />
-                가입 중...
-              </span>
+              <span className="w-4 h-4 border-2 rounded-full animate-spin"
+                style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }} />
+              가입 중...
+            </span>
             : "회원가입 완료"}
         </button>
 
@@ -629,14 +668,14 @@ function SignupForm({
 type Props = { onLogin: () => void };
 
 export function LoginScreen({ onLogin }: Props) {
-  const [cardOpen,      setCardOpen]      = useState(false);
-  const [mode,          setMode]          = useState<CardMode>("login");
-  const [blurring,      setBlurring]      = useState(false);
-  const [exiting,       setExiting]       = useState(false);
-  const [prefillEmail,  setPrefillEmail]  = useState("");
+  const [cardOpen, setCardOpen] = useState(false);
+  const [mode, setMode] = useState<CardMode>("login");
+  const [blurring, setBlurring] = useState(false);
+  const [exiting, setExiting] = useState(false);
+  const [prefillEmail, setPrefillEmail] = useState("");
   const [socialProvider, setSocialProvider] = useState<"kakao" | "naver" | "google" | undefined>(undefined);
 
-  const innerRef      = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const [cardH, setCardH] = useState<number | null>(null);
 
   useEffect(() => {
@@ -687,7 +726,7 @@ export function LoginScreen({ onLogin }: Props) {
       className="size-full relative overflow-hidden flex items-center justify-center"
       style={{
         background: "#F5F4F1",
-        opacity:    exiting ? 0 : 1,
+        opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.42s ease" : "none",
       }}
     >
@@ -697,9 +736,9 @@ export function LoginScreen({ onLogin }: Props) {
       <div
         className="absolute inset-0 flex flex-col items-center justify-center px-8"
         style={{
-          opacity:    cardOpen ? 0.12 : 1,
-          filter:     cardOpen ? "blur(4px)" : "none",
-          transform:  cardOpen ? "scale(0.985)" : "scale(1)",
+          opacity: cardOpen ? 0.12 : 1,
+          filter: cardOpen ? "blur(4px)" : "none",
+          transform: cardOpen ? "scale(0.985)" : "scale(1)",
           transition: "opacity 0.38s ease, filter 0.38s ease, transform 0.38s ease",
           pointerEvents: cardOpen ? "none" : "auto",
           zIndex: 5,
@@ -800,9 +839,9 @@ export function LoginScreen({ onLogin }: Props) {
           <div ref={innerRef}>
             <div
               style={{
-                opacity:    blurring ? 0 : 1,
-                filter:     blurring ? "blur(6px)" : "blur(0px)",
-                transform:  blurring ? "scale(0.99)" : "scale(1)",
+                opacity: blurring ? 0 : 1,
+                filter: blurring ? "blur(6px)" : "blur(0px)",
+                transform: blurring ? "scale(0.99)" : "scale(1)",
                 transition: blurring
                   ? "opacity 0.18s ease, filter 0.18s ease, transform 0.18s ease"
                   : "opacity 0.22s ease, filter 0.22s ease, transform 0.22s ease",
@@ -810,25 +849,29 @@ export function LoginScreen({ onLogin }: Props) {
             >
               {mode === "login"
                 ? <LoginForm
-                    onLogin={handleLoginSuccess}
-                    onSwitchToSignup={(email) => switchMode("signup", email)}
-                    onSocialLogin={handleSocialLogin}
-                  />
+                  onLogin={handleLoginSuccess}
+                  onSwitchToSignup={(email) => switchMode("signup", email)}
+                  onSocialLogin={handleSocialLogin}
+                />
                 : <SignupForm
-                    onSwitchToLogin={() => switchMode("login")}
-                    initialEmail={prefillEmail}
-                    socialProvider={socialProvider}
-                  />
+                  onSwitchToLogin={() => switchMode("login")}
+                  initialEmail={prefillEmail}
+                  socialProvider={socialProvider}
+                />
               }
             </div>
           </div>
         </div>
 
         {/* 두께감 레이어 */}
-        <div style={{ position: "absolute", left: 6, bottom: -5, right: 6, height: 12,
-          background: LOGIN_SHADOW_1, borderRadius: "0 0 20px 20px", zIndex: -1 }} />
-        <div style={{ position: "absolute", left: 12, bottom: -9, right: 12, height: 10,
-          background: LOGIN_SHADOW_2, borderRadius: "0 0 16px 16px", zIndex: -2 }} />
+        <div style={{
+          position: "absolute", left: 6, bottom: -5, right: 6, height: 12,
+          background: LOGIN_SHADOW_1, borderRadius: "0 0 20px 20px", zIndex: -1
+        }} />
+        <div style={{
+          position: "absolute", left: 12, bottom: -9, right: 12, height: 10,
+          background: LOGIN_SHADOW_2, borderRadius: "0 0 16px 16px", zIndex: -2
+        }} />
       </div>
     </div>
   );
