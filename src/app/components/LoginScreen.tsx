@@ -488,7 +488,9 @@ function SignupForm({
           </div>
         )}
 
-        <Field label="이름" icon={User} value={name} onChange={setName} placeholder="홍길동" />
+        <Field label="이름" icon={User} value={name}
+          onChange={(v) => { setName(v); setSignupError(""); }}
+          placeholder="홍길동" />
 
         {/* 이메일 + 인증 */}
         <div className="space-y-1.5">
@@ -585,7 +587,9 @@ function SignupForm({
 
         <Field label="비밀번호" icon={Lock}
           type={showPw ? "text" : "password"}
-          value={pw} onChange={setPw} placeholder="8자 이상"
+          value={pw}
+          onChange={(v) => { setPw(v); setSignupError(""); }}
+          placeholder="8자 이상"
           right={<button onClick={() => setShowPw(p => !p)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>}
@@ -593,7 +597,9 @@ function SignupForm({
 
         <Field label="비밀번호 확인" icon={Lock}
           type={showPwC ? "text" : "password"}
-          value={pwConfirm} onChange={setPwConfirm} placeholder="비밀번호 재입력"
+          value={pwConfirm}
+          onChange={(v) => { setPwConfirm(v); setSignupError(""); }}
+          placeholder="비밀번호 재입력"
           error={pwConfirm && pw !== pwConfirm ? "비밀번호가 일치하지 않습니다." : undefined}
           right={<button onClick={() => setShowPwC(p => !p)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
             {showPwC ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -625,7 +631,7 @@ function SignupForm({
           <AgreeRow label="푸시 알림 수신 동의 (선택)" checked={agreePush} showArrow
             onChange={v => syncAll(agreePrivacy, agreeMarketing, v)} />
         </div>
-        
+
         {signupError && (
           <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>{signupError}</p>
         )}
