@@ -20,7 +20,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://172.22.96.1', // 실제 백엔드 서버 주소 (포트 번호 확인 필요)
+        target: 'http://localhost:8080', // 실제 백엔드 서버 주소 (포트 번호 확인 필요)
         changeOrigin: true,
       },
     },
