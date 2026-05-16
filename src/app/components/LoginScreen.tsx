@@ -424,7 +424,7 @@ function SignupForm({
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim(),
-          password: "pw",
+          password: pw,
           socialProvider: socialProvider || null,
           agreedMarketing: agreeMarketing,
           agreedPush: agreePush,
