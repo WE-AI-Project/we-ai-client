@@ -422,7 +422,9 @@ function SignupForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "홍길동", email: "test@test.com", password: "pw",
+          name: name.trim(),
+          email: email.trim(),
+          password: "pw",
           socialProvider: socialProvider || null,
           agreedMarketing: agreeMarketing,
           agreedPush: agreePush,
