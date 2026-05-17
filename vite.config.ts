@@ -1,31 +1,36 @@
-import { defineConfig } from 'vite'
-import path from 'path'
-import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig, loadEnv } from "vite";
+import path from "path";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 
-export default defineConfig({
-  plugins: [
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      // Alias @ to the src directory
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const rawApiBaseUrl = env.VITE_API_BASE_URL?.trim() ?? "";
+  const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
+  const proxyTarget = apiBaseUrl || "http://localhost:8080";
 
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080', // 실제 백엔드 서버 주소 (포트 번호 확인 필요)
-        changeOrigin: true,
+  return {
+    plugins: [
+      // The React and Tailwind plugins are both required for Make, even if
+      // Tailwind is not being actively used, so do not remove them.
+      react(),
+      tailwindcss(),
+    ],
+    resolve: {
+      alias: {
+        // Alias @ to the src directory.
+        "@": path.resolve(__dirname, "./src"),
       },
     },
-  },
-
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
-  assetsInclude: ['**/*.svg', '**/*.csv'],
-})
+    server: {
+      proxy: {
+        "/api": {
+          target: proxyTarget,
+          changeOrigin: true,
+        },
+      },
+    },
+    // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
+    assetsInclude: ["**/*.svg", "**/*.csv"],
+  };
+});

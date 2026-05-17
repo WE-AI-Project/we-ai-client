@@ -421,7 +421,10 @@ function SignupForm({
     try {
       const response = await fetch(buildApiUrl("/api/v1/auth/signup"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim(),
