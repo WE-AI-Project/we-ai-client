@@ -10,6 +10,7 @@ import {
   User, ChevronRight, CheckSquare, Square, X, ArrowRight,
   ShieldCheck, CheckCircle2,
 } from "lucide-react";
+import { buildApiUrl } from "../lib/api";
 
 // ── 카드 등장 애니메이션 ──
 const KEYFRAMES = `
@@ -418,7 +419,7 @@ function SignupForm({
     setSignupError("");
 
     try {
-      const response = await fetch("/api/v1/auth/signup", {
+      const response = await fetch(buildApiUrl("/api/v1/auth/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
