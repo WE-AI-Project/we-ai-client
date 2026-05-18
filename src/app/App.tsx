@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,    // ── 상단 타이틀바 토글 아이콘
+  ChevronDown,  // ── 상단 타이틀바 토글 아이콘
   Hash,
   GitPullRequest,
   MessageCircle,
@@ -163,6 +165,9 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
   const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
 
+  // ── 타이틀바 보이기/숨기기 상태 (기본값: true)
+  const [showTitleBar, setShowTitleBar] = useState(true);
+
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragStartW = useRef(SIDEBAR_EXPANDED);
@@ -222,7 +227,6 @@ export default function App() {
 
       setTimeout(() => {
         setIsLoading(false);
-        // 오늘 dismiss 안 했으면 스탠드업 팝업 자동 표시
         if (!isDismissedToday()) {
           setTimeout(() => setShowStandup(true), 700);
         }
@@ -243,7 +247,6 @@ export default function App() {
   const handleFileSelect = (file: CommitFile | null) => setDiffFile(file);
   const handleNavigateQA = () => { setDiffFile(null); setActiveNav("AIQA"); };
 
-  // 스탠드업 내부 페이지 이동
   const handleStandupNavigate = (page: string) => {
     setActiveNav(page as NavId);
     setDiffFile(null);
@@ -340,61 +343,68 @@ export default function App() {
       )}
 
       <div
-        className="flex-1 flex flex-col rounded-xl overflow-hidden"
+        className="flex-1 flex flex-col rounded-xl overflow-hidden relative"
         style={{
           background: SIDEBAR_BG,
           boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)",
         }}
       >
-        {/* 타이틀바 */}
-        <div
-          className="h-11 flex items-center px-4 shrink-0"
-          style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}`, background: GRADIENT_SIDEBAR }}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
-              <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
-            </div>
-            <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>WE&amp;AI Project Office</span>
-          </div>
-
-          {projectCode && (
-            <div className="ml-3 flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ background: "rgba(174,183,132,0.12)", border: `1px solid rgba(174,183,132,0.18)` }}>
-              <Hash className="w-2.5 h-2.5" style={{ color: SIDEBAR_TEXT_HOVER }} />
-              <span className="text-[9px] font-mono font-semibold tracking-wider" style={{ color: SIDEBAR_TEXT_HOVER }}>{projectCode}</span>
-            </div>
-          )}
-
-          {diffFile && (
-            <div className="ml-4 flex items-center gap-2 text-[11px]" style={{ color: SIDEBAR_TEXT }}>
-              <span>/</span>
-              <span style={{ color: SIDEBAR_TEXT_ACTIVE }}>{diffFile.name}</span>
-            </div>
-          )}
-
-          {/* 타이틀바 우측 */}
-          <div className="ml-auto flex items-center gap-2">
-            {/* ✦ 데일리 스탠드업 버튼 */}
-            <button
-              onClick={() => setShowStandup(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
-              style={{
-                background: showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)",
-                color: "#D4CC9E",
-                border: `1px solid rgba(174,183,132,0.18)`,
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(174,183,132,0.20)"}
-              onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)"}
-              title="데일리 스탠드업 브리핑"
-            >
-              <Sun className="w-3 h-3" />
-              스탠드업
-            </button>
-
-            {/* 알림 버튼 */}
+        {/* ★ 타이틀바가 숨겨졌을 때 우측 상단에 플로팅 상태로 유지되는 알림 컴포넌트 */}
+        {!showTitleBar && (
+          <div className="absolute top-3 right-4 z-40 transition-all">
             <NotificationPanel />
           </div>
-        </div>
+        )}
+
+        {/* 타이틀바 */}
+        {showTitleBar && (
+          <div
+            className="h-11 flex items-center px-4 shrink-0"
+            style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}`, background: GRADIENT_SIDEBAR }}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
+                <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
+              </div>
+              <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>WE&amp;AI Project Office</span>
+            </div>
+
+            {projectCode && (
+              <div className="ml-3 flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ background: "rgba(174,183,132,0.12)", border: `1px solid rgba(174,183,132,0.18)` }}>
+                <Hash className="w-2.5 h-2.5" style={{ color: SIDEBAR_TEXT_HOVER }} />
+                <span className="text-[9px] font-mono font-semibold tracking-wider" style={{ color: SIDEBAR_TEXT_HOVER }}>{projectCode}</span>
+              </div>
+            )}
+
+            {diffFile && (
+              <div className="ml-4 flex items-center gap-2 text-[11px]" style={{ color: SIDEBAR_TEXT }}>
+                <span>/</span>
+                <span style={{ color: SIDEBAR_TEXT_ACTIVE }}>{diffFile.name}</span>
+              </div>
+            )}
+
+            {/* 타이틀바 우측 */}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowStandup(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
+                style={{
+                  background: showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)",
+                  color: "#D4CC9E",
+                  border: `1px solid rgba(174,183,132,0.18)`,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(174,183,132,0.20)"}
+                onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)"}
+                title="데일리 스탠드업 브리핑"
+              >
+                <Sun className="w-3 h-3" />
+                스탠드업
+              </button>
+
+              <NotificationPanel />
+            </div>
+          </div>
+        )}
 
         {/* 바디 */}
         <div className="flex-1 flex overflow-hidden">
@@ -531,6 +541,30 @@ export default function App() {
                   {!isCollapsed && <span className="text-xs">Leave Project</span>}
                 </button>
                 {isCollapsed && <Tooltip label="Leave Project" />}
+              </div>
+
+              {/* 타이틀바 보이기/숨기기 토글 단추 */}
+              <div className="relative group">
+                <button
+                  onClick={() => setShowTitleBar(v => !v)}
+                  className="w-full flex items-center rounded-lg mt-1 transition-all"
+                  style={{ padding: isCollapsed ? "6px 0" : "6px 8px", justifyContent: isCollapsed ? "center" : "flex-start", color: SIDEBAR_TEXT }}
+                  onMouseEnter={e => (e.currentTarget.style.background = SIDEBAR_HOVER)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  {showTitleBar ? (
+                    <>
+                      <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                      {!isCollapsed && <span className="text-[10px] ml-2">Hide Titlebar</span>}
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                      {!isCollapsed && <span className="text-[10px] ml-2">Show Titlebar</span>}
+                    </>
+                  )}
+                </button>
+                {isCollapsed && <Tooltip label={showTitleBar ? "Hide Titlebar" : "Show Titlebar"} />}
               </div>
 
               <button
