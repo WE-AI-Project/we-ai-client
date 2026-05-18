@@ -17,9 +17,11 @@ import {
   CalendarDays,
   Folder,
   Sun,
+  Orbit,
 } from "lucide-react";
 
 // ── 페이지 컴포넌트 ──
+import { SynAIpseGalaxyPage } from "./components/SynAIpseGalaxyPage";
 import { JoinProjectScreen } from "./components/JoinProjectScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { DashboardPage } from "./components/DashboardPage";
@@ -51,10 +53,10 @@ import {
 } from "./colors";
 
 // ── 사이드바 너비 상수 ──
-const SIDEBAR_EXPANDED  = 220;
+const SIDEBAR_EXPANDED = 220;
 const SIDEBAR_COLLAPSED = 52;
-const SIDEBAR_MIN       = 44;
-const SIDEBAR_MAX       = 340;
+const SIDEBAR_MIN = 44;
+const SIDEBAR_MAX = 340;
 const COLLAPSE_THRESHOLD = 100;
 
 function genProjectCode(): string {
@@ -63,24 +65,25 @@ function genProjectCode(): string {
 }
 
 const NAV_ITEMS = [
-  { id: "Dashboard",   icon: Home,          label: "Dashboard"     },
-  { id: "Changes",     icon: GitPullRequest, label: "Changes"       },
-  { id: "Commits",     icon: GitCommit,      label: "Commits"       },
-  { id: "ServerBuild", icon: Terminal,       label: "Server & Build" },
-  { id: "Chat",        icon: MessageCircle,  label: "Chat"          },
-  { id: "Calendar",    icon: CalendarDays,   label: "Calendar"      },
+  { id: "Dashboard", icon: Home, label: "Dashboard" },
+  { id: "Changes", icon: GitPullRequest, label: "Changes" },
+  { id: "Commits", icon: GitCommit, label: "Commits" },
+  { id: "ServerBuild", icon: Terminal, label: "Server & Build" },
+  { id: "Chat", icon: MessageCircle, label: "Chat" },
+  { id: "Calendar", icon: CalendarDays, label: "Calendar" },
+  { id: "Galaxy", icon: Orbit, label: "SynAIpse Galaxy" },
 ] as const;
 
 const SYSTEM_ITEMS = [
-  { id: "EnvSettings",      icon: Settings,    label: "Environment"      },
-  { id: "AIQA",             icon: ShieldCheck, label: "QA & Agents"      },
-  { id: "ProjectSettings",  icon: FolderGit2,  label: "Project Settings" },
+  { id: "EnvSettings", icon: Settings, label: "Environment" },
+  { id: "AIQA", icon: ShieldCheck, label: "QA & Agents" },
+  { id: "ProjectSettings", icon: FolderGit2, label: "Project Settings" },
 ] as const;
 
 type NavId =
   | "Dashboard" | "Changes" | "Commits" | "ServerBuild"
   | "Chat" | "Calendar" | "EnvSettings" | "AIQA"
-  | "ProjectSettings" | "Profile";
+  | "ProjectSettings" | "Profile" | "Galaxy";
 
 // ── Tooltip ──
 function Tooltip({ label }: { label: string }) {
@@ -141,17 +144,17 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
 // 메인 App
 // ─────────────────────────────────────────────
 export default function App() {
-  const [screen,        setScreen]        = useState<"login" | "join" | "workspace">("login");
-  const [projectName,   setProject]       = useState("");
-  const [projectId,     setProjectId]     = useState("");
-  const [projectCode,   setProjectCode]   = useState("");
-  const [localPath,     setLocalPath]     = useState("");
-  const [activeNav,     setActiveNav]     = useState<NavId>("Dashboard");
-  const [diffFile,      setDiffFile]      = useState<CommitFile | null>(null);
-  const [isLoading,     setIsLoading]     = useState(false);
-  const [joinExiting,   setJoinExiting]   = useState(false);
+  const [screen, setScreen] = useState<"login" | "join" | "workspace">("login");
+  const [projectName, setProject] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [projectCode, setProjectCode] = useState("");
+  const [localPath, setLocalPath] = useState("");
+  const [activeNav, setActiveNav] = useState<NavId>("Dashboard");
+  const [diffFile, setDiffFile] = useState<CommitFile | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [joinExiting, setJoinExiting] = useState(false);
   const [sidebarProfile, setSidebarProfile] = useState(() => loadProfile());
-  const [docCount,      setDocCount]      = useState(() => loadDocs().length);
+  const [docCount, setDocCount] = useState(() => loadDocs().length);
 
   // ── 데일리 스탠드업 ──
   const [showStandup, setShowStandup] = useState(false);
@@ -212,7 +215,7 @@ export default function App() {
         saveSettings({
           ...cur,
           projectName: name || cur.projectName,
-          repository:  path || cur.repository,
+          repository: path || cur.repository,
           description: cur.description || `${name} — WE&AI Enterprise Project`,
         });
       }
@@ -263,17 +266,18 @@ export default function App() {
       );
     }
     switch (activeNav) {
-      case "Dashboard":       return <DashboardPage projectName={projectName} />;
-      case "Changes":         return <ChangesPage onNavigateQA={handleNavigateQA} />;
-      case "Commits":         return <CommitDiffPage />;
-      case "ServerBuild":     return <ServerBuildPage />;
-      case "Chat":            return <ChatPage onDocsUpdate={setDocCount} />;
-      case "Calendar":        return <CalendarPage />;
-      case "EnvSettings":     return <EnvironmentSettingsPage />;
-      case "AIQA":            return <AIQAPage autoStart />;
+      case "Dashboard": return <DashboardPage projectName={projectName} />;
+      case "Changes": return <ChangesPage onNavigateQA={handleNavigateQA} />;
+      case "Commits": return <CommitDiffPage />;
+      case "ServerBuild": return <ServerBuildPage />;
+      case "Chat": return <ChatPage onDocsUpdate={setDocCount} />;
+      case "Calendar": return <CalendarPage />;
+      case "EnvSettings": return <EnvironmentSettingsPage />;
+      case "AIQA": return <AIQAPage autoStart />;
       case "ProjectSettings": return <ProjectSettingsPage />;
-      case "Profile":         return <ProfilePage />;
-      default:                return <DashboardPage projectName={projectName} />;
+      case "Profile": return <ProfilePage />;
+      case "Galaxy":    return <SynAIpseGalaxyPage />;
+      default: return <DashboardPage projectName={projectName} />;
     }
   };
 
@@ -295,7 +299,7 @@ export default function App() {
         className="size-full flex p-3"
         style={{
           background: GRADIENT_OUTER,
-          opacity:   joinExiting ? 0 : 1,
+          opacity: joinExiting ? 0 : 1,
           transform: joinExiting ? "translateX(-28px) scale(0.99)" : "translateX(0) scale(1)",
           transition: joinExiting ? "opacity 0.40s ease, transform 0.40s ease" : "none",
         }}
@@ -376,8 +380,8 @@ export default function App() {
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
               style={{
                 background: showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)",
-                color:      "#D4CC9E",
-                border:     `1px solid rgba(174,183,132,0.18)`,
+                color: "#D4CC9E",
+                border: `1px solid rgba(174,183,132,0.18)`,
               }}
               onMouseEnter={e => e.currentTarget.style.background = "rgba(174,183,132,0.20)"}
               onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)"}
