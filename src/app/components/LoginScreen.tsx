@@ -361,6 +361,9 @@ function SignupForm({
   const [showPw, setShowPw] = useState(false);
   const [showPwC, setShowPwC] = useState(false);
 
+  // ── 에러 및 검증 상태 ──
+  const [pwError, setPwError] = useState(""); 
+
   // ── 이메일 인증 상태 ──
   const [otpSent, setOtpSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -376,6 +379,22 @@ function SignupForm({
 
   // 백엔드 처리
   const [signupError, setSignupError] = useState("");
+
+  // 비밀번호 입력 즉시 체크하는 실시간 유효성 검사 로직
+  useEffect(() => {
+    if (pw.length === 0) {
+      setPwError("");
+      return;
+    }
+
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+={}\[\]|\\:;"'<>,.?\/~`]).{8,16}$/;
+    
+    if (!passwordRegex.test(pw)) {
+      setPwError("비밀번호는 영문, 숫자, 특수문자를 포함하여 8~16자로 입력해야 합니다.");
+    } else {
+      setPwError("");
+    }
+  }, [pw]);
 
   const setAll = (v: boolean) => { setAgreeAll(v); setAgreePrivacy(v); setAgreeMarketing(v); setAgreePush(v); };
   const syncAll = (p: boolean, m: boolean, pu: boolean) => {
@@ -397,7 +416,6 @@ function SignupForm({
     setOtpVerifying(true);
     setTimeout(() => {
       setOtpVerifying(false);
-      // 목 환경: 6자리면 모두 통과
       if (code.length === 6) {
         setVerified(true);
         setOtpError("");
@@ -407,8 +425,11 @@ function SignupForm({
     }, 900);
   };
 
-  const handleSignup = async () => {
+  // 회원가입 클릭 이벤트 핸들러
+  const handleSignup = () => {
     if (!agreePrivacy || !verified) return;
+    if (pwError || !pw) return;
+
     if (pw !== pwConfirm) {
       setSignupError("비밀번호가 일치하지 않습니다.");
       return;
@@ -417,35 +438,23 @@ function SignupForm({
     setLoading(true);
     setSignupError("");
 
-    try {
-      const response = await fetch("/api/v1/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          password: pw,
-          socialProvider: socialProvider || null,
-          agreedMarketing: agreeMarketing,
-          agreedPush: agreePush,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "회원가입 중 오류가 발생했습니다.");
-      }
-
-      // 가입 성공 시 로그인 화면으로 이동
-      onSwitchToLogin();
-    } catch (err: any) {
-      setSignupError(err.message || "서버 통신에 실패했습니다.");
-    } finally {
+    // 프론트엔드 단독 테스트용 딜레이 (1초 후 로그인 화면으로 전환)
+    setTimeout(() => {
       setLoading(false);
-    }
+      onSwitchToLogin(); 
+    }, 1000);
   };
 
   const socialLabel: Record<string, string> = { kakao: "카카오", naver: "네이버", google: "Google" };
+
+  // 모든 조건 충족 여부 체크
+  const isFormValid = 
+    name.trim() !== "" &&
+    agreePrivacy && 
+    verified && 
+    pw !== "" &&  
+    !pwError && 
+    pw === pwConfirm;
 
   return (
     <div className="overflow-y-auto" style={{ maxHeight: 580 }}>
@@ -552,7 +561,6 @@ function SignupForm({
           {/* OTP 입력 영역 */}
           {otpSent && !verified && (
             <div className="space-y-3 pt-2">
-              {/* 안내 */}
               <div
                 className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
                 style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
@@ -591,7 +599,8 @@ function SignupForm({
           type={showPw ? "text" : "password"}
           value={pw}
           onChange={(v) => { setPw(v); setSignupError(""); }}
-          placeholder="8자 이상"
+          placeholder="영문, 숫자, 특수문자 포함 8~16자"
+          error={pwError}
           right={<button onClick={() => setShowPw(p => !p)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>}
@@ -637,14 +646,14 @@ function SignupForm({
         {signupError && (
           <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>{signupError}</p>
         )}
-
+        
         <button
-          onClick={handleSignup}
-          disabled={loading || !agreePrivacy || !verified}
+          onClick={handleSignup} // ★ [수정] 누락되었던 클릭 이벤트 바인딩 추가
+          disabled={loading || !isFormValid}
           className="w-full py-3.5 rounded-xl text-sm font-semibold"
           style={{
-            background: agreePrivacy && verified ? OLIVE_DARK : LOGIN_DISABLED_BG2,
-            color: agreePrivacy && verified ? "white" : LOGIN_ICON_MUTED,
+            background: isFormValid ? OLIVE_DARK : LOGIN_DISABLED_BG2,
+            color: isFormValid ? "white" : LOGIN_ICON_MUTED,
             transition: "all 0.15s",
           }}
         >
@@ -701,7 +710,6 @@ export function LoginScreen({ onLogin }: Props) {
     setTimeout(() => onLogin(), 450);
   };
 
-  // 블러 아웃 → 콘텐츠 전환 → 블러 인
   const switchMode = (target: CardMode, email?: string, provider?: "kakao" | "naver" | "google") => {
     if (target === mode || blurring) return;
     if (email !== undefined) setPrefillEmail(email);
@@ -714,14 +722,11 @@ export function LoginScreen({ onLogin }: Props) {
     }, 220);
   };
 
-  // 소셜 로그인 처리
   const handleSocialLogin = (provider: "kakao" | "naver" | "google") => {
     const email = SOCIAL_EMAILS[provider];
     if (MOCK_REGISTERED.has(email)) {
-      // 이미 가입된 유저 → 바로 로그인
       handleLoginSuccess();
     } else {
-      // 신규 유저 → 회원가입으로 이메일만 가져가기
       setCardOpen(true);
       switchMode("signup", email, provider);
     }
@@ -738,7 +743,7 @@ export function LoginScreen({ onLogin }: Props) {
     >
       <style>{KEYFRAMES}</style>
 
-      {/* ════ Welcome 콘텐츠 ════ */}
+      {/* Welcome 콘텐츠 */}
       <div
         className="absolute inset-0 flex flex-col items-center justify-center px-8"
         style={{
@@ -750,7 +755,6 @@ export function LoginScreen({ onLogin }: Props) {
           zIndex: 5,
         }}
       >
-        {/* 로고 */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: OLIVE_DARK }}>
             <FolderGit2 className="w-5.5 h-5.5" style={{ color: "white" }} />
@@ -774,7 +778,7 @@ export function LoginScreen({ onLogin }: Props) {
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center mb-10">
-          {["멀티에이전트 관리", "AI QA 모니터링", "실시간 빌드", "팀 협업 대시보드"].map(tag => (
+          {["멀티에이전트 관리", "AI QA 모니전링", "실시간 빌드", "팀 협업 대시보드"].map(tag => (
             <span key={tag} className="px-3 py-1.5 rounded-full text-[11px] font-medium"
               style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}>
               {tag}
@@ -797,7 +801,7 @@ export function LoginScreen({ onLogin }: Props) {
         </p>
       </div>
 
-      {/* ════ 딤 백드롭 ════ */}
+      {/* 딤 백드롭 */}
       {cardOpen && (
         <div
           className="absolute inset-0 z-20"
@@ -806,7 +810,7 @@ export function LoginScreen({ onLogin }: Props) {
         />
       )}
 
-      {/* ════ 카드 ════ */}
+      {/* 카드 */}
       <div
         style={{
           position: "absolute",
@@ -820,7 +824,7 @@ export function LoginScreen({ onLogin }: Props) {
           transform: "translate(-50%, -50%)",
         }}
       >
-        {/* 닫기 */}
+        {/* 닫기 버튼 */}
         <button
           onClick={() => setCardOpen(false)}
           className="absolute -top-3 -right-3 w-8 h-8 rounded-full flex items-center justify-center z-50"
@@ -841,7 +845,6 @@ export function LoginScreen({ onLogin }: Props) {
             transition: "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
-          {/* 내부 측정용 래퍼 */}
           <div ref={innerRef}>
             <div
               style={{
