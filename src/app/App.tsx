@@ -11,8 +11,8 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,    // ── 상단 타이틀바 토글 아이콘
-  ChevronDown,  // ── 상단 타이틀바 토글 아이콘
+  ChevronUp,
+  ChevronDown,
   Hash,
   GitPullRequest,
   MessageCircle,
@@ -20,6 +20,7 @@ import {
   Folder,
   Sun,
   Orbit,
+  X,
 } from "lucide-react";
 
 // ── 페이지 컴포넌트 ──
@@ -144,14 +145,26 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
 
 // ─────────────────────────────────────────────
 // 메인 App
-// ─────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState<"login" | "join" | "workspace">("login");
   const [projectName, setProject] = useState("");
   const [projectId, setProjectId] = useState("");
   const [projectCode, setProjectCode] = useState("");
   const [localPath, setLocalPath] = useState("");
-  const [activeNav, setActiveNav] = useState<NavId>("Dashboard");
+
+  // ── 명시적 Left / Right 패널 상태 관리 구조 ──
+  const [leftTabs, setLeftTabs] = useState<NavId[]>(["Dashboard"]);
+  const [rightTabs, setRightTabs] = useState<NavId[]>([]);
+  const [activeLeftTab, setActiveLeftTab] = useState<NavId>("Dashboard");
+  const [activeRightTab, setActiveRightTab] = useState<NavId>("Chat");
+  const [isSplit, setIsSplit] = useState(false); // 분할 화면 활성화 여부
+  const [activePanel, setActivePanel] = useState<"left" | "right">("left"); // 현재 포커스 패널
+  const [splitPercent, setSplitPercent] = useState<number>(50); // 분할 비율 (%)
+
+  // 드래그 앤 드롭 상태 추적
+  const [isDraggingTab, setIsDraggingTab] = useState(false);
+  const [draggedTab, setDraggedTab] = useState<{ id: NavId; from: "left" | "right" } | null>(null);
+
   const [diffFile, setDiffFile] = useState<CommitFile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [joinExiting, setJoinExiting] = useState(false);
@@ -165,12 +178,106 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
   const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
 
-  // ── 타이틀바 보이기/숨기기 상태 (기본값: true)
+  // ── 타이틀바 보이기/숨기기 상태
   const [showTitleBar, setShowTitleBar] = useState(true);
 
+  // ── 사이드바 메뉴 클릭 핸들러
+  const handleNavClick = (id: NavId) => {
+    setDiffFile(null);
+    if (!isSplit || activePanel === "left") {
+      if (!leftTabs.includes(id)) setLeftTabs([...leftTabs, id]);
+      setActiveLeftTab(id);
+      setActivePanel("left");
+    } else {
+      if (!rightTabs.includes(id)) setRightTabs([...rightTabs, id]);
+      setActiveRightTab(id);
+      setActivePanel("right");
+    }
+  };
+
+  // ── 드래그 앤 드롭 분할 제어 엔진
+  const handleTabDrop = (target: "left" | "right" | "split-left" | "split-right") => {
+    if (!draggedTab) return;
+    const { id: tabId, from: source } = draggedTab;
+
+    setIsDraggingTab(false);
+    setDraggedTab(null);
+
+    // 단일 탭인 상태에서 분할을 시도하면 분할하지 않고 원상 유지
+    if ((target === "split-left" || target === "split-right") && leftTabs.length <= 1) {
+      return;
+    }
+
+    // 좌측 분할 영역에 떨어트린 경우
+    if (target === "split-left") {
+      const remaining = leftTabs.filter(t => t !== tabId);
+      setLeftTabs([tabId]);
+      setActiveLeftTab(tabId);
+      setRightTabs(remaining);
+      setActiveRightTab(remaining[remaining.length - 1]);
+      setIsSplit(true);
+      setSplitPercent(50);
+      setActivePanel("left");
+      return;
+    }
+
+    // 우측 분할 영역에 떨어트린 경우
+    if (target === "split-right") {
+      const remaining = leftTabs.filter(t => t !== tabId);
+      setLeftTabs(remaining);
+      setActiveLeftTab(remaining[remaining.length - 1]);
+      setRightTabs([tabId]);
+      setActiveRightTab(tabId);
+      setIsSplit(true);
+      setSplitPercent(50);
+      setActivePanel("right");
+      return;
+    }
+
+    if (source === target) return;
+
+    // 왼쪽에서 오른쪽 패널로 탭을 병합 이동한 경우
+    if (source === "left" && target === "right") {
+      const nextLeft = leftTabs.filter(t => t !== tabId);
+      if (nextLeft.length === 0) {
+        setLeftTabs([...rightTabs, tabId]);
+        setActiveLeftTab(tabId);
+        setRightTabs([]);
+        setIsSplit(false);
+        setActivePanel("left");
+      } else {
+        setLeftTabs(nextLeft);
+        if (activeLeftTab === tabId) setActiveLeftTab(nextLeft[nextLeft.length - 1]);
+        if (!rightTabs.includes(tabId)) setRightTabs([...rightTabs, tabId]);
+        setActiveRightTab(tabId);
+        setActivePanel("right");
+      }
+    }
+
+    // 오른쪽에서 왼쪽 패널로 탭을 병합 이동한 경우
+    else if (source === "right" && target === "left") {
+      const nextRight = rightTabs.filter(t => t !== tabId);
+      if (!leftTabs.includes(tabId)) setLeftTabs([...leftTabs, tabId]);
+      setActiveLeftTab(tabId);
+      setActivePanel("left");
+
+      if (nextRight.length === 0) {
+        setRightTabs([]);
+        setIsSplit(false);
+      } else {
+        setRightTabs(nextRight);
+        if (activeRightTab === tabId) setActiveRightTab(nextRight[nextRight.length - 1]);
+      }
+    }
+  };
+
+  // ── 리사이즈 처리 드래그 이벤트 엔진들
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragStartW = useRef(SIDEBAR_EXPANDED);
+
+  const isSplitDragging = useRef(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
 
   const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -181,19 +288,39 @@ export default function App() {
     document.body.style.userSelect = "none";
   }, [sidebarWidth]);
 
+  const onSplitResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isSplitDragging.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-      const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragStartW.current + e.clientX - dragStartX.current));
-      setSidebarWidth(next);
+      if (isDragging.current) {
+        const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragStartW.current + e.clientX - dragStartX.current));
+        setSidebarWidth(next);
+      }
+      if (isSplitDragging.current && splitContainerRef.current) {
+        const rect = splitContainerRef.current.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const percent = (offsetX / rect.width) * 100;
+        setSplitPercent(Math.max(20, Math.min(80, percent)));
+      }
     };
+
     const onUp = () => {
-      if (!isDragging.current) return;
-      isDragging.current = false;
+      if (isDragging.current) {
+        isDragging.current = false;
+        setSidebarWidth(w => w < COLLAPSE_THRESHOLD ? SIDEBAR_COLLAPSED : w);
+      }
+      if (isSplitDragging.current) {
+        isSplitDragging.current = false;
+      }
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
-      setSidebarWidth(w => w < COLLAPSE_THRESHOLD ? SIDEBAR_COLLAPSED : w);
     };
+
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
     return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
@@ -210,7 +337,13 @@ export default function App() {
       setProjectCode(code ?? genProjectCode());
       setLocalPath(path ?? "");
       setScreen("workspace");
-      setActiveNav("Dashboard");
+
+      setLeftTabs(["Dashboard"]);
+      setActiveLeftTab("Dashboard");
+      setRightTabs([]);
+      setIsSplit(false);
+      setActivePanel("left");
+
       setDiffFile(null);
       setIsLoading(true);
       setJoinExiting(false);
@@ -245,15 +378,135 @@ export default function App() {
   };
 
   const handleFileSelect = (file: CommitFile | null) => setDiffFile(file);
-  const handleNavigateQA = () => { setDiffFile(null); setActiveNav("AIQA"); };
+  const handleNavigateQA = () => { setDiffFile(null); handleNavClick("AIQA"); };
 
   const handleStandupNavigate = (page: string) => {
-    setActiveNav(page as NavId);
+    handleNavClick(page as NavId);
     setDiffFile(null);
     setShowStandup(false);
   };
 
   // ── 페이지 렌더 ──
+  const renderPage = (nav: NavId) => {
+    switch (nav) {
+      case "Dashboard": return <DashboardPage projectName={projectName} />;
+      case "Changes": return <ChangesPage onNavigateQA={handleNavigateQA} />;
+      case "Commits": return <CommitDiffPage />;
+      case "ServerBuild": return <ServerBuildPage />;
+      case "Chat": return <ChatPage onDocsUpdate={setDocCount} />;
+      case "Calendar": return <CalendarPage />;
+      case "EnvSettings": return <EnvironmentSettingsPage />;
+      case "AIQA": return <AIQAPage autoStart />;
+      case "ProjectSettings": return <ProjectSettingsPage />;
+      case "Profile": return <ProfilePage />;
+      case "Galaxy": return <SynAIpseGalaxyPage />;
+      default: return <DashboardPage projectName={projectName} />;
+    }
+  };
+
+  // 공통 패널 컴포넌트 렌더러
+  const renderPanel = (
+    panelType: "left" | "right",
+    tabs: NavId[],
+    activeTab: NavId,
+    setActiveTab: (id: NavId) => void,
+    setTabs: React.Dispatch<React.SetStateAction<NavId[]>>
+  ) => {
+    const isFocused = activePanel === panelType;
+
+    return (
+      <div
+        className="size-full flex flex-col overflow-hidden transition-colors duration-200"
+        style={{ background: "#0d1117", border: isFocused ? "1px solid #AEB784" : "1px solid transparent" }}
+        onClickCapture={() => setActivePanel(panelType)}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => handleTabDrop(panelType)}
+      >
+        {/* VS Code 스타일 상단 탭 헤더 바 */}
+        <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
+          {tabs.map(tId => (
+            <div
+              key={tId}
+              draggable
+              onDragStart={(e) => {
+                setDraggedTab({ id: tId, from: panelType });
+                setTimeout(() => {
+                  setIsDraggingTab(true);
+                }, 0);
+              }}
+              onDragEnd={() => {
+                setIsDraggingTab(false);
+                setDraggedTab(null);
+              }}
+              onClick={() => setActiveTab(tId)}
+              className="flex items-center gap-2 px-4 py-2 text-[11px] font-medium cursor-pointer transition-all border-r select-none"
+              style={{
+                color: activeTab === tId ? "#c9d1d9" : "#8b949e",
+                background: activeTab === tId ? "#0d1117" : "transparent",
+                borderRight: "1px solid rgba(255,255,255,0.08)",
+                borderTop: activeTab === tId ? "2px solid #AEB784" : "2px solid transparent"
+              }}
+            >
+              <span>{tId}</span>
+              <X
+                className="w-3 h-3 hover:text-red-400 transition-colors rounded-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const nextTabs = tabs.filter(t => t !== tId);
+                  setTabs(nextTabs);
+                  if (nextTabs.length > 0) {
+                    if (activeTab === tId) setActiveTab(nextTabs[nextTabs.length - 1]);
+                  }
+                }}
+              />
+            </div>
+          ))}
+
+          {/* 우측 상단 패널 전체 닫기 버튼 */}
+          <div className="ml-auto px-3 flex items-center gap-2">
+            {isSplit && (
+              <button
+                onClick={() => {
+                  if (panelType === "right") {
+                    // [우측 패널 닫기] 우측 탭만 비우고 분할 종료
+                    setRightTabs([]);
+                    setIsSplit(false);
+                    setActivePanel("left");
+                  } else {
+                    // [좌측 패널 닫기] 좌측 탭 비우고 우측 탭을 메인으로 이관
+                    setLeftTabs([...rightTabs]);
+                    setActiveLeftTab(activeRightTab);
+                    setRightTabs([]);
+                    setIsSplit(false);
+                    setActivePanel("left");
+                  }
+                }}
+                className="text-[10px] text-red-400 hover:text-red-300 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20"
+              >
+                ✕ 닫기
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 탭 내부 페이지 본문 콘텐츠 (가로/세로 스크롤 완벽 지원) */}
+        <div className="flex-1 overflow-auto relative">
+          {tabs.length > 0 ? (
+            <div className="min-w-fit min-h-full">
+              {/* 💡 min-w-fit을 주어 창이 극단적으로 작아져도 내부 페이지 레이아웃이 찌그러지지 않고 스크롤바가 생깁니다. */}
+              {renderPage(activeTab)}
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-xs text-white/30">
+              열려있는 메뉴가 없습니다
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── 레이아웃 빌더 ──
   const renderContent = () => {
     if (diffFile) {
       return (
@@ -268,23 +521,68 @@ export default function App() {
         </div>
       );
     }
-    switch (activeNav) {
-      case "Dashboard": return <DashboardPage projectName={projectName} />;
-      case "Changes": return <ChangesPage onNavigateQA={handleNavigateQA} />;
-      case "Commits": return <CommitDiffPage />;
-      case "ServerBuild": return <ServerBuildPage />;
-      case "Chat": return <ChatPage onDocsUpdate={setDocCount} />;
-      case "Calendar": return <CalendarPage />;
-      case "EnvSettings": return <EnvironmentSettingsPage />;
-      case "AIQA": return <AIQAPage autoStart />;
-      case "ProjectSettings": return <ProjectSettingsPage />;
-      case "Profile": return <ProfilePage />;
-      case "Galaxy":    return <SynAIpseGalaxyPage />;
-      default: return <DashboardPage projectName={projectName} />;
-    }
+
+    return (
+      <div ref={splitContainerRef} className="flex-1 flex overflow-hidden relative">
+        {/* 왼쪽 주 패널 컨테이너 */}
+        <div
+          style={{ width: isSplit ? `${splitPercent}%` : "100%" }}
+          className="h-full flex flex-col overflow-hidden shrink-0"
+        >
+          {renderPanel("left", leftTabs, activeLeftTab, setActiveLeftTab, setLeftTabs)}
+        </div>
+
+        {/* 드래그 가능한 가운데 크기 조절바 Divider */}
+        {isSplit && (
+          <div
+            onMouseDown={onSplitResizeMouseDown}
+            className="w-1 h-full bg-white/10 hover:bg-[#AEB784]/60 cursor-col-resize z-30 transition-colors shrink-0"
+            title="드래그하여 크기 조절"
+          />
+        )}
+
+        {/* 오른쪽 분할 패널 컨테이너 */}
+        {isSplit && (
+          <div
+            style={{ width: `${100 - splitPercent}%` }}
+            className="h-full flex flex-col overflow-hidden shrink-0"
+          >
+            {renderPanel("right", rightTabs, activeRightTab, setActiveRightTab, setRightTabs)}
+          </div>
+        )}
+
+        {!isSplit && isDraggingTab && (
+          <div className="absolute inset-0 flex z-40 pointer-events-none animate-in fade-in duration-150">
+            {/* 좌측 분할 구역 가이드 박스 */}
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleTabDrop("split-left")}
+              className="w-1/2 h-full flex flex-col items-center justify-center border-2 border-dashed border-[#AEB784]/40 bg-[#AEB784]/5 text-xs text-[#AEB784] pointer-events-auto backdrop-blur-[2px]"
+            >
+              <div className="p-5 border border-dashed border-[#AEB784]/30 rounded-xl bg-[#161b22]/95 text-center shadow-2xl">
+                <p className="font-semibold mb-1 text-[11px] text-[#c9d1d9]">좌측 분할 영역</p>
+                <p className="text-[10px] text-white/40">여기에 놓으면 왼쪽에 새 분할창을 엽니다</p>
+              </div>
+            </div>
+
+            {/* 우측 분할 구역 가이드 박스 */}
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleTabDrop("split-right")}
+              className="w-1/2 h-full flex flex-col items-center justify-center border-2 border-dashed border-[#AEB784]/40 bg-[#AEB784]/5 text-xs text-[#AEB784] pointer-events-auto backdrop-blur-[2px] border-l-0"
+            >
+              <div className="p-5 border border-dashed border-[#AEB784]/30 rounded-xl bg-[#161b22]/95 text-center shadow-2xl">
+                <p className="font-semibold mb-1 text-[11px] text-[#c9d1d9]">우측 분할 영역</p>
+                <p className="text-[10px] text-white/40">여기에 놓으면 오른쪽에 새 분할창을 엽니다</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
-  // ── 로그인 화면 ──
+  // ── 외부 페이지 렌더링 분기 분리 ──
   if (screen === "login") {
     return (
       <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
@@ -295,7 +593,6 @@ export default function App() {
     );
   }
 
-  // ── Join 화면 ──
   if (screen === "join") {
     return (
       <div
@@ -329,6 +626,8 @@ export default function App() {
     );
   }
 
+  const currentActiveTab = activePanel === "left" ? activeLeftTab : activeRightTab;
+
   // ── Workspace 화면 ──
   return (
     <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
@@ -349,7 +648,6 @@ export default function App() {
           boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)",
         }}
       >
-        {/* ★ 타이틀바가 숨겨졌을 때 우측 상단에 플로팅 상태로 유지되는 알림 컴포넌트 */}
         {!showTitleBar && (
           <div className="absolute top-3 right-4 z-40 transition-all">
             <NotificationPanel />
@@ -383,7 +681,6 @@ export default function App() {
               </div>
             )}
 
-            {/* 타이틀바 우측 */}
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={() => setShowStandup(true)}
@@ -424,9 +721,9 @@ export default function App() {
               {isCollapsed ? (
                 <div className="relative group">
                   <button
-                    onClick={() => { setActiveNav("Profile"); setDiffFile(null); }}
+                    onClick={() => handleNavClick("Profile")}
                     className="w-full flex justify-center py-1 rounded-lg transition-all"
-                    style={{ background: activeNav === "Profile" && !diffFile ? SIDEBAR_ACTIVE : "transparent" }}
+                    style={{ background: (currentActiveTab === "Profile" && !diffFile) ? SIDEBAR_ACTIVE : "transparent" }}
                   >
                     <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
                       <User className="w-4 h-4" style={{ color: "rgba(255,255,255,0.90)" }} />
@@ -436,9 +733,9 @@ export default function App() {
                 </div>
               ) : (
                 <button
-                  onClick={() => { setActiveNav("Profile"); setDiffFile(null); }}
+                  onClick={() => handleNavClick("Profile")}
                   className="w-full text-left transition-all rounded-lg px-1 py-1"
-                  style={{ background: activeNav === "Profile" && !diffFile ? SIDEBAR_ACTIVE : "transparent" }}
+                  style={{ background: (currentActiveTab === "Profile" && !diffFile) ? SIDEBAR_ACTIVE : "transparent" }}
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: GRADIENT_LOGO }}>
@@ -455,7 +752,6 @@ export default function App() {
 
             {/* 스크롤 영역 */}
             <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
-              {/* 현재 프로젝트 */}
               {!isCollapsed && (
                 <div className="px-2.5 pt-2.5 pb-2" style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
                   <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: SIDEBAR_TEXT_LABEL }}>Current Project</p>
@@ -501,9 +797,11 @@ export default function App() {
                     return (
                       <div key={item.id} className="relative">
                         <NavBtn
-                          icon={item.icon} label={item.label}
-                          active={activeNav === item.id && !diffFile} collapsed={isCollapsed}
-                          onClick={() => { setActiveNav(item.id as NavId); setDiffFile(null); }}
+                          icon={item.icon}
+                          label={item.label}
+                          active={currentActiveTab === item.id && !diffFile}
+                          collapsed={isCollapsed}
+                          onClick={() => handleNavClick(item.id)}
                         />
                         {badge && <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">{badge}</div>}
                       </div>
@@ -518,9 +816,12 @@ export default function App() {
                 <nav className="space-y-0.5">
                   {SYSTEM_ITEMS.map(item => (
                     <NavBtn
-                      key={item.id} icon={item.icon} label={item.label}
-                      active={activeNav === item.id && !diffFile} collapsed={isCollapsed}
-                      onClick={() => { setActiveNav(item.id as NavId); setDiffFile(null); }}
+                      key={item.id}
+                      icon={item.icon}
+                      label={item.label}
+                      active={currentActiveTab === item.id && !diffFile}
+                      collapsed={isCollapsed}
+                      onClick={() => handleNavClick(item.id)}
                     />
                   ))}
                 </nav>
@@ -543,7 +844,6 @@ export default function App() {
                 {isCollapsed && <Tooltip label="Leave Project" />}
               </div>
 
-              {/* 타이틀바 보이기/숨기기 토글 단추 */}
               <div className="relative group">
                 <button
                   onClick={() => setShowTitleBar(v => !v)}
@@ -588,7 +888,7 @@ export default function App() {
             />
           </div>
 
-          {/* ════════ 메인 콘텐츠 ════════ */}
+          {/* ── 메인 콘텐츠 ── */}
           {renderContent()}
         </div>
 
