@@ -16,6 +16,51 @@ import {
 import { cn } from "./utils";
 import { Label } from "./label";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. Form 관련 Skeleton 컴포넌트들
+ * 폼 필드 하나하나의 로딩 상태를 시각화합니다.
+ */
+function FormItemSkeleton() {
+  return (
+    <div className="grid gap-2 py-2">
+      {/* 라벨 뼈대 */}
+      <Skeleton className="h-4 w-20" />
+      {/* 입력창 뼈대 */}
+      <Skeleton className="h-10 w-full" />
+    </div>
+  );
+}
+
+function FormSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="space-y-4 w-full">
+      {Array.from({ length: count }).map((_, i) => (
+        <FormItemSkeleton key={i} />
+      ))}
+      {/* 버튼 자리 뼈대 */}
+      <Skeleton className="h-10 w-full mt-6" />
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Form 관련 컴포넌트 로직
+ */
 const Form = FormProvider;
 
 type FormFieldContextValue<
@@ -165,4 +210,5 @@ export {
   FormDescription,
   FormMessage,
   FormField,
+  FormSkeleton, // 스켈레톤 내보내기
 };

@@ -13,6 +13,50 @@ import {
   DialogTitle,
 } from "./dialog";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션(animate-pulse)을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. CommandSkeleton 컴포넌트
+ * 커맨드 목록이 로딩 중일 때 표시할 뼈대입니다.
+ * 검색창 하단에 여러 개의 항목이 나열된 느낌을 시각적으로 재현했습니다.
+ */
+function CommandSkeleton({ count = 5 }: { count?: number }) {
+  return (
+    <div className="flex flex-col gap-1 p-1">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2 px-2 py-3"
+        >
+          {/* 아이콘 자리 뼈대 */}
+          <Skeleton className="size-4 shrink-0 rounded-sm" />
+          {/* 텍스트 자리 뼈대 */}
+          <Skeleton className="h-4 w-[60%]" />
+          {/* 단축키 자리 뼈대 (우측 정렬) */}
+          <Skeleton className="ml-auto h-3 w-10" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Command 관련 컴포넌트들
+ */
 function Command({
   className,
   ...props
@@ -174,4 +218,5 @@ export {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
+  CommandSkeleton, // 스켈레톤도 함께 내보냅니다!
 };

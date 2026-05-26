@@ -6,6 +6,45 @@ import { ChevronDownIcon } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * Skeleton 조각 컴포넌트
+ * 아코디언 내부의 텍스트나 아이콘 자리를 대체합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * AccordionSkeleton 컴포넌트
+ * 로딩 중일 때 이 컴포넌트를 호출하여 사용하세요.
+ * count 프롭을 통해 표시할 아이템 개수를 조절할 수 있습니다.
+ */
+function AccordionSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="w-full">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between border-b py-4 gap-4"
+        >
+          {/* 제목 뼈대 */}
+          <Skeleton className="h-4 w-[60%]" />
+          {/* 아이콘 뼈대 */}
+          <Skeleton className="h-4 w-4 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Accordion({
   ...props
 }: React.ComponentProps<typeof AccordionPrimitive.Root>) {
@@ -63,4 +102,10 @@ function AccordionContent({
   );
 }
 
-export { Accordion, AccordionItem, AccordionTrigger, AccordionContent };
+export { 
+  Accordion, 
+  AccordionItem, 
+  AccordionTrigger, 
+  AccordionContent, 
+  AccordionSkeleton 
+};

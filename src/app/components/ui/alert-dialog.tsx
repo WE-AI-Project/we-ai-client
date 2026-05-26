@@ -6,6 +6,49 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { cn } from "./utils";
 import { buttonVariants } from "./button";
 
+/**
+ * 1. Skeleton 조각 컴포넌트
+ * 다이얼로그 내부의 제목, 설명, 버튼 위치를 시각적으로 대체합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. AlertDialogSkeleton 컴포넌트
+ * 로딩 중일 때 AlertDialogContent 내부에 넣어서 사용하거나, 
+ * 다이얼로그 전체의 느낌을 미리 보여줄 때 사용합니다.
+ */
+function AlertDialogSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 w-full">
+      <div className="space-y-2">
+        {/* 제목 자리 */}
+        <Skeleton className="h-6 w-[40%]" />
+        {/* 설명 자리 (두 줄) */}
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-[80%]" />
+      </div>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {/* 버튼들 자리 */}
+        <Skeleton className="h-9 w-full sm:w-20" />
+        <Skeleton className="h-9 w-full sm:w-20" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 AlertDialog 관련 컴포넌트들
+ */
 function AlertDialog({
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
@@ -154,4 +197,5 @@ export {
   AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
+  AlertDialogSkeleton, // 스켈레톤도 함께 내보냅니다!
 };

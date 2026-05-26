@@ -34,6 +34,71 @@ function useChart() {
   return context;
 }
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 일정한 pulse 맥박 애니메이션 리듬을 공유합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. ChartSkeleton 컴포넌트
+ * 차트 내부의 대형 그래픽 요소를 긁어오는 동안 구획을 단단하게 지탱해 주는 전신 뼈대입니다.
+ * 실제 차트와 동일한 비율(aspect-video)을 선점하고 가짜 격자 막대 바를 부드럽게 깜빡여 줍니다.
+ */
+function ChartSkeleton({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      role="status"
+      aria-label="Loading charts"
+      className={cn(
+        "flex aspect-video w-full flex-col justify-between border border-border/40 rounded-xl p-4 bg-background/40 animate-pulse",
+        className
+      )}
+      {...props}
+    >
+      {/* 상단 헬퍼 범례/헤더 구역 모킹 */}
+      <div className="flex items-center justify-between border-b border-border/20 pb-2 shrink-0">
+        <Skeleton className="h-4 w-32" />
+        <div className="flex gap-2">
+          <Skeleton className="h-3 w-10" />
+          <Skeleton className="h-3 w-10" />
+        </div>
+      </div>
+
+      {/* 중앙 차트 막대 수직 데이터 볼륨 구역 모킹 */}
+      <div className="flex-1 flex items-end gap-3 md:gap-4 pt-6 px-2 min-h-0">
+        <Skeleton className="h-[35%] flex-1 rounded-t-[4px] bg-muted/70" />
+        <Skeleton className="h-[65%] flex-1 rounded-t-[4px] bg-muted/70" />
+        <Skeleton className="h-[45%] flex-1 rounded-t-[4px] bg-muted/70" />
+        <Skeleton className="h-[85%] flex-1 rounded-t-[4px] bg-muted/70" />
+        <Skeleton className="h-[55%] flex-1 rounded-t-[4px] bg-muted/70" />
+        <Skeleton className="h-[70%] flex-1 rounded-t-[4px] bg-muted/70" />
+      </div>
+
+      {/* 하단 가로 X축 티커 축선 라벨 구역 모킹 */}
+      <div className="flex justify-between items-center pt-3 border-t border-border/20 px-1 mt-2 shrink-0">
+        <Skeleton className="h-3 w-8" />
+        <Skeleton className="h-3 w-8" />
+        <Skeleton className="h-3 w-8" />
+        <Skeleton className="h-3 w-8" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Chart 핵심 컴포넌트 프리미티브
+ */
 function ChartContainer({
   id,
   className,
@@ -350,4 +415,5 @@ export {
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
+  ChartSkeleton, // 패밀리 룩 뼈대 컴포넌트를 안전하게 내보냅니다!
 };

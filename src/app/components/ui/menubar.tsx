@@ -6,6 +6,40 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. MenubarSkeleton 컴포넌트
+ * 메뉴바가 로딩 중일 때 표시할 뼈대입니다.
+ * 상단 메뉴 항목들이 수평으로 나열된 느낌을 시각적으로 재현했습니다.
+ */
+function MenubarSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="bg-background flex h-9 items-center gap-1 rounded-md border p-1 shadow-xs w-fit">
+      {Array.from({ length: count }).map((_, i) => (
+        <Skeleton key={i} className="h-7 w-16 px-2" />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Menubar 관련 컴포넌트들
+ */
 function Menubar({
   className,
   ...props
@@ -273,4 +307,5 @@ export {
   MenubarSub,
   MenubarSubTrigger,
   MenubarSubContent,
+  MenubarSkeleton, // 스켈레톤 내보내기
 };

@@ -6,6 +6,49 @@ import * as ResizablePrimitive from "react-resizable-panels";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. ResizableSkeleton 컴포넌트
+ * 메인 대시보드 구조(좌측 메뉴 바 패널 + 우측 메인 콘텐츠 판)가 로딩 중일 때
+ * 전체 화면 비율이 깨지지 않도록 공간을 완벽하게 홀딩해 주는 레이아웃 뼈대입니다.
+ */
+function ResizableSkeleton({ className }: { className?: string }) {
+  return (
+    <div 
+      className={cn("flex h-screen w-full gap-1 p-2 bg-background", className)}
+      role="status"
+      aria-label="Loading page layout"
+    >
+      {/* 왼쪽 사이드바 영역 뼈대 */}
+      <Skeleton className="h-full w-64 shrink-0 rounded-xl" />
+      
+      {/* 패널 경계선 조절 바 시각화 */}
+      <div className="bg-border/60 w-px h-full" />
+      
+      {/* 오른쪽 메인 대시보드 영역 뼈대 */}
+      <Skeleton className="h-full flex-1 rounded-xl" />
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Resizable 관련 컴포넌트들
+ */
 function ResizablePanelGroup({
   className,
   ...props
@@ -53,4 +96,9 @@ function ResizableHandle({
   );
 }
 
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
+export { 
+  ResizablePanelGroup, 
+  ResizablePanel, 
+  ResizableHandle,
+  ResizableSkeleton // 스켈레톤 내보내기
+};

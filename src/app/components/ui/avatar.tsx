@@ -5,6 +5,38 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * 다른 컴포넌트들과 통일된 애니메이션 효과를 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. AvatarSkeleton 컴포넌트
+ * 프로필 이미지가 로딩 중일 때 보여줄 원형 뼈대입니다.
+ * 기본 크기는 size-10(40px)이며, className을 통해 조절 가능합니다.
+ */
+function AvatarSkeleton({ className }: { className?: string }) {
+  return (
+    <Skeleton 
+      className={cn("size-10 shrink-0 rounded-full", className)} 
+    />
+  );
+}
+
+/**
+ * 3. 실제 Avatar 관련 컴포넌트들
+ */
 function Avatar({
   className,
   ...props
@@ -50,4 +82,4 @@ function AvatarFallback({
   );
 }
 
-export { Avatar, AvatarImage, AvatarFallback };
+export { Avatar, AvatarImage, AvatarFallback, AvatarSkeleton };

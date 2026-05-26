@@ -5,6 +5,59 @@ import * as SliderPrimitive from "@radix-ui/react-slider";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. SliderSkeleton 컴포넌트
+ * 슬라이더 바가 초기 상태이거나 로딩 중일 때 표시할 레이아웃 뼈대입니다.
+ * 가로(horizontal)와 세로(vertical) 방향 속성을 완벽히 재현하도록 매핑했습니다.
+ */
+function SliderSkeleton({
+  orientation = "horizontal",
+  className,
+}: {
+  orientation?: "horizontal" | "vertical";
+  className?: string;
+}) {
+  return (
+    <div
+      role="status"
+      aria-label="Loading slider"
+      className={cn(
+        "relative flex items-center select-none justify-center",
+        orientation === "horizontal" && "w-full h-9",
+        orientation === "vertical" && "h-full min-h-44 w-4 flex-col",
+        className
+      )}
+    >
+      <Skeleton
+        className={cn(
+          "rounded-full",
+          orientation === "horizontal" && "h-4 w-full",
+          orientation === "vertical" && "w-1.5 h-full"
+        )}
+      />
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Slider 컴포넌트
+ */
 function Slider({
   className,
   defaultValue,
@@ -60,4 +113,4 @@ function Slider({
   );
 }
 
-export { Slider };
+export { Slider, SliderSkeleton };

@@ -1,7 +1,39 @@
+"use client";
+
 import * as React from "react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. InputSkeleton 컴포넌트
+ * 입력창이 로딩 중일 때 표시할 뼈대입니다.
+ * 실제 Input과 동일한 높이(h-9)를 가져서 레이아웃 변화를 최소화합니다.
+ */
+function InputSkeleton({ className }: { className?: string }) {
+  return (
+    <Skeleton className={cn("h-9 w-full", className)} />
+  );
+}
+
+/**
+ * 3. 실제 Input 컴포넌트
+ */
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
     <input
@@ -18,4 +50,4 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   );
 }
 
-export { Input };
+export { Input, InputSkeleton };

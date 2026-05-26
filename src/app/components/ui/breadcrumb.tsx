@@ -1,9 +1,56 @@
+"use client";
+
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { ChevronRight, MoreHorizontal } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. BreadcrumbSkeleton 컴포넌트
+ * 경로가 로딩 중일 때 표시할 가짜 경로입니다.
+ * depth 프롭을 통해 표시할 경로 단계를 조절할 수 있습니다.
+ */
+function BreadcrumbSkeleton({ depth = 3 }: { depth?: number }) {
+  return (
+    <nav aria-label="breadcrumb-skeleton">
+      <ol className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm sm:gap-2.5">
+        {Array.from({ length: depth }).map((_, i) => (
+          <React.Fragment key={i}>
+            <li className="inline-flex items-center gap-1.5">
+              <Skeleton className="h-4 w-16" />
+            </li>
+            {i < depth - 1 && (
+              <li role="presentation" aria-hidden="true" className="[&>svg]:size-3.5">
+                <ChevronRight />
+              </li>
+            )}
+          </React.Fragment>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * 3. 실제 Breadcrumb 관련 컴포넌트들
+ */
 function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {
   return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;
 }
@@ -74,9 +121,7 @@ function BreadcrumbSeparator({
       aria-hidden="true"
       className={cn("[&>svg]:size-3.5", className)}
       {...props}
-    >
-      {children ?? <ChevronRight />}
-    </li>
+    />
   );
 }
 
@@ -91,10 +136,7 @@ function BreadcrumbEllipsis({
       aria-hidden="true"
       className={cn("flex size-9 items-center justify-center", className)}
       {...props}
-    >
-      <MoreHorizontal className="size-4" />
-      <span className="sr-only">More</span>
-    </span>
+    />
   );
 }
 
@@ -106,4 +148,5 @@ export {
   BreadcrumbPage,
   BreadcrumbSeparator,
   BreadcrumbEllipsis,
+  BreadcrumbSkeleton, // 스켈레톤도 함께 내보냅니다!
 };

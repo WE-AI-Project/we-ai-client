@@ -10,6 +10,48 @@ import {
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. SelectSkeleton 컴포넌트
+ * 선택 박스가 로딩 중일 때 표시할 트리거 형태의 뼈대입니다.
+ * 실제 SelectTrigger의 크기(default: h-9, sm: h-8)와 곡률(rounded-md)을 완벽히 재현했습니다.
+ */
+function SelectSkeleton({
+  size = "default",
+  className,
+}: {
+  size?: "sm" | "default";
+  className?: string;
+}) {
+  return (
+    <Skeleton
+      className={cn(
+        "w-full rounded-md border border-input/50",
+        size === "default" ? "h-9" : "h-8",
+        className
+      )}
+    />
+  );
+}
+
+/**
+ * 3. 실제 Select 관련 컴포넌트들
+ */
 function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
@@ -186,4 +228,5 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  SelectSkeleton, // 스켈레톤도 함께 안전하게 내보냅니다!
 };

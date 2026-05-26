@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu";
 import { cva } from "class-variance-authority";
@@ -5,6 +7,40 @@ import { ChevronDownIcon } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. NavigationMenuSkeleton 컴포넌트
+ * 내비게이션 바가 로딩 중일 때 표시할 뼈대입니다.
+ * 상단 메뉴 항목들이 나란히 놓인 느낌을 시각적으로 재현했습니다.
+ */
+function NavigationMenuSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="flex items-center gap-1 h-9">
+      {Array.from({ length: count }).map((_, i) => (
+        <Skeleton key={i} className="h-9 w-24 px-4 py-2" />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 NavigationMenu 관련 컴포넌트들
+ */
 function NavigationMenu({
   className,
   children,
@@ -165,4 +201,5 @@ export {
   NavigationMenuIndicator,
   NavigationMenuViewport,
   navigationMenuTriggerStyle,
+  NavigationMenuSkeleton, // 스켈레톤 내보내기
 };

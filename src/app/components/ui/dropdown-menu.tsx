@@ -6,6 +6,50 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. DropdownMenuSkeleton 컴포넌트
+ * 메뉴 내용이 로딩 중일 때 표시할 뼈대입니다.
+ * 드롭다운 항목들이 나열된 느낌을 시각적으로 재현했습니다.
+ */
+function DropdownMenuSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="bg-popover min-w-[8rem] overflow-hidden rounded-md border p-1 shadow-md">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2 px-2 py-1.5"
+        >
+          {/* 아이콘/체크박스 영역 뼈대 */}
+          <Skeleton className="size-4 shrink-0 rounded-sm opacity-50" />
+          {/* 메뉴 텍스트 자리 뼈대 */}
+          <Skeleton className="h-4 w-[60%]" />
+          {/* 우측 단축키 자리 뼈대 */}
+          <Skeleton className="ml-auto h-3 w-8 opacity-50" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 DropdownMenu 관련 컴포넌트들
+ */
 function DropdownMenu({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
@@ -230,7 +274,7 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md border p-1 shadow-lg",
+        "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-md border p-1 shadow-lg",
         className,
       )}
       {...props}
@@ -254,4 +298,5 @@ export {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuSkeleton, // 스켈레톤도 함께 내보냅니다!
 };

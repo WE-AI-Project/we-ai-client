@@ -6,6 +6,53 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. DialogSkeleton 컴포넌트
+ * 다이얼로그 내부에 로딩 중일 때 표시할 뼈대입니다.
+ * 제목, 본문, 그리고 하단 버튼 자리를 시각적으로 재현했습니다.
+ */
+function DialogSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 w-full py-2">
+      <div className="space-y-2">
+        {/* 제목 자리 뼈대 */}
+        <Skeleton className="h-6 w-[40%]" />
+        {/* 설명 자리 뼈대 (두 줄) */}
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-[80%]" />
+      </div>
+      
+      {/* 중앙 본문 영역 뼈대 */}
+      <Skeleton className="h-32 w-full mt-2" />
+
+      {/* 하단 푸터 버튼 영역 뼈대 */}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-4">
+        <Skeleton className="h-9 w-full sm:w-20" />
+        <Skeleton className="h-9 w-full sm:w-20" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Dialog 관련 컴포넌트들
+ */
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -132,4 +179,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  DialogSkeleton, // 스켈레톤도 함께 내보냅니다!
 };
