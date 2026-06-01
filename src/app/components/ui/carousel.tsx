@@ -9,6 +9,56 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "./utils";
 import { Button } from "./button";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. CarouselSkeleton 컴포넌트
+ * 캐러셀 로딩 중일 때 표시할 뼈대입니다.
+ * 슬라이드 영역과 좌우 이동 버튼의 위치를 미리 잡아줍니다.
+ */
+function CarouselSkeleton({ className }: { className?: string }) {
+  return (
+    <div 
+      className={cn("relative w-full overflow-hidden", className)} 
+      role="status" 
+      aria-label="Loading carousel"
+    >
+      {/* 슬라이드 뼈대 영역 */}
+      <div className="flex gap-4">
+        {/* 현재 보이는 메인 슬라이드 */}
+        <Skeleton className="aspect-video w-full shrink-0 rounded-xl" />
+        {/* 옆에 살짝 보이는 다음 슬라이드 조각 */}
+        <Skeleton className="aspect-video w-20 shrink-0 rounded-xl opacity-50" />
+      </div>
+
+      {/* 좌우 버튼 뼈대 (상대 위치 고정) */}
+      <div className="absolute top-1/2 -left-12 -translate-y-1/2">
+        <Skeleton className="size-8 rounded-full" />
+      </div>
+      <div className="absolute top-1/2 -right-12 -translate-y-1/2">
+        <Skeleton className="size-8 rounded-full" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. Carousel 관련 타입 및 컨텍스트
+ */
 type CarouselApi = UseEmblaCarouselType[1];
 type UseCarouselParameters = Parameters<typeof useEmblaCarousel>;
 type CarouselOptions = UseCarouselParameters[0];
@@ -42,6 +92,9 @@ function useCarousel() {
   return context;
 }
 
+/**
+ * 4. 실제 Carousel 컴포넌트 조각들
+ */
 function Carousel({
   orientation = "horizontal",
   opts,
@@ -238,4 +291,5 @@ export {
   CarouselItem,
   CarouselPrevious,
   CarouselNext,
+  CarouselSkeleton, // 스켈레톤 내보내기
 };

@@ -354,7 +354,7 @@ export default function App() {
           ...cur,
           projectName: name || cur.projectName,
           repository: path || cur.repository,
-          description: cur.description || `${name} — WE&AI Enterprise Project`,
+          description: cur.description || `${name} — SynAIpse Enterprise Project`,
         });
       }
 
@@ -617,7 +617,7 @@ export default function App() {
               <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
                 <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
               </div>
-              <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>WE&amp;AI Project Office</span>
+              <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse Project Office</span>
             </div>
           </div>
           <JoinProjectScreen onJoin={handleJoin} />
@@ -664,7 +664,7 @@ export default function App() {
               <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
                 <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
               </div>
-              <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>WE&amp;AI Project Office</span>
+              <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse Project Office</span>
             </div>
 
             {projectCode && (

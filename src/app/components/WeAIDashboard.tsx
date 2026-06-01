@@ -279,7 +279,7 @@ function ProjectEntry({ onJoin }: { onJoin: (project: typeof PROJECTS[number]) =
             >
               <Bot className="w-5 h-5" style={{ color: ACCENT }} />
             </div>
-            <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>Welcome to WE&amp;AI Office</h1>
+            <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>Welcome to SynAIpse Office</h1>
             <p className="text-xs mt-1" style={{ color: TEXT_SECONDARY }}>프로젝트를 선택하여 워크스페이스에 참여하세요</p>
           </div>
 

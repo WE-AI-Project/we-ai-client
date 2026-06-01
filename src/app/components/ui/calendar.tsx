@@ -7,6 +7,63 @@ import { DayPicker } from "react-day-picker";
 import { cn } from "./utils";
 import { buttonVariants } from "./button";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 다른 컴포넌트들과 통일된 애니메이션 효과를 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. CalendarSkeleton 컴포넌트
+ * 달력이 로딩 중일 때 표시할 뼈대입니다.
+ * 실제 달력의 크기와 구조(헤더, 요일, 날짜 그리드)를 그대로 재현했습니다.
+ */
+function CalendarSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("p-3 w-fit border rounded-md", className)}>
+      <div className="space-y-4">
+        {/* 달력 헤더 (월/년 및 내비게이션 버튼) */}
+        <div className="flex justify-center pt-1 relative items-center w-full">
+          <Skeleton className="h-7 w-7 absolute left-1" /> {/* 이전 버튼 */}
+          <Skeleton className="h-4 w-24" /> {/* 월/년 텍스트 */}
+          <Skeleton className="h-7 w-7 absolute right-1" /> {/* 다음 버튼 */}
+        </div>
+
+        {/* 요일 헤더 (일~월) */}
+        <div className="flex gap-1">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-8 rounded-md" />
+          ))}
+        </div>
+
+        {/* 날짜 그리드 (보통 5~6줄) */}
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, rowIndex) => (
+            <div key={rowIndex} className="flex gap-1">
+              {Array.from({ length: 7 }).map((_, colIndex) => (
+                <Skeleton key={colIndex} className="h-8 w-8 rounded-md" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Calendar 컴포넌트
+ */
 function Calendar({
   className,
   classNames,
@@ -72,4 +129,4 @@ function Calendar({
   );
 }
 
-export { Calendar };
+export { Calendar, CalendarSkeleton };

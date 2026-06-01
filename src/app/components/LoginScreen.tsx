@@ -275,7 +275,7 @@ function LoginForm({
         </div>
         <div>
           <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>로그인</h2>
-          <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>WE&amp;AI 계정으로 시작하세요</p>
+          <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>SynAIpse 계정으로 시작하세요</p>
         </div>
       </div>
 
@@ -789,7 +789,7 @@ export function LoginScreen({ onLogin }: Props) {
             <FolderGit2 className="w-5.5 h-5.5" style={{ color: "white" }} />
           </div>
           <div>
-            <p className="text-xl font-bold" style={{ color: TEXT_PRIMARY }}>WE&amp;AI</p>
+            <p className="text-xl font-bold" style={{ color: TEXT_PRIMARY }}>SynAIpse</p>
             <p className="text-[10px]" style={{ color: LOGIN_MUTED }}>Project Office</p>
           </div>
         </div>
@@ -797,7 +797,7 @@ export function LoginScreen({ onLogin }: Props) {
         <h1 className="text-[40px] font-bold text-center mb-3 leading-tight tracking-tight">
           <span style={{ color: "#1A1C06" }}>Welcome to</span>
           <br />
-          <span style={{ color: OLIVE_DARK }}>WE&amp;AI</span>
+          <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
         </h1>
 
         <p className="text-sm text-center mb-8" style={{ color: LOGIN_OLIVE_TEXT, maxWidth: 310 }}>
@@ -826,7 +826,7 @@ export function LoginScreen({ onLogin }: Props) {
         </button>
 
         <p className="mt-6 text-[10px]" style={{ color: LOGIN_ICON_MUTED }}>
-          WE&amp;AI Enterprise Platform — v2025.1
+          SynAIpse Enterprise Platform — v2025.1
         </p>
       </div>
 

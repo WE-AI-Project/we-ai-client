@@ -6,6 +6,63 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. SheetSkeleton 컴포넌트
+ * 사이드 시트 내부가 로딩 중일 때 본문 및 헤더 구역 공간을 채워주는 뼈대입니다.
+ * 제목, 설명문, 본문 리스트 피드 라인들을 세련되게 시각화했습니다.
+ */
+function SheetSkeleton({ className }: { className?: string }) {
+  return (
+    <div 
+      className={cn("flex flex-col gap-4 w-full p-4 h-full bg-background", className)}
+      role="status"
+      aria-label="Loading panel details"
+    >
+      <div className="space-y-2">
+        {/* 헤더 타이틀 자리 뼈대 */}
+        <Skeleton className="h-5 w-[40%]" />
+        {/* 헤더 서브 설명 자리 뼈대 */}
+        <Skeleton className="h-4 w-[60%]" />
+      </div>
+      
+      {/* 본문 콘텐츠 섹션 뼈대 세트 */}
+      <div className="space-y-4 mt-6 flex-1">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-2 border-b border-muted/30 pb-3 last:border-0">
+            <Skeleton className="h-4 w-[25%]" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-[85%]" />
+          </div>
+        ))}
+      </div>
+
+      {/* 하단 푸터 액션 버튼 영역 뼈대 */}
+      <div className="mt-auto pt-4 flex flex-col gap-2">
+        <Skeleton className="h-10 w-full" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Sheet 관련 컴포넌트들
+ */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
@@ -68,7 +125,7 @@ function SheetContent({
           side === "bottom" &&
             "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
           className,
-        )}
+         )}
         {...props}
       >
         {children}
@@ -136,4 +193,5 @@ export {
   SheetFooter,
   SheetTitle,
   SheetDescription,
+  SheetSkeleton, // 스켈레톤 내보내기
 };

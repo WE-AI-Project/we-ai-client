@@ -204,7 +204,7 @@ export function ProfilePage() {
                 <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-2">
                     <FolderGit2 className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
-                    <span className="text-xs" style={{ color: TEXT_SECONDARY }}>WE&amp;AI Project Office</span>
+                    <span className="text-xs" style={{ color: TEXT_SECONDARY }}>SynAIpse Project Office</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Mail className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />

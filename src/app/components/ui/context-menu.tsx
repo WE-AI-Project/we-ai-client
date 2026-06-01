@@ -6,6 +6,48 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. ContextMenuSkeleton 컴포넌트
+ * 메뉴 내용이 로딩 중일 때 표시할 뼈대입니다.
+ * 컨텍스트 메뉴의 아이템들이 나열된 느낌을 시각적으로 재현했습니다.
+ */
+function ContextMenuSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="bg-popover min-w-[8rem] overflow-hidden rounded-md border p-1 shadow-md">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2 px-2 py-1.5"
+        >
+          {/* 아이템 텍스트 자리 뼈대 */}
+          <Skeleton className="h-4 w-[70%]" />
+          {/* 우측 단축키 자리 뼈대 (선택적) */}
+          <Skeleton className="ml-auto h-3 w-8" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 ContextMenu 관련 컴포넌트들
+ */
 function ContextMenu({
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
@@ -243,6 +285,7 @@ export {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSkeleton, // 스켈레톤도 함께 내보냅니다!
   ContextMenuGroup,
   ContextMenuPortal,
   ContextMenuSub,

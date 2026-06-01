@@ -695,7 +695,7 @@ export function JoinProjectScreen({ onJoin }: Props) {
             >
               <Bot className="w-7 h-7" style={{ color: "white" }} />
             </div>
-            <h1 className="text-xl font-bold mb-1.5" style={{ color: TEXT_PRIMARY }}>Welcome to WE&amp;AI Office</h1>
+            <h1 className="text-xl font-bold mb-1.5" style={{ color: TEXT_PRIMARY }}>Welcome to SynAIpse Office</h1>
             <p className="text-xs" style={{ color: TEXT_SECONDARY }}>Intelligent Multi-Agent Project Office</p>
           </div>
 

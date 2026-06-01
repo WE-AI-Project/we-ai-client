@@ -17,7 +17,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "./sheet";
-import { Skeleton } from "./skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -32,6 +31,92 @@ const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 공통 로딩 테마(animate-pulse)를 안정적으로 공유합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. SidebarSkeleton 컴포넌트
+ * 사이드바 전체 레이아웃이 서버 통신 중일 때 공간을 안정적으로 보존해 주는 전신 뼈대입니다.
+ * 상단 로고 헤더, 인풋 검색 창, 메뉴 라벨 및 서브 네스트 아이템들을 직관적으로 시각화했습니다.
+ */
+function SidebarSkeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "bg-sidebar text-sidebar-foreground flex h-screen w-[16rem] flex-col border-r p-2 bg-background gap-4 animate-pulse",
+        className
+      )}
+      role="status"
+      aria-label="Loading sidebar layout"
+    >
+      {/* 사이드바 최상단 프로필/헤더 뼈대 */}
+      <div className="flex items-center gap-2 p-2">
+        <Skeleton className="size-6 rounded-md shrink-0" />
+        <Skeleton className="h-5 w-24" />
+      </div>
+
+      {/* 내부 검색창 슬롯 뼈대 */}
+      <div className="px-2">
+        <Skeleton className="h-8 w-full rounded-md" />
+      </div>
+
+      {/* 대메뉴 및 세부 메뉴 조각들 수직 정렬 시각화 */}
+      <div className="flex-1 flex flex-col gap-6 p-2 overflow-hidden">
+        {/* 메뉴 그룹 A */}
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-16 px-2 mb-3 opacity-80" /> {/* 그룹 라벨 */}
+          <div className="space-y-1">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex h-8 items-center gap-2 rounded-md px-2">
+                <Skeleton className="size-4 rounded-sm shrink-0" />
+                <Skeleton className="h-4 flex-1" style={{ maxWidth: `${60 + (i % 3) * 10}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 메뉴 그룹 B */}
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-20 px-2 mb-3 opacity-80" /> {/* 그룹 라벨 */}
+          <div className="space-y-1">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex h-8 items-center gap-2 rounded-md px-2">
+                <Skeleton className="size-4 rounded-sm shrink-0" />
+                <Skeleton className="h-4 flex-1" style={{ maxWidth: `${50 + (i % 2) * 15}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 최하단 유저 프로필 영역 뼈대 */}
+      <div className="flex items-center gap-2 p-2 border-t border-sidebar-border/20">
+        <Skeleton className="size-8 rounded-full shrink-0" />
+        <div className="space-y-1.5 flex-1">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-2.5 w-28" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Sidebar 컨텍스트 및 컴포넌트 프리미티브 로직들
+ */
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
   open: boolean;
@@ -49,7 +134,6 @@ function useSidebar() {
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider.");
   }
-
   return context;
 }
 
@@ -69,8 +153,6 @@ function SidebarProvider({
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
@@ -81,19 +163,15 @@ function SidebarProvider({
       } else {
         _setOpen(openState);
       }
-
-      // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
     [setOpenProp, open],
   );
 
-  // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen, setOpenMobile]);
 
-  // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -109,8 +187,6 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed";
 
   const contextValue = React.useMemo<SidebarContextProps>(
@@ -214,7 +290,6 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(
@@ -233,7 +308,6 @@ function Sidebar({
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -399,7 +473,6 @@ function SidebarGroupLabel({
   ...props
 }: React.ComponentProps<"div"> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "div";
-
   return (
     <Comp
       data-slot="sidebar-group-label"
@@ -420,14 +493,12 @@ function SidebarGroupAction({
   ...props
 }: React.ComponentProps<"button"> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "button";
-
   return (
     <Comp
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
       className={cn(
         "text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 outline-hidden transition-transform focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 md:after:hidden",
         "group-data-[collapsible=icon]:hidden",
         className,
@@ -555,14 +626,12 @@ function SidebarMenuAction({
   showOnHover?: boolean;
 }) {
   const Comp = asChild ? Slot : "button";
-
   return (
     <Comp
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
       className={cn(
         "text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground peer-hover/menu-button:text-sidebar-accent-foreground absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 outline-hidden transition-transform focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 md:after:hidden",
         "peer-data-[size=sm]/menu-button:top-1",
         "peer-data-[size=default]/menu-button:top-1.5",
@@ -606,7 +675,6 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
 }) {
-  // Random width between 50 to 90%.
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
@@ -678,7 +746,6 @@ function SidebarMenuSubButton({
   isActive?: boolean;
 }) {
   const Comp = asChild ? Slot : "a";
-
   return (
     <Comp
       data-slot="sidebar-menu-sub-button"
@@ -723,4 +790,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  SidebarSkeleton, // 안전하게 대형 스켈레톤 홀더를 내보냅니다!
 };

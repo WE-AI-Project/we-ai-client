@@ -5,6 +5,65 @@ import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "./utils";
 
+/**
+ * 1. 기초가 되는 Skeleton 조각
+ * SynAIpse 프로젝트의 통일된 로딩 애니메이션을 제공합니다.
+ */
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("bg-muted animate-pulse rounded-md", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * 2. DrawerSkeleton 컴포넌트
+ * 드로어 내부에 로딩 중일 때 표시할 뼈대입니다.
+ * 상단 바, 헤더, 리스트 형태의 본문 영역을 시각적으로 재현했습니다.
+ */
+function DrawerSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 w-full p-4">
+      {/* 상단 드래그 핸들 뼈대 (바닥에서 올라오는 드로어 전용) */}
+      <div className="mx-auto h-2 w-[100px] rounded-full bg-muted/50 mb-2" />
+      
+      <div className="space-y-2">
+        {/* 제목 자리 뼈대 */}
+        <Skeleton className="h-6 w-[40%]" />
+        {/* 설명 자리 뼈대 */}
+        <Skeleton className="h-4 w-[60%]" />
+      </div>
+      
+      {/* 본문 리스트 아이템 뼈대들 */}
+      <div className="space-y-4 mt-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <Skeleton className="size-10 rounded-full" /> {/* 이미지/아이콘 자리 */}
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-4 w-[80%]" />
+              <Skeleton className="h-3 w-[40%]" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 하단 버튼 영역 뼈대 */}
+      <div className="mt-auto pt-6 flex flex-col gap-2">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 3. 실제 Drawer 관련 컴포넌트들
+ */
 function Drawer({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
@@ -129,4 +188,5 @@ export {
   DrawerFooter,
   DrawerTitle,
   DrawerDescription,
+  DrawerSkeleton, // 스켈레톤 내보내기
 };
