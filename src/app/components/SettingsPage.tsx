@@ -145,7 +145,7 @@ export function SettingsPage() {
                 className="px-3 py-2 rounded-xl text-xs"
                 style={{ background: "rgba(99,91,255,0.06)", border: "1px solid rgba(99,91,255,0.12)", color: ACCENT }}
               >
-                WE&amp;AI Project Office
+                SynAIpse Project Office
               </div>
             </div>
           </SectionCard>

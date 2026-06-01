@@ -97,7 +97,7 @@ export function QAReportsPage() {
                 <Sparkles className="w-4 h-4" style={{ color: ACCENT }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>AI QA Reports</h1>
               </div>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>WE&amp;AI Backend Server · Last scan: Today 09:41</p>
+              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>SynAIpse Backend Server · Last scan: Today 09:41</p>
             </div>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold" style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}>
               <RefreshCw className="w-3 h-3" /> Re-scan
