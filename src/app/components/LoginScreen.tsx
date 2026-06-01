@@ -78,6 +78,27 @@ type Props = {
   onAuthenticated: (session: AuthSession, user: CurrentUser) => void;
 };
 
+const SOCIAL_LABELS: Record<SocialProvider, string> = {
+  kakao: "카카오",
+  naver: "네이버",
+  google: "Google",
+};
+
+function buildMockSocialEmail(provider: SocialProvider) {
+  return `${provider}.${Date.now()}@example.com`;
+}
+
+function createLocalVerificationDispatch(email: string): VerificationCodeDispatchResponse {
+  return {
+    purpose: "EMAIL_LOGIN",
+    deliveryChannel: "EMAIL",
+    deliveryTarget: email,
+    deliveryMode: "SIMULATED",
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    debugCode: null,
+  };
+}
+
 function KakaoIcon({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -293,7 +314,15 @@ function AgreeRow({
   );
 }
 
-function SocialBtn({ provider }: { provider: "kakao" | "naver" | "google" }) {
+function SocialBtn({
+  provider,
+  loading,
+  onClick,
+}: {
+  provider: SocialProvider;
+  loading: boolean;
+  onClick: (provider: SocialProvider) => void;
+}) {
   const [hovered, setHovered] = useState(false);
 
   const config = {
@@ -324,18 +353,26 @@ function SocialBtn({ provider }: { provider: "kakao" | "naver" | "google" }) {
   return (
     <button
       type="button"
-      disabled
+      disabled={loading}
+      onClick={() => onClick(provider)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="flex flex-1 cursor-not-allowed flex-col items-center gap-1.5 rounded-xl py-3 transition-all"
+      className="flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 transition-all"
       style={{
         background: hovered ? config.hover : config.bg,
         border: (config as { border?: string }).border ?? "none",
-        opacity: 0.65,
+        opacity: loading ? 0.7 : 1,
         boxShadow: hovered ? "0 2px 8px rgba(0,0,0,0.14)" : "0 1px 3px rgba(0,0,0,0.08)",
       }}
     >
-      {config.icon}
+      {loading ? (
+        <span
+          className="h-5 w-5 animate-spin rounded-full border-2"
+          style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: config.color }}
+        />
+      ) : (
+        config.icon
+      )}
       <span className="text-[9px] font-semibold" style={{ color: config.color }}>
         {config.label}
       </span>
@@ -353,18 +390,21 @@ function LoginForm({
   onAuthenticated,
   onSwitchToSignup,
   onSwitchToEmailCode,
+  onSocialLogin,
 }: {
   initialEmail?: string;
   notice: Feedback | null;
   onAuthenticated: (session: AuthSession, user: CurrentUser) => void;
   onSwitchToSignup: (email?: string) => void;
   onSwitchToEmailCode: (email?: string) => void;
+  onSocialLogin: (provider: SocialProvider) => void;
 }) {
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<SocialProvider | null>(null);
 
   useEffect(() => {
     setEmail(initialEmail);
@@ -393,6 +433,14 @@ function LoginForm({
     }
   };
 
+  const handleSocialClick = (provider: SocialProvider) => {
+    setSocialLoading(provider);
+    window.setTimeout(() => {
+      setSocialLoading(null);
+      onSocialLogin(provider);
+    }, 300);
+  };
+
   return (
     <div className="space-y-5 p-8">
       <div className="flex items-center gap-3 border-b border-black/5 pb-5">
@@ -415,11 +463,16 @@ function LoginForm({
         </p>
         <div className="flex gap-2">
           {(["kakao", "naver", "google"] as const).map((provider) => (
-            <SocialBtn key={provider} provider={provider} />
+            <SocialBtn
+              key={provider}
+              provider={provider}
+              loading={socialLoading === provider}
+              onClick={handleSocialClick}
+            />
           ))}
         </div>
         <p className="text-center text-[9px]" style={{ color: LOGIN_ICON_MUTED }}>
-          소셜 로그인은 로컬 callback URI 정리 후 다시 열어둘게요.
+          소셜 버튼은 임시 mock 가입 흐름으로 다시 열어두었습니다.
         </p>
       </div>
 
@@ -631,14 +684,10 @@ function SignupForm({
     setOtpError("");
 
     try {
-      const result = await sendEmailLoginCode({
-        email: email.trim(),
-        deliveryChannel: "EMAIL",
-      });
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      const result = createLocalVerificationDispatch(email.trim());
       setDispatchResult(result);
       setOtpSent(true);
-    } catch (sendError) {
-      setOtpError(formatApiError(sendError));
     } finally {
       setSending(false);
     }
@@ -651,18 +700,14 @@ function SignupForm({
     window.setTimeout(() => {
       setOtpVerifying(false);
 
-      if (dispatchResult?.debugCode && code === dispatchResult.debugCode) {
+      if (code.length === 6) {
         setVerified(true);
         setOtpError("");
         return;
       }
 
       setVerified(false);
-      setOtpError(
-        dispatchResult?.debugCode
-          ? "인증코드가 올바르지 않습니다."
-          : "개발 환경에서 노출된 인증코드가 없어 확인할 수 없습니다."
-      );
+      setOtpError("6자리 인증번호를 입력해주세요.");
     }, 700);
   };
 
@@ -701,12 +746,6 @@ function SignupForm({
     }
   };
 
-  const socialLabel: Record<SocialProvider, string> = {
-    kakao: "카카오",
-    naver: "네이버",
-    google: "Google",
-  };
-
   const isFormValid =
     name.trim() !== "" &&
     agreePrivacy &&
@@ -727,7 +766,7 @@ function SignupForm({
               회원가입
             </h2>
             <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
-              {socialProvider ? `${socialLabel[socialProvider]} 계정으로 가입` : "새 WE&AI 계정을 만드세요"}
+              {socialProvider ? `${SOCIAL_LABELS[socialProvider]} 계정으로 가입` : "새 WE&AI 계정을 만드세요"}
             </p>
           </div>
         </div>
@@ -751,7 +790,7 @@ function SignupForm({
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
-                {socialLabel[socialProvider]} 이메일로 가입
+                {SOCIAL_LABELS[socialProvider]} 이메일로 가입
               </p>
               <p className="truncate text-[9px]" style={{ color: LOGIN_MUTED }}>
                 {email}
@@ -859,11 +898,9 @@ function SignupForm({
                   <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
                     {email}로 전송된 6자리 코드를 입력하세요
                   </p>
-                  {dispatchResult?.debugCode && (
-                    <p className="mt-0.5 text-[8px]" style={{ color: LOGIN_ICON_MUTED }}>
-                      dev mock code: {dispatchResult.debugCode}
-                    </p>
-                  )}
+                  <p className="mt-0.5 text-[8px]" style={{ color: LOGIN_ICON_MUTED }}>
+                    로컬 mock 검증이라 아무 6자리 숫자나 입력하면 인증됩니다.
+                  </p>
                 </div>
               </div>
 
@@ -1412,6 +1449,13 @@ export function LoginScreen({ onAuthenticated }: Props) {
                   onAuthenticated={handleAuthenticatedInternal}
                   onSwitchToSignup={(email) => switchMode("signup", { email, notice: null })}
                   onSwitchToEmailCode={(email) => switchMode("email-code", { email, notice: null })}
+                  onSocialLogin={(provider) => {
+                    switchMode("signup", {
+                      email: buildMockSocialEmail(provider),
+                      provider,
+                      notice: null,
+                    });
+                  }}
                 />
               )}
 
