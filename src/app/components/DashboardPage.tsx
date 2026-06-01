@@ -1,352 +1,349 @@
-import { GitCommit, FileText, Activity, Bot, Server, Cpu } from "lucide-react";
-import { PageLoader, DashboardSkeleton } from "./SkeletonLoader";
+import { useEffect, useMemo, useState } from "react";
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1,
+  Activity,
+  CalendarDays,
+  CheckCircle2,
+  Hash,
+  ListTodo,
+  RefreshCw,
+  Users,
+} from "lucide-react";
+import { DashboardSkeleton } from "./SkeletonLoader";
+import {
+  ACCENT,
+  ACCENT_BG,
+  BORDER,
+  BORDER_SUBTLE,
+  GRADIENT_PAGE,
+  STATUS_ERROR,
+  TEXT_LABEL,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  TEXT_TERTIARY,
 } from "../colors";
+import {
+  ProjectDashboard,
+  ProjectDepartment,
+  ProjectScheduleStatus,
+  fetchProjectDashboard,
+  formatApiError,
+} from "../lib/api";
 
-// ── 프로젝트 진행률 데이터 ──
-const PROGRESS_DATA = {
-  overall:  { label: "Overall",  pct: 42, color: ACCENT || "#AEB784" },
-  backend:  { label: "Backend",  pct: 58, color: "#5A8A4A" },
-  frontend: { label: "Frontend", pct: 27, color: "#C09840" },
-  agents:   { label: "Agents",   pct: 50, color: "#AEB784" },
+const DEPARTMENT_LABELS: Record<ProjectDepartment, string> = {
+  BACKEND: "Backend",
+  FRONTEND: "Frontend",
+  QA: "QA",
+  DEVOPS: "DevOps",
+  AI: "AI",
+  DATABASE: "Database",
+  DESIGN: "Design",
+  PM: "PM",
 };
 
-// ── 마일스톤 ──
-const MILESTONES = [
-  { label: "Spring Boot 기본 설정",         done: true  },
-  { label: "멀티에이전트 통신 프로토콜",   done: true  },
-  { label: "DataSyncAgent 구현",           done: true  },
-  { label: "ParserAgent 안정화",           done: false },
-  { label: "JWT 인증 미들웨어",            done: false },
-  { label: "프론트 Agent 대시보드",        done: false },
-  { label: "AI QA 자동화 통합",            done: false },
-];
-
-// ── 최근 커밋 ──
-const RECENT_COMMITS = [
-  { hash: "7f2b1a3", message: "Fixed JDK 17 toolchain issue in settings.gradle",    author: "병권", time: "5m ago",  branch: "main"          },
-  { hash: "a9c4d02", message: "Refactored MultiAgentController dispatch logic",    author: "병권", time: "1h ago",  branch: "main"          },
-  { hash: "3e8f51b", message: "Added application-dev.yml default agent configs",     author: "Admin",time: "3h ago",  branch: "feature/agent" },
-  { hash: "b2d7890", message: "Resolved DataSync Alpha null pointer exception",      author: "병권", time: "5h ago",  branch: "main"          },
-  { hash: "f1a6c34", message: "Updated Gradle wrapper to 8.7",                       author: "Admin",time: "1d ago",  branch: "main"          },
-  { hash: "9e3b2f7", message: "Initial multi-agent handshake protocol impl",         author: "Admin",time: "2d ago",  branch: "feature/agent" },
-];
-
-// ── 최근 변경 파일 ──
-const RECENT_FILES = [
-  { path: "D:\\WE_AI\\build.gradle",                                   type: "gradle", changed: "5m ago",  status: "modified" },
-  { path: "D:\\WE_AI\\src\\main\\resources\\application-dev.yml",    type: "yml",    changed: "1h ago",  status: "modified" },
-  { path: "D:\\WE_AI\\src\\main\\java\\...\\MultiAgentController.java",type:"java",  changed: "3h ago",  status: "modified" },
-  { path: "D:\\WE_AI\\src\\main\\java\\...\\DataSyncAgent.java",     type: "java",   changed: "3h ago",  status: "added"    },
-  { path: "D:\\WE_AI\\settings.gradle",                               type: "gradle", changed: "5h ago",  status: "modified" },
-  { path: "D:\\WE_AI\\src\\main\\java\\...\\AgentScheduler.java",    type: "java",   changed: "1d ago",  status: "modified" },
-  { path: "D:\\WE_AI\\.env.dev",                                      type: "env",    changed: "2d ago",  status: "deleted"  },
-];
-
-// ── 에이전트 ──
-const AGENT_SUMMARY = [
-  { name: "DataSync Alpha",  status: "running", cpu: 38, mem: 412 },
-  { name: "Classifier Beta", status: "running", cpu: 72, mem: 680 },
-  { name: "Logger Gamma",    status: "idle",    cpu: 2,  mem: 120 },
-  { name: "Parser Delta",    status: "error",   cpu: 0,  mem: 0   },
-  { name: "Scheduler Eps",   status: "running", cpu: 18, mem: 230 },
-  { name: "Analyzer Zeta",   status: "idle",    cpu: 4,  mem: 98  },
-];
-
-const STATUS_COLOR: Record<string, string> = {
-  running: "#10b981", idle: "#9ca3af", error: "#ef4444",
+const STATUS_COLORS: Record<ProjectScheduleStatus, { color: string; bg: string }> = {
+  TODO: { color: "#C09840", bg: "rgba(192,152,64,0.12)" },
+  IN_PROGRESS: { color: ACCENT, bg: ACCENT_BG },
+  DONE: { color: "#5A8A4A", bg: "rgba(90,138,74,0.12)" },
+  COMPLETED: { color: "#5A8A4A", bg: "rgba(90,138,74,0.12)" },
+  HOLD: { color: "#888A62", bg: "rgba(136,138,98,0.12)" },
 };
 
-const FILE_TYPE_COLOR: Record<string, { bg: string; color: string }> = {
-  gradle: { bg: "rgba(65,67,27,0.08)",    color: ACCENT || "#AEB784" },
-  yml:    { bg: "rgba(90,138,74,0.08)",   color: "#5A8A4A"  },
-  java:   { bg: "rgba(192,152,64,0.08)",  color: "#C09840"  },
-  env:    { bg: "rgba(136,138,98,0.08)",  color: "#888A62"  },
-};
-
-const STATUS_FILE: Record<string, { color: string; label: string }> = {
-  modified: { color: "#C09840", label: "M" },
-  added:    { color: "#5A8A4A", label: "A" },
-  deleted:  { color: "#B85450", label: "D" },
-};
-
-function CircleProgress({ pct, color, size = 72, strokeW = 5 }: { pct: number; color: string; size?: number; strokeW?: number }) {
-  const r   = (size - strokeW * 2) / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = ((pct || 0) / 100) * circ;
-
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+}) {
   return (
-    <svg width={size} height={size}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={strokeW} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r}
-        fill="none" stroke={color || "#AEB784"} strokeWidth={strokeW}
-        strokeDasharray={`${dash} ${circ - dash}`}
-        strokeDashoffset={circ / 4}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dasharray 0.8s ease" }}
-      />
-    </svg>
-  );
-}
-
-function LinearBar({ pct, color }: { pct: number; color: string; bg?: string }) {
-  return (
-    <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.07)" }}>
-      <div className="h-full rounded-full transition-all" style={{ width: `${pct || 0}%`, background: color }} />
+    <div
+      className="rounded-2xl border px-4 py-4"
+      style={{ background: "rgba(255,255,255,0.88)", borderColor: BORDER }}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+        {label}
+      </p>
+      <p className="mt-3 text-2xl font-bold" style={{ color: tone }}>
+        {value}
+      </p>
     </div>
   );
 }
 
-type Props = { projectName: string };
+type Props = {
+  projectId: number | null;
+  projectName: string;
+};
 
-export function DashboardPage({ projectName }: Props) {
-  const runningCount = AGENT_SUMMARY?.filter(a => a?.status === "running")?.length || 0;
-  const errorCount   = AGENT_SUMMARY?.filter(a => a?.status === "error")?.length || 0;
-  const doneMile     = MILESTONES?.filter(m => m?.done)?.length || 0;
+export function DashboardPage({ projectId, projectName }: Props) {
+  const [dashboard, setDashboard] = useState<ProjectDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 안전하게 데이터를 매핑하기 위한 바인딩 배열 생성 기법
-  const targetProgressData = [
-    PROGRESS_DATA?.backend || { label: "Backend", pct: 0, color: "#5A8A4A" },
-    PROGRESS_DATA?.frontend || { label: "Frontend", pct: 0, color: "#C09840" },
-    PROGRESS_DATA?.agents || { label: "Agents", pct: 0, color: "#AEB784" }
-  ];
+  const progressLabel = useMemo(() => `${dashboard?.progressRate ?? 0}%`, [dashboard]);
 
-  const content = (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,152,64,0.14) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
+  const loadDashboard = async () => {
+    if (!projectId) {
+      setDashboard(null);
+      setLoading(false);
+      return;
+    }
 
-      <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+    setLoading(true);
 
-          {/* ── 헤더 ── */}
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#10b981" }} />
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#10b981" }}>Active</p>
-              </div>
-              <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>{projectName || "SynAIpse"}</h1>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>Java 17 · Spring Boot 3 · Gradle 8.7</p>
-            </div>
-            <div className="flex items-center gap-2 text-[10px]" style={{ color: TEXT_TERTIARY }}>
-              <span>마일스톤 {doneMile}/{MILESTONES?.length || 0}</span>
-            </div>
-          </div>
+    try {
+      const nextDashboard = await fetchProjectDashboard(projectId);
+      setDashboard(nextDashboard);
+      setError(null);
+    } catch (loadError) {
+      setError(formatApiError(loadError));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          {/* ── 프로젝트 진행률 섹션 ── */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(248,243,225,0.82)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <div className="flex items-center gap-2 px-5 py-3.5" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
-              <Activity className="w-3.5 h-3.5" style={{ color: ACCENT || "#AEB784" }} />
-              <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Project Progress</p>
-              <span className="ml-auto text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: ACCENT_BG, color: ACCENT || "#AEB784" }}>
-                Sprint 1 / 3
-              </span>
-            </div>
+  useEffect(() => {
+    void loadDashboard();
+  }, [projectId]);
 
-            <div className="p-5">
-              <div className="flex items-center gap-6">
-                {/* Overall 큰 원 */}
-                <div className="flex flex-col items-center gap-2">
-                  <div className="relative">
-                    <CircleProgress pct={PROGRESS_DATA?.overall?.pct || 0} color={PROGRESS_DATA?.overall?.color || "#AEB784"} size={84} strokeW={6} />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
-                        {PROGRESS_DATA?.overall?.pct || 0}%
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>Overall</p>
-                </div>
-
-                <div className="w-px h-16 shrink-0" style={{ background: BORDER }} />
-
-                {/* Backend / Frontend / Agents 작은 원 */}
-                <div className="flex items-center gap-6 flex-1">
-                  {targetProgressData.map(p => (
-                    <div key={p?.label} className="flex flex-col items-center gap-2">
-                      <div className="relative">
-                        <CircleProgress pct={p?.pct || 0} color={p?.color} size={60} strokeW={5} />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
-                            {p?.pct || 0}%
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>{p?.label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="w-px h-16 shrink-0" style={{ background: BORDER }} />
-                
-                {/* 마일스톤 미니 뷰 */}
-                <div className="flex flex-col gap-1.5" style={{ minWidth: 140 }}>
-                  <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_LABEL }}>Milestones</p>
-                  {MILESTONES?.slice(0, 5).map((m, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: m?.done ? "#10b981" : "rgba(0,0,0,0.10)" }} />
-                      <p className="text-[9px] truncate" style={{ color: m?.done ? TEXT_SECONDARY : TEXT_TERTIARY }}>
-                        {m?.label}
-                      </p>
-                    </div>
-                  ))}
-                  {(MILESTONES?.length || 0) > 5 && (
-                    <p className="text-[8px]" style={{ color: TEXT_TERTIARY }}>
-                      +{(MILESTONES?.length || 0) - 5} more…
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* 파트별 선형 바 (옵셔널 체이닝 보완 완료) */}
-              <div className="mt-5 grid grid-cols-3 gap-4">
-                {targetProgressData.map(p => (
-                  <div key={p?.label} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>{p?.label}</span>
-                      <span className="text-[10px] font-mono font-semibold" style={{ color: p?.color }}>{p?.pct || 0}%</span>
-                    </div>
-                    <LinearBar pct={p?.pct || 0} color={p?.color} />
-                    <div className="flex items-center justify-between text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                      <span>진행 중</span>
-                      <span>목표 100%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ── 상태 요약 카드 4개 ── */}
-          <div className="grid grid-cols-4 gap-2.5">
-            {[
-              { label: "Total Agents",   value: String(AGENT_SUMMARY?.length || 0), color: ACCENT || "#AEB784",    bg: "rgba(174,183,132,0.12)", icon: Bot     },
-              { label: "Running",        value: String(runningCount),              color: "#5A8A4A",  bg: "rgba(90,138,74,0.07)",    icon: Server  },
-              { label: "Error",          value: String(errorCount),                color: "#B85450",  bg: "rgba(184,84,80,0.07)",    icon: Server  },
-              { label: "Recent Commits", value: String(RECENT_COMMITS?.length || 0), color: "#AEB784",  bg: "rgba(174,183,132,0.10)",  icon: GitCommit },
-            ].map(s => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label} className="rounded-xl p-3.5" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}` }}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: s.bg }}>
-                    <Icon className="w-3 h-3" style={{ color: s.color }} />
-                  </div>
-                  <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* ── 2-컬럼 컨텐츠 ── */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* 최근 커밋 목록 */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-              <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(237,232,210,0.8)" }}>
-                <GitCommit className="w-3.5 h-3.5" style={{ color: ACCENT || "#AEB784" }} />
-                <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Recent Commits</p>
-                <span className="ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: ACCENT_BG, color: ACCENT || "#AEB784" }}>
-                  {RECENT_COMMITS?.length || 0}
-                </span>
-              </div>
-              <div>
-                {RECENT_COMMITS?.map((c, i) => (
-                  <div
-                    key={c?.hash}
-                    className="px-4 py-2.5 transition-colors hover:bg-black/[0.02] cursor-pointer"
-                    style={{ borderBottom: i < (RECENT_COMMITS?.length || 0) - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}
-                  >
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ background: ACCENT_BG, color: ACCENT || "#AEB784" }}>
-                        [{c?.hash?.slice(0, 7)}]
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(65,67,27,0.05)", color: TEXT_TERTIARY }}>
-                        {c?.branch}
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-medium leading-snug mb-0.5 line-clamp-1" style={{ color: TEXT_PRIMARY }}>
-                      {c?.message}
-                    </p>
-                    <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{c?.author} · {c?.time}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 변경된 파일 & 에이전트 상태 */}
-            <div className="space-y-3">
-              <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-                <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(237,232,210,0.8)" }}>
-                  <FileText className="w-3.5 h-3.5" style={{ color: "#C09840" }} />
-                  <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Recently Changed Files</p>
-                </div>
-                <div>
-                  {RECENT_FILES?.map((f, i) => {
-                    const tc = FILE_TYPE_COLOR[f?.type] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY };
-                    const sc = STATUS_FILE[f?.status] ?? { color: TEXT_TERTIARY, label: "?" };
-                    const filename = f?.path?.split("\\")?.pop() || f?.path;
-                    return (
-                      <div
-                        key={f?.path}
-                        className="px-4 py-2 flex items-center gap-2.5 transition-colors hover:bg-black/[0.02] cursor-pointer"
-                        style={{ borderBottom: i < (RECENT_FILES?.length || 0) - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}
-                      >
-                        <span className="text-[8px] font-semibold uppercase px-1.5 py-0.5 rounded shrink-0" style={{ background: tc.bg, color: tc.color }}>
-                          .{f?.type}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium truncate" style={{ color: TEXT_PRIMARY }}>{filename}</p>
-                          <p className="text-[9px] truncate" style={{ color: TEXT_TERTIARY }}>{f?.changed}</p>
-                        </div>
-                        <span className="text-[9px] font-bold shrink-0" style={{ color: sc.color }}>{sc.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Agent Status 리스트 */}
-              <div className="rounded-2xl p-3.5" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Activity className="w-3.5 h-3.5" style={{ color: "#10b981" }} />
-                  <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Agent Status</p>
-                </div>
-                <div className="space-y-2">
-                  {AGENT_SUMMARY?.map(a => (
-                    <div key={a?.name} className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_COLOR[a?.status] || "#9ca3af" }} />
-                      <p className="text-[10px] flex-1 truncate" style={{ color: TEXT_PRIMARY }}>{a?.name}</p>
-                      {a?.status === "running" ? (
-                        <div className="flex items-center gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                          <Cpu className="w-2.5 h-2.5" />
-                          <span style={{ color: (a?.cpu || 0) > 70 ? "#ef4444" : TEXT_SECONDARY }}>{a?.cpu || 0}%</span>
-                          <span>{a?.mem || 0}MB</span>
-                        </div>
-                      ) : (
-                        <span className="text-[9px] capitalize" style={{ color: STATUS_COLOR[a?.status] || "#9ca3af" }}>{a?.status}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
+  if (!projectId) {
+    return (
+      <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
+        <div
+          className="rounded-3xl border px-6 py-6 text-center"
+          style={{ background: "rgba(255,255,255,0.94)", borderColor: BORDER }}
+        >
+          <p className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+            아직 선택된 프로젝트가 없습니다.
+          </p>
+          <p className="mt-2 text-sm" style={{ color: TEXT_SECONDARY }}>
+            프로젝트 목록에서 하나를 열면 실시간 대시보드가 여기 표시됩니다.
+          </p>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (!dashboard || error) {
+    return (
+      <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
+        <div
+          className="max-w-lg rounded-3xl border px-6 py-6 text-center"
+          style={{ background: "rgba(255,255,255,0.94)", borderColor: BORDER }}
+        >
+          <p className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+            대시보드를 불러오지 못했습니다.
+          </p>
+          <p className="mt-2 text-sm" style={{ color: error ? STATUS_ERROR : TEXT_SECONDARY }}>
+            {error ?? "응답 데이터가 비어 있습니다."}
+          </p>
+          <button
+            onClick={() => void loadDashboard()}
+            type="button"
+            className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+            style={{ background: ACCENT, color: "white" }}
+          >
+            <RefreshCw className="h-4 w-4" />
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <PageLoader skeleton={<DashboardSkeleton />} delay={700}>
-      {content}
-    </PageLoader>
+    <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
+      <div className="mx-auto max-w-6xl space-y-5">
+        <section
+          className="rounded-[28px] border px-6 py-6"
+          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: TEXT_LABEL }}>
+                Project Dashboard
+              </p>
+              <h1 className="mt-2 text-3xl font-bold" style={{ color: TEXT_PRIMARY }}>
+                {dashboard.projectName || projectName}
+              </h1>
+              <div className="mt-3 flex flex-wrap gap-2 text-[12px]" style={{ color: TEXT_SECONDARY }}>
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: ACCENT_BG }}>
+                  <Hash className="h-3.5 w-3.5" />
+                  {dashboard.projectCode}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(90,138,74,0.12)" }}>
+                  <Activity className="h-3.5 w-3.5" />
+                  {dashboard.status}
+                </span>
+                {dashboard.targetDate && (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(192,152,64,0.12)" }}>
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {dashboard.targetDate}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => void loadDashboard()}
+              type="button"
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+              style={{ background: ACCENT, color: "white" }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              새로고침
+            </button>
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <StatCard label="Members" value={`${dashboard.memberCount}`} tone={ACCENT} />
+          <StatCard label="Schedules" value={`${dashboard.scheduleCount}`} tone="#C09840" />
+          <StatCard label="Completed" value={`${dashboard.completedScheduleCount}`} tone="#5A8A4A" />
+          <StatCard label="Progress" value={progressLabel} tone={ACCENT} />
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div
+            className="rounded-[28px] border px-5 py-5"
+            style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" style={{ color: ACCENT }} />
+              <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+                부서별 진행률
+              </h2>
+            </div>
+
+            <div className="space-y-4">
+              {dashboard.departmentProgress.length === 0 ? (
+                <p className="text-sm" style={{ color: TEXT_TERTIARY }}>
+                  아직 집계된 부서별 일정이 없습니다.
+                </p>
+              ) : (
+                dashboard.departmentProgress.map((item) => (
+                  <div key={item.department} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+                          {DEPARTMENT_LABELS[item.department]}
+                        </p>
+                        <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>
+                          완료 {item.completedCount} / 전체 {item.totalCount}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold" style={{ color: ACCENT }}>
+                        {item.progressRate}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full" style={{ background: ACCENT_BG }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${item.progressRate}%`, background: ACCENT }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div
+            className="rounded-[28px] border px-5 py-5"
+            style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <ListTodo className="h-4 w-4" style={{ color: ACCENT }} />
+              <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+                최근 일정
+              </h2>
+            </div>
+
+            <div className="space-y-3">
+              {dashboard.recentSchedules.length === 0 ? (
+                <p className="text-sm" style={{ color: TEXT_TERTIARY }}>
+                  아직 표시할 일정이 없습니다.
+                </p>
+              ) : (
+                dashboard.recentSchedules.map((schedule) => {
+                  const statusColor = STATUS_COLORS[schedule.status];
+
+                  return (
+                    <div
+                      key={schedule.scheduleId}
+                      className="rounded-2xl border px-4 py-3"
+                      style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+                            {schedule.title}
+                          </p>
+                          <p className="mt-1 text-[12px]" style={{ color: TEXT_TERTIARY }}>
+                            {DEPARTMENT_LABELS[schedule.department]}
+                            {schedule.endDate ? ` · ${schedule.endDate}` : ""}
+                          </p>
+                        </div>
+                        <span
+                          className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          style={{ color: statusColor.color, background: statusColor.bg }}
+                        >
+                          {schedule.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="rounded-[28px] border px-5 py-5"
+          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+        >
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="h-4 w-4" style={{ color: ACCENT }} />
+            <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+              요약
+            </h2>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+                Start Date
+              </p>
+              <p className="mt-2 text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+                {dashboard.startDate ?? "-"}
+              </p>
+            </div>
+            <div className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+                Target Date
+              </p>
+              <p className="mt-2 text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+                {dashboard.targetDate ?? "-"}
+              </p>
+            </div>
+            <div className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+                Completion Ratio
+              </p>
+              <p className="mt-2 text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+                {dashboard.completedScheduleCount}/{dashboard.scheduleCount}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }

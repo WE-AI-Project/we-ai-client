@@ -1,18 +1,52 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  OLIVE_DARK, SAGE, TEXT_PRIMARY, STATUS_ERROR, STATUS_SUCCESS,
-  LOGIN_MUTED, LOGIN_ICON_MUTED, LOGIN_CHECKBOX, LOGIN_CHEVRON,
-  LOGIN_OLIVE_TEXT, LOGIN_DISABLED_BG, LOGIN_DISABLED_BG2,
-  LOGIN_SHADOW_1, LOGIN_SHADOW_2, INPUT_BG, TEXT_LABEL,
+  OLIVE_DARK,
+  SAGE,
+  TEXT_PRIMARY,
+  STATUS_ERROR,
+  STATUS_SUCCESS,
+  LOGIN_MUTED,
+  LOGIN_ICON_MUTED,
+  LOGIN_CHECKBOX,
+  LOGIN_CHEVRON,
+  LOGIN_OLIVE_TEXT,
+  LOGIN_DISABLED_BG,
+  LOGIN_DISABLED_BG2,
+  LOGIN_SHADOW_1,
+  LOGIN_SHADOW_2,
+  INPUT_BG,
+  TEXT_LABEL,
+  TEXT_SECONDARY,
 } from "../colors";
 import {
-  FolderGit2, Mail, Lock, Eye, EyeOff,
-  User, ChevronRight, CheckSquare, Square, X, ArrowRight,
-  ShieldCheck, CheckCircle2,
+  FolderGit2,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  ChevronRight,
+  CheckSquare,
+  Square,
+  X,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  KeyRound,
 } from "lucide-react";
-import { buildApiUrl } from "../lib/api";
+import {
+  AuthSession,
+  CurrentUser,
+  SocialProvider,
+  VerificationCodeDispatchResponse,
+  fetchCurrentUser,
+  formatApiError,
+  login,
+  loginWithEmailCode,
+  sendEmailLoginCode,
+  signUp,
+} from "../lib/api";
 
-// ── 카드 등장 애니메이션 ──
 const KEYFRAMES = `
   @keyframes card-appear {
     from { opacity: 0; transform: translate(-50%, -46%) scale(0.96); }
@@ -31,19 +65,19 @@ const THICK_SHADOW = [
   "0 32px 64px rgba(0,0,0,0.14)",
 ].join(", ");
 
-type CardMode = "login" | "signup";
+type CardMode = "login" | "signup" | "email-code";
 
-// ── 목 DB (등록된 이메일) ──
-const MOCK_REGISTERED = new Set(["test@weai.com", "admin@weai.com"]);
+type FeedbackTone = "success" | "error" | "info";
 
-// ── 소셜 공급자 목 이메일 (신규 유저 → 회원가입으로 이동) ──
-const SOCIAL_EMAILS: Record<"kakao" | "naver" | "google", string> = {
-  kakao: "me@kakao.com",
-  naver: "me@naver.com",
-  google: "me@gmail.com",
+type Feedback = {
+  tone: FeedbackTone;
+  text: string;
 };
 
-// ─── 소셜 SVG 아이콘 ─────────────────────────────────────
+type Props = {
+  onAuthenticated: (session: AuthSession, user: CurrentUser) => void;
+};
+
 function KakaoIcon({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -74,64 +108,93 @@ function GoogleIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-// ─── OTP 6자리 입력 ──────────────────────────────────────
-function OtpInput({ onComplete, disabled }: { onComplete: (code: string) => void; disabled?: boolean }) {
+function OtpInput({
+  onComplete,
+  disabled,
+  resetKey,
+}: {
+  onComplete: (code: string) => void;
+  disabled?: boolean;
+  resetKey?: string;
+}) {
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const handleChange = (i: number, v: string) => {
-    if (!/^[a-zA-Z0-9]*$/.test(v)) return;
-    const next = [...digits];
-    next[i] = v.slice(-1).toUpperCase();
-    setDigits(next);
-    if (v && i < 5) refs.current[i + 1]?.focus();
-    const code = next.join("");
-    if (next.every(d => d !== "")) onComplete(code);
-  };
+  useEffect(() => {
+    setDigits(["", "", "", "", "", ""]);
+  }, [resetKey]);
 
-  const handleKeyDown = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !digits[i] && i > 0) {
-      const next = [...digits];
-      next[i - 1] = "";
-      setDigits(next);
-      refs.current[i - 1]?.focus();
+  const handleChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) {
+      return;
     }
-    if (e.key === "ArrowLeft" && i > 0) refs.current[i - 1]?.focus();
-    if (e.key === "ArrowRight" && i < 5) refs.current[i + 1]?.focus();
+
+    const next = [...digits];
+    next[index] = value.slice(-1);
+    setDigits(next);
+
+    if (value && index < 5) {
+      refs.current[index + 1]?.focus();
+    }
+
+    const code = next.join("");
+    if (next.every((digit) => digit !== "")) {
+      onComplete(code);
+    }
   };
 
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData("text").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6);
+  const handleKeyDown = (index: number, event: React.KeyboardEvent) => {
+    if (event.key === "Backspace" && !digits[index] && index > 0) {
+      const next = [...digits];
+      next[index - 1] = "";
+      setDigits(next);
+      refs.current[index - 1]?.focus();
+    }
+
+    if (event.key === "ArrowLeft" && index > 0) {
+      refs.current[index - 1]?.focus();
+    }
+
+    if (event.key === "ArrowRight" && index < 5) {
+      refs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (event: React.ClipboardEvent) => {
+    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     if (pasted.length === 6) {
       setDigits(pasted.split(""));
       refs.current[5]?.focus();
       onComplete(pasted);
     }
-    e.preventDefault();
+    event.preventDefault();
   };
 
   return (
-    <div className="flex gap-2 justify-center" style={{ animation: "otp-slide 0.25s ease forwards" }}>
-      {digits.map((d, i) => (
+    <div className="flex justify-center gap-2" style={{ animation: "otp-slide 0.25s ease forwards" }}>
+      {digits.map((digit, index) => (
         <input
-          key={i}
-          ref={el => { refs.current[i] = el; }}
-          value={d}
-          onChange={e => handleChange(i, e.target.value)}
-          onKeyDown={e => handleKeyDown(i, e)}
-          onPaste={i === 0 ? handlePaste : undefined}
+          key={index}
+          ref={(element) => {
+            refs.current[index] = element;
+          }}
+          value={digit}
+          onChange={(event) => handleChange(index, event.target.value)}
+          onKeyDown={(event) => handleKeyDown(index, event)}
+          onPaste={index === 0 ? handlePaste : undefined}
           maxLength={1}
           disabled={disabled}
-          inputMode="text"
-          className="outline-none text-center rounded-xl font-bold"
+          inputMode="numeric"
+          className="rounded-xl text-center font-bold outline-none"
           style={{
-            width: 42, height: 50,
+            width: 42,
+            height: 50,
             fontSize: 20,
-            background: d ? "#FFFFFF" : INPUT_BG,
-            border: `2px solid ${d ? OLIVE_DARK : "rgba(0,0,0,0.08)"}`,
+            background: digit ? "#FFFFFF" : INPUT_BG,
+            border: `2px solid ${digit ? OLIVE_DARK : "rgba(0,0,0,0.08)"}`,
             color: TEXT_PRIMARY,
             transition: "all 0.15s",
-            boxShadow: d ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
+            boxShadow: digit ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
           }}
         />
       ))}
@@ -139,23 +202,36 @@ function OtpInput({ onComplete, disabled }: { onComplete: (code: string) => void
   );
 }
 
-// ─── 인풋 필드 ──────────────────────────────────────────
 function Field({
-  label, icon: Icon, type = "text", value, onChange,
-  placeholder, right, error, disabled,
+  label,
+  icon: Icon,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+  right,
+  error,
+  disabled,
 }: {
-  label: string; icon: React.ElementType; type?: string;
-  value: string; onChange: (v: string) => void;
-  placeholder: string; right?: React.ReactNode; error?: string; disabled?: boolean;
+  label: string;
+  icon: React.ElementType;
+  type?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  right?: React.ReactNode;
+  error?: string;
+  disabled?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
+
   return (
     <div className="space-y-1.5">
-      <label className="block text-[10px] font-semibold tracking-widest uppercase" style={{ color: LOGIN_MUTED }}>
+      <label className="block text-[10px] font-semibold uppercase tracking-widest" style={{ color: LOGIN_MUTED }}>
         {label}
       </label>
       <div
-        className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl"
+        className="flex items-center gap-2.5 rounded-xl px-3.5 py-3"
         style={{
           background: focused ? "#FFFFFF" : INPUT_BG,
           border: `1.5px solid ${focused ? OLIVE_DARK : error ? STATUS_ERROR : "transparent"}`,
@@ -163,181 +239,311 @@ function Field({
           opacity: disabled ? 0.7 : 1,
         }}
       >
-        <Icon className="w-4 h-4 shrink-0" style={{ color: focused ? OLIVE_DARK : LOGIN_ICON_MUTED, transition: "color 0.15s" }} />
+        <Icon
+          className="h-4 w-4 shrink-0"
+          style={{ color: focused ? OLIVE_DARK : LOGIN_ICON_MUTED, transition: "color 0.15s" }}
+        />
         <input
           value={value}
-          onChange={e => onChange(e.target.value)}
+          onChange={(event) => onChange(event.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           type={type}
           placeholder={placeholder}
           disabled={disabled}
-          className="flex-1 text-sm outline-none min-w-0 bg-transparent"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none"
           style={{ color: TEXT_PRIMARY }}
         />
         {right}
       </div>
-      {error && <p className="text-[9px] pl-1" style={{ color: STATUS_ERROR }}>{error}</p>}
+      {error && (
+        <p className="pl-1 text-[9px]" style={{ color: STATUS_ERROR }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
 
-// ─── 동의 항목 ───────────────────────────────────────────
-function AgreeRow({ label, checked, onChange, accent, showArrow }: {
-  label: string; checked: boolean; onChange: (v: boolean) => void; accent?: boolean; showArrow?: boolean;
+function AgreeRow({
+  label,
+  checked,
+  onChange,
+  accent,
+  showArrow,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  accent?: boolean;
+  showArrow?: boolean;
 }) {
   return (
-    <button onClick={() => onChange(!checked)} className="w-full flex items-center gap-2.5 py-1.5 text-left">
-      {checked
-        ? <CheckSquare className="w-4 h-4 shrink-0" style={{ color: OLIVE_DARK }} />
-        : <Square className="w-4 h-4 shrink-0" style={{ color: LOGIN_CHECKBOX }} />}
-      <span className="flex-1 text-[11px]" style={{ color: accent ? STATUS_ERROR : OLIVE_DARK }}>{label}</span>
-      {showArrow && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: LOGIN_CHEVRON }} />}
+    <button type="button" onClick={() => onChange(!checked)} className="flex w-full items-center gap-2.5 py-1.5 text-left">
+      {checked ? (
+        <CheckSquare className="h-4 w-4 shrink-0" style={{ color: OLIVE_DARK }} />
+      ) : (
+        <Square className="h-4 w-4 shrink-0" style={{ color: LOGIN_CHECKBOX }} />
+      )}
+      <span className="flex-1 text-[11px]" style={{ color: accent ? STATUS_ERROR : OLIVE_DARK }}>
+        {label}
+      </span>
+      {showArrow && <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: LOGIN_CHEVRON }} />}
     </button>
   );
 }
 
-// ─── 소셜 로그인 버튼 ────────────────────────────────────
-function SocialBtn({
-  provider, loading, onClick,
-}: {
-  provider: "kakao" | "naver" | "google";
-  loading: boolean;
-  onClick: () => void;
-}) {
-  const [hov, setHov] = useState(false);
+function SocialBtn({ provider }: { provider: "kakao" | "naver" | "google" }) {
+  const [hovered, setHovered] = useState(false);
 
-  const cfg = {
-    kakao: { label: "카카오", bg: "#FEE500", hover: "#F5DC00", color: "#3C1E1E", icon: <KakaoIcon /> },
-    naver: { label: "네이버", bg: "#03C75A", hover: "#02B04E", color: "#FFFFFF", icon: <NaverIcon /> },
-    google: { label: "Google", bg: "#FFFFFF", hover: "#F5F5F5", color: "#3C4043", icon: <GoogleIcon />, border: "1px solid rgba(0,0,0,0.12)" },
+  const config = {
+    kakao: {
+      label: "카카오",
+      bg: "#FEE500",
+      hover: "#F5DC00",
+      color: "#3C1E1E",
+      icon: <KakaoIcon />,
+    },
+    naver: {
+      label: "네이버",
+      bg: "#03C75A",
+      hover: "#02B04E",
+      color: "#FFFFFF",
+      icon: <NaverIcon />,
+    },
+    google: {
+      label: "Google",
+      bg: "#FFFFFF",
+      hover: "#F5F5F5",
+      color: "#3C4043",
+      icon: <GoogleIcon />,
+      border: "1px solid rgba(0,0,0,0.12)",
+    },
   }[provider];
 
   return (
     <button
-      onClick={onClick}
-      disabled={loading}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all"
+      type="button"
+      disabled
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex flex-1 cursor-not-allowed flex-col items-center gap-1.5 rounded-xl py-3 transition-all"
       style={{
-        background: hov ? cfg.hover : cfg.bg,
-        border: (cfg as any).border ?? "none",
-        opacity: loading ? 0.7 : 1,
-        boxShadow: hov ? "0 2px 8px rgba(0,0,0,0.14)" : "0 1px 3px rgba(0,0,0,0.08)",
-        transition: "all 0.15s",
+        background: hovered ? config.hover : config.bg,
+        border: (config as { border?: string }).border ?? "none",
+        opacity: 0.65,
+        boxShadow: hovered ? "0 2px 8px rgba(0,0,0,0.14)" : "0 1px 3px rgba(0,0,0,0.08)",
       }}
     >
-      {loading
-        ? <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: `${cfg.color}30`, borderTopColor: cfg.color }} />
-        : cfg.icon
-      }
-      <span className="text-[9px] font-semibold" style={{ color: cfg.color }}>{cfg.label}</span>
+      {config.icon}
+      <span className="text-[9px] font-semibold" style={{ color: config.color }}>
+        {config.label}
+      </span>
     </button>
   );
 }
 
-// ─── 로그인 폼 ───────────────────────────────────────────
+async function resolveAuthenticatedUser(session: AuthSession) {
+  return fetchCurrentUser();
+}
+
 function LoginForm({
-  onLogin, onSwitchToSignup, onSocialLogin,
+  initialEmail = "",
+  notice,
+  onAuthenticated,
+  onSwitchToSignup,
+  onSwitchToEmailCode,
 }: {
-  onLogin: () => void;
+  initialEmail?: string;
+  notice: Feedback | null;
+  onAuthenticated: (session: AuthSession, user: CurrentUser) => void;
   onSwitchToSignup: (email?: string) => void;
-  onSocialLogin: (provider: "kakao" | "naver" | "google") => void;
+  onSwitchToEmailCode: (email?: string) => void;
 }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<"kakao" | "naver" | "google" | null>(null);
 
-  const handleLogin = () => {
-    if (!email.trim() || !password) { setError("이메일과 비밀번호를 입력해주세요."); return; }
-    setError(""); setLoading(true);
-    setTimeout(() => { setLoading(false); onLogin(); }, 750);
-  };
+  useEffect(() => {
+    setEmail(initialEmail);
+  }, [initialEmail]);
 
-  const handleSocial = (p: "kakao" | "naver" | "google") => {
-    setSocialLoading(p);
-    setTimeout(() => {
-      setSocialLoading(null);
-      onSocialLogin(p);
-    }, 1200);
+  const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      setError("이메일과 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const session = await login({
+        email: email.trim(),
+        password,
+      });
+      const user = await resolveAuthenticatedUser(session);
+      onAuthenticated(session, user);
+    } catch (loginError) {
+      setError(formatApiError(loginError));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="p-8 space-y-5">
-      {/* 헤더 */}
-      <div className="flex items-center gap-3 pb-5" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
-          <FolderGit2 className="w-5 h-5" style={{ color: "white" }} />
+    <div className="space-y-5 p-8">
+      <div className="flex items-center gap-3 border-b border-black/5 pb-5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
+          <FolderGit2 className="h-5 w-5" style={{ color: "white" }} />
         </div>
         <div>
-          <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>로그인</h2>
-          <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>SynAIpse 계정으로 시작하세요</p>
+          <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
+            로그인
+          </h2>
+          <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
+            SynAIpse 계정으로 시작하세요
+          </p>
         </div>
       </div>
 
-      {/* 소셜 로그인 */}
       <div className="space-y-2.5">
-        <p className="text-[9px] font-semibold tracking-widest uppercase text-center" style={{ color: LOGIN_MUTED }}>소셜 계정으로 로그인</p>
+        <p className="text-center text-[9px] font-semibold uppercase tracking-widest" style={{ color: LOGIN_MUTED }}>
+          소셜 계정으로 로그인
+        </p>
         <div className="flex gap-2">
-          {(["kakao", "naver", "google"] as const).map(p => (
-            <SocialBtn
-              key={p}
-              provider={p}
-              loading={socialLoading === p}
-              onClick={() => handleSocial(p)}
-            />
+          {(["kakao", "naver", "google"] as const).map((provider) => (
+            <SocialBtn key={provider} provider={provider} />
           ))}
         </div>
+        <p className="text-center text-[9px]" style={{ color: LOGIN_ICON_MUTED }}>
+          소셜 로그인은 로컬 callback URI 정리 후 다시 열어둘게요.
+        </p>
       </div>
 
-      {/* 구분선 */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.06)" }} />
-        <span className="text-[10px] font-medium" style={{ color: LOGIN_ICON_MUTED }}>또는 이메일로 로그인</span>
-        <div className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.06)" }} />
+        <div className="h-px flex-1" style={{ background: "rgba(0,0,0,0.06)" }} />
+        <span className="text-[10px] font-medium" style={{ color: LOGIN_ICON_MUTED }}>
+          또는 이메일로 로그인
+        </span>
+        <div className="h-px flex-1" style={{ background: "rgba(0,0,0,0.06)" }} />
       </div>
 
-      <Field label="이메일" icon={Mail} type="email" value={email}
-        onChange={v => { setEmail(v); setError(""); }} placeholder="your@email.com" />
+      {notice && (
+        <div
+          className="rounded-xl px-3.5 py-2.5 text-[10px]"
+          style={{
+            background:
+              notice.tone === "success"
+                ? "rgba(90,138,74,0.08)"
+                : notice.tone === "error"
+                  ? "rgba(184,84,80,0.08)"
+                  : "rgba(65,67,27,0.06)",
+            color:
+              notice.tone === "success"
+                ? STATUS_SUCCESS
+                : notice.tone === "error"
+                  ? STATUS_ERROR
+                  : TEXT_SECONDARY,
+            border: `1px solid ${
+              notice.tone === "success"
+                ? "rgba(90,138,74,0.16)"
+                : notice.tone === "error"
+                  ? "rgba(184,84,80,0.16)"
+                  : "rgba(65,67,27,0.12)"
+            }`,
+          }}
+        >
+          {notice.text}
+        </div>
+      )}
 
-      <Field label="비밀번호" icon={Lock}
-        type={showPw ? "text" : "password"}
-        value={password} onChange={v => { setPassword(v); setError(""); }}
+      <Field
+        label="이메일"
+        icon={Mail}
+        type="email"
+        value={email}
+        onChange={(value) => {
+          setEmail(value);
+          setError("");
+        }}
+        placeholder="your@email.com"
+      />
+
+      <Field
+        label="비밀번호"
+        icon={Lock}
+        type={showPassword ? "text" : "password"}
+        value={password}
+        onChange={(value) => {
+          setPassword(value);
+          setError("");
+        }}
         placeholder="••••••••"
         right={
-          <button onClick={() => setShowPw(p => !p)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
-            {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         }
       />
 
       {error && (
-        <p className="text-[10px] flex items-center gap-1.5" style={{ color: STATUS_ERROR }}>
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_ERROR }} />{error}
+        <p className="flex items-center gap-1.5 text-[10px]" style={{ color: STATUS_ERROR }}>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: STATUS_ERROR }} />
+          {error}
         </p>
       )}
 
-      <button onClick={handleLogin} disabled={loading}
-        className="w-full py-3.5 rounded-xl text-sm font-semibold"
-        style={{ background: OLIVE_DARK, color: "white", opacity: loading ? 0.75 : 1, transition: "opacity 0.15s" }}>
-        {loading
-          ? <span className="flex items-center justify-center gap-2">
-            <span className="w-4 h-4 border-2 rounded-full animate-spin"
-              style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }} />
+      <button
+        type="button"
+        onClick={() => void handleLogin()}
+        disabled={loading}
+        className="w-full rounded-xl py-3.5 text-sm font-semibold"
+        style={{ background: OLIVE_DARK, color: "white", opacity: loading ? 0.75 : 1, transition: "opacity 0.15s" }}
+      >
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2"
+              style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }}
+            />
             로그인 중...
           </span>
-          : "로그인"}
+        ) : (
+          "로그인"
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSwitchToEmailCode(email.trim() || undefined)}
+        className="flex w-full items-center justify-center gap-1.5 text-[11px] font-semibold"
+        style={{ color: OLIVE_DARK }}
+      >
+        <KeyRound className="h-3.5 w-3.5" />
+        이메일 코드 로그인
       </button>
 
       <p className="text-center text-[11px]" style={{ color: LOGIN_MUTED }}>
         계정이 없으신가요?{" "}
-        <button onClick={() => onSwitchToSignup()} className="font-semibold" style={{ color: OLIVE_DARK }}
-          onMouseEnter={e => (e.currentTarget.style.textDecoration = "underline")}
-          onMouseLeave={e => (e.currentTarget.style.textDecoration = "none")}>
+        <button
+          type="button"
+          onClick={() => onSwitchToSignup(email.trim() || undefined)}
+          className="font-semibold"
+          style={{ color: OLIVE_DARK }}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.textDecoration = "underline";
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.textDecoration = "none";
+          }}
+        >
           회원가입
         </button>
       </p>
@@ -345,175 +551,200 @@ function LoginForm({
   );
 }
 
-// ─── 회원가입 폼 ─────────────────────────────────────────
 function SignupForm({
   onSwitchToLogin,
   initialEmail = "",
   socialProvider,
 }: {
-  onSwitchToLogin: () => void;
+  onSwitchToLogin: (prefillEmail?: string, notice?: Feedback) => void;
   initialEmail?: string;
-  socialProvider?: "kakao" | "naver" | "google";
+  socialProvider?: SocialProvider;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState(initialEmail);
-  const [pw, setPw] = useState("");
-  const [pwConfirm, setPwConfirm] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [showPwC, setShowPwC] = useState(false);
-
-  // ── 에러 및 검증 상태 ──
-  const [pwError, setPwError] = useState(""); 
-
-  // ── 이메일 인증 상태 ──
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [otpError, setOtpError] = useState("");
-
+  const [dispatchResult, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
   const [agreeAll, setAgreeAll] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeMarketing, setAgreeMarketing] = useState(false);
   const [agreePush, setAgreePush] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // 백엔드 처리
   const [signupError, setSignupError] = useState("");
 
-  // 비밀번호 입력 즉시 체크하는 실시간 유효성 검사 로직
   useEffect(() => {
-    if (pw.length === 0) {
-      setPwError("");
+    setEmail(initialEmail);
+  }, [initialEmail]);
+
+  useEffect(() => {
+    if (password.length === 0) {
+      setPasswordError("");
       return;
     }
 
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+={}\[\]|\\:;"'<>,.?\/~`]).{8,16}$/;
-    
-    if (!passwordRegex.test(pw)) {
-      setPwError("비밀번호는 영문, 숫자, 특수문자를 포함하여 8~16자로 입력해야 합니다.");
-    } else {
-      setPwError("");
-    }
-  }, [pw]);
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+={}\[\]|\\:;"'<>,.?/~`]).{8,16}$/;
 
-  const setAll = (v: boolean) => { setAgreeAll(v); setAgreePrivacy(v); setAgreeMarketing(v); setAgreePush(v); };
-  const syncAll = (p: boolean, m: boolean, pu: boolean) => {
-    setAgreePrivacy(p); setAgreeMarketing(m); setAgreePush(pu); setAgreeAll(p && m && pu);
+    if (!passwordRegex.test(password)) {
+      setPasswordError("비밀번호는 영문, 숫자, 특수문자를 포함하여 8~16자로 입력해야 합니다.");
+      return;
+    }
+
+    setPasswordError("");
+  }, [password]);
+
+  const setAll = (value: boolean) => {
+    setAgreeAll(value);
+    setAgreePrivacy(value);
+    setAgreeMarketing(value);
+    setAgreePush(value);
   };
 
-  const handleSendOtp = () => {
-    if (!email.trim()) return;
+  const syncAll = (privacy: boolean, marketing: boolean, push: boolean) => {
+    setAgreePrivacy(privacy);
+    setAgreeMarketing(marketing);
+    setAgreePush(push);
+    setAgreeAll(privacy && marketing && push);
+  };
+
+  const resetVerification = (nextEmail: string) => {
+    setEmail(nextEmail);
+    setVerified(false);
+    setOtpSent(false);
+    setOtpError("");
+    setDispatchResult(null);
+  };
+
+  const handleSendOtp = async () => {
+    if (!email.trim()) {
+      return;
+    }
+
     setSending(true);
     setOtpError("");
-    setTimeout(() => {
-      setSending(false);
+
+    try {
+      const result = await sendEmailLoginCode({
+        email: email.trim(),
+        deliveryChannel: "EMAIL",
+      });
+      setDispatchResult(result);
       setOtpSent(true);
-    }, 1200);
+    } catch (sendError) {
+      setOtpError(formatApiError(sendError));
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleOtpComplete = (code: string) => {
     setOtpError("");
     setOtpVerifying(true);
-    setTimeout(() => {
+
+    window.setTimeout(() => {
       setOtpVerifying(false);
-      if (code.length === 6) {
+
+      if (dispatchResult?.debugCode && code === dispatchResult.debugCode) {
         setVerified(true);
         setOtpError("");
-      } else {
-        setOtpError("인증코드가 올바르지 않습니다.");
+        return;
       }
-    }, 900);
+
+      setVerified(false);
+      setOtpError(
+        dispatchResult?.debugCode
+          ? "인증코드가 올바르지 않습니다."
+          : "개발 환경에서 노출된 인증코드가 없어 확인할 수 없습니다."
+      );
+    }, 700);
   };
 
-  // 회원가입 클릭 이벤트 핸들러
   const handleSignup = async () => {
-  if (!agreePrivacy || !verified) return;
-  if (pwError || !pw) return;
-
-  if (pw !== pwConfirm) {
-    setSignupError("비밀번호가 일치하지 않습니다.");
-    return;
-  }
-
-  setLoading(true);
-  setSignupError("");
-
-  try {
-    const response = await fetch(buildApiUrl("/api/v1/auth/signup"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        name: name.trim(),
-        email: email.trim(),
-        password: pw,
-        socialProvider: socialProvider || null,
-        agreedMarketing: agreeMarketing,
-        agreedPush: agreePush,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-
-      throw new Error(
-        errorData.message || "회원가입 중 오류가 발생했습니다."
-      );
+    if (!agreePrivacy || !verified) {
+      return;
     }
 
-    // 가입 성공 시 로그인 화면으로 이동
-    onSwitchToLogin();
-  } catch (err: any) {
-    setSignupError(err.message || "서버 통신에 실패했습니다.");
-  } finally {
-    // 로딩 종료
-    setLoading(false);
-  }
-};
+    if (passwordError || !password) {
+      return;
+    }
 
-  const socialLabel: Record<string, string> = { kakao: "카카오", naver: "네이버", google: "Google" };
+    if (password !== passwordConfirm) {
+      setSignupError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
 
-  // 모든 조건 충족 여부 체크
-  const isFormValid = 
+    setLoading(true);
+    setSignupError("");
+
+    try {
+      await signUp({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
+
+      onSwitchToLogin(email.trim(), {
+        tone: "success",
+        text: "회원가입이 완료되었습니다. 같은 이메일로 로그인해보세요.",
+      });
+    } catch (signupFailure) {
+      setSignupError(formatApiError(signupFailure));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const socialLabel: Record<SocialProvider, string> = {
+    kakao: "카카오",
+    naver: "네이버",
+    google: "Google",
+  };
+
+  const isFormValid =
     name.trim() !== "" &&
-    agreePrivacy && 
-    verified && 
-    pw !== "" &&  
-    !pwError && 
-    pw === pwConfirm;
+    agreePrivacy &&
+    verified &&
+    password !== "" &&
+    !passwordError &&
+    password === passwordConfirm;
 
   return (
     <div className="overflow-y-auto" style={{ maxHeight: 580 }}>
-      <div className="p-8 space-y-4">
-        {/* 헤더 */}
-        <div className="flex items-center gap-3 pb-5" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: SAGE }}>
-            <User className="w-5 h-5" style={{ color: "white" }} />
+      <div className="space-y-4 p-8">
+        <div className="flex items-center gap-3 border-b border-black/5 pb-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: SAGE }}>
+            <User className="h-5 w-5" style={{ color: "white" }} />
           </div>
           <div>
-            <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>회원가입</h2>
+            <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
+              회원가입
+            </h2>
             <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
-              {socialProvider
-                ? `${socialLabel[socialProvider]} 계정으로 가입`
-                : "새 WE&AI 계정을 만드세요"}
+              {socialProvider ? `${socialLabel[socialProvider]} 계정으로 가입` : "새 WE&AI 계정을 만드세요"}
             </p>
           </div>
         </div>
 
-        {/* 소셜 계정 연동 배지 */}
         {socialProvider && (
           <div
-            className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
+            className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
             style={{ background: "rgba(65,67,27,0.05)", border: "1.5px solid rgba(65,67,27,0.12)" }}
           >
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+            <div
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
               style={{
-                background: socialProvider === "kakao" ? "#FEE500" : socialProvider === "naver" ? "#03C75A" : "#FFFFFF",
+                background:
+                  socialProvider === "kakao" ? "#FEE500" : socialProvider === "naver" ? "#03C75A" : "#FFFFFF",
                 border: socialProvider === "google" ? "1px solid rgba(0,0,0,0.1)" : "none",
-              }}>
+              }}
+            >
               {socialProvider === "kakao" && <KakaoIcon size={14} />}
               {socialProvider === "naver" && <NaverIcon size={14} />}
               {socialProvider === "google" && <GoogleIcon size={14} />}
@@ -522,79 +753,105 @@ function SignupForm({
               <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
                 {socialLabel[socialProvider]} 이메일로 가입
               </p>
-              <p className="text-[9px] truncate" style={{ color: LOGIN_MUTED }}>{email}</p>
+              <p className="truncate text-[9px]" style={{ color: LOGIN_MUTED }}>
+                {email}
+              </p>
             </div>
-            <CheckCircle2 className="w-4 h-4 shrink-0 ml-auto" style={{ color: STATUS_SUCCESS }} />
+            <CheckCircle2 className="ml-auto h-4 w-4 shrink-0" style={{ color: STATUS_SUCCESS }} />
           </div>
         )}
 
-        <Field label="이름" icon={User} value={name}
-          onChange={(v) => { setName(v); setSignupError(""); }}
-          placeholder="홍길동" />
+        <Field
+          label="이름"
+          icon={User}
+          value={name}
+          onChange={(value) => {
+            setName(value);
+            setSignupError("");
+          }}
+          placeholder="홍길동"
+        />
 
-        {/* 이메일 + 인증 */}
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-semibold tracking-widest uppercase" style={{ color: LOGIN_MUTED }}>
+          <label className="block text-[10px] font-semibold uppercase tracking-widest" style={{ color: LOGIN_MUTED }}>
             이메일
           </label>
           <div
-            className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl"
+            className="flex items-center gap-2.5 rounded-xl px-3.5 py-3"
             style={{
               background: INPUT_BG,
-              border: `1.5px solid ${verified ? STATUS_SUCCESS : otpSent ? "rgba(65,67,27,0.20)" : "transparent"}`,
+              border: `1.5px solid ${
+                verified ? STATUS_SUCCESS : otpSent ? "rgba(65,67,27,0.20)" : "transparent"
+              }`,
               transition: "border-color 0.15s",
             }}
           >
-            <Mail className="w-4 h-4 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
+            <Mail className="h-4 w-4 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
             <input
               value={email}
-              onChange={e => { setEmail(e.target.value); setVerified(false); setOtpSent(false); setOtpError(""); }}
+              onChange={(event) => {
+                resetVerification(event.target.value);
+                setSignupError("");
+              }}
               type="email"
               placeholder="your@email.com"
               disabled={!!socialProvider || otpSent}
-              className="flex-1 text-sm outline-none min-w-0 bg-transparent"
-              style={{ color: TEXT_PRIMARY, opacity: (!!socialProvider || otpSent) ? 0.75 : 1 }}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              style={{ color: TEXT_PRIMARY, opacity: socialProvider || otpSent ? 0.75 : 1 }}
             />
-            {verified
-              ? <span className="text-[9px] px-2 py-1 rounded-lg font-semibold shrink-0"
-                style={{ background: "rgba(90,138,74,0.10)", color: STATUS_SUCCESS }}>인증됨 ✓</span>
-              : !otpSent
-                ? <button
-                  onClick={handleSendOtp}
-                  disabled={!email.trim() || sending}
-                  className="shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-semibold"
-                  style={{
-                    background: !email.trim() || sending ? LOGIN_DISABLED_BG : OLIVE_DARK,
-                    color: !email.trim() || sending ? LOGIN_ICON_MUTED : "white",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {sending
-                    ? <span className="flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 border-2 rounded-full animate-spin"
-                        style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: LOGIN_ICON_MUTED }} />
-                      전송 중
-                    </span>
-                    : "인증하기"}
-                </button>
-                : <button
-                  onClick={() => { setOtpSent(false); setOtpError(""); }}
-                  className="shrink-0 px-2.5 py-1 rounded-lg text-[9px] font-medium"
-                  style={{ color: LOGIN_MUTED, background: "transparent" }}
-                >
-                  재전송
-                </button>
-            }
+            {verified ? (
+              <span
+                className="shrink-0 rounded-lg px-2 py-1 text-[9px] font-semibold"
+                style={{ background: "rgba(90,138,74,0.10)", color: STATUS_SUCCESS }}
+              >
+                인증됨 ✓
+              </span>
+            ) : !otpSent ? (
+              <button
+                type="button"
+                onClick={() => void handleSendOtp()}
+                disabled={!email.trim() || sending}
+                className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
+                style={{
+                  background: !email.trim() || sending ? LOGIN_DISABLED_BG : OLIVE_DARK,
+                  color: !email.trim() || sending ? LOGIN_ICON_MUTED : "white",
+                  transition: "all 0.15s",
+                }}
+              >
+                {sending ? (
+                  <span className="flex items-center gap-1">
+                    <span
+                      className="h-2.5 w-2.5 animate-spin rounded-full border-2"
+                      style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: LOGIN_ICON_MUTED }}
+                    />
+                    전송 중
+                  </span>
+                ) : (
+                  "인증하기"
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtpError("");
+                }}
+                className="shrink-0 rounded-lg px-2.5 py-1 text-[9px] font-medium"
+                style={{ color: LOGIN_MUTED, background: "transparent" }}
+              >
+                재전송
+              </button>
+            )}
           </div>
 
-          {/* OTP 입력 영역 */}
           {otpSent && !verified && (
             <div className="space-y-3 pt-2">
               <div
-                className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
+                className="flex items-start gap-2 rounded-xl px-3 py-2.5"
                 style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
               >
-                <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: OLIVE_DARK }} />
+                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: OLIVE_DARK }} />
                 <div>
                   <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
                     인증코드를 발송했습니다
@@ -602,104 +859,159 @@ function SignupForm({
                   <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
                     {email}로 전송된 6자리 코드를 입력하세요
                   </p>
-                  <p className="text-[8px] mt-0.5" style={{ color: LOGIN_ICON_MUTED }}>
-                    (테스트 환경: 임의의 6자리 숫자)
-                  </p>
+                  {dispatchResult?.debugCode && (
+                    <p className="mt-0.5 text-[8px]" style={{ color: LOGIN_ICON_MUTED }}>
+                      dev mock code: {dispatchResult.debugCode}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <OtpInput onComplete={handleOtpComplete} disabled={otpVerifying} />
+              <OtpInput onComplete={handleOtpComplete} disabled={otpVerifying} resetKey={email} />
 
               {otpVerifying && (
-                <p className="text-center text-[10px] flex items-center justify-center gap-1.5" style={{ color: LOGIN_MUTED }}>
-                  <span className="w-3 h-3 border-2 rounded-full animate-spin"
-                    style={{ borderColor: "rgba(0,0,0,0.12)", borderTopColor: OLIVE_DARK }} />
+                <p className="flex items-center justify-center gap-1.5 text-center text-[10px]" style={{ color: LOGIN_MUTED }}>
+                  <span
+                    className="h-3 w-3 animate-spin rounded-full border-2"
+                    style={{ borderColor: "rgba(0,0,0,0.12)", borderTopColor: OLIVE_DARK }}
+                  />
                   확인 중...
                 </p>
               )}
               {otpError && (
-                <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>{otpError}</p>
+                <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>
+                  {otpError}
+                </p>
               )}
             </div>
           )}
         </div>
 
-        <Field label="비밀번호" icon={Lock}
-          type={showPw ? "text" : "password"}
-          value={pw}
-          onChange={(v) => { setPw(v); setSignupError(""); }}
+        <Field
+          label="비밀번호"
+          icon={Lock}
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(value) => {
+            setPassword(value);
+            setSignupError("");
+          }}
           placeholder="영문, 숫자, 특수문자 포함 8~16자"
-          error={pwError}
-          right={<button onClick={() => setShowPw(p => !p)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
-            {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>}
+          error={passwordError}
+          right={
+            <button type="button" onClick={() => setShowPassword((current) => !current)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
         />
 
-        <Field label="비밀번호 확인" icon={Lock}
-          type={showPwC ? "text" : "password"}
-          value={pwConfirm}
-          onChange={(v) => { setPwConfirm(v); setSignupError(""); }}
+        <Field
+          label="비밀번호 확인"
+          icon={Lock}
+          type={showPasswordConfirm ? "text" : "password"}
+          value={passwordConfirm}
+          onChange={(value) => {
+            setPasswordConfirm(value);
+            setSignupError("");
+          }}
           placeholder="비밀번호 재입력"
-          error={pwConfirm && pw !== pwConfirm ? "비밀번호가 일치하지 않습니다." : undefined}
-          right={<button onClick={() => setShowPwC(p => !p)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
-            {showPwC ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>}
+          error={passwordConfirm && password !== passwordConfirm ? "비밀번호가 일치하지 않습니다." : undefined}
+          right={
+            <button
+              type="button"
+              onClick={() => setShowPasswordConfirm((current) => !current)}
+              style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}
+            >
+              {showPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
         />
 
-        {/* 이메일 인증 미완료 경고 */}
         {!verified && (
-          <p className="text-[9px] flex items-center gap-1.5 px-1" style={{ color: LOGIN_MUTED }}>
-            <ShieldCheck className="w-3 h-3 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
+          <p className="flex items-center gap-1.5 px-1 text-[9px]" style={{ color: LOGIN_MUTED }}>
+            <ShieldCheck className="h-3 w-3 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
             회원가입 전 이메일 인증이 필요합니다
           </p>
         )}
 
-        {/* 동의 섹션 */}
         <div className="rounded-xl px-4 py-3" style={{ background: INPUT_BG, border: "1px solid rgba(0,0,0,0.04)" }}>
-          <div className="flex items-center gap-2.5 pb-2.5 mb-1.5" style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-            <button onClick={() => setAll(!agreeAll)}>
-              {agreeAll
-                ? <CheckSquare className="w-4 h-4" style={{ color: OLIVE_DARK }} />
-                : <Square className="w-4 h-4" style={{ color: LOGIN_CHECKBOX }} />}
+          <div className="mb-1.5 flex items-center gap-2.5 border-b border-black/6 pb-2.5">
+            <button type="button" onClick={() => setAll(!agreeAll)}>
+              {agreeAll ? (
+                <CheckSquare className="h-4 w-4" style={{ color: OLIVE_DARK }} />
+              ) : (
+                <Square className="h-4 w-4" style={{ color: LOGIN_CHECKBOX }} />
+              )}
             </button>
-            <span className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>전체 동의</span>
+            <span className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+              전체 동의
+            </span>
           </div>
-          <AgreeRow label="개인정보 수집 및 이용 동의 (필수)" checked={agreePrivacy} accent showArrow
-            onChange={v => syncAll(v, agreeMarketing, agreePush)} />
-          <AgreeRow label="마케팅 수신 동의 (선택)" checked={agreeMarketing} showArrow
-            onChange={v => syncAll(agreePrivacy, v, agreePush)} />
-          <AgreeRow label="푸시 알림 수신 동의 (선택)" checked={agreePush} showArrow
-            onChange={v => syncAll(agreePrivacy, agreeMarketing, v)} />
+          <AgreeRow
+            label="개인정보 수집 및 이용 동의 (필수)"
+            checked={agreePrivacy}
+            accent
+            showArrow
+            onChange={(value) => syncAll(value, agreeMarketing, agreePush)}
+          />
+          <AgreeRow
+            label="마케팅 수신 동의 (선택)"
+            checked={agreeMarketing}
+            showArrow
+            onChange={(value) => syncAll(agreePrivacy, value, agreePush)}
+          />
+          <AgreeRow
+            label="푸시 알림 수신 동의 (선택)"
+            checked={agreePush}
+            showArrow
+            onChange={(value) => syncAll(agreePrivacy, agreeMarketing, value)}
+          />
         </div>
 
         {signupError && (
-          <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>{signupError}</p>
+          <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>
+            {signupError}
+          </p>
         )}
-        
+
         <button
-          onClick={handleSignup} // ★ [수정] 누락되었던 클릭 이벤트 바인딩 추가
+          type="button"
+          onClick={() => void handleSignup()}
           disabled={loading || !isFormValid}
-          className="w-full py-3.5 rounded-xl text-sm font-semibold"
+          className="w-full rounded-xl py-3.5 text-sm font-semibold"
           style={{
             background: isFormValid ? OLIVE_DARK : LOGIN_DISABLED_BG2,
             color: isFormValid ? "white" : LOGIN_ICON_MUTED,
             transition: "all 0.15s",
           }}
         >
-          {loading
-            ? <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 rounded-full animate-spin"
-                style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }} />
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2"
+                style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }}
+              />
               가입 중...
             </span>
-            : "회원가입 완료"}
+          ) : (
+            "회원가입 완료"
+          )}
         </button>
 
-        <p className="text-center text-[11px] pb-1" style={{ color: LOGIN_MUTED }}>
+        <p className="pb-1 text-center text-[11px]" style={{ color: LOGIN_MUTED }}>
           이미 계정이 있으신가요?{" "}
-          <button onClick={onSwitchToLogin} className="font-semibold" style={{ color: OLIVE_DARK }}
-            onMouseEnter={e => (e.currentTarget.style.textDecoration = "underline")}
-            onMouseLeave={e => (e.currentTarget.style.textDecoration = "none")}>
+          <button
+            type="button"
+            onClick={() => onSwitchToLogin(email.trim() || undefined)}
+            className="font-semibold"
+            style={{ color: OLIVE_DARK }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.textDecoration = "underline";
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.textDecoration = "none";
+            }}
+          >
             로그인
           </button>
         </p>
@@ -708,62 +1020,262 @@ function SignupForm({
   );
 }
 
-// ─── 메인 LoginScreen ────────────────────────────────────
-type Props = { onLogin: () => void };
+function EmailCodeLoginForm({
+  initialEmail = "",
+  onAuthenticated,
+  onSwitchToLogin,
+}: {
+  initialEmail?: string;
+  onAuthenticated: (session: AuthSession, user: CurrentUser) => void;
+  onSwitchToLogin: (prefillEmail?: string) => void;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
+  const [dispatchResult, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-export function LoginScreen({ onLogin }: Props) {
+  useEffect(() => {
+    setEmail(initialEmail);
+  }, [initialEmail]);
+
+  const handleSendCode = async () => {
+    if (!email.trim()) {
+      setError("이메일을 입력해주세요.");
+      return;
+    }
+
+    setSending(true);
+    setError("");
+
+    try {
+      const result = await sendEmailLoginCode({
+        email: email.trim(),
+        deliveryChannel: "EMAIL",
+      });
+      setDispatchResult(result);
+      setCode("");
+    } catch (sendError) {
+      setDispatchResult(null);
+      setError(formatApiError(sendError));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email.trim() || code.length !== 6) {
+      setError("이메일과 6자리 인증코드를 모두 입력해주세요.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const session = await loginWithEmailCode({
+        email: email.trim(),
+        verificationCode: code,
+      });
+      const user = await resolveAuthenticatedUser(session);
+      onAuthenticated(session, user);
+    } catch (loginError) {
+      setError(formatApiError(loginError));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5 p-8">
+      <div className="flex items-center gap-3 border-b border-black/5 pb-5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
+          <KeyRound className="h-5 w-5" style={{ color: "white" }} />
+        </div>
+        <div>
+          <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
+            이메일 코드 로그인
+          </h2>
+          <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
+            비밀번호 없이 6자리 인증코드로 로그인하세요
+          </p>
+        </div>
+      </div>
+
+      <Field
+        label="이메일"
+        icon={Mail}
+        type="email"
+        value={email}
+        onChange={(value) => {
+          setEmail(value);
+          setError("");
+        }}
+        placeholder="your@email.com"
+      />
+
+      <button
+        type="button"
+        onClick={() => void handleSendCode()}
+        disabled={sending}
+        className="w-full rounded-xl py-3 text-sm font-semibold"
+        style={{
+          background: "rgba(65,67,27,0.08)",
+          color: OLIVE_DARK,
+          border: "1px solid rgba(65,67,27,0.10)",
+          opacity: sending ? 0.75 : 1,
+        }}
+      >
+        {sending ? "코드 발급 중..." : "인증코드 발급"}
+      </button>
+
+      {dispatchResult && (
+        <div
+          className="rounded-xl px-3.5 py-3"
+          style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
+        >
+          <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+            인증코드를 보냈습니다
+          </p>
+          <p className="mt-1 text-[9px]" style={{ color: LOGIN_MUTED }}>
+            전달 채널: {dispatchResult.deliveryChannel}
+          </p>
+          <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
+            만료 시각: {dispatchResult.expiresAt}
+          </p>
+          {dispatchResult.debugCode && (
+            <p className="mt-1 text-[9px]" style={{ color: LOGIN_ICON_MUTED }}>
+              dev mock code: {dispatchResult.debugCode}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <p className="text-center text-[10px] font-semibold uppercase tracking-widest" style={{ color: LOGIN_MUTED }}>
+          6자리 인증코드 입력
+        </p>
+        <OtpInput onComplete={setCode} resetKey={`${email}:${dispatchResult?.expiresAt ?? "idle"}`} />
+      </div>
+
+      {error && (
+        <p className="flex items-center gap-1.5 text-[10px]" style={{ color: STATUS_ERROR }}>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: STATUS_ERROR }} />
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={() => void handleLogin()}
+        disabled={loading}
+        className="w-full rounded-xl py-3.5 text-sm font-semibold"
+        style={{ background: OLIVE_DARK, color: "white", opacity: loading ? 0.75 : 1 }}
+      >
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2"
+              style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }}
+            />
+            로그인 중...
+          </span>
+        ) : (
+          "이메일 코드로 로그인"
+        )}
+      </button>
+
+      <p className="text-center text-[11px]" style={{ color: LOGIN_MUTED }}>
+        비밀번호로 로그인하고 싶으신가요?{" "}
+        <button
+          type="button"
+          onClick={() => onSwitchToLogin(email.trim() || undefined)}
+          className="font-semibold"
+          style={{ color: OLIVE_DARK }}
+        >
+          로그인
+        </button>
+      </p>
+    </div>
+  );
+}
+
+export function LoginScreen({ onAuthenticated }: Props) {
   const [cardOpen, setCardOpen] = useState(false);
   const [mode, setMode] = useState<CardMode>("login");
   const [blurring, setBlurring] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [prefillEmail, setPrefillEmail] = useState("");
-  const [socialProvider, setSocialProvider] = useState<"kakao" | "naver" | "google" | undefined>(undefined);
-
+  const [socialProvider, setSocialProvider] = useState<SocialProvider | undefined>(undefined);
+  const [notice, setNotice] = useState<Feedback | null>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const [cardH, setCardH] = useState<number | null>(null);
+  const [cardHeight, setCardHeight] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!innerRef.current) return;
-    const ro = new ResizeObserver(entries => {
-      const h =
+    if (!innerRef.current) {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const height =
         entries[0].borderBoxSize?.[0]?.blockSize ??
         entries[0].contentRect.height;
-      setCardH(h);
+      setCardHeight(height);
     });
-    ro.observe(innerRef.current);
-    return () => ro.disconnect();
+
+    observer.observe(innerRef.current);
+    return () => observer.disconnect();
   }, []);
 
-  const handleLoginSuccess = () => {
+  const handleAuthenticatedInternal = (session: AuthSession, user: CurrentUser) => {
     setExiting(true);
-    setTimeout(() => onLogin(), 450);
+    window.setTimeout(() => {
+      onAuthenticated(session, user);
+    }, 450);
   };
 
-  const switchMode = (target: CardMode, email?: string, provider?: "kakao" | "naver" | "google") => {
-    if (target === mode || blurring) return;
-    if (email !== undefined) setPrefillEmail(email);
-    if (provider !== undefined) setSocialProvider(provider);
-    if (target === "login") { setPrefillEmail(""); setSocialProvider(undefined); }
+  const switchMode = (
+    target: CardMode,
+    options?: {
+      email?: string;
+      provider?: SocialProvider;
+      notice?: Feedback | null;
+    }
+  ) => {
+    if (target === mode || blurring) {
+      if (options?.notice !== undefined) {
+        setNotice(options.notice);
+      }
+      if (options?.email !== undefined) {
+        setPrefillEmail(options.email);
+      }
+      return;
+    }
+
+    if (options?.email !== undefined) {
+      setPrefillEmail(options.email);
+    }
+    if (options?.provider !== undefined) {
+      setSocialProvider(options.provider);
+    }
+    if (options?.notice !== undefined) {
+      setNotice(options.notice);
+    }
+    if (target === "login" && options?.provider === undefined) {
+      setSocialProvider(undefined);
+    }
+
     setBlurring(true);
-    setTimeout(() => {
+    window.setTimeout(() => {
       setMode(target);
       setBlurring(false);
     }, 220);
   };
 
-  const handleSocialLogin = (provider: "kakao" | "naver" | "google") => {
-    const email = SOCIAL_EMAILS[provider];
-    if (MOCK_REGISTERED.has(email)) {
-      handleLoginSuccess();
-    } else {
-      setCardOpen(true);
-      switchMode("signup", email, provider);
-    }
-  };
-
   return (
     <div
-      className="size-full relative overflow-hidden flex items-center justify-center"
+      className="relative flex size-full items-center justify-center overflow-hidden"
       style={{
         background: "#F5F4F1",
         opacity: exiting ? 0 : 1,
@@ -772,7 +1284,6 @@ export function LoginScreen({ onLogin }: Props) {
     >
       <style>{KEYFRAMES}</style>
 
-      {/* Welcome 콘텐츠 */}
       <div
         className="absolute inset-0 flex flex-col items-center justify-center px-8"
         style={{
@@ -784,53 +1295,64 @@ export function LoginScreen({ onLogin }: Props) {
           zIndex: 5,
         }}
       >
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: OLIVE_DARK }}>
-            <FolderGit2 className="w-5.5 h-5.5" style={{ color: "white" }} />
+        <div className="mb-8 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
+            <FolderGit2 className="h-5.5 w-5.5" style={{ color: "white" }} />
           </div>
           <div>
-            <p className="text-xl font-bold" style={{ color: TEXT_PRIMARY }}>SynAIpse</p>
-            <p className="text-[10px]" style={{ color: LOGIN_MUTED }}>Project Office</p>
+            <p className="text-xl font-bold" style={{ color: TEXT_PRIMARY }}>
+              SynAIpse
+            </p>
+            <p className="text-[10px]" style={{ color: LOGIN_MUTED }}>
+              Project Office
+            </p>
           </div>
         </div>
 
-        <h1 className="text-[40px] font-bold text-center mb-3 leading-tight tracking-tight">
+        <h1 className="mb-3 text-center text-[40px] font-bold leading-tight tracking-tight">
           <span style={{ color: "#1A1C06" }}>Welcome to</span>
           <br />
           <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
         </h1>
 
-        <p className="text-sm text-center mb-8" style={{ color: LOGIN_OLIVE_TEXT, maxWidth: 310 }}>
+        <p className="mb-8 text-center text-sm" style={{ color: LOGIN_OLIVE_TEXT, maxWidth: 310 }}>
           Intelligent Multi-Agent Project Office
           <br />
           <span style={{ color: LOGIN_MUTED, fontSize: 11 }}>Java/Spring Boot 기반 엔터프라이즈 관리 플랫폼</span>
         </p>
 
-        <div className="flex flex-wrap gap-2 justify-center mb-10">
-          {["멀티에이전트 관리", "AI QA 모니전링", "실시간 빌드", "팀 협업 대시보드"].map(tag => (
-            <span key={tag} className="px-3 py-1.5 rounded-full text-[11px] font-medium"
-              style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}>
+        <div className="mb-10 flex flex-wrap justify-center gap-2">
+          {["멀티에이전트 관리", "AI QA 모니터링", "실시간 빌드", "팀 협업 대시보드"].map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full px-3 py-1.5 text-[11px] font-medium"
+              style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
+            >
               {tag}
             </span>
           ))}
         </div>
 
         <button
+          type="button"
           onClick={() => setCardOpen(true)}
-          className="flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-semibold"
+          className="flex items-center gap-2 rounded-xl px-8 py-3.5 text-sm font-semibold"
           style={{ background: OLIVE_DARK, color: "white" }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
-          onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.opacity = "0.88";
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.opacity = "1";
+          }}
         >
-          시작하기 <ArrowRight className="w-4 h-4" />
+          시작하기 <ArrowRight className="h-4 w-4" />
         </button>
 
         <p className="mt-6 text-[10px]" style={{ color: LOGIN_ICON_MUTED }}>
-          SynAIpse Enterprise Platform — v2025.1
+          SynAIpse Enterprise Platform - v2025.1
         </p>
       </div>
 
-      {/* 딤 백드롭 */}
       {cardOpen && (
         <div
           className="absolute inset-0 z-20"
@@ -839,7 +1361,6 @@ export function LoginScreen({ onLogin }: Props) {
         />
       )}
 
-      {/* 카드 */}
       <div
         style={{
           position: "absolute",
@@ -853,16 +1374,15 @@ export function LoginScreen({ onLogin }: Props) {
           transform: "translate(-50%, -50%)",
         }}
       >
-        {/* 닫기 버튼 */}
         <button
+          type="button"
           onClick={() => setCardOpen(false)}
-          className="absolute -top-3 -right-3 w-8 h-8 rounded-full flex items-center justify-center z-50"
+          className="absolute -right-3 -top-3 z-50 flex h-8 w-8 items-center justify-center rounded-full"
           style={{ background: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.14)", color: TEXT_LABEL }}
         >
-          <X className="w-4 h-4" />
+          <X className="h-4 w-4" />
         </button>
 
-        {/* 카드 본체 */}
         <div
           style={{
             background: "#FFFFFF",
@@ -870,7 +1390,7 @@ export function LoginScreen({ onLogin }: Props) {
             boxShadow: THICK_SHADOW,
             border: "1px solid rgba(0,0,0,0.05)",
             overflow: "hidden",
-            height: cardH != null ? cardH + 3 : "auto",
+            height: cardHeight != null ? cardHeight + 3 : "auto",
             transition: "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
@@ -885,31 +1405,59 @@ export function LoginScreen({ onLogin }: Props) {
                   : "opacity 0.22s ease, filter 0.22s ease, transform 0.22s ease",
               }}
             >
-              {mode === "login"
-                ? <LoginForm
-                  onLogin={handleLoginSuccess}
-                  onSwitchToSignup={(email) => switchMode("signup", email)}
-                  onSocialLogin={handleSocialLogin}
+              {mode === "login" && (
+                <LoginForm
+                  initialEmail={prefillEmail}
+                  notice={notice}
+                  onAuthenticated={handleAuthenticatedInternal}
+                  onSwitchToSignup={(email) => switchMode("signup", { email, notice: null })}
+                  onSwitchToEmailCode={(email) => switchMode("email-code", { email, notice: null })}
                 />
-                : <SignupForm
-                  onSwitchToLogin={() => switchMode("login")}
+              )}
+
+              {mode === "signup" && (
+                <SignupForm
+                  onSwitchToLogin={(email, nextNotice) => switchMode("login", { email, notice: nextNotice ?? null })}
                   initialEmail={prefillEmail}
                   socialProvider={socialProvider}
                 />
-              }
+              )}
+
+              {mode === "email-code" && (
+                <EmailCodeLoginForm
+                  initialEmail={prefillEmail}
+                  onAuthenticated={handleAuthenticatedInternal}
+                  onSwitchToLogin={(email) => switchMode("login", { email, notice: null })}
+                />
+              )}
             </div>
           </div>
         </div>
 
-        {/* 두께감 레이어 */}
-        <div style={{
-          position: "absolute", left: 6, bottom: -5, right: 6, height: 12,
-          background: LOGIN_SHADOW_1, borderRadius: "0 0 20px 20px", zIndex: -1
-        }} />
-        <div style={{
-          position: "absolute", left: 12, bottom: -9, right: 12, height: 10,
-          background: LOGIN_SHADOW_2, borderRadius: "0 0 16px 16px", zIndex: -2
-        }} />
+        <div
+          style={{
+            position: "absolute",
+            left: 6,
+            bottom: -5,
+            right: 6,
+            height: 12,
+            background: LOGIN_SHADOW_1,
+            borderRadius: "0 0 20px 20px",
+            zIndex: -1,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: 12,
+            bottom: -9,
+            right: 12,
+            height: 10,
+            background: LOGIN_SHADOW_2,
+            borderRadius: "0 0 16px 16px",
+            zIndex: -2,
+          }}
+        />
       </div>
     </div>
   );

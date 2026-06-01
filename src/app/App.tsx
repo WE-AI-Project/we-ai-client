@@ -39,11 +39,24 @@ import { ProjectSettingsPage } from "./components/ProjectSettingsPage";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServerBuildPage } from "./components/ServerBuildPage";
 import type { CommitFile } from "./components/commitData";
-import { loadProfile } from "./data/profileStore";
+import { loadProfile, saveProfile } from "./data/profileStore";
 import { loadDocs } from "./data/chatStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
 import { NotificationPanel } from "./components/NotificationPanel";
 import { DailyStandupModal, isDismissedToday } from "./components/DailyStandupModal";
+import {
+  AUTH_SESSION_EVENT,
+  AuthSession,
+  CurrentUser,
+  ProjectDetail,
+  ProjectLaunchTarget,
+  clearSession,
+  fetchCurrentUser,
+  fetchProjectDetail,
+  loadSession,
+  logout,
+  refreshSession,
+} from "./lib/api";
 
 // ── 디자인 토큰 ──
 import {
@@ -65,6 +78,60 @@ const COLLAPSE_THRESHOLD = 100;
 function genProjectCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+function buildSidebarProfile(user: CurrentUser) {
+  const cachedProfile = loadProfile();
+  return {
+    ...cachedProfile,
+    displayName: user.name,
+    email: user.email,
+    role: user.role === "ADMIN" ? "Administrator" : "Project Member",
+  };
+}
+
+function cacheProjectSummary(detail: ProjectDetail) {
+  const currentSettings = loadSettings();
+  saveSettings({
+    ...currentSettings,
+    projectName: detail.projectName,
+    description: detail.description || currentSettings.description,
+    startDate: detail.startDate || currentSettings.startDate,
+    targetDate: detail.targetDate || currentSettings.targetDate,
+    repository: detail.repositoryUrl || currentSettings.repository,
+  });
+}
+
+function resetWorkspaceState({
+  setAuthSession,
+  setCurrentUser,
+  setShowStandup,
+  setScreen,
+  setProjectId,
+  setProject,
+  setProjectCode,
+  setLocalPath,
+  setDiffFile,
+}: {
+  setAuthSession: React.Dispatch<React.SetStateAction<AuthSession | null>>;
+  setCurrentUser: React.Dispatch<React.SetStateAction<CurrentUser | null>>;
+  setShowStandup: React.Dispatch<React.SetStateAction<boolean>>;
+  setScreen: React.Dispatch<React.SetStateAction<"login" | "join" | "workspace">>;
+  setProjectId: React.Dispatch<React.SetStateAction<number | null>>;
+  setProject: React.Dispatch<React.SetStateAction<string>>;
+  setProjectCode: React.Dispatch<React.SetStateAction<string>>;
+  setLocalPath: React.Dispatch<React.SetStateAction<string>>;
+  setDiffFile: React.Dispatch<React.SetStateAction<CommitFile | null>>;
+}) {
+  setAuthSession(null);
+  setCurrentUser(null);
+  setShowStandup(false);
+  setScreen("login");
+  setProjectId(null);
+  setProject("");
+  setProjectCode("");
+  setLocalPath("");
+  setDiffFile(null);
 }
 
 const NAV_ITEMS = [
@@ -147,8 +214,11 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
 // 메인 App
 export default function App() {
   const [screen, setScreen] = useState<"login" | "join" | "workspace">("login");
+  const [authSession, setAuthSession] = useState<AuthSession | null>(() => loadSession());
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [authBootstrapping, setAuthBootstrapping] = useState(true);
   const [projectName, setProject] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState<number | null>(null);
   const [projectCode, setProjectCode] = useState("");
   const [localPath, setLocalPath] = useState("");
 
@@ -180,6 +250,125 @@ export default function App() {
 
   // ── 타이틀바 보이기/숨기기 상태
   const [showTitleBar, setShowTitleBar] = useState(true);
+
+  useEffect(() => {
+    const handleSessionChange = () => {
+      const nextSession = loadSession();
+      setAuthSession(nextSession);
+
+      if (!nextSession) {
+        setCurrentUser(null);
+        setShowStandup(false);
+        setProjectId(null);
+        setProject("");
+        setProjectCode("");
+        setLocalPath("");
+        setDiffFile(null);
+        setScreen("login");
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(AUTH_SESSION_EVENT, handleSessionChange);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(AUTH_SESSION_EVENT, handleSessionChange);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const bootstrapSession = async () => {
+      const existingSession = loadSession();
+
+      if (!existingSession) {
+        if (active) {
+          setAuthSession(null);
+          setCurrentUser(null);
+          setScreen("login");
+          setAuthBootstrapping(false);
+        }
+        return;
+      }
+
+      try {
+        const refreshedSession = await refreshSession(existingSession.refreshToken);
+        const user = await fetchCurrentUser();
+
+        if (!active) {
+          return;
+        }
+
+        setAuthSession(refreshedSession);
+        setCurrentUser(user);
+        setScreen("join");
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        clearSession();
+        setAuthSession(null);
+        setCurrentUser(null);
+        setScreen("login");
+      } finally {
+        if (active) {
+          setAuthBootstrapping(false);
+        }
+      }
+    };
+
+    void bootstrapSession();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const nextProfile = buildSidebarProfile(currentUser);
+    setSidebarProfile(nextProfile);
+    saveProfile(nextProfile);
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    let active = true;
+
+    const syncProjectContext = async () => {
+      try {
+        const detail = await fetchProjectDetail(projectId);
+
+        if (!active) {
+          return;
+        }
+
+        setProject(detail.projectName);
+        setProjectCode(detail.projectCode);
+        setLocalPath(detail.localPath ?? "");
+        cacheProjectSummary(detail);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    void syncProjectContext();
+
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
 
   // ── 사이드바 메뉴 클릭 핸들러
   const handleNavClick = (id: NavId) => {
@@ -329,13 +518,23 @@ export default function App() {
   const toggleSidebar = () => setSidebarWidth(w => w <= COLLAPSE_THRESHOLD ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED);
 
   // ── 프로젝트 참여 ──
-  const handleJoin = (id: string, name: string, code?: string, path?: string) => {
+  const handleAuthenticated = (session: AuthSession, user: CurrentUser) => {
+    setAuthSession(session);
+    setCurrentUser(user);
+    setScreen("join");
+    setProjectId(null);
+    setProject("");
+    setProjectCode("");
+    setLocalPath("");
+  };
+
+  const handleJoin = (project: ProjectLaunchTarget) => {
     setJoinExiting(true);
     setTimeout(() => {
-      setProjectId(id);
-      setProject(name);
-      setProjectCode(code ?? genProjectCode());
-      setLocalPath(path ?? "");
+      setProjectId(project.projectId);
+      setProject(project.projectName);
+      setProjectCode(project.projectCode ?? genProjectCode());
+      setLocalPath(project.localPath ?? "");
       setScreen("workspace");
 
       setLeftTabs(["Dashboard"]);
@@ -348,13 +547,13 @@ export default function App() {
       setIsLoading(true);
       setJoinExiting(false);
 
-      if (path || name) {
+      if (project.localPath || project.projectName) {
         const cur = loadSettings();
         saveSettings({
           ...cur,
-          projectName: name || cur.projectName,
-          repository: path || cur.repository,
-          description: cur.description || `${name} — SynAIpse Enterprise Project`,
+          projectName: project.projectName || cur.projectName,
+          repository: project.localPath || cur.repository,
+          description: cur.description || `${project.projectName} project`,
         });
       }
 
@@ -367,14 +566,34 @@ export default function App() {
     }, 440);
   };
 
-  const handleLeave = () => {
+  const handleLeaveProject = () => {
     setShowStandup(false);
     setScreen("join");
-    setProjectId("");
+    setProjectId(null);
     setProject("");
     setProjectCode("");
     setLocalPath("");
     setDiffFile(null);
+  };
+
+  const handleLogout = async () => {
+    resetWorkspaceState({
+      setAuthSession,
+      setCurrentUser,
+      setShowStandup,
+      setScreen,
+      setProjectId,
+      setProject,
+      setProjectCode,
+      setLocalPath,
+      setDiffFile,
+    });
+
+    try {
+      await logout();
+    } catch {
+      clearSession();
+    }
   };
 
   const handleFileSelect = (file: CommitFile | null) => setDiffFile(file);
@@ -389,7 +608,7 @@ export default function App() {
   // ── 페이지 렌더 ──
   const renderPage = (nav: NavId) => {
     switch (nav) {
-      case "Dashboard": return <DashboardPage projectName={projectName} />;
+      case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
       case "Changes": return <ChangesPage onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage />;
       case "ServerBuild": return <ServerBuildPage />;
@@ -397,10 +616,10 @@ export default function App() {
       case "Calendar": return <CalendarPage />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage autoStart />;
-      case "ProjectSettings": return <ProjectSettingsPage />;
+      case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} />;
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
-      default: return <DashboardPage projectName={projectName} />;
+      default: return <DashboardPage projectId={projectId} projectName={projectName} />;
     }
   };
 
@@ -583,11 +802,34 @@ export default function App() {
   };
 
   // ── 외부 페이지 렌더링 분기 분리 ──
-  if (screen === "login") {
+  if (authBootstrapping) {
+    return (
+      <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
+        <div
+          className="flex-1 flex items-center justify-center rounded-xl"
+          style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)", background: SIDEBAR_BG }}
+        >
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
+              <FolderGit2 className="w-5 h-5" style={{ color: "rgba(255,255,255,0.92)" }} />
+            </div>
+            <div>
+              <p className="text-lg font-bold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse</p>
+              <p className="text-sm" style={{ color: SIDEBAR_TEXT }}>
+                saved session 복구 중...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authSession || screen === "login") {
     return (
       <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
         <div className="flex-1 flex flex-col rounded-xl overflow-hidden" style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)" }}>
-          <LoginScreen onLogin={() => setScreen("join")} />
+          <LoginScreen onAuthenticated={handleAuthenticated} />
         </div>
       </div>
     );
@@ -612,15 +854,11 @@ export default function App() {
             animation: "_join-fadein 0.40s cubic-bezier(0.22, 1, 0.36, 1) forwards",
           }}
         >
-          <div className="h-11 flex items-center px-4 shrink-0" style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}`, background: GRADIENT_SIDEBAR }}>
-            <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
-                <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
-              </div>
-              <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse Project Office</span>
-            </div>
-          </div>
-          <JoinProjectScreen onJoin={handleJoin} />
+          <JoinProjectScreen
+            currentUser={currentUser}
+            onOpenProject={handleJoin}
+            onLogout={() => void handleLogout()}
+          />
         </div>
       </div>
     );
@@ -832,16 +1070,30 @@ export default function App() {
             <div className={`shrink-0 ${isCollapsed ? "px-1 py-2" : "px-1.5 py-2"}`} style={{ borderTop: `1px solid ${SIDEBAR_BORDER}` }}>
               <div className="relative group">
                 <button
-                  onClick={handleLeave}
+                  onClick={handleLeaveProject}
                   className="w-full flex items-center gap-2 rounded-lg transition-all"
+                  style={{ padding: isCollapsed ? "6px 0" : "6px 8px", justifyContent: isCollapsed ? "center" : "flex-start", color: "#D4CC9E" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(174,183,132,0.10)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: "#D4CC9E" }} />
+                  {!isCollapsed && <span className="text-xs">Back To Projects</span>}
+                </button>
+                {isCollapsed && <Tooltip label="Back To Projects" />}
+              </div>
+
+              <div className="relative group">
+                <button
+                  onClick={() => void handleLogout()}
+                  className="w-full flex items-center gap-2 rounded-lg mt-1 transition-all"
                   style={{ padding: isCollapsed ? "6px 0" : "6px 8px", justifyContent: isCollapsed ? "center" : "flex-start", color: "#B85450" }}
                   onMouseEnter={e => (e.currentTarget.style.background = "rgba(184,84,80,0.10)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
                   <LogOut className="w-4 h-4 shrink-0" style={{ color: "#B85450" }} />
-                  {!isCollapsed && <span className="text-xs">Leave Project</span>}
+                  {!isCollapsed && <span className="text-xs">Sign Out</span>}
                 </button>
-                {isCollapsed && <Tooltip label="Leave Project" />}
+                {isCollapsed && <Tooltip label="Sign Out" />}
               </div>
 
               <div className="relative group">

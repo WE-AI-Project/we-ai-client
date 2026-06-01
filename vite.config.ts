@@ -5,9 +5,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const rawApiBaseUrl = env.VITE_API_BASE_URL?.trim() ?? "";
-  const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
-  const proxyTarget = apiBaseUrl || "http://localhost:8080";
+  const rawProxyTarget = env.VITE_DEV_PROXY_TARGET?.trim() ?? "";
+  const proxyTarget = rawProxyTarget.replace(/\/+$/, "") || "http://localhost:8080";
 
   return {
     plugins: [

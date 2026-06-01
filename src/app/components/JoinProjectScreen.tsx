@@ -1,16 +1,46 @@
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bot, ArrowRight, Hash, FolderPlus,
-  ChevronRight, X, Play, Plus, Folder, FolderOpen,
-  CheckCircle2, Loader2, AlertCircle, CalendarDays,
+  AlertCircle,
+  ArrowRight,
+  Bot,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Hash,
+  Loader2,
+  LogOut,
+  Play,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  UserCircle2,
+  X,
 } from "lucide-react";
 import {
-  BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_LOGO,
-  CREAM, CONTENT_BG, BEIGE,
+  ACCENT,
+  ACCENT_BG,
+  ACCENT_BORDER,
+  BORDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  TEXT_TERTIARY,
 } from "../colors";
+import {
+  CurrentUser,
+  MyProject,
+  ProjectCreatePayload,
+  ProjectDepartment,
+  ProjectLaunchTarget,
+  ProjectTechStackInput,
+  createProject,
+  fetchMyProjects,
+  formatApiError,
+  joinProject,
+} from "../lib/api";
 
-// ── OS별 경로 플레이스홀더 ──
 const PATH_EXAMPLES = [
   "D:\\WE_AI\\enterprise",
   "C:\\Users\\병권\\projects\\weai",
@@ -18,7 +48,28 @@ const PATH_EXAMPLES = [
   "/home/dev/weai-enterprise",
 ];
 
-// ── 자동 감지 시뮬레이션 결과 ──
+const DEPARTMENTS: ProjectDepartment[] = [
+  "BACKEND",
+  "FRONTEND",
+  "QA",
+  "DEVOPS",
+  "AI",
+  "DATABASE",
+  "DESIGN",
+  "PM",
+];
+
+const DEPARTMENT_LABELS: Record<ProjectDepartment, string> = {
+  BACKEND: "Backend",
+  FRONTEND: "Frontend",
+  QA: "QA",
+  DEVOPS: "DevOps",
+  AI: "AI",
+  DATABASE: "Database",
+  DESIGN: "Design",
+  PM: "PM",
+};
+
 type DetectedInfo = {
   stack: string[];
   framework: string;
@@ -27,7 +78,6 @@ type DetectedInfo = {
 };
 
 function detectFromPath(path: string): DetectedInfo {
-  // 경로 힌트로 기술 스택 추론 시뮬레이션
   const lower = path.toLowerCase();
   const isJava = lower.includes("java") || lower.includes("spring") || lower.includes("weai");
   const isNode = lower.includes("node") || lower.includes("react") || lower.includes("frontend");
@@ -41,6 +91,7 @@ function detectFromPath(path: string): DetectedInfo {
       build: "Gradle",
     };
   }
+
   if (isNode) {
     return {
       stack: ["Node.js 20", "React 18", "TypeScript 5.4", "Vite 5", "Tailwind CSS 4"],
@@ -49,6 +100,7 @@ function detectFromPath(path: string): DetectedInfo {
       build: "Vite",
     };
   }
+
   return {
     stack: ["Python 3.12", "FastAPI 0.110", "PostgreSQL 16", "Docker", "Redis"],
     framework: "FastAPI",
@@ -57,88 +109,131 @@ function detectFromPath(path: string): DetectedInfo {
   };
 }
 
-// ── 랜덤 8자리 코드 ──
 function genCode(): string {
-  const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  return Array.from({ length: 8 }, () => c[Math.floor(Math.random() * c.length)]).join("");
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-// ── 경로 입력 필드 ──
+function guessCategory(name: string): ProjectTechStackInput["category"] {
+  const lower = name.toLowerCase();
+
+  if (lower.includes("react") || lower.includes("typescript") || lower.includes("vite") || lower.includes("tailwind")) {
+    return "FRONTEND";
+  }
+
+  if (lower.includes("docker")) {
+    return "DEVOPS";
+  }
+
+  if (lower.includes("gradle")) {
+    return "BUILD_TOOL";
+  }
+
+  if (lower.includes("java") || lower.includes("python") || lower.includes("node")) {
+    return "LANGUAGE";
+  }
+
+  if (lower.includes("postgresql") || lower.includes("redis")) {
+    return "DATABASE";
+  }
+
+  return "BACKEND";
+}
+
+function mapDetectedInfoToTechStacks(info: DetectedInfo | null): ProjectTechStackInput[] | undefined {
+  if (!info) {
+    return undefined;
+  }
+
+  return info.stack.map((item) => {
+    const [name, ...rest] = item.split(" ");
+    return {
+      name,
+      version: rest.join(" ") || undefined,
+      category: guessCategory(item),
+      isRequired: true,
+    };
+  });
+}
+
 function LocalPathInput({
-  value, onChange, label = "프로젝트 저장 위치",
+  value,
+  onChange,
+  label = "프로젝트 저장 위치",
+  required = true,
 }: {
-  value: string; onChange: (v: string) => void; label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+  required?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);  //추가
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 영역 클릭 시 숨겨진 탐색기 창 열기 트리거
   const handleOpenExplorer = () => {
     fileInputRef.current?.click();
   };
 
-  // 폴더 선택 완료 시 경로 추출
-  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const handleFolderSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
     if (files && files.length > 0) {
-      // 일반 웹 브라우저 보안 정책상 파일의 상대 경로 정보를 기반으로 상위 경로 힌트를 제공
-      const file = files[0] as any;
+      const file = files[0] as File & { path?: string; webkitRelativePath?: string };
       if (file.path) {
-        const folderPath = file.path.replace(/(\\|\/)[^\/\\]+$/, '');
-        onChange(folderPath);
+        onChange(file.path.replace(/(\\|\/)[^/\\]+$/, ""));
       } else if (file.webkitRelativePath) {
-        const topFolder = file.webkitRelativePath.split('/')[0];
+        const topFolder = file.webkitRelativePath.split("/")[0];
         onChange(`C:\\Projects\\${topFolder}`);
       }
     }
-    // 동일한 폴더를 다시 선택할 수 있도록 input 초기화
-    e.target.value = "";
+    event.target.value = "";
   };
 
   return (
     <div className="space-y-1.5">
       <label className="block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
-        {label} <span style={{ color: "#B85450" }}>*</span>
+        {label}
+        {required && <span style={{ color: "#B85450" }}> *</span>}
       </label>
       <div
         onClick={handleOpenExplorer}
-        className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all cursor-pointer hover:bg-black/[0.02]"
+        className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 transition-all hover:bg-black/[0.02]"
         style={{
           background: "rgba(65,67,27,0.04)",
           border: `1.5px solid ${focused ? "rgba(65,67,27,0.35)" : BORDER}`,
         }}
       >
-        <Folder className="w-4 h-4 shrink-0" style={{ color: value ? ACCENT : TEXT_TERTIARY }} />
+        <Folder className="h-4 w-4 shrink-0" style={{ color: value ? ACCENT : TEXT_TERTIARY }} />
         <input
           readOnly
           value={value}
-          onChange={e => onChange(e.target.value)}
+          onChange={(event) => onChange(event.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={PATH_EXAMPLES[0]}
-          className="flex-1 text-sm outline-none font-mono"
-          style={{ background: "transparent", color: TEXT_PRIMARY }}
+          className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none"
+          style={{ color: TEXT_PRIMARY }}
         />
 
         <input
           ref={fileInputRef}
           type="file"
           className="hidden"
-          // @ts-ignore: React 표준 타입 선언 누락 방지용 예외 처리
+          // @ts-expect-error browser directory picker attribute
           webkitdirectory=""
           directory=""
           onChange={handleFolderSelect}
         />
-        
+
         {value && (
           <button
-            onClick={(e) => {
-              e.stopPropagation(); // 지우기 버튼 클릭 시 탐색기가 함께 열리지 않도록
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
               onChange("");
             }}
-            className="shrink-0 p-1 hover:bg-black/[0.05] rounded"
+            className="shrink-0 rounded p-1 hover:bg-black/[0.05]"
           >
-            <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+            <X className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
           </button>
         )}
       </div>
@@ -149,17 +244,17 @@ function LocalPathInput({
   );
 }
 
-// ── 자동 감지 결과 카드 ──
 function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
   return (
-    <div
-      className="rounded-xl p-3.5 space-y-2.5"
-      style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}
-    >
+    <div className="space-y-2.5 rounded-xl p-3.5" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#5A8A4A" }} />
-        <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>프로젝트 감지 완료</p>
-        <span className="ml-auto text-[8px] font-mono truncate" style={{ color: TEXT_TERTIARY, maxWidth: 200 }}>{path}</span>
+        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#5A8A4A" }} />
+        <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+          프로젝트 감지 완료
+        </p>
+        <span className="ml-auto max-w-[200px] truncate font-mono text-[8px]" style={{ color: TEXT_TERTIARY }}>
+          {path}
+        </span>
       </div>
       <div className="grid grid-cols-2 gap-2 text-[9px]">
         {[
@@ -167,168 +262,254 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
           { label: "언어", value: info.language },
           { label: "빌드 툴", value: info.build },
           { label: "감지 스택", value: `${info.stack.length}개` },
-        ].map(r => (
-          <div key={r.label}>
-            <span style={{ color: TEXT_TERTIARY }}>{r.label}: </span>
-            <span className="font-semibold" style={{ color: ACCENT }}>{r.value}</span>
+        ].map((row) => (
+          <div key={row.label}>
+            <span style={{ color: TEXT_TERTIARY }}>{row.label}: </span>
+            <span className="font-semibold" style={{ color: ACCENT }}>
+              {row.value}
+            </span>
           </div>
         ))}
       </div>
       <div className="flex flex-wrap gap-1">
-        {info.stack.map(s => (
-          <span key={s} className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: ACCENT_BG, color: ACCENT }}>
-            {s}
+        {info.stack.map((stack) => (
+          <span key={stack} className="rounded px-1.5 py-0.5 text-[8px]" style={{ background: ACCENT_BG, color: ACCENT }}>
+            {stack}
           </span>
         ))}
       </div>
       <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
-        💡 팀 구성 및 기술 스택은 <strong>Project Settings</strong>에서 세부 설정 가능합니다.
+        팀 구성 및 기술 스택은 <strong>Project Settings</strong>에서 세부 설정 가능합니다.
       </p>
     </div>
   );
 }
 
-// ── 새 프로젝트 만들기 모달 ──
+function DepartmentPicker({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: ProjectDepartment;
+  onChange: (value: ProjectDepartment) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`grid gap-1.5 ${compact ? "grid-cols-4" : "grid-cols-2"}`}>
+      {DEPARTMENTS.map((department) => {
+        const selected = department === value;
+        return (
+          <button
+            key={department}
+            type="button"
+            onClick={() => onChange(department)}
+            className={`rounded-lg font-semibold transition-all ${compact ? "px-2 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"}`}
+            style={{
+              background: selected ? "rgba(65,67,27,0.10)" : "rgba(0,0,0,0.04)",
+              color: selected ? ACCENT : TEXT_TERTIARY,
+              border: `1px solid ${selected ? "rgba(65,67,27,0.18)" : "transparent"}`,
+            }}
+          >
+            {DEPARTMENT_LABELS[department]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function CreateProjectModal({
-  onClose, onCreate,
+  onClose,
+  onCreate,
 }: {
   onClose: () => void;
-  onCreate: (name: string, code: string, localPath: string) => void;
+  onCreate: (project: ProjectLaunchTarget) => void;
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
+  const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [localPath, setLocalPath] = useState("");
+  const [department, setDepartment] = useState<ProjectDepartment>("BACKEND");
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
-  const [code] = useState(genCode());
+  const [previewCode] = useState(genCode());
   const [creating, setCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const TOTAL_STEPS = 3;
+  const totalSteps = 3;
+  const canNextStepOne = name.trim().length > 0;
+  const canNextStepTwo = localPath.trim().length > 0;
+  const deadlineDays = deadline ? Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000) : null;
 
   const handleDetect = () => {
-    if (!localPath.trim()) return;
+    if (!localPath.trim()) {
+      return;
+    }
+
     setDetecting(true);
-    setTimeout(() => {
+    window.setTimeout(() => {
       setDetected(detectFromPath(localPath.trim()));
       setDetecting(false);
     }, 1000);
   };
 
-  const handleCreate = () => {
-    if (!name.trim() || !localPath.trim()) return;
+  const handleCreate = async () => {
+    if (!name.trim() || !localPath.trim()) {
+      setErrorMessage("프로젝트 이름과 저장 경로를 입력해주세요.");
+      return;
+    }
+
     setCreating(true);
-    setTimeout(() => {
+    setErrorMessage("");
+
+    const payload: ProjectCreatePayload = {
+      projectName: name.trim(),
+      description: description.trim() || undefined,
+      localPath: localPath.trim(),
+      department,
+      deadlineDate: deadline || undefined,
+      techStacks: mapDetectedInfoToTechStacks(detected),
+    };
+
+    try {
+      const created = await createProject(payload);
+      onCreate({
+        projectId: created.projectId,
+        projectName: created.projectName,
+        projectCode: created.projectCode,
+        localPath: created.localPath ?? localPath.trim(),
+      });
+    } catch (createError) {
+      setErrorMessage(formatApiError(createError));
+    } finally {
       setCreating(false);
-      onCreate(name.trim(), code, localPath.trim());
-    }, 900);
+    }
   };
-
-  const canNext1 = name.trim().length > 0;
-  const canNext2 = localPath.trim().length > 0;
-
-  // 마감일까지 남은 일수 계산
-  const deadlineDays = deadline
-    ? Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000)
-    : null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
-        className="w-full relative flex flex-col rounded-2xl overflow-hidden"
-        style={{ maxWidth: 480, maxHeight: "92vh", background: "rgba(255,255,255,0.97)", border: `1px solid ${BORDER}`, boxShadow: "0 12px 48px rgba(0,0,0,0.16)" }}
+        className="relative flex w-full flex-col overflow-hidden rounded-2xl"
+        style={{
+          maxWidth: 480,
+          maxHeight: "92vh",
+          background: "rgba(255,255,255,0.97)",
+          border: `1px solid ${BORDER}`,
+          boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
+        }}
       >
-        {/* 헤더 */}
-        <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom: `1px solid ${BORDER}` }}>
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg, #e0e7ff, #e8d5f5)" }}>
-            <FolderPlus className="w-4 h-4" style={{ color: ACCENT }} />
+        <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: "linear-gradient(135deg, #e0e7ff, #e8d5f5)" }}>
+            <FolderPlus className="h-4 w-4" style={{ color: ACCENT }} />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>새 프로젝트 만들기</p>
-            <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>WE&AI Project Office</p>
+            <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+              새 프로젝트 만들기
+            </p>
+            <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
+              WE&AI Project Office
+            </p>
           </div>
-          {/* 스텝 인디케이터 */}
-          <div className="flex items-center gap-1.5 mr-2">
-            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+          <div className="mr-2 flex items-center gap-1.5">
+            {Array.from({ length: totalSteps }).map((_, index) => (
               <div
-                key={i}
+                key={index}
                 className="rounded-full transition-all"
                 style={{
-                  width: step === i + 1 ? 18 : 6, height: 6,
-                  background: i + 1 <= step ? ACCENT : "rgba(0,0,0,0.12)",
+                  width: step === index + 1 ? 18 : 6,
+                  height: 6,
+                  background: index + 1 <= step ? ACCENT : "rgba(0,0,0,0.12)",
                 }}
               />
             ))}
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/[0.06]">
-            <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+          <button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-black/[0.06]">
+            <X className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
           </button>
         </div>
 
-        {/* 바디 */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-
-          {/* ── Step 1: 프로젝트 기본 정보 ── */}
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {step === 1 && (
             <>
               <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: TEXT_SECONDARY }}>
+                <label className="mb-1.5 block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
                   프로젝트 이름 <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <input
                   autoFocus
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setErrorMessage("");
+                  }}
                   placeholder="예: WE&AI Backend Server"
-                  className="w-full px-3 py-2.5 text-sm rounded-xl outline-none"
-                  style={{ background: "rgba(0,0,0,0.03)", border: `1.5px solid ${name ? "rgba(65,67,27,0.30)" : BORDER}`, color: TEXT_PRIMARY }}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                  style={{
+                    background: "rgba(0,0,0,0.03)",
+                    border: `1.5px solid ${name ? "rgba(65,67,27,0.30)" : BORDER}`,
+                    color: TEXT_PRIMARY,
+                  }}
                 />
               </div>
+
               <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: TEXT_SECONDARY }}>프로젝트 설명</label>
+                <label className="mb-1.5 block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
+                  프로젝트 설명
+                </label>
                 <textarea
-                  value={desc}
-                  onChange={e => setDesc(e.target.value)}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                   placeholder="프로젝트 목적 및 개요를 입력하세요"
                   rows={3}
-                  className="w-full px-3 py-2.5 text-sm rounded-xl outline-none resize-none"
+                  className="w-full resize-none rounded-xl px-3 py-2.5 text-sm outline-none"
                   style={{ background: "rgba(0,0,0,0.03)", border: `1.5px solid ${BORDER}`, color: TEXT_PRIMARY }}
                 />
               </div>
 
-              {/* ── 마감일 ── */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
+                  생성자 기본 파트
+                </label>
+                <DepartmentPicker value={department} onChange={setDepartment} />
+              </div>
+
               <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: TEXT_SECONDARY }}>
+                <label className="mb-1.5 block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
                   <span className="flex items-center gap-1.5">
-                    <CalendarDays className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                    <CalendarDays className="h-3 w-3" style={{ color: TEXT_TERTIARY }} />
                     프로젝트 마감일
-                    <span className="text-[9px] font-normal" style={{ color: TEXT_TERTIARY }}>(선택)</span>
+                    <span className="text-[9px] font-normal" style={{ color: TEXT_TERTIARY }}>
+                      (선택)
+                    </span>
                   </span>
                 </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={deadline}
-                    onChange={e => setDeadline(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl outline-none"
-                    style={{
-                      background: deadline ? "rgba(65,67,27,0.04)" : "rgba(0,0,0,0.03)",
-                      border: `1.5px solid ${deadline ? "rgba(65,67,27,0.28)" : BORDER}`,
-                      color: deadline ? TEXT_PRIMARY : TEXT_TERTIARY,
-                    }}
-                  />
-                </div>
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={(event) => setDeadline(event.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                  style={{
+                    background: deadline ? "rgba(65,67,27,0.04)" : "rgba(0,0,0,0.03)",
+                    border: `1.5px solid ${deadline ? "rgba(65,67,27,0.28)" : BORDER}`,
+                    color: deadline ? TEXT_PRIMARY : TEXT_TERTIARY,
+                  }}
+                />
                 {deadline && deadlineDays !== null && (
-                  <p className="text-[9px] mt-1.5 flex items-center gap-1" style={{
-                    color: deadlineDays < 7 ? "#B85450" : deadlineDays < 30 ? "#C09840" : "#5A8A4A"
-                  }}>
-                    <CalendarDays className="w-2.5 h-2.5" />
+                  <p
+                    className="mt-1.5 flex items-center gap-1 text-[9px]"
+                    style={{ color: deadlineDays < 7 ? "#B85450" : deadlineDays < 30 ? "#C09840" : "#5A8A4A" }}
+                  >
+                    <CalendarDays className="h-2.5 w-2.5" />
                     {deadlineDays > 0
                       ? `마감까지 ${deadlineDays}일 남음`
                       : deadlineDays === 0
@@ -340,138 +521,184 @@ function CreateProjectModal({
             </>
           )}
 
-          {/* ── Step 2: 저장 경로 + 자동 감지 ── */}
           {step === 2 && (
             <>
-              <div
-                className="rounded-xl px-4 py-3"
-                style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}
-              >
-                <p className="text-[10px] font-semibold mb-0.5" style={{ color: ACCENT }}>프로젝트 저장 위치 설정</p>
+              <div className="rounded-xl px-4 py-3" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
+                <p className="mb-0.5 text-[10px] font-semibold" style={{ color: ACCENT }}>
+                  프로젝트 저장 위치 설정
+                </p>
                 <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
-                  로컬 절대 경로를 입력하면 기술 스택을 자동으로 감지하고, 팀 구성·빌드 설정이 자동으로 적용됩니다.
+                  로컬 절대 경로를 입력하면 기술 스택을 자동으로 감지하고, 팀 구성 초안에 반영할 수 있습니다.
                 </p>
               </div>
 
               <LocalPathInput
                 value={localPath}
-                onChange={v => { setLocalPath(v); setDetected(null); }}
+                onChange={(value) => {
+                  setLocalPath(value);
+                  setDetected(null);
+                  setErrorMessage("");
+                }}
               />
 
-              {/* 경로 감지 버튼 */}
               <button
+                type="button"
                 onClick={handleDetect}
                 disabled={!localPath.trim() || detecting}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all"
+                className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-all"
                 style={{
                   background: localPath.trim() && !detecting ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
                   color: localPath.trim() && !detecting ? ACCENT : TEXT_TERTIARY,
                   border: `1px solid ${localPath.trim() && !detecting ? ACCENT_BORDER : "transparent"}`,
                 }}
               >
-                {detecting
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> 프로젝트 분석 중...</>
-                  : <><FolderOpen className="w-3.5 h-3.5" /> 경로 분석 및 기술 스택 감지</>
-                }
+                {detecting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    프로젝트 분석 중...
+                  </>
+                ) : (
+                  <>
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    경로 분석 및 기술 스택 감지
+                  </>
+                )}
               </button>
 
-              {/* 감지 결과 */}
               {detected && <DetectResult info={detected} path={localPath} />}
 
-              {/* 감지 전 안내 */}
               {!detected && !detecting && localPath && (
                 <div className="flex items-start gap-2 px-1">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: TEXT_TERTIARY }} />
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: TEXT_TERTIARY }} />
                   <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                    위 버튼을 눌러 경로를 분석하면 기술 스택이 자동으로 감지됩니다. (개발 환경 설치는 별도로 진행)
+                    위 버튼을 눌러 경로를 분석하면 기술 스택이 자동으로 감지됩니다.
                   </p>
                 </div>
               )}
             </>
           )}
 
-          {/* ── Step 3: 참여 코드 + 요약 ── */}
           {step === 3 && (
             <>
-              {/* 코드 */}
               <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: TEXT_SECONDARY }}>참여 코드 (자동 생성)</label>
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}` }}>
-                  <Hash className="w-4 h-4 shrink-0" style={{ color: TEXT_TERTIARY }} />
-                  <span className="flex-1 text-2xl font-mono font-bold tracking-[0.4em]" style={{ color: ACCENT }}>{code}</span>
-                  <span className="text-[9px] px-2 py-0.5 rounded" style={{ background: ACCENT_BG, color: ACCENT }}>8자리</span>
+                <label className="mb-1.5 block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
+                  참여 코드 (생성 후 서버 발급)
+                </label>
+                <div className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}` }}>
+                  <Hash className="h-4 w-4 shrink-0" style={{ color: TEXT_TERTIARY }} />
+                  <span className="flex-1 font-mono text-2xl font-bold tracking-[0.4em]" style={{ color: ACCENT }}>
+                    {previewCode}
+                  </span>
+                  <span className="rounded px-2 py-0.5 text-[9px]" style={{ background: ACCENT_BG, color: ACCENT }}>
+                    8자리
+                  </span>
                 </div>
-                <p className="text-[9px] mt-1.5" style={{ color: TEXT_TERTIARY }}>
-                  팀원에게 이 코드를 공유하면 프로젝트에 참여할 수 있습니다.
+                <p className="mt-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                  실제 참여 코드는 생성 시 서버가 발급한 값으로 자동 대체됩니다.
                 </p>
               </div>
 
-              {/* 요약 카드 */}
-              <div className="rounded-xl p-3.5 space-y-2" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
-                <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: ACCENT }}>생성 요약</p>
+              <div className="space-y-2 rounded-xl p-3.5" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
+                <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: ACCENT }}>
+                  생성 요약
+                </p>
                 {[
                   { label: "프로젝트명", value: name },
-                  { label: "저장 위치", value: localPath || "—" },
-                  { label: "마감일", value: deadline ? `${deadline}${deadlineDays !== null ? ` (${deadlineDays > 0 ? `${deadlineDays}일 후` : deadlineDays === 0 ? "오늘" : "기간 초과"})` : ""}` : "미설정" },
-                  { label: "감지된 스택", value: detected ? `${detected.stack.length}개 자동 감지됨` : "수동 설정 필요" },
-                ].map(r => (
-                  <div key={r.label} className="flex items-start justify-between gap-3 text-[10px]">
-                    <span style={{ color: TEXT_TERTIARY, flexShrink: 0 }}>{r.label}</span>
-                    <span className="font-semibold text-right font-mono truncate" style={{ color: r.label === "마감일" && deadline && deadlineDays !== null && deadlineDays < 7 ? "#B85450" : TEXT_PRIMARY, maxWidth: 260 }}>{r.value}</span>
+                  { label: "저장 위치", value: localPath || "-" },
+                  { label: "담당 파트", value: DEPARTMENT_LABELS[department] },
+                  {
+                    label: "마감일",
+                    value: deadline
+                      ? `${deadline}${deadlineDays !== null ? ` (${deadlineDays > 0 ? `${deadlineDays}일 후` : deadlineDays === 0 ? "오늘" : "기간 초과"})` : ""}`
+                      : "미설정",
+                  },
+                  {
+                    label: "감지된 스택",
+                    value: detected ? `${detected.stack.length}개 자동 감지됨` : "수동 설정 가능",
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-start justify-between gap-3 text-[10px]">
+                    <span style={{ color: TEXT_TERTIARY, flexShrink: 0 }}>{row.label}</span>
+                    <span className="max-w-[260px] truncate text-right font-mono font-semibold" style={{ color: TEXT_PRIMARY }}>
+                      {row.value}
+                    </span>
                   </div>
                 ))}
               </div>
 
+              {errorMessage && (
+                <p className="text-center text-[10px]" style={{ color: "#B85450" }}>
+                  {errorMessage}
+                </p>
+              )}
+
               <div
-                className="rounded-xl p-3 flex items-start gap-2"
+                className="flex items-start gap-2 rounded-xl p-3"
                 style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.18)" }}
               >
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: "#10b981" }} />
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: "#10b981" }} />
                 <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
-                  프로젝트 생성 후 <strong>Project Settings</strong>에서 팀 구성, 기술 스택 버전, 일정을 추가로 설정할 수 있습니다. 개발 환경(JDK, Node.js 등) 설치는 별도로 진행하세요.
+                  프로젝트 생성 후 <strong>Project Settings</strong>에서 팀 구성, 기술 스택 버전, 일정을 추가로 설정할 수 있습니다.
                 </p>
               </div>
             </>
           )}
         </div>
 
-        {/* 푸터 */}
-        <div className="px-5 py-4 flex gap-2.5 shrink-0" style={{ borderTop: `1px solid ${BORDER}` }}>
-          {step > 1 && (
-            <button onClick={() => setStep(s => (s - 1) as any)} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}>
+        <div className="flex gap-2.5 px-5 py-4" style={{ borderTop: `1px solid ${BORDER}` }}>
+          {step > 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep((current) => (current - 1) as 1 | 2 | 3)}
+              className="flex-1 rounded-xl py-2.5 text-xs font-semibold"
+              style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+            >
               이전
             </button>
-          )}
-          {step === 1 && (
-            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl py-2.5 text-xs font-semibold"
+              style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+            >
               취소
             </button>
           )}
 
           {step < 3 ? (
             <button
-              onClick={() => setStep(s => (s + 1) as any)}
-              disabled={step === 1 ? !canNext1 : !canNext2}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all"
+              type="button"
+              onClick={() => setStep((current) => (current + 1) as 1 | 2 | 3)}
+              disabled={step === 1 ? !canNextStepOne : !canNextStepTwo}
+              className="flex-1 rounded-xl py-2.5 text-xs font-semibold transition-all"
               style={{
-                background: (step === 1 ? canNext1 : canNext2) ? ACCENT : "rgba(0,0,0,0.07)",
-                color: (step === 1 ? canNext1 : canNext2) ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-                boxShadow: (step === 1 ? canNext1 : canNext2) ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
+                background: (step === 1 ? canNextStepOne : canNextStepTwo) ? ACCENT : "rgba(0,0,0,0.07)",
+                color: (step === 1 ? canNextStepOne : canNextStepTwo) ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
+                boxShadow: (step === 1 ? canNextStepOne : canNextStepTwo) ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
               }}
             >
-              다음 <ChevronRight className="w-3 h-3" />
+              다음 <ChevronRight className="ml-1 inline h-3 w-3" />
             </button>
           ) : (
             <button
-              onClick={handleCreate}
+              type="button"
+              onClick={() => void handleCreate()}
               disabled={creating}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold"
+              className="flex-1 rounded-xl py-2.5 text-xs font-semibold"
               style={{ background: ACCENT, color: "rgba(255,255,255,0.95)", boxShadow: "0 4px 16px rgba(65,67,27,0.30)" }}
             >
-              {creating
-                ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />생성 중...</>
-                : <><FolderPlus className="w-3 h-3" />프로젝트 생성</>
-              }
+              {creating ? (
+                <>
+                  <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <FolderPlus className="mr-1 inline h-3 w-3" />
+                  프로젝트 생성
+                </>
+              )}
             </button>
           )}
         </div>
@@ -480,138 +707,235 @@ function CreateProjectModal({
   );
 }
 
-// ── 기존 프로젝트 시작 모달 ──
-const EXISTING_PROJECTS = [
-  { id: "weai-backend", name: "WE&AI Backend Server", code: "WEAI2025", path: "D:\\WE_AI\\enterprise" },
-  { id: "ma-simulator", name: "Multi-Agent Simulator", code: "SIM2B3XX", path: "D:\\WE_AI\\ma-simulator" },
-  { id: "devops-pipeline", name: "DevOps Pipeline", code: "DEV9XZAB", path: "/home/dev/devops-pipeline" },
-];
-
-function StartModal({ onClose, onSelect }: {
+function StartModal({
+  currentUser,
+  projects,
+  loading,
+  errorMessage,
+  onRefresh,
+  onClose,
+  onSelect,
+}: {
+  currentUser: CurrentUser | null;
+  projects: MyProject[];
+  loading: boolean;
+  errorMessage: string;
+  onRefresh: () => void;
   onClose: () => void;
-  onSelect: (id: string, name: string, localPath: string) => void;
+  onSelect: (project: ProjectLaunchTarget) => void;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [localPath, setLocalPath] = useState("");
   const [joining, setJoining] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
 
-  const selectedProj = EXISTING_PROJECTS.find(p => p.id === selected);
+  const selectedProject = projects.find((project) => project.projectId === selectedProjectId) ?? null;
 
-  const handleSelect = (id: string) => {
-    setSelected(id);
-    const proj = EXISTING_PROJECTS.find(p => p.id === id);
-    if (proj) {
-      setLocalPath(proj.path);
-      setDetected(null);
-      // 자동 감지
-      setTimeout(() => {
-        setDetecting(true);
-        setTimeout(() => {
-          setDetected(detectFromPath(proj.path));
-          setDetecting(false);
-        }, 800);
-      }, 100);
-    }
+  const handleSelect = (project: MyProject) => {
+    setSelectedProjectId(project.projectId);
+    setDetected(null);
+    setLocalPath("");
   };
 
   const handleEnter = () => {
-    if (!selectedProj) return;
+    if (!selectedProject) {
+      return;
+    }
+
     setJoining(true);
-    setTimeout(() => {
+    window.setTimeout(() => {
+      onSelect({
+        projectId: selectedProject.projectId,
+        projectName: selectedProject.projectName,
+        projectCode: selectedProject.projectCode,
+        localPath: localPath.trim() || undefined,
+      });
       setJoining(false);
-      onSelect(selectedProj.id, selectedProj.name, localPath.trim() || selectedProj.path);
-    }, 700);
+    }, 300);
+  };
+
+  const handlePathDetect = () => {
+    if (!localPath.trim()) {
+      return;
+    }
+
+    setDetecting(true);
+    window.setTimeout(() => {
+      setDetected(detectFromPath(localPath.trim()));
+      setDetecting(false);
+    }, 800);
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
-        className="w-full relative flex flex-col rounded-2xl overflow-hidden"
-        style={{ maxWidth: 440, maxHeight: "88vh", background: "rgba(255,255,255,0.97)", border: `1px solid ${BORDER}`, boxShadow: "0 12px 48px rgba(0,0,0,0.16)" }}
+        className="relative flex w-full flex-col overflow-hidden rounded-2xl"
+        style={{
+          maxWidth: 440,
+          maxHeight: "88vh",
+          background: "rgba(255,255,255,0.97)",
+          border: `1px solid ${BORDER}`,
+          boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
+        }}
       >
-        <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom: `1px solid ${BORDER}` }}>
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(65,67,27,0.10)" }}>
-            <Play className="w-4 h-4" style={{ color: ACCENT }} />
+        <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(65,67,27,0.10)" }}>
+            <Play className="h-4 w-4" style={{ color: ACCENT }} />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>프로젝트 시작하기</p>
-            <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>참여 중인 프로젝트를 선택하세요</p>
+            <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+              프로젝트 시작하기
+            </p>
+            <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
+              {currentUser?.name ? `${currentUser.name}님이 참여 중인 프로젝트` : "참여 중인 프로젝트를 선택하세요"}
+            </p>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/[0.06]">
-            <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+          <button type="button" onClick={onRefresh} className="rounded-lg p-1 hover:bg-black/[0.06]" title="새로고침">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} style={{ color: TEXT_TERTIARY }} />
+          </button>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-black/[0.06]">
+            <X className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          {/* 프로젝트 목록 */}
-          <div className="space-y-2">
-            {EXISTING_PROJECTS.map(p => {
-              const isSel = selected === p.id;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => handleSelect(p.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
-                  style={{
-                    background: isSel ? "rgba(65,67,27,0.07)" : "rgba(0,0,0,0.03)",
-                    border: `1.5px solid ${isSel ? ACCENT_BORDER : BORDER}`,
-                  }}
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: isSel ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.06)" }}>
-                    <Bot className="w-4 h-4" style={{ color: isSel ? ACCENT : TEXT_SECONDARY }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate" style={{ color: isSel ? ACCENT : TEXT_PRIMARY }}>{p.name}</p>
-                    <p className="text-[9px] font-mono mt-0.5 truncate" style={{ color: TEXT_TERTIARY }}>
-                      <Folder className="w-2.5 h-2.5 inline mr-1" />{p.path}
-                    </p>
-                  </div>
-                  {isSel && <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: ACCENT }}><div className="w-1.5 h-1.5 rounded-full bg-white" /></div>}
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          {errorMessage && (
+            <div className="rounded-xl px-3 py-2.5 text-[10px]" style={{ background: "rgba(184,84,80,0.06)", border: "1px solid rgba(184,84,80,0.14)", color: "#B85450" }}>
+              {errorMessage}
+            </div>
+          )}
 
-          {/* 선택된 경우: 경로 수정 + 감지 결과 */}
-          {selected && (
+          {loading ? (
+            <div className="flex items-center gap-2 px-2 py-4">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: ACCENT }} />
+              <p className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
+                프로젝트 목록을 불러오는 중...
+              </p>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="rounded-xl border px-4 py-6 text-center" style={{ background: "rgba(0,0,0,0.02)", borderColor: BORDER }}>
+              <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+                아직 참여 중인 프로젝트가 없습니다
+              </p>
+              <p className="mt-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                새 프로젝트를 만들거나 초대 코드로 참여해보세요.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {projects.map((project) => {
+                const selected = selectedProjectId === project.projectId;
+                return (
+                  <button
+                    key={project.projectId}
+                    type="button"
+                    onClick={() => handleSelect(project)}
+                    className="w-full rounded-xl px-4 py-3 text-left transition-all"
+                    style={{
+                      background: selected ? "rgba(65,67,27,0.07)" : "rgba(0,0,0,0.03)",
+                      border: `1.5px solid ${selected ? ACCENT_BORDER : BORDER}`,
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: selected ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.06)" }}>
+                        <Bot className="h-4 w-4" style={{ color: selected ? ACCENT : TEXT_SECONDARY }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold" style={{ color: selected ? ACCENT : TEXT_PRIMARY }}>
+                          {project.projectName}
+                        </p>
+                        <p className="mt-0.5 truncate text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                          #{project.projectCode} · {project.role} / {project.department}
+                        </p>
+                        <p className="mt-1 truncate text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                          {project.description || "설명이 아직 등록되지 않았습니다."}
+                        </p>
+                      </div>
+                      {selected && (
+                        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full" style={{ background: ACCENT }}>
+                          <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedProject && (
             <>
               <LocalPathInput
                 value={localPath}
-                onChange={v => { setLocalPath(v); setDetected(null); }}
+                onChange={(value) => {
+                  setLocalPath(value);
+                  setDetected(null);
+                }}
                 label="저장 경로 확인/수정"
+                required={false}
               />
-              {detecting && (
-                <div className="flex items-center gap-2 px-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: ACCENT }} />
-                  <p className="text-[10px]" style={{ color: TEXT_SECONDARY }}>프로젝트 분석 중...</p>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={handlePathDetect}
+                disabled={!localPath.trim() || detecting}
+                className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-all"
+                style={{
+                  background: localPath.trim() && !detecting ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
+                  color: localPath.trim() && !detecting ? ACCENT : TEXT_TERTIARY,
+                  border: `1px solid ${localPath.trim() && !detecting ? ACCENT_BORDER : "transparent"}`,
+                }}
+              >
+                {detecting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    프로젝트 분석 중...
+                  </>
+                ) : (
+                  <>
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    경로 분석 및 기술 스택 감지
+                  </>
+                )}
+              </button>
               {detected && !detecting && <DetectResult info={detected} path={localPath} />}
             </>
           )}
         </div>
 
-        <div className="px-4 pb-4 pt-2 flex gap-2.5 shrink-0" style={{ borderTop: `1px solid ${BORDER}` }}>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}>
+        <div className="flex gap-2.5 border-t px-4 pb-4 pt-2" style={{ borderColor: BORDER }}>
+          <button type="button" onClick={onClose} className="flex-1 rounded-xl py-2.5 text-xs font-semibold" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}>
             취소
           </button>
           <button
+            type="button"
             onClick={handleEnter}
-            disabled={!selected || joining}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all"
+            disabled={!selectedProject || joining}
+            className="flex-1 rounded-xl py-2.5 text-xs font-semibold transition-all"
             style={{
-              background: selected ? ACCENT : "rgba(0,0,0,0.07)",
-              color: selected ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-              boxShadow: selected ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
+              background: selectedProject ? ACCENT : "rgba(0,0,0,0.07)",
+              color: selectedProject ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
+              boxShadow: selectedProject ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
             }}
           >
-            {joining ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Loading...</> : <>시작하기 <ArrowRight className="w-3 h-3" /></>}
+            {joining ? (
+              <>
+                <span className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                로딩 중...
+              </>
+            ) : (
+              <>
+                시작하기 <ArrowRight className="ml-1 inline h-3 w-3" />
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -619,177 +943,329 @@ function StartModal({ onClose, onSelect }: {
   );
 }
 
-// ── 코드로 참여 ──
-const PROJECTS_BY_CODE: Record<string, { id: string; name: string; path: string }> = {
-  "WEAI2025": { id: "weai-backend", name: "WE&AI Backend Server", path: "D:\\WE_AI\\enterprise" },
-  "SIM2B3XX": { id: "ma-simulator", name: "Multi-Agent Simulator", path: "D:\\WE_AI\\ma-simulator" },
-  "DEV9XZAB": { id: "devops-pipeline", name: "DevOps Pipeline", path: "/home/dev/devops-pipeline" },
-};
-
-// ────────────────────────────────────────────
-// 메인 JoinProjectScreen
-// ────────────────────────────────────────────
 type Props = {
-  onJoin: (projectId: string, projectName: string, code?: string, localPath?: string) => void;
+  currentUser: CurrentUser | null;
+  onOpenProject: (project: ProjectLaunchTarget) => void;
+  onLogout: () => void;
 };
 
-export function JoinProjectScreen({ onJoin }: Props) {
+export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Props) {
   const [modal, setModal] = useState<"none" | "start" | "create">("none");
-  const [codeInput, setCode] = useState("");
-  const [codeError, setCodeError] = useState(false);
-  const [codeJoining, setCodeJoining] = useState(false);
+  const [projects, setProjects] = useState<MyProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projectError, setProjectError] = useState("");
+  const [codeInput, setCodeInput] = useState("");
+  const [codeStep, setCodeStep] = useState<"input" | "path">("input");
   const [codePath, setCodePath] = useState("");
   const [codeDetect, setCodeDetect] = useState<DetectedInfo | null>(null);
-  const [codeStep, setCodeStep] = useState<"input" | "path">("input");
+  const [joinDepartment, setJoinDepartment] = useState<ProjectDepartment>("BACKEND");
+  const [codeJoining, setCodeJoining] = useState(false);
+  const [codeError, setCodeError] = useState("");
 
-  const handleCodeJoin = () => {
-    const c = codeInput.trim().toUpperCase();
-    const p = PROJECTS_BY_CODE[c];
-    if (p) {
-      setCodeError(false);
-      if (codeStep === "input") {
-        setCodePath(p.path);
-        setCodeStep("path");
-        // 자동 감지
-        setTimeout(() => setCodeDetect(detectFromPath(p.path)), 600);
-      } else {
-        setCodeJoining(true);
-        setTimeout(() => {
-          setCodeJoining(false);
-          onJoin(p.id, p.name, c, codePath || p.path);
-        }, 800);
-      }
-    } else {
-      setCodeError(true);
+  const sortedProjects = useMemo(
+    () =>
+      [...projects].sort((left, right) => {
+        const leftDate = new Date(left.createdAt).getTime();
+        const rightDate = new Date(right.createdAt).getTime();
+        return rightDate - leftDate;
+      }),
+    [projects]
+  );
+
+  const refreshProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const nextProjects = await fetchMyProjects();
+      setProjects(nextProjects);
+      setProjectError("");
+    } catch (error) {
+      setProjectError(formatApiError(error));
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
-  const handleCreate = (name: string, code: string, localPath: string) => {
+  useEffect(() => {
+    void refreshProjects();
+  }, []);
+
+  const handleCreate = (project: ProjectLaunchTarget) => {
     setModal("none");
-    onJoin(`proj-${Date.now()}`, name, code, localPath);
+    void refreshProjects();
+    onOpenProject(project);
   };
 
-  const handleSelect = (id: string, name: string, localPath: string) => {
+  const handleSelectProject = (project: ProjectLaunchTarget) => {
     setModal("none");
-    const proj = EXISTING_PROJECTS.find(p => p.id === id);
-    onJoin(id, name, proj?.code, localPath);
+    onOpenProject(project);
+  };
+
+  const handleCodeJoin = async () => {
+    const normalizedCode = codeInput.trim().toUpperCase();
+
+    if (!normalizedCode) {
+      setCodeError("참여 코드를 입력해주세요.");
+      return;
+    }
+
+    if (codeStep === "input") {
+      setCodeError("");
+      setCodeStep("path");
+      return;
+    }
+
+    setCodeJoining(true);
+    setCodeError("");
+
+    try {
+      const joined = await joinProject({
+        projectCode: normalizedCode,
+        department: joinDepartment,
+      });
+
+      await refreshProjects();
+      onOpenProject({
+        projectId: joined.projectId,
+        projectName: joined.projectName,
+        projectCode: joined.projectCode,
+        localPath: codePath.trim() || undefined,
+      });
+    } catch (error) {
+      setCodeError(formatApiError(error));
+    } finally {
+      setCodeJoining(false);
+    }
   };
 
   return (
     <>
-      {modal === "start" && <StartModal onClose={() => setModal("none")} onSelect={handleSelect} />}
+      {modal === "start" && (
+        <StartModal
+          currentUser={currentUser}
+          projects={sortedProjects}
+          loading={loadingProjects}
+          errorMessage={projectError}
+          onRefresh={() => void refreshProjects()}
+          onClose={() => setModal("none")}
+          onSelect={handleSelectProject}
+        />
+      )}
+
       {modal === "create" && <CreateProjectModal onClose={() => setModal("none")} onCreate={handleCreate} />}
 
-      {/* ── 단색 배경 (login과 동일한 #F5F4F1) ── */}
-      <div
-        className="size-full flex items-center justify-center relative overflow-hidden"
-        style={{ background: "#F5F4F1" }}
-      >
-        {/* 카드 */}
-        <div className="relative z-10 flex flex-col items-center gap-7 w-full px-6" style={{ maxWidth: 400 }}>
-          {/* 로고 */}
+      <div className="relative flex size-full items-center justify-center overflow-hidden" style={{ background: "#F5F4F1" }}>
+        <div className="absolute right-6 top-6 z-20 flex items-center gap-2">
+          {currentUser && (
+            <div
+              className="hidden items-center gap-2 rounded-full px-3 py-2 text-[11px] sm:flex"
+              style={{ background: "#FFFFFF", border: `1px solid rgba(0,0,0,0.06)`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+            >
+              <UserCircle2 className="h-4 w-4" style={{ color: ACCENT }} />
+              <span style={{ color: TEXT_SECONDARY }}>{currentUser.name}</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-semibold"
+            style={{ background: "#FFFFFF", color: TEXT_SECONDARY, border: `1px solid rgba(0,0,0,0.06)`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            로그아웃
+          </button>
+        </div>
+
+        <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center gap-7 px-6">
           <div className="text-center">
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
               style={{ background: "#41431B", boxShadow: "0 8px 24px rgba(65,67,27,0.25)" }}
             >
-              <Bot className="w-7 h-7" style={{ color: "white" }} />
+              <Bot className="h-7 w-7" style={{ color: "white" }} />
             </div>
-            <h1 className="text-xl font-bold mb-1.5" style={{ color: TEXT_PRIMARY }}>Welcome to SynAIpse Office</h1>
-            <p className="text-xs" style={{ color: TEXT_SECONDARY }}>Intelligent Multi-Agent Project Office</p>
+            <h1 className="mb-1.5 text-xl font-bold" style={{ color: TEXT_PRIMARY }}>
+              Welcome to SynAIpse Office
+            </h1>
+            <p className="text-xs" style={{ color: TEXT_SECONDARY }}>
+              Intelligent Multi-Agent Project Office
+            </p>
+            {currentUser && (
+              <p className="mt-2 text-[11px]" style={{ color: TEXT_TERTIARY }}>
+                {currentUser.name}님, 프로젝트를 선택하거나 새로 만들어보세요.
+              </p>
+            )}
           </div>
 
-          {/* 액션 카드 */}
           <div className="w-full space-y-3">
-
-            {/* 1. 시작하기 */}
             <button
+              type="button"
               onClick={() => setModal("start")}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left group"
-              style={{ background: "#FFFFFF", border: `1px solid rgba(0,0,0,0.07)`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(65,67,27,0.14)"; e.currentTarget.style.border = "1px solid rgba(65,67,27,0.18)"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)"; e.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)"; }}
+              className="group flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left"
+              style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.boxShadow = "0 6px 20px rgba(65,67,27,0.14)";
+                event.currentTarget.style.border = "1px solid rgba(65,67,27,0.18)";
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
+                event.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)";
+              }}
             >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(65,67,27,0.08)" }}>
-                <Play className="w-5 h-5" style={{ color: ACCENT }} />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(65,67,27,0.08)" }}>
+                <Play className="h-5 w-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>시작하기</p>
-                <p className="text-[11px] mt-0.5" style={{ color: TEXT_SECONDARY }}>참여 중인 프로젝트 목록에서 선택</p>
+                <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+                  시작하기
+                </p>
+                <p className="mt-0.5 text-[11px]" style={{ color: TEXT_SECONDARY }}>
+                  참여 중인 프로젝트 목록에서 선택
+                </p>
               </div>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" style={{ color: TEXT_TERTIARY }} />
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" style={{ color: TEXT_TERTIARY }} />
             </button>
 
-            {/* 2. 새 프로젝트 */}
             <button
+              type="button"
               onClick={() => setModal("create")}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left group"
-              style={{ background: "#FFFFFF", border: `1px solid rgba(0,0,0,0.07)`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(65,67,27,0.14)"; e.currentTarget.style.border = "1px solid rgba(65,67,27,0.18)"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)"; e.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)"; }}
+              className="group flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left"
+              style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.boxShadow = "0 6px 20px rgba(65,67,27,0.14)";
+                event.currentTarget.style.border = "1px solid rgba(65,67,27,0.18)";
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
+                event.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)";
+              }}
             >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(174,183,132,0.15)" }}>
-                <Plus className="w-5 h-5" style={{ color: ACCENT }} />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(174,183,132,0.15)" }}>
+                <Plus className="h-5 w-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>새 프로젝트</p>
-                <p className="text-[11px] mt-0.5" style={{ color: TEXT_SECONDARY }}>저장 경로 지정 후 자동으로 세팅</p>
+                <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+                  새 프로젝트
+                </p>
+                <p className="mt-0.5 text-[11px]" style={{ color: TEXT_SECONDARY }}>
+                  저장 경로 지정 후 자동으로 세팅
+                </p>
               </div>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" style={{ color: TEXT_TERTIARY }} />
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" style={{ color: TEXT_TERTIARY }} />
             </button>
 
-            {/* 3. 코드로 참여 */}
-            <div className="w-full px-5 py-4 rounded-2xl" style={{ background: "#FFFFFF", border: `1px solid rgba(0,0,0,0.07)`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(65,67,27,0.06)" }}>
-                  <Hash className="w-5 h-5" style={{ color: ACCENT }} />
+            <div
+              className="w-full rounded-2xl px-5 py-4"
+              style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+            >
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(65,67,27,0.06)" }}>
+                  <Hash className="h-5 w-5" style={{ color: ACCENT }} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>코드로 참여</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: TEXT_SECONDARY }}>8자리 초대 코드로 바로 참여</p>
+                  <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+                    코드로 참여
+                  </p>
+                  <p className="mt-0.5 text-[11px]" style={{ color: TEXT_SECONDARY }}>
+                    8자리 초대 코드로 바로 참여
+                  </p>
                 </div>
               </div>
 
               {codeStep === "input" ? (
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-                    <input
-                      value={codeInput}
-                      onChange={e => { setCodeError(false); setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)); }}
-                      onKeyDown={e => e.key === "Enter" && handleCodeJoin()}
-                      placeholder="WEAI2025"
-                      maxLength={8}
-                      className="w-full pl-8 pr-3 py-2.5 text-sm font-mono rounded-xl outline-none uppercase tracking-widest"
-                      style={{ background: codeError ? "rgba(184,84,80,0.05)" : "#F4F3F0", border: `1.5px solid ${codeError ? "rgba(184,84,80,0.35)" : "transparent"}`, color: TEXT_PRIMARY }}
-                    />
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Hash className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2" style={{ color: TEXT_TERTIARY }} />
+                      <input
+                        value={codeInput}
+                        onChange={(event) => {
+                          setCodeError("");
+                          setCodeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8));
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            void handleCodeJoin();
+                          }
+                        }}
+                        placeholder="WEAI2025"
+                        maxLength={8}
+                        className="w-full rounded-xl py-2.5 pl-8 pr-3 font-mono text-sm uppercase tracking-widest outline-none"
+                        style={{
+                          background: codeError ? "rgba(184,84,80,0.05)" : "#F4F3F0",
+                          border: `1.5px solid ${codeError ? "rgba(184,84,80,0.35)" : "transparent"}`,
+                          color: TEXT_PRIMARY,
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleCodeJoin()}
+                      disabled={codeInput.length < 6}
+                      className="shrink-0 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all"
+                      style={{
+                        background: codeInput.length >= 6 ? "#41431B" : "rgba(0,0,0,0.07)",
+                        color: codeInput.length >= 6 ? "white" : TEXT_TERTIARY,
+                      }}
+                    >
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={handleCodeJoin}
-                    disabled={codeInput.length < 6 || codeJoining}
-                    className="flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0"
-                    style={{
-                      background: codeInput.length >= 6 ? "#41431B" : "rgba(0,0,0,0.07)",
-                      color: codeInput.length >= 6 ? "white" : TEXT_TERTIARY,
-                    }}
-                  >
-                    {codeJoining ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
-                  </button>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
+                      참여 파트 선택
+                    </p>
+                    <DepartmentPicker value={joinDepartment} onChange={setJoinDepartment} compact />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <LocalPathInput
                     value={codePath}
-                    onChange={v => { setCodePath(v); setCodeDetect(null); }}
+                    onChange={(value) => {
+                      setCodePath(value);
+                      setCodeDetect(null);
+                    }}
                     label="저장 경로 확인"
+                    required={false}
                   />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!codePath.trim()) {
+                        return;
+                      }
+                      setCodeDetect(detectFromPath(codePath.trim()));
+                    }}
+                    disabled={!codePath.trim()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-all"
+                    style={{
+                      background: codePath.trim() ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
+                      color: codePath.trim() ? ACCENT : TEXT_TERTIARY,
+                      border: `1px solid ${codePath.trim() ? ACCENT_BORDER : "transparent"}`,
+                    }}
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    경로 분석
+                  </button>
                   {codeDetect && <DetectResult info={codeDetect} path={codePath} />}
                   <div className="flex gap-2">
-                    <button onClick={() => setCodeStep("input")} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}>이전</button>
                     <button
-                      onClick={handleCodeJoin}
+                      type="button"
+                      onClick={() => {
+                        setCodeStep("input");
+                        setCodeError("");
+                      }}
+                      className="flex-1 rounded-xl py-2 text-xs font-semibold"
+                      style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+                    >
+                      이전
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCodeJoin()}
                       disabled={codeJoining}
-                      className="flex-1 py-2 rounded-xl text-xs font-semibold"
+                      className="flex-1 rounded-xl py-2 text-xs font-semibold"
                       style={{ background: "#41431B", color: "white" }}
                     >
                       {codeJoining ? "참여 중..." : "참여하기"}
@@ -799,10 +1275,25 @@ export function JoinProjectScreen({ onJoin }: Props) {
               )}
 
               {codeError && (
-                <p className="text-[10px] mt-2" style={{ color: "#ef4444" }}>
-                  존재하지 않는 코드입니다. 다시 확인해주세요.
+                <p className="mt-2 text-[10px]" style={{ color: "#ef4444" }}>
+                  {codeError}
                 </p>
               )}
+            </div>
+
+            {projectError && !modal && (
+              <div className="rounded-xl px-4 py-3 text-[10px]" style={{ background: "rgba(184,84,80,0.06)", border: "1px solid rgba(184,84,80,0.14)", color: "#B85450" }}>
+                {projectError}
+              </div>
+            )}
+
+            <div className="rounded-xl px-4 py-3 text-[10px]" style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.08)" }}>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: ACCENT }} />
+                <span style={{ color: TEXT_SECONDARY }}>
+                  내 프로젝트 {sortedProjects.length}개가 실제 서버 데이터로 연결되어 있습니다.
+                </span>
+              </div>
             </div>
           </div>
         </div>
