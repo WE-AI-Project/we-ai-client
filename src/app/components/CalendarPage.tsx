@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Calendar, Plus, X, ChevronLeft, ChevronRight,
   User, Flag, CheckCircle2, Clock, Circle, Tag,
@@ -24,17 +24,16 @@ const PRIORITIES: SchedulePriority[] = ["high", "medium", "low"];
 const STATUSES: ScheduleStatus[] = ["todo", "in-progress", "done"];
 const WEEK_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-//추가
 interface ScheduleModalProps {
   initial?: Partial<Schedule> | null;
   onSave: (s: Schedule) => void;
   onClose: () => void;
-  //추가
   onColorChange: (dept: string, color: { bg: string; color: string }) => void;
+  onDeptDelete: (dept: string) => void; // 부서 삭제 이벤트를 부모로 전달
   deptColors: Record<string, { bg: string; color: string; light: string }>;
 }
 
-function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: ScheduleModalProps) {
+function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, deptColors }: ScheduleModalProps) {
   const [form, setForm] = useState<Partial<Schedule>>({
     title: "",
     assignee: "",
@@ -49,42 +48,29 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
 
   const [isCustomDept, setIsCustomDept] = useState(false);
   const [customDept, setCustomDept] = useState("");
-  const [addedDepts, setAddedDepts] = useState<string[]>([]);
+  const addedDepts = Object.keys(deptColors).filter(
+    d => d !== "전체" && !["Frontend", "Backend", "Agent", "DevOps", "QA", "Design"].includes(d)
+  );
 
-  // [수정] 기본 선택 색상을 팔레트의 첫 번째 진한 색으로 설정
   const [customColor, setCustomColor] = useState({ bg: "#2B6CB0", color: "#ffffff" });
   const COLOR_PALETTE = [
-    { bg: "#2B6CB0", color: "#ffffff" },
-    { bg: "#2F855A", color: "#ffffff" },
-    { bg: "#C53030", color: "#ffffff" },
-    { bg: "#C05621", color: "#ffffff" },
+    { bg: "#322c8b", color: "#ffffff" },
+    { bg: "#283930", color: "#ffffff" },
+    { bg: "#c02020", color: "#ffffff" },
+    { bg: "#793a1b", color: "#ffffff" },
   ];
 
   const set = (k: keyof Schedule, v: any) => setForm(f => ({ ...f, [k]: v }));
 
-  // [수정] 부서 추가 로직: 색상을 선명하게 주입하고 중복 방지
   const handleAddCustomDept = () => {
     const trimmed = customDept.trim();
     if (!trimmed) return;
-
-    // 1. 전역 색상 객체에 사용자가 고른 진한 배경색 적용
-    const newColor = {
-      bg: customColor.bg,
-      color: customColor.color,
-      light: customColor.bg
-    };
 
     onColorChange(trimmed, {
       bg: customColor.bg,
       color: customColor.color
     });
 
-    // 2. 목록에 추가 (이미 있으면 추가 안함)
-    if (!DEPTS.includes(trimmed as Dept) && !addedDepts.includes(trimmed)) {
-      setAddedDepts(prev => [...prev, trimmed]);
-    }
-
-    // 3. 상태 변경 및 입력창 닫기
     set("department", trimmed as Dept);
     setIsCustomDept(false);
     setCustomDept("");
@@ -99,19 +85,9 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
       return;
     }
 
-    //색상 변경 반영
-    // const isNewDept = !deptColors[finalDept];
-
-    // if (isNewDept) {
-    //   onColorChange(finalDept, {
-    //     bg: customColor.bg,
-    //     color: customColor.color
-    //   });
-    // }
-
     onColorChange(finalDept, {
       bg: customColor.bg,
-      color: customColor.color
+      color: customColor.bg
     });
 
     onSave({
@@ -127,7 +103,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
     });
   };
 
-  // 상단 헤더 색상 (선택된 부서의 색 반영)
   const dc = deptColors[form.department as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
 
   return (
@@ -145,7 +120,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
           maxHeight: "90vh",
         }}
       >
-        {/* 헤더 */}
         <div
           className="flex items-center gap-3 px-5 py-4 shrink-0"
           style={{
@@ -165,7 +139,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* 기능명 */}
           <div className="space-y-1">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>
               기능명 <span style={{ color: "#ef4444" }}>*</span>
@@ -180,7 +153,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
             />
           </div>
 
-          {/* 담당자 */}
           <div className="space-y-1">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>
               담당자 <span style={{ color: TEXT_TERTIARY }}>(선택)</span>
@@ -197,29 +169,49 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
             </div>
           </div>
 
-          {/* 부서 선택 영역 */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>부서</label>
             <div className="grid grid-cols-4 gap-1.5">
               {[...DEPTS.filter(d => d !== "전체"), ...addedDepts].map(d => {
                 const c = deptColors[d as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
                 const sel = !isCustomDept && form.department === d;
+                const isSystemDept = ["Frontend", "Backend", "Agent", "DevOps", "QA", "Design"].includes(d);
+
                 return (
-                  <button
-                    key={d}
-                    onClick={() => { setIsCustomDept(false); set("department", d); }}
-                    className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-                    style={{
-                      background: sel ? c.bg : "rgba(0,0,0,0.04)",
-                      color: sel ? c.color : TEXT_TERTIARY,
-                      border: `1px solid ${sel ? c.color + "40" : "transparent"}`,
-                    }}
-                  >
-                    {d}
-                  </button>
+                  <div key={d} className="relative group flex h-full">
+                    {/* 메인 부서 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => { setIsCustomDept(false); set("department", d); }}
+                      className="w-full py-1.5 rounded-lg text-[10px] font-semibold transition-all overflow-hidden"
+                      style={{
+                        background: sel ? c.bg : "rgba(0,0,0,0.04)",
+                        color: sel ? c.color : TEXT_TERTIARY,
+                        border: `1px solid ${sel ? c.color + "40" : "transparent"}`,
+                      }}
+                    >
+                      <span className="block truncate px-1">{d}</span>
+                    </button>
+
+                    {/* X 버튼 (마우스를 올렸을 때 투명에서 불투명으로 부드럽게 나타남) */}
+                    {!isSystemDept && (
+                      <div
+                        className="absolute inset-y-0 right-0 flex items-center px-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                        style={{ background: "transparent" }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onDeptDelete(d);
+                        }}
+                      >
+                        <X className="w-3 h-3 text-red-500 hover:text-red-700" />
+                      </div>
+                    )}
+                  </div>
                 );
               })}
               <button
+                type="button"
                 onClick={() => { setIsCustomDept(true); set("department", "" as Dept); }}
                 className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                 style={{
@@ -232,9 +224,8 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
               </button>
             </div>
 
-            {/* [추가] 새 부서 입력창 + 색상 팔레트 */}
             {isCustomDept && (
-              <div className="mt-2 p-3 rounded-xl border animate-in fade-in slide-in-from-top-1" style={{ background: "#FFFFFF", borderColor: BORDER_SUBTLE }}>
+              <div className="mt-2 p-3 rounded-xl border" style={{ background: "#FFFFFF", borderColor: BORDER_SUBTLE }}>
                 <div className="relative flex items-center">
                   <input
                     value={customDept}
@@ -268,6 +259,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
                     {COLOR_PALETTE.map((cp, idx) => (
                       <button
                         key={idx}
+                        type="button"
                         onClick={() => setCustomColor(cp)}
                         className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
                         style={{
@@ -282,7 +274,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
             )}
           </div>
 
-          {/* 날짜 */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>시작일 *</label>
@@ -307,7 +298,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
             </div>
           </div>
 
-          {/* 우선순위 + 상태 */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>우선순위</label>
@@ -318,6 +308,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
                   return (
                     <button
                       key={p}
+                      type="button"
                       onClick={() => set("priority", p)}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                       style={{
@@ -342,6 +333,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
                   return (
                     <button
                       key={s}
+                      type="button"
                       onClick={() => set("status", s)}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                       style={{
@@ -359,7 +351,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
             </div>
           </div>
 
-          {/* 설명 */}
           <div className="space-y-1">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>설명</label>
             <textarea
@@ -373,12 +364,12 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, deptColors }: 
           </div>
         </div>
 
-        {/* 푸터 */}
         <div className="flex gap-2 px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: BEIGE, color: TEXT_SECONDARY }}>
+          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: BEIGE, color: TEXT_SECONDARY }}>
             취소
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={!form.title?.trim()}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold"
@@ -429,11 +420,9 @@ function ScheduleCard({
     >
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
-          {/* 제목 */}
           <p className="text-[11px] font-semibold leading-snug" style={{ color: TEXT_PRIMARY }}>
             {schedule.title}
           </p>
-          {/* 담당자 */}
           {schedule.assignee ? (
             <div className="flex items-center gap-1 mt-0.5">
               <User className="w-2.5 h-2.5 shrink-0" style={{ color: TEXT_TERTIARY }} />
@@ -442,17 +431,14 @@ function ScheduleCard({
           ) : (
             <p className="text-[9px] mt-0.5" style={{ color: TEXT_TERTIARY }}>담당자 미지정</p>
           )}
-          {/* 날짜 */}
           <p className="text-[9px] mt-1" style={{ color: TEXT_TERTIARY }}>
             {formatDateKR(schedule.startDate)} → {formatDateKR(schedule.endDate)}
             <span className="ml-1">({dayCount}일)</span>
           </p>
-          {/* 설명 */}
           {schedule.desc && (
             <p className="text-[9px] mt-1 line-clamp-1" style={{ color: TEXT_TERTIARY }}>{schedule.desc}</p>
           )}
         </div>
-        {/* 액션 */}
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
           <button onClick={() => onEdit(schedule)} className="p-1 rounded hover:bg-black/[0.06]">
             <Edit2 className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
@@ -463,7 +449,6 @@ function ScheduleCard({
         </div>
       </div>
 
-      {/* 뱃지 */}
       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
         <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: dc.bg, color: dc.color }}>
           {schedule.department}
@@ -480,7 +465,7 @@ function ScheduleCard({
   );
 }
 
-// 메인 CalendarPage
+// ══ 메인 CalendarPage ══
 export function CalendarPage() {
   const [schedules, setSchedules] = useState<Schedule[]>(() => loadSchedules());
   const [year, setYear] = useState(() => new Date().getFullYear());
@@ -489,20 +474,56 @@ export function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
   const [view, setView] = useState<"month" | "list">("month");
-  const [deptColors, setDeptColors] = useState<DeptColorType>(DEPT_COLOR);
-  const todayStr = getTodayStr();
-  const [scheduleToDelete, setScheduleToDelete] = useState<Schedule | null>(null);  //삭제 모달
 
-
-  //추가
   type DeptColorType = Record<string, {
     bg: string;
     color: string;
     light: string;
   }>;
 
+  const [deptColors, setDeptColors] = useState<DeptColorType>(() => {
+    try {
+      const storedColors = localStorage.getItem("weai_custom_dept_colors_v1");
+      if (storedColors) {
+        return JSON.parse(storedColors);
+      }
+    } catch (e) {
+      console.error("부서 색상을 불러오는 중 오류가 발생했습니다:", e);
+    }
+    return DEPT_COLOR;
+  });
 
-  // ── 일정 필터 ──
+  useEffect(() => {
+    try {
+      localStorage.setItem("weai_custom_dept_colors_v1", JSON.stringify(deptColors));
+    } catch (e) {
+      console.error("부서 색상을 저장하는 중 오류가 발생했습니다:", e);
+    }
+  }, [deptColors]);
+
+  const [deptToDelete, setDeptToDelete] = useState<string | null>(null);
+
+  const confirmDeleteDept = () => {
+    if (!deptToDelete) return;
+    setSchedules(prev => {
+      const next = prev.filter(s => s.department !== deptToDelete);
+      saveSchedules(next); // 삭제된 결과를 로컬 저장소에 즉시 반영
+      return next;
+    });
+
+    setDeptColors(prev => {
+      const next = { ...prev };
+      delete next[deptToDelete];
+      return next;
+    });
+
+    if (deptFilter === deptToDelete) setDeptFilter("전체");
+    setDeptToDelete(null);
+  };
+
+  const todayStr = getTodayStr();
+  const [scheduleToDelete, setScheduleToDelete] = useState<Schedule | null>(null);
+
   const filtered = useMemo(() =>
     deptFilter === "전체"
       ? schedules
@@ -510,12 +531,10 @@ export function CalendarPage() {
     [schedules, deptFilter]
   );
 
-  // ── 이번 달 날짜 계산 ──
   const daysInMonth = getDaysInMonth(year, month);
   const firstWeekDay = getFirstDayOfMonth(year, month);
   const totalCells = Math.ceil((firstWeekDay + daysInMonth) / 7) * 7;
 
-  // ── 날짜별 일정 맵 ──
   const daySchedules = useMemo(() => {
     const map: Record<string, Schedule[]> = {};
     for (let day = 1; day <= daysInMonth; day++) {
@@ -525,10 +544,8 @@ export function CalendarPage() {
     return map;
   }, [filtered, year, month, daysInMonth]);
 
-  // ── 선택 날짜의 일정 ──
   const selectedDaySchedules = selectedDay ? (daySchedules[selectedDay] ?? []) : [];
 
-  // ── CRUD ──
   const handleSave = (s: Schedule) => {
     setSchedules(prev => {
       const next = prev.some(x => x.id === s.id)
@@ -548,7 +565,6 @@ export function CalendarPage() {
     });
   };
 
-  // ── 월 이동 ──
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
     else { setMonth(m => m - 1); }
@@ -560,7 +576,6 @@ export function CalendarPage() {
     setSelectedDay(null);
   };
 
-  // ── 통계 ──
   const stats = {
     total: filtered.length,
     done: filtered.filter(s => s.status === "done").length,
@@ -568,7 +583,6 @@ export function CalendarPage() {
     todo: filtered.filter(s => s.status === "todo").length,
   };
 
-  // ── 일정 바 (캘린더 셀 내) ──
   function EventBar({ schedule, compact = false }: { schedule: Schedule; compact?: boolean }) {
     const dc = deptColors[schedule.department as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
     return (
@@ -583,43 +597,48 @@ export function CalendarPage() {
     );
   }
 
-  //추가
   const dynamicDepts = useMemo(() => {
     const fromSchedules = schedules.map(s => s.department);
-    const combined = ["전체", ...DEPTS.filter(d => d !== "전체"), ...fromSchedules];
-    return Array.from(new Set(combined)) as Dept[]; // 중복 제거된 유니크한 부서 리스트
-  }, [schedules]);
+    const customDepts = Object.keys(deptColors).filter(
+      d => d !== "전체" && !["Frontend", "Backend", "Agent", "DevOps", "QA", "Design"].includes(d)
+    );
+    const combined = ["전체", ...DEPTS.filter(d => d !== "전체"), ...customDepts, ...fromSchedules];
+    return Array.from(new Set(combined)) as Dept[];
+  }, [schedules, deptColors]);
 
-  //추가
   const getDeptColor = (dept: string) => {
     return deptColors[dept as Dept] || { bg: "#F1F2E9", color: "#6B7040", light: "#F1F2E9" };
   };
 
-  //추가
   const handleDeptColorChange = (dept: string, color: { bg: string; color: string }) => {
+    const mainColor = color.bg;
+    const lightBg = mainColor.startsWith("#") ? `${mainColor}26` : mainColor;
+
     setDeptColors(prev => ({
       ...prev,
-      [dept]: { ...color, light: color.bg }
+      [dept]: {
+        color: mainColor,
+        bg: lightBg,
+        light: lightBg
+      }
     }));
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 — 팔레트 그라데이션 */}
+    <div className="absolute inset-0 flex flex-col overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
       <div className="absolute inset-0 pointer-events-none">
         <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
         <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: GRADIENT_ORB_2, filter: "blur(50px)" }} />
       </div>
 
-      <div className="relative z-10 flex-1 flex overflow-hidden">
+      <div className="relative z-10 flex-1 flex overflow-hidden h-full">
 
         {/* ══ 왼쪽: 사이드 패널 ══ */}
         <div
           className="flex flex-col shrink-0 overflow-hidden"
           style={{ width: 260, borderRight: `1px solid ${BORDER}`, background: `rgba(254,252,245,0.92)` }}
         >
-          {/* 헤더 */}
           <div
             className="flex items-center gap-2 px-4 py-3 shrink-0"
             style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: BRIGHT_BEIGE }}
@@ -628,7 +647,6 @@ export function CalendarPage() {
             <p className="text-xs font-semibold flex-1" style={{ color: TEXT_PRIMARY }}>개발 일정</p>
           </div>
 
-          {/* 부서 필터 */}
           <div
             className="flex flex-col gap-1 p-2.5 overflow-y-auto shrink-0"
             style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
@@ -637,25 +655,49 @@ export function CalendarPage() {
               const dc = getDeptColor(d);
               const cnt = d === "전체" ? schedules.length : schedules.filter(s => s.department === d).length;
               const sel = deptFilter === d;
+
+              const isSystemDept = ["전체", "Frontend", "Backend", "Agent", "DevOps", "QA", "Design"].includes(d);
+
               return (
-                <button
-                  key={d}
-                  onClick={() => setDeptFilter(d)}
-                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all"
-                  style={{
-                    background: sel ? dc.bg : "transparent",
-                    border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
-                  }}
-                >
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
-                  <span className="text-[11px] font-semibold flex-1" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
-                  <span className="text-[9px] font-mono" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>{cnt}</span>
-                </button>
+                <div key={d} className="relative group flex h-full">
+                  <button
+                    type="button"
+                    onClick={() => setDeptFilter(d)}
+                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all w-full"
+                    style={{
+                      background: sel ? dc.bg : "transparent",
+                      border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
+                    }}
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
+                    <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
+                    <div className="flex items-center shrink-0 min-w-[16px] justify-end">
+                      <span className="text-[9px] font-mono group-hover:hidden" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>
+                        {cnt}
+                      </span>
+                    </div>
+                  </button>
+                  
+                  {/* 사이드바 필터에 있는 부서는 X로 삭제하게 하면 위험할 수 있으나,
+                      요청사항에 맞게 커스텀 부서는 호버시 삭제 버튼이 보이게 연결합니다. */}
+                  {!isSystemDept && (
+                    <div
+                      className="absolute inset-y-0 right-0 px-2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                      style={{ background: "transparent" }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeptToDelete(d);
+                      }}
+                    >
+                      <X className="w-3 h-3 text-red-500 hover:text-red-700" />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
 
-          {/* 통계 요약 */}
           <div className="px-3 py-2.5 shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
             <div className="grid grid-cols-3 gap-1.5">
               {[
@@ -671,7 +713,6 @@ export function CalendarPage() {
             </div>
           </div>
 
-          {/* 선택된 날짜 일정 / 전체 일정 목록 */}
           <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
             {selectedDay ? (
               <>
@@ -736,14 +777,13 @@ export function CalendarPage() {
         </div>
 
         {/* ══ 오른쪽: 캘린더 본체 ══ */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden h-full">
 
           {/* 캘린더 헤더 */}
           <div
             className="flex items-center gap-3 px-5 py-3 shrink-0"
             style={{ borderBottom: `1px solid ${BORDER}`, background: BRIGHT_BEIGE }}
           >
-            {/* 월 이동 */}
             <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-black/[0.06] transition-all">
               <ChevronLeft className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
             </button>
@@ -754,7 +794,6 @@ export function CalendarPage() {
               <ChevronRight className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
             </button>
 
-            {/* 오늘 버튼 */}
             <button
               onClick={() => {
                 const now = new Date();
@@ -768,7 +807,6 @@ export function CalendarPage() {
               오늘
             </button>
 
-            {/* 범례 */}
             <div className="ml-auto flex items-center gap-3 flex-wrap">
               {dynamicDepts.filter(d => d !== "전체").map(d => {
                 const dc = deptColors[d] || {
@@ -807,225 +845,262 @@ export function CalendarPage() {
             </button>
           </div>
 
-          {/* ── 달력 그리드 ── */}
-          <div className="flex-1 overflow-auto p-3">
-            <div className="h-full flex flex-col" style={{ minHeight: 480 }}>
-              {/* 요일 헤더 */}
-              <div className="grid grid-cols-7 mb-1">
-                {WEEK_DAYS.map((d, i) => (
-                  <div
-                    key={d}
-                    className="text-center py-1.5 text-[10px] font-semibold"
-                    style={{ color: i === 0 ? "#B85450" : i === 6 ? "#6B7A50" : TEXT_LABEL }}
-                  >
-                    {d}
-                  </div>
-                ))}
-              </div>
-
-              {/* 날짜 셀 그리드 */}
-              <div className="grid grid-cols-7 flex-1 gap-px" style={{ background: BORDER }}>
-                {Array.from({ length: totalCells }).map((_, idx) => {
-                  const dayNum = idx - firstWeekDay + 1;
-                  const isValid = dayNum >= 1 && dayNum <= daysInMonth;
-                  const ds = isValid ? dateStr(year, month, dayNum) : "";
-                  const dayEvts = isValid ? (daySchedules[ds] ?? []) : [];
-                  const isToday = ds === todayStr;
-                  const isSel = ds === selectedDay;
-                  const isSun = idx % 7 === 0;
-                  const isSat = idx % 7 === 6;
-
-                  const startsToday = dayEvts.filter(s => s.startDate === ds);
-                  const continues = dayEvts.filter(s => s.startDate !== ds);
-
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => isValid && setSelectedDay(isSel ? null : ds)}
-                      className="relative p-1 transition-all overflow-hidden"
-                      style={{
-                        background: !isValid ? `rgba(254,252,245,0.45)`
-                          : isSel ? ACCENT_BG
-                            : BRIGHT_BEIGE,
-                        cursor: isValid ? "pointer" : "default",
-                        minHeight: 80,
-                      }}
-                      onMouseEnter={e => { if (isValid && !isSel) e.currentTarget.style.background = CREAM; }}
-                      onMouseLeave={e => { if (isValid && !isSel) e.currentTarget.style.background = BRIGHT_BEIGE; }}
-                    >
-                      {isValid && (
-                        <>
-                          {/* 날짜 숫자 */}
-                          <div className="flex items-center justify-between mb-1">
-                            <span
-                              className="text-[11px] font-semibold w-6 h-6 flex items-center justify-center rounded-full"
-                              style={{
-                                color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
-                                background: isToday ? ACCENT : "transparent",
-                              }}
-                            >
-                              {dayNum}
-                            </span>
-                            {dayEvts.length > 0 && (
-                              <span className="text-[8px]" style={{ color: TEXT_TERTIARY }}>{dayEvts.length}</span>
-                            )}
-                          </div>
-
-                          {/* 이벤트 바 */}
-                          <div className="space-y-0.5">
-                            {startsToday.slice(0, 3).map(s => (
-                              <EventBar key={s.id} schedule={s} compact />
-                            ))}
-                            {continues.slice(0, Math.max(0, 3 - startsToday.length)).map(s => (
-                              <div
-                                key={s.id}
-                                className="h-1.5 rounded-full opacity-40"
-                                style={{ background: deptColors[s.department].color }}
-                              />
-                            ))}
-                            {dayEvts.length > 3 && (
-                              <span className="text-[7px]" style={{ color: TEXT_TERTIARY }}>
-                                +{dayEvts.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* ── 하단 간트 뷰 ── */}
-          <div
-            className="shrink-0 overflow-hidden"
-            style={{ height: 110, borderTop: `1px solid ${BORDER}`, background: CREAM }}
-          >
-            <div className="px-4 pt-2 pb-1">
-              <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: TEXT_LABEL }}>
-                {month}월 간트 뷰
-              </p>
-            </div>
-            <div className="overflow-x-auto px-4 pb-2">
-              <div style={{ minWidth: daysInMonth * 20 }}>
-                {/* 날짜 눈금 */}
-                <div className="flex mb-1">
-                  {Array.from({ length: daysInMonth }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex-none text-center text-[7px]"
-                      style={{
-                        width: 20,
-                        color: dateStr(year, month, i + 1) === todayStr ? ACCENT : TEXT_TERTIARY,
-                        fontWeight: dateStr(year, month, i + 1) === todayStr ? "bold" : "normal",
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                  ))}
+          {/* ── 달력 그리드 영역 및 하단 간트 뷰 통합 배치 ── */}
+          <div className="flex-1 flex flex-col overflow-hidden p-3 min-h-0">
+            {/* 요일 헤더 */}
+            <div className="grid grid-cols-7 mb-1 shrink-0">
+              {WEEK_DAYS.map((d, i) => (
+                <div
+                  key={d}
+                  className="text-center py-1.5 text-[10px] font-semibold"
+                  style={{ color: i === 0 ? "#B85450" : i === 6 ? "#6B7A50" : TEXT_LABEL }}
+                >
+                  {d}
                 </div>
-                {/* 부서별 바 */}
-                {DEPTS.filter(d => d !== "전체").map(d => {
-                  const dc = deptColors[d];
-                  const dScheds = filtered.filter(s => s.department === d);
-                  if (dScheds.length === 0) return null;
-                  return (
-                    <div key={d} className="flex items-center gap-2 mb-1" style={{ height: 14 }}>
-                      <span
-                        className="text-[8px] font-semibold shrink-0"
-                        style={{ color: dc.color, width: 0, overflow: "visible", whiteSpace: "nowrap", marginLeft: -60 }}
-                      />
-                      <div className="relative flex-1" style={{ height: 12 }}>
-                        {/* 배경 격자 */}
-                        <div className="absolute inset-0 flex" style={{ opacity: 0.2 }}>
-                          {Array.from({ length: daysInMonth }).map((_, i) => (
-                            <div key={i} className="flex-none border-r" style={{ width: 20, borderColor: BORDER }} />
-                          ))}
+              ))}
+            </div>
+
+            {/* 날짜 셀 그리드 */}
+            <div
+              className="grid grid-cols-7 flex-1 gap-px"
+              style={{
+                background: BORDER,
+                gridTemplateRows: `repeat(${totalCells / 7}, 115px)`,
+                height: "100%",
+                minHeight: 0,
+                overflowY: "auto"
+              }}
+            >
+              {Array.from({ length: totalCells }).map((_, idx) => {
+                const dayNum = idx - firstWeekDay + 1;
+                const isValid = dayNum >= 1 && dayNum <= daysInMonth;
+                const ds = isValid ? dateStr(year, month, dayNum) : "";
+                const dayEvts = isValid ? (daySchedules[ds] ?? []) : [];
+                const isToday = ds === todayStr;
+                const isSel = ds === selectedDay;
+                const isSun = idx % 7 === 0;
+                const isSat = idx % 7 === 6;
+
+                const startsToday = dayEvts.filter(s => s.startDate === ds);
+                const continues = dayEvts.filter(s => s.startDate !== ds);
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => isValid && setSelectedDay(isSel ? null : ds)}
+                    className="relative p-1 transition-all overflow-hidden flex flex-col"
+                    style={{
+                      background: !isValid ? `rgba(254,252,245,0.45)`
+                        : isSel ? ACCENT_BG
+                          : BRIGHT_BEIGE,
+                      cursor: isValid ? "pointer" : "default",
+                      height: "100%",
+                      minHeight: 0
+                    }}
+                  >
+                    {isValid && (
+                      <>
+                        {/* 날짜 숫자 */}
+                        <div className="flex items-center justify-between mb-1 shrink-0">
+                          <span
+                            className="text-[11px] font-semibold w-6 h-6 flex items-center justify-center rounded-full"
+                            style={{
+                              color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
+                              background: isToday ? ACCENT : "transparent",
+                            }}
+                          >
+                            {dayNum}
+                          </span>
+                          {dayEvts.length > 3 && (
+                            <span className="text-[8px]" style={{ color: TEXT_TERTIARY }}>{dayEvts.length}</span>
+                          )}
                         </div>
-                        {/* 일정 바 */}
-                        {dScheds.map(s => {
-                          const sDay = new Date(s.startDate).getDate();
-                          const eDay = Math.min(daysInMonth, new Date(s.endDate).getDate());
-                          const left = (sDay - 1) * 20;
-                          const width = Math.max(20, (eDay - sDay + 1) * 20);
-                          const sm = STATUS_META[s.status];
-                          return (
+
+                        {/* 이벤트 바 */}
+                        <div className="space-y-0.5 flex-1 overflow-hidden">
+                          {startsToday.slice(0, 3).map(s => (
+                            <EventBar key={s.id} schedule={s} compact />
+                          ))}
+                          {continues.slice(0, Math.max(0, 3 - startsToday.length)).map(s => (
                             <div
                               key={s.id}
-                              className="absolute rounded-full flex items-center px-1"
-                              style={{
-                                left, width, height: 12, top: 0,
-                                background: dc.bg,
-                                border: `1px solid ${dc.color}40`,
-                              }}
-                              title={`${s.title}${s.assignee ? ` — ${s.assignee}` : ""}`}
-                            >
-                              <span className="text-[6px] truncate font-semibold" style={{ color: dc.color }}>
-                                {s.title}
-                              </span>
-                            </div>
-                          );
-                        })}
+                              className="h-1.5 rounded-full opacity-40"
+                              style={{ background: deptColors[s.department]?.color || DEPT_COLOR[s.department]?.color }}
+                            />
+                          ))}
+                          {dayEvts.length > 3 && (
+                            <span className="text-[7px] block" style={{ color: TEXT_TERTIARY }}>
+                              +{dayEvts.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── 하단 간트 뷰 ── */}
+            <div
+              className="shrink-0 overflow-y-auto mt-2"
+              style={{
+                height: "110px",
+                borderTop: `1px solid ${BORDER}`,
+                background: CREAM
+              }}
+            >
+              <div className="px-4 pt-2 pb-1 sticky top-0 z-10" style={{ background: CREAM }}>
+                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: TEXT_LABEL }}>
+                  {month}월 간트 뷰
+                </p>
+              </div>
+              <div className="overflow-x-auto px-4 pb-2">
+                <div style={{ minWidth: daysInMonth * 20 }}>
+                  {/* 날짜 눈금 */}
+                  <div className="flex mb-1 sticky top-[22px] z-10" style={{ background: CREAM }}>
+                    {Array.from({ length: daysInMonth }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="flex-none text-center text-[7px]"
+                        style={{
+                          width: 20,
+                          color: dateStr(year, month, i + 1) === todayStr ? ACCENT : TEXT_TERTIARY,
+                          fontWeight: dateStr(year, month, i + 1) === todayStr ? "bold" : "normal",
+                        }}
+                      >
+                        {i + 1}
                       </div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                  {/* 부서별 바 */}
+                  {DEPTS.filter(d => d !== "전체").map(d => {
+                    const dc = deptColors[d];
+                    const dScheds = filtered.filter(s => s.department === d);
+                    if (dScheds.length === 0) return null;
+                    return (
+                      <div key={d} className="flex items-center gap-2 mb-1" style={{ height: 14 }}>
+                        <span
+                          className="text-[8px] font-semibold shrink-0"
+                          style={{ color: dc?.color, width: 0, overflow: "visible", whiteSpace: "nowrap", marginLeft: -60 }}
+                        />
+                        <div className="relative flex-1" style={{ height: 12 }}>
+                          {/* 배경 격자 */}
+                          <div className="absolute inset-0 flex" style={{ opacity: 0.2 }}>
+                            {Array.from({ length: daysInMonth }).map((_, i) => (
+                              <div key={i} className="flex-none border-r" style={{ width: 20, borderColor: BORDER }} />
+                            ))}
+                          </div>
+                          {/* 일정 바 */}
+                          {dScheds.map(s => {
+                            const sDay = new Date(s.startDate).getDate();
+                            const eDay = Math.min(daysInMonth, new Date(s.endDate).getDate());
+                            const left = (sDay - 1) * 20;
+                            const width = Math.max(20, (eDay - sDay + 1) * 20);
+                            return (
+                              <div
+                                key={s.id}
+                                className="absolute rounded-full flex items-center px-1"
+                                style={{
+                                  left, width, height: 12, top: 0,
+                                  background: dc?.bg,
+                                  border: `1px solid ${dc?.color}40`,
+                                }}
+                                title={`${s.title}${s.assignee ? ` — ${s.assignee}` : ""}`}
+                              >
+                                <span className="text-[6px] truncate font-semibold" style={{ color: dc?.color }}>
+                                  {s.title}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
+
           </div>
         </div>
       </div>
 
       {/* 일정 추가/편집 모달 */}
-      {editSchedule !== null && (
-        <ScheduleModal
-          initial={editSchedule === "new" ? undefined : editSchedule}
-          onSave={handleSave}
-          onClose={() => setEditSchedule(null)}
-          onColorChange={handleDeptColorChange}
-          deptColors={deptColors}
-        />
-      )}
+      {
+        editSchedule !== null && (
+          <ScheduleModal
+            initial={editSchedule === "new" ? undefined : editSchedule}
+            onSave={handleSave}
+            onClose={() => setEditSchedule(null)}
+            onColorChange={handleDeptColorChange}
+            onDeptDelete={(dept) => setDeptToDelete(dept)} // 🔴 부서 삭제 팝업 요청 연결
+            deptColors={deptColors}
+          />
+        )
+      }
 
-      {/* 삭제 모달 */}
-      {scheduleToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* 일정 삭제 모달 */}
+      {
+        scheduleToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div
+              className="fixed inset-0 bg-black/30"
+              onClick={() => setScheduleToDelete(null)}
+            />
+            <div className="relative bg-white w-[320px] min-h-[180px] px-5 py-6 rounded-2xl shadow-lg flex flex-col justify-center">
+              <div className="text-sm font-semibold mb-4 text-center">
+                "{scheduleToDelete.title}" 삭제하시겠습니까?
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setScheduleToDelete(null)}
+                  className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold"
+                  style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => {
+                    handleDelete(scheduleToDelete.id);
+                    setScheduleToDelete(null);
+                  }}
+                  className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold text-white bg-red-500"
+                >
+                  삭제하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
 
-          {/* 배경 */}
+      {/* 🔴 [추가] 부서 삭제 확인 모달 (z-[60] 설정) */}
+      {deptToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
           <div
             className="fixed inset-0 bg-black/30"
-            onClick={() => setScheduleToDelete(null)}
+            onClick={() => setDeptToDelete(null)}
           />
-
-          {/* 모달 박스 */}
-          <div className="relative bg-white w-[320px] min-h-[180px] px-5 py-6 rounded-2xl shadow-lg flex flex-col justify-center">
-
-            <div className="text-sm font-semibold mb-4 text-center">
-              "{scheduleToDelete.title}" 삭제하시겠습니까?
+          <div className="relative bg-white w-[320px] min-h-[180px] px-5 py-6 rounded-2xl shadow-lg flex flex-col justify-center z-10 animate-in fade-in zoom-in-95 duration-150">
+            <div className="text-sm font-semibold mb-4 text-center leading-relaxed text-gray-800">
+              "{deptToDelete}" 부서를 삭제하시겠습니까?
             </div>
-
             <div className="flex gap-2">
               <button
-                onClick={() => setScheduleToDelete(null)}
+                onClick={() => setDeptToDelete(null)}
                 className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold"
                 style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
               >
                 취소
               </button>
-
               <button
-                onClick={() => {
-                  handleDelete(scheduleToDelete.id);
-                  setScheduleToDelete(null);
-                }}
+                onClick={confirmDeleteDept}
                 className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold text-white bg-red-500"
               >
                 삭제하기
               </button>
             </div>
-
           </div>
         </div>
       )}
