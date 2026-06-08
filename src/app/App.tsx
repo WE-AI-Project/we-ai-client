@@ -709,7 +709,7 @@ export default function App() {
         </div>
 
         {/* 탭 내부 페이지 본문 콘텐츠 (가로/세로 스크롤 완벽 지원) */}
-        <div className="flex-1 overflow-auto relative">
+        <div className="flex-1 overflow-auto scrollbar-hide relative">
           {tabs.length > 0 ? (
             <div className="min-w-fit min-h-full">
               {/* 💡 min-w-fit을 주어 창이 극단적으로 작아져도 내부 페이지 레이아웃이 찌그러지지 않고 스크롤바가 생깁니다. */}
@@ -989,7 +989,7 @@ export default function App() {
             </div>
 
             {/* 스크롤 영역 */}
-            <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
               {!isCollapsed && (
                 <div className="px-2.5 pt-2.5 pb-2" style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
                   <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: SIDEBAR_TEXT_LABEL }}>Current Project</p>

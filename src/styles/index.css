@@ -1,3 +1,29 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* ----------------------------------------------------
+   [응용 프로그램 맞춤형 스크롤바 제어 설정]
+---------------------------------------------------- */
+
+/* 1. 응용 프로그램 메인 창(Window) 자체의 스크롤을 원천 차단 */
+html, body, #root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden; /* 데스크톱 창 전체가 스크롤되거나 흔들리는 현상 방지 */
+  margin: 0;
+  padding: 0;
+}
+
+/* 2. 스크롤이 필요한 내부 영역의 스크롤바 숨기기 (Tailwind 유틸리티 추가) */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* Windows WebView2 등 */
+    scrollbar-width: none;
+  }
+  
+  /* Electron(Chromium) 및 대부분의 데스크톱 웹뷰 엔진 적용 */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; 
+  }
+}

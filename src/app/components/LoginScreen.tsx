@@ -488,7 +488,13 @@ function LoginForm({
   };
 
   return (
-    <div className="space-y-5 p-8">
+    <form 
+      className="space-y-5 p-8"
+      onSubmit={(e) => {
+        e.preventDefault(); // 엔터 시 페이지 새로고침 방지
+        void handleLogin(); // 로그인 함수 실행
+      }}
+    >
       <div className="flex items-center gap-3 border-b border-black/5 pb-5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
           <FolderGit2 className="h-5 w-5" style={{ color: "white" }} />
@@ -600,8 +606,7 @@ function LoginForm({
       )}
 
       <button
-        type="button"
-        onClick={() => void handleLogin()}
+        type="submit"
         disabled={loading}
         className="w-full rounded-xl py-3.5 text-sm font-semibold"
         style={{ background: OLIVE_DARK, color: "white", opacity: loading ? 0.75 : 1, transition: "opacity 0.15s" }}
@@ -646,7 +651,7 @@ function LoginForm({
           회원가입
         </button>
       </p>
-    </div>
+    </form>
   );
 }
 
