@@ -354,7 +354,7 @@ function CreateProjectModal({
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const totalSteps = 3;
-  const canNextStepOne = name.trim().length > 0;
+  const canNextStepOne = name.trim().length >= 2;
   const canNextStepTwo = localPath.trim().length > 0;
   const deadlineDays = deadline ? Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000) : null;
 
@@ -391,6 +391,10 @@ function CreateProjectModal({
       setErrorMessage("프로젝트 이름과 저장 경로를 입력해주세요.");
       return;
     }
+    if (name.trim().length < 2) {
+    setErrorMessage("프로젝트 이름은 2글자 이상이어야 합니다.");
+    return;
+  }
 
     setCreating(true);
     setErrorMessage("");
@@ -491,6 +495,11 @@ function CreateProjectModal({
                     color: TEXT_PRIMARY,
                   }}
                 />
+                {name.trim().length > 0 && name.trim().length < 2 && (
+                  <p className="mt-1.5 pl-1 text-[10px]" style={{ color: "#B85450" }}>
+                    프로젝트 이름은 2글자 이상 입력해주세요.
+                  </p>
+                )}
               </div>
 
               <div>

@@ -681,43 +681,19 @@ export default function App() {
             </div>
           ))}
 
-          {/* 우측 상단 패널 전체 닫기 버튼 */}
-          <div className="ml-auto px-3 flex items-center gap-2">
-            {isSplit && (
-              <button
-                onClick={() => {
-                  if (panelType === "right") {
-                    // [우측 패널 닫기] 우측 탭만 비우고 분할 종료
-                    setRightTabs([]);
-                    setIsSplit(false);
-                    setActivePanel("left");
-                  } else {
-                    // [좌측 패널 닫기] 좌측 탭 비우고 우측 탭을 메인으로 이관
-                    setLeftTabs([...rightTabs]);
-                    setActiveLeftTab(activeRightTab);
-                    setRightTabs([]);
-                    setIsSplit(false);
-                    setActivePanel("left");
-                  }
-                }}
-                className="text-[10px] text-red-400 hover:text-red-300 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20"
-              >
-                ✕ 닫기
-              </button>
-            )}
-          </div>
+          {/* 우측 상단 닫기 유틸리티 영역 (개별 닫기 버튼 비활성화) */}
+          <div className="ml-auto px-3 flex items-center gap-2" />
         </div>
 
         {/* 탭 내부 페이지 본문 콘텐츠 (가로/세로 스크롤 완벽 지원) */}
         <div className="flex-1 overflow-auto scrollbar-hide relative">
           {tabs.length > 0 ? (
             <div className="min-w-fit min-h-full">
-              {/* 💡 min-w-fit을 주어 창이 극단적으로 작아져도 내부 페이지 레이아웃이 찌그러지지 않고 스크롤바가 생깁니다. */}
               {renderPage(activeTab)}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-xs text-white/30">
-              열려있는 메뉴가 없습니다
+              열려있는 메뉴가 없습니다.
             </div>
           )}
         </div>
@@ -1049,7 +1025,7 @@ export default function App() {
               </div>
 
               {/* SYSTEM 메뉴 */}
-              <div className={`pb-2 ${isCollapsed ? "px-1" : "px-1.5"}`} style={{ borderTop: `1px solid ${SIDEBAR_BORDER}`, paddingTop: 8 }}>
+              <div className={`pb-2 ${isCollapsed ? "px-1" : "px-1.5"}`}>
                 <SectionLabel collapsed={isCollapsed}>SYSTEM</SectionLabel>
                 <nav className="space-y-0.5">
                   {SYSTEM_ITEMS.map(item => (
