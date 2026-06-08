@@ -26,6 +26,7 @@ import {
   EyeOff,
   User,
   ChevronRight,
+  ChevronDown, // 💡 추가됨: 아래 방향 화살표 아이콘
   CheckSquare,
   Square,
   X,
@@ -66,14 +67,11 @@ const THICK_SHADOW = [
 ].join(", ");
 
 type CardMode = "login" | "signup" | "email-code";
-
 type FeedbackTone = "success" | "error" | "info";
-
 type Feedback = {
   tone: FeedbackTone;
   text: string;
 };
-
 type Props = {
   onAuthenticated: (session: AuthSession, user: CurrentUser) => void;
 };
@@ -82,6 +80,29 @@ const SOCIAL_LABELS: Record<SocialProvider, string> = {
   kakao: "카카오",
   naver: "네이버",
   google: "Google",
+};
+
+// 💡 약관 상세 내용 데이터
+const TERMS_CONTENT = {
+  privacy: {
+    content: `SynAIpse는 원활한 서비스 제공을 위해 아래와 같이 개인정보를 수집 및 이용합니다.
+    
+1. 수집 항목: 이메일, 이름, 비밀번호
+2. 수집 목적: 회원 식별, 서비스 제공 및 고객 상담
+3. 보유 기간: 회원 탈퇴 시 파기 (단, 관계 법령에 따른 보존 필요 시 보관)
+
+본 동의를 거부하실 권리가 있으나, 거부 시 회원가입 및 서비스 이용이 제한될 수 있습니다.`,
+  },
+  marketing: {
+    content: `SynAIpse의 새로운 기능, 업데이트 소식, 이벤트 및 프로모션 안내 등 다양한 마케팅 정보를 이메일 또는 푸시 알림 등의 방법으로 보내드립니다.
+    
+본 동의는 선택 사항이며, 동의하지 않으셔도 기본 서비스 이용에는 지장이 없습니다. 동의 후 언제든지 내 정보 설정에서 철회하실 수 있습니다.`,
+  },
+  push: {
+    content: `프로젝트 내 중요한 알림(에이전트 상태 변경, 빌드 완료 등), 팀원 초대 및 멘션 등 서비스 이용에 필요한 실시간 푸시 알림을 수신하는 데 동의합니다.
+    
+본 동의는 선택 사항이며, 알림 설정에서 개별 항목별로 수신 여부를 변경하실 수 있습니다.`,
+  },
 };
 
 function buildMockSocialEmail(provider: SocialProvider) {
@@ -149,15 +170,12 @@ function OtpInput({
     if (!/^\d*$/.test(value)) {
       return;
     }
-
     const next = [...digits];
     next[index] = value.slice(-1);
     setDigits(next);
-
     if (value && index < 5) {
       refs.current[index + 1]?.focus();
     }
-
     const code = next.join("");
     if (next.every((digit) => digit !== "")) {
       onComplete(code);
@@ -171,11 +189,9 @@ function OtpInput({
       setDigits(next);
       refs.current[index - 1]?.focus();
     }
-
     if (event.key === "ArrowLeft" && index > 0) {
       refs.current[index - 1]?.focus();
     }
-
     if (event.key === "ArrowRight" && index < 5) {
       refs.current[index + 1]?.focus();
     }
@@ -286,31 +302,63 @@ function Field({
   );
 }
 
+// 💡 [수정됨] 아코디언 방식으로 펼쳐지는 AgreeRow
 function AgreeRow({
   label,
   checked,
   onChange,
   accent,
-  showArrow,
+  content,
 }: {
   label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
   accent?: boolean;
-  showArrow?: boolean;
+  content?: string;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
-    <button type="button" onClick={() => onChange(!checked)} className="flex w-full items-center gap-2.5 py-1.5 text-left">
-      {checked ? (
-        <CheckSquare className="h-4 w-4 shrink-0" style={{ color: OLIVE_DARK }} />
-      ) : (
-        <Square className="h-4 w-4 shrink-0" style={{ color: LOGIN_CHECKBOX }} />
+    <div className="flex w-full flex-col py-0.5">
+      <div className="flex w-full items-center justify-between py-1">
+        {/* 체크박스와 라벨 (클릭 시 체크만 토글) */}
+        <button type="button" onClick={() => onChange(!checked)} className="flex items-center gap-2.5 text-left flex-1">
+          {checked ? (
+            <CheckSquare className="h-4 w-4 shrink-0" style={{ color: OLIVE_DARK }} />
+          ) : (
+            <Square className="h-4 w-4 shrink-0" style={{ color: LOGIN_CHECKBOX }} />
+          )}
+          <span className="flex-1 text-[11px]" style={{ color: accent && !checked ? STATUS_ERROR : OLIVE_DARK }}>
+            {label}
+          </span>
+        </button>
+        
+        {/* 화살표 아이콘 (클릭 시 내용 펼치기 토글) */}
+        {content && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1 -mr-1 rounded-md hover:bg-black/[0.04] transition-colors"
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: LOGIN_CHEVRON }} />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: LOGIN_CHEVRON }} />
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* 펼쳐지는 상세 약관 내용 */}
+      {isExpanded && content && (
+        <div
+          className="mt-1 mb-2 ml-6 rounded-lg p-3 text-[10px] leading-relaxed"
+          style={{ background: "rgba(0,0,0,0.03)", color: TEXT_SECONDARY, whiteSpace: "pre-wrap" }}
+        >
+          {content}
+        </div>
       )}
-      <span className="flex-1 text-[11px]" style={{ color: accent ? STATUS_ERROR : OLIVE_DARK }}>
-        {label}
-      </span>
-      {showArrow && <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: LOGIN_CHEVRON }} />}
-    </button>
+    </div>
   );
 }
 
@@ -415,10 +463,8 @@ function LoginForm({
       setError("이메일과 비밀번호를 입력해주세요.");
       return;
     }
-
     setError("");
     setLoading(true);
-
     try {
       const session = await login({
         email: email.trim(),
@@ -626,10 +672,13 @@ function SignupForm({
   const [verified, setVerified] = useState(false);
   const [otpError, setOtpError] = useState("");
   const [dispatchResult, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
+  
+  // 약관 동의 상태
   const [agreeAll, setAgreeAll] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeMarketing, setAgreeMarketing] = useState(false);
   const [agreePush, setAgreePush] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [signupError, setSignupError] = useState("");
 
@@ -755,303 +804,307 @@ function SignupForm({
     password === passwordConfirm;
 
   return (
-    <div className="overflow-y-auto" style={{ maxHeight: 580 }}>
-      <div className="space-y-4 p-8">
-        <div className="flex items-center gap-3 border-b border-black/5 pb-5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: SAGE }}>
-            <User className="h-5 w-5" style={{ color: "white" }} />
+    <div className="relative">
+      <div className="overflow-y-auto" style={{ maxHeight: 580 }}>
+        <div className="space-y-4 p-8">
+          <div className="flex items-center gap-3 border-b border-black/5 pb-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: SAGE }}>
+              <User className="h-5 w-5" style={{ color: "white" }} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
+                회원가입
+              </h2>
+              <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
+                {socialProvider ? `${SOCIAL_LABELS[socialProvider]} 계정으로 가입` : "새 SynAIpse 계정을 만드세요"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
-              회원가입
-            </h2>
-            <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
-              {socialProvider ? `${SOCIAL_LABELS[socialProvider]} 계정으로 가입` : "새 WE&AI 계정을 만드세요"}
-            </p>
-          </div>
-        </div>
 
-        {socialProvider && (
-          <div
-            className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
-            style={{ background: "rgba(65,67,27,0.05)", border: "1.5px solid rgba(65,67,27,0.12)" }}
-          >
+          {socialProvider && (
             <div
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
+              className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
+              style={{ background: "rgba(65,67,27,0.05)", border: "1.5px solid rgba(65,67,27,0.12)" }}
+            >
+              <div
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
+                style={{
+                  background:
+                    socialProvider === "kakao" ? "#FEE500" : socialProvider === "naver" ? "#03C75A" : "#FFFFFF",
+                  border: socialProvider === "google" ? "1px solid rgba(0,0,0,0.1)" : "none",
+                }}
+              >
+                {socialProvider === "kakao" && <KakaoIcon size={14} />}
+                {socialProvider === "naver" && <NaverIcon size={14} />}
+                {socialProvider === "google" && <GoogleIcon size={14} />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+                  {SOCIAL_LABELS[socialProvider]} 이메일로 가입
+                </p>
+                <p className="truncate text-[9px]" style={{ color: LOGIN_MUTED }}>
+                  {email}
+                </p>
+              </div>
+              <CheckCircle2 className="ml-auto h-4 w-4 shrink-0" style={{ color: STATUS_SUCCESS }} />
+            </div>
+          )}
+
+          <Field
+            label="이름"
+            icon={User}
+            value={name}
+            onChange={(value) => {
+              setName(value);
+              setSignupError("");
+            }}
+            placeholder="홍길동"
+          />
+
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-semibold uppercase tracking-widest" style={{ color: LOGIN_MUTED }}>
+              이메일
+            </label>
+            <div
+              className="flex items-center gap-2.5 rounded-xl px-3.5 py-3"
               style={{
-                background:
-                  socialProvider === "kakao" ? "#FEE500" : socialProvider === "naver" ? "#03C75A" : "#FFFFFF",
-                border: socialProvider === "google" ? "1px solid rgba(0,0,0,0.1)" : "none",
+                background: INPUT_BG,
+                border: `1.5px solid ${
+                  verified ? STATUS_SUCCESS : otpSent ? "rgba(65,67,27,0.20)" : "transparent"
+                }`,
+                transition: "border-color 0.15s",
               }}
             >
-              {socialProvider === "kakao" && <KakaoIcon size={14} />}
-              {socialProvider === "naver" && <NaverIcon size={14} />}
-              {socialProvider === "google" && <GoogleIcon size={14} />}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
-                {SOCIAL_LABELS[socialProvider]} 이메일로 가입
-              </p>
-              <p className="truncate text-[9px]" style={{ color: LOGIN_MUTED }}>
-                {email}
-              </p>
-            </div>
-            <CheckCircle2 className="ml-auto h-4 w-4 shrink-0" style={{ color: STATUS_SUCCESS }} />
-          </div>
-        )}
-
-        <Field
-          label="이름"
-          icon={User}
-          value={name}
-          onChange={(value) => {
-            setName(value);
-            setSignupError("");
-          }}
-          placeholder="홍길동"
-        />
-
-        <div className="space-y-1.5">
-          <label className="block text-[10px] font-semibold uppercase tracking-widest" style={{ color: LOGIN_MUTED }}>
-            이메일
-          </label>
-          <div
-            className="flex items-center gap-2.5 rounded-xl px-3.5 py-3"
-            style={{
-              background: INPUT_BG,
-              border: `1.5px solid ${
-                verified ? STATUS_SUCCESS : otpSent ? "rgba(65,67,27,0.20)" : "transparent"
-              }`,
-              transition: "border-color 0.15s",
-            }}
-          >
-            <Mail className="h-4 w-4 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
-            <input
-              value={email}
-              onChange={(event) => {
-                resetVerification(event.target.value);
-                setSignupError("");
-              }}
-              type="email"
-              placeholder="your@email.com"
-              disabled={!!socialProvider || otpSent}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-              style={{ color: TEXT_PRIMARY, opacity: socialProvider || otpSent ? 0.75 : 1 }}
-            />
-            {verified ? (
-              <span
-                className="shrink-0 rounded-lg px-2 py-1 text-[9px] font-semibold"
-                style={{ background: "rgba(90,138,74,0.10)", color: STATUS_SUCCESS }}
-              >
-                인증됨 ✓
-              </span>
-            ) : !otpSent ? (
-              <button
-                type="button"
-                onClick={() => void handleSendOtp()}
-                disabled={!email.trim() || sending}
-                className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
-                style={{
-                  background: !email.trim() || sending ? LOGIN_DISABLED_BG : OLIVE_DARK,
-                  color: !email.trim() || sending ? LOGIN_ICON_MUTED : "white",
-                  transition: "all 0.15s",
+              <Mail className="h-4 w-4 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
+              <input
+                value={email}
+                onChange={(event) => {
+                  resetVerification(event.target.value);
+                  setSignupError("");
                 }}
-              >
-                {sending ? (
-                  <span className="flex items-center gap-1">
+                type="email"
+                placeholder="your@email.com"
+                disabled={!!socialProvider || otpSent}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                style={{ color: TEXT_PRIMARY, opacity: socialProvider || otpSent ? 0.75 : 1 }}
+              />
+              {verified ? (
+                <span
+                  className="shrink-0 rounded-lg px-2 py-1 text-[9px] font-semibold"
+                  style={{ background: "rgba(90,138,74,0.10)", color: STATUS_SUCCESS }}
+                >
+                  인증됨 ✓
+                </span>
+              ) : !otpSent ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSendOtp()}
+                  disabled={!email.trim() || sending}
+                  className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
+                  style={{
+                    background: !email.trim() || sending ? LOGIN_DISABLED_BG : OLIVE_DARK,
+                    color: !email.trim() || sending ? LOGIN_ICON_MUTED : "white",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {sending ? (
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="h-2.5 w-2.5 animate-spin rounded-full border-2"
+                        style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: LOGIN_ICON_MUTED }}
+                      />
+                      전송 중
+                    </span>
+                  ) : (
+                    "인증하기"
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpSent(false);
+                    setOtpError("");
+                  }}
+                  className="shrink-0 rounded-lg px-2.5 py-1 text-[9px] font-medium"
+                  style={{ color: LOGIN_MUTED, background: "transparent" }}
+                >
+                  재전송
+                </button>
+              )}
+            </div>
+
+            {otpSent && !verified && (
+              <div className="space-y-3 pt-2">
+                <div
+                  className="flex items-start gap-2 rounded-xl px-3 py-2.5"
+                  style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
+                >
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: OLIVE_DARK }} />
+                  <div>
+                    <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+                      인증코드를 발송했습니다
+                    </p>
+                    <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
+                      {email}로 전송된 6자리 코드를 입력하세요
+                    </p>
+                    <p className="mt-0.5 text-[8px]" style={{ color: LOGIN_ICON_MUTED }}>
+                      로컬 mock 검증이라 아무 6자리 숫자나 입력하면 인증됩니다.
+                    </p>
+                  </div>
+                </div>
+
+                <OtpInput onComplete={handleOtpComplete} disabled={otpVerifying} resetKey={email} />
+
+                {otpVerifying && (
+                  <p className="flex items-center justify-center gap-1.5 text-center text-[10px]" style={{ color: LOGIN_MUTED }}>
                     <span
-                      className="h-2.5 w-2.5 animate-spin rounded-full border-2"
-                      style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: LOGIN_ICON_MUTED }}
+                      className="h-3 w-3 animate-spin rounded-full border-2"
+                      style={{ borderColor: "rgba(0,0,0,0.12)", borderTopColor: OLIVE_DARK }}
                     />
-                    전송 중
-                  </span>
-                ) : (
-                  "인증하기"
+                    확인 중...
+                  </p>
                 )}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setOtpSent(false);
-                  setOtpError("");
-                }}
-                className="shrink-0 rounded-lg px-2.5 py-1 text-[9px] font-medium"
-                style={{ color: LOGIN_MUTED, background: "transparent" }}
-              >
-                재전송
-              </button>
+                {otpError && (
+                  <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>
+                    {otpError}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
-          {otpSent && !verified && (
-            <div className="space-y-3 pt-2">
-              <div
-                className="flex items-start gap-2 rounded-xl px-3 py-2.5"
-                style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
+          <Field
+            label="비밀번호"
+            icon={Lock}
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(value) => {
+              setPassword(value);
+              setSignupError("");
+            }}
+            placeholder="영문, 숫자, 특수문자 포함 8~16자"
+            error={passwordError}
+            right={
+              <button type="button" onClick={() => setShowPassword((current) => !current)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            }
+          />
+
+          <Field
+            label="비밀번호 확인"
+            icon={Lock}
+            type={showPasswordConfirm ? "text" : "password"}
+            value={passwordConfirm}
+            onChange={(value) => {
+              setPasswordConfirm(value);
+              setSignupError("");
+            }}
+            placeholder="비밀번호 재입력"
+            error={passwordConfirm && password !== passwordConfirm ? "비밀번호가 일치하지 않습니다." : undefined}
+            right={
+              <button
+                type="button"
+                onClick={() => setShowPasswordConfirm((current) => !current)}
+                style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}
               >
-                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: OLIVE_DARK }} />
-                <div>
-                  <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
-                    인증코드를 발송했습니다
-                  </p>
-                  <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
-                    {email}로 전송된 6자리 코드를 입력하세요
-                  </p>
-                  <p className="mt-0.5 text-[8px]" style={{ color: LOGIN_ICON_MUTED }}>
-                    로컬 mock 검증이라 아무 6자리 숫자나 입력하면 인증됩니다.
-                  </p>
-                </div>
-              </div>
+                {showPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            }
+          />
 
-              <OtpInput onComplete={handleOtpComplete} disabled={otpVerifying} resetKey={email} />
+          {!verified && (
+            <p className="flex items-center gap-1.5 px-1 text-[9px]" style={{ color: LOGIN_MUTED }}>
+              <ShieldCheck className="h-3 w-3 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
+              회원가입 전 이메일 인증이 필요합니다
+            </p>
+          )}
 
-              {otpVerifying && (
-                <p className="flex items-center justify-center gap-1.5 text-center text-[10px]" style={{ color: LOGIN_MUTED }}>
-                  <span
-                    className="h-3 w-3 animate-spin rounded-full border-2"
-                    style={{ borderColor: "rgba(0,0,0,0.12)", borderTopColor: OLIVE_DARK }}
-                  />
-                  확인 중...
-                </p>
-              )}
-              {otpError && (
-                <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>
-                  {otpError}
-                </p>
-              )}
+          {/* 💡 [수정됨] 펼쳐지는 아코디언 약관 영역 */}
+          <div className="rounded-xl px-4 py-3" style={{ background: INPUT_BG, border: "1px solid rgba(0,0,0,0.04)" }}>
+            <div className="mb-1.5 flex items-center gap-2.5 border-b border-black/6 pb-2.5">
+              <button type="button" onClick={() => setAll(!agreeAll)}>
+                {agreeAll ? (
+                  <CheckSquare className="h-4 w-4" style={{ color: OLIVE_DARK }} />
+                ) : (
+                  <Square className="h-4 w-4" style={{ color: LOGIN_CHECKBOX }} />
+                )}
+              </button>
+              <span className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+                전체 동의
+              </span>
             </div>
-          )}
-        </div>
-
-        <Field
-          label="비밀번호"
-          icon={Lock}
-          type={showPassword ? "text" : "password"}
-          value={password}
-          onChange={(value) => {
-            setPassword(value);
-            setSignupError("");
-          }}
-          placeholder="영문, 숫자, 특수문자 포함 8~16자"
-          error={passwordError}
-          right={
-            <button type="button" onClick={() => setShowPassword((current) => !current)} style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}>
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          }
-        />
-
-        <Field
-          label="비밀번호 확인"
-          icon={Lock}
-          type={showPasswordConfirm ? "text" : "password"}
-          value={passwordConfirm}
-          onChange={(value) => {
-            setPasswordConfirm(value);
-            setSignupError("");
-          }}
-          placeholder="비밀번호 재입력"
-          error={passwordConfirm && password !== passwordConfirm ? "비밀번호가 일치하지 않습니다." : undefined}
-          right={
-            <button
-              type="button"
-              onClick={() => setShowPasswordConfirm((current) => !current)}
-              style={{ color: LOGIN_ICON_MUTED, flexShrink: 0 }}
-            >
-              {showPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          }
-        />
-
-        {!verified && (
-          <p className="flex items-center gap-1.5 px-1 text-[9px]" style={{ color: LOGIN_MUTED }}>
-            <ShieldCheck className="h-3 w-3 shrink-0" style={{ color: LOGIN_ICON_MUTED }} />
-            회원가입 전 이메일 인증이 필요합니다
-          </p>
-        )}
-
-        <div className="rounded-xl px-4 py-3" style={{ background: INPUT_BG, border: "1px solid rgba(0,0,0,0.04)" }}>
-          <div className="mb-1.5 flex items-center gap-2.5 border-b border-black/6 pb-2.5">
-            <button type="button" onClick={() => setAll(!agreeAll)}>
-              {agreeAll ? (
-                <CheckSquare className="h-4 w-4" style={{ color: OLIVE_DARK }} />
-              ) : (
-                <Square className="h-4 w-4" style={{ color: LOGIN_CHECKBOX }} />
-              )}
-            </button>
-            <span className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
-              전체 동의
-            </span>
+            
+            <AgreeRow
+              label="개인정보 수집 및 이용 동의 (필수)"
+              checked={agreePrivacy}
+              accent={!agreePrivacy}
+              content={TERMS_CONTENT.privacy.content}
+              onChange={(value) => syncAll(value, agreeMarketing, agreePush)}
+            />
+            <AgreeRow
+              label="마케팅 수신 동의 (선택)"
+              checked={agreeMarketing}
+              content={TERMS_CONTENT.marketing.content}
+              onChange={(value) => syncAll(agreePrivacy, value, agreePush)}
+            />
+            <AgreeRow
+              label="푸시 알림 수신 동의 (선택)"
+              checked={agreePush}
+              content={TERMS_CONTENT.push.content}
+              onChange={(value) => syncAll(agreePrivacy, agreeMarketing, value)}
+            />
           </div>
-          <AgreeRow
-            label="개인정보 수집 및 이용 동의 (필수)"
-            checked={agreePrivacy}
-            accent
-            showArrow
-            onChange={(value) => syncAll(value, agreeMarketing, agreePush)}
-          />
-          <AgreeRow
-            label="마케팅 수신 동의 (선택)"
-            checked={agreeMarketing}
-            showArrow
-            onChange={(value) => syncAll(agreePrivacy, value, agreePush)}
-          />
-          <AgreeRow
-            label="푸시 알림 수신 동의 (선택)"
-            checked={agreePush}
-            showArrow
-            onChange={(value) => syncAll(agreePrivacy, agreeMarketing, value)}
-          />
-        </div>
 
-        {signupError && (
-          <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>
-            {signupError}
-          </p>
-        )}
-
-        <button
-          type="button"
-          onClick={() => void handleSignup()}
-          disabled={loading || !isFormValid}
-          className="w-full rounded-xl py-3.5 text-sm font-semibold"
-          style={{
-            background: isFormValid ? OLIVE_DARK : LOGIN_DISABLED_BG2,
-            color: isFormValid ? "white" : LOGIN_ICON_MUTED,
-            transition: "all 0.15s",
-          }}
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span
-                className="h-4 w-4 animate-spin rounded-full border-2"
-                style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }}
-              />
-              가입 중...
-            </span>
-          ) : (
-            "회원가입 완료"
+          {signupError && (
+            <p className="text-center text-[10px]" style={{ color: STATUS_ERROR }}>
+              {signupError}
+            </p>
           )}
-        </button>
 
-        <p className="pb-1 text-center text-[11px]" style={{ color: LOGIN_MUTED }}>
-          이미 계정이 있으신가요?{" "}
           <button
             type="button"
-            onClick={() => onSwitchToLogin(email.trim() || undefined)}
-            className="font-semibold"
-            style={{ color: OLIVE_DARK }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.textDecoration = "underline";
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.textDecoration = "none";
+            onClick={() => void handleSignup()}
+            disabled={loading || !isFormValid}
+            className="w-full rounded-xl py-3.5 text-sm font-semibold"
+            style={{
+              background: isFormValid ? OLIVE_DARK : LOGIN_DISABLED_BG2,
+              color: isFormValid ? "white" : LOGIN_ICON_MUTED,
+              transition: "all 0.15s",
             }}
           >
-            로그인
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span
+                  className="h-4 w-4 animate-spin rounded-full border-2"
+                  style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }}
+                />
+                가입 중...
+              </span>
+            ) : (
+              "회원가입 완료"
+            )}
           </button>
-        </p>
+
+          <p className="pb-1 text-center text-[11px]" style={{ color: LOGIN_MUTED }}>
+            이미 계정이 있으신가요?{" "}
+            <button
+              type="button"
+              onClick={() => onSwitchToLogin(email.trim() || undefined)}
+              className="font-semibold"
+              style={{ color: OLIVE_DARK }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.textDecoration = "underline";
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.textDecoration = "none";
+              }}
+            >
+              로그인
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -1082,10 +1135,8 @@ function EmailCodeLoginForm({
       setError("이메일을 입력해주세요.");
       return;
     }
-
     setSending(true);
     setError("");
-
     try {
       const result = await sendEmailLoginCode({
         email: email.trim(),
@@ -1106,10 +1157,8 @@ function EmailCodeLoginForm({
       setError("이메일과 6자리 인증코드를 모두 입력해주세요.");
       return;
     }
-
     setLoading(true);
     setError("");
-
     try {
       const session = await loginWithEmailCode({
         email: email.trim(),
@@ -1253,14 +1302,12 @@ export function LoginScreen({ onAuthenticated }: Props) {
     if (!innerRef.current) {
       return;
     }
-
     const observer = new ResizeObserver((entries) => {
       const height =
         entries[0].borderBoxSize?.[0]?.blockSize ??
         entries[0].contentRect.height;
       setCardHeight(height);
     });
-
     observer.observe(innerRef.current);
     return () => observer.disconnect();
   }, []);
@@ -1289,7 +1336,6 @@ export function LoginScreen({ onAuthenticated }: Props) {
       }
       return;
     }
-
     if (options?.email !== undefined) {
       setPrefillEmail(options.email);
     }
