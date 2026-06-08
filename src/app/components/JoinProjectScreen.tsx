@@ -19,6 +19,19 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
+
+// 💡 [추가됨] 만들어둔 공통 알림창 컴포넌트 불러오기 (경로는 실제 위치에 맞게 조정해주세요)
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
+
 import {
   ACCENT,
   ACCENT_BG,
@@ -337,6 +350,9 @@ function CreateProjectModal({
   const [creating, setCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // 💡 [추가됨] 알림창 상태 관리
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+
   const totalSteps = 3;
   const canNextStepOne = name.trim().length > 0;
   const canNextStepTwo = localPath.trim().length > 0;
@@ -352,6 +368,22 @@ function CreateProjectModal({
       setDetected(detectFromPath(localPath.trim()));
       setDetecting(false);
     }, 1000);
+  };
+
+  // 💡 [추가됨] 다음 버튼 클릭 시 실행할 로직
+  const handleNextClick = () => {
+    if (step === 1) {
+      setStep(2);
+    } else if (step === 2) {
+      // 2단계에서 다음 버튼 누르면 알림창 띄우기
+      setIsAlertOpen(true);
+    }
+  };
+
+  // 💡 [추가됨] 알림창에서 '예'를 눌렀을 때 실행될 로직
+  const handleConfirmPath = () => {
+    setIsAlertOpen(false);
+    setStep(3); // 3단계로 넘어감
   };
 
   const handleCreate = async () => {
@@ -669,7 +701,8 @@ function CreateProjectModal({
           {step < 3 ? (
             <button
               type="button"
-              onClick={() => setStep((current) => (current + 1) as 1 | 2 | 3)}
+              // 💡 [수정됨] 기존 onClick을 handleNextClick으로 연결
+              onClick={handleNextClick}
               disabled={step === 1 ? !canNextStepOne : !canNextStepTwo}
               className="flex-1 rounded-xl py-2.5 text-xs font-semibold transition-all"
               style={{
@@ -703,6 +736,24 @@ function CreateProjectModal({
           )}
         </div>
       </div>
+
+      {/* 💡 [추가됨] 더블체크용 알림창 (AlertDialog) */}
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>이 경로로 하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription className="font-mono text-sm mt-2 text-foreground break-all">
+              {localPath}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>아니오</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPath} style={{ background: ACCENT, color: "white" }}>
+              예
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
