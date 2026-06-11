@@ -18,6 +18,9 @@ import {
   ShieldCheck,
   UserCircle2,
   X,
+  Trash2,
+  AlertTriangle,
+  FolderGit2
 } from "lucide-react";
 
 // 💡 [추가됨] 만들어둔 공통 알림창 컴포넌트 불러오기 (경로는 실제 위치에 맞게 조정해주세요)
