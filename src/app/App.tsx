@@ -728,9 +728,9 @@ export default function App() {
         </div>
 
         {/* 탭 내부 페이지 본문 콘텐츠 (가로/세로 스크롤 완벽 지원) */}
-        <div className="flex-1 overflow-auto relative">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           {tabs.length > 0 ? (
-            <div className="min-w-fit min-h-full">
+            <div className="flex-1 flex flex-col w-full h-full min-w-full min-h-full">
               {renderPage(activeTab)}
             </div>
           ) : (
@@ -898,7 +898,7 @@ export default function App() {
       )}
 
       <div
-        className="flex-1 flex flex-col rounded-lg overflow-hidden relative"
+        className="flex-1 flex flex-col overflow-hidden relative"
         style={{
           background: SIDEBAR_BG,
           boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)",
