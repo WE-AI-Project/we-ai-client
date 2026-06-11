@@ -1205,7 +1205,7 @@ export default function App() {
                   onMouseLeave={e => { if (!showSystemMenu) e.currentTarget.style.background = "transparent"; }}
                 >
                   <Menu className="w-4 h-4 shrink-0" style={{ color: SIDEBAR_TEXT_ACTIVE }} />
-                  {!isCollapsed && <span className="text-xs font-medium">시스템 메뉴</span>}
+                  {!isCollapsed && <span className="text-xs font-medium">System Menu</span>}
                 </button>
                 {isCollapsed && <Tooltip label="시스템 메뉴" />}
               </div>

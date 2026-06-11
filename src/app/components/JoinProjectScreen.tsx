@@ -23,7 +23,7 @@ import {
   FolderGit2
 } from "lucide-react";
 
-// 💡 [추가됨] 만들어둔 공통 알림창 컴포넌트 불러오기 (경로는 실제 위치에 맞게 조정해주세요)
+// 만들어둔 공통 알림창 컴포넌트 불러오기
 import {
   AlertDialog,
   AlertDialogAction,
@@ -334,6 +334,48 @@ function DepartmentPicker({
   );
 }
 
+/* 복수 선택(Multi-select)이 가능한 파트 선택 컴포넌트 추가 */
+function MultiDepartmentPicker({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: ProjectDepartment[];
+  onChange: (value: ProjectDepartment[]) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`grid gap-1.5 ${compact ? "grid-cols-4" : "grid-cols-2"}`}>
+      {DEPARTMENTS.map((department) => {
+        const selected = value.includes(department);
+        return (
+          <button
+            key={department}
+            type="button"
+            onClick={() => {
+              if (selected) {
+                // 이미 선택되어 있다면 제외 (Toggle off)
+                onChange(value.filter((d) => d !== department));
+              } else {
+                // 선택되어 있지 않다면 추가 (Toggle on)
+                onChange([...value, department]);
+              }
+            }}
+            className={`rounded-lg font-semibold transition-all ${compact ? "px-2 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"}`}
+            style={{
+              background: selected ? "rgba(65,67,27,0.10)" : "rgba(0,0,0,0.04)",
+              color: selected ? ACCENT : TEXT_TERTIARY,
+              border: `1px solid ${selected ? "rgba(65,67,27,0.18)" : "transparent"}`,
+            }}
+          >
+            {DEPARTMENT_LABELS[department]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function CreateProjectModal({
   onClose,
   onCreate,
@@ -346,14 +388,16 @@ function CreateProjectModal({
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [localPath, setLocalPath] = useState("");
-  const [department, setDepartment] = useState<ProjectDepartment>("BACKEND");
+  
+  const [departments, setDepartments] = useState<ProjectDepartment[]>(["BACKEND"]);
+  
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
   const [previewCode] = useState(genCode());
   const [creating, setCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // 💡 [추가됨] 알림창 상태 관리
+  // 알림창 상태 관리
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const totalSteps = 3;
@@ -373,17 +417,15 @@ function CreateProjectModal({
     }, 1000);
   };
 
-  // 💡 [추가됨] 다음 버튼 클릭 시 실행할 로직
+  // 다음 버튼 클릭 시 실행할 로직
   const handleNextClick = () => {
     if (step === 1) {
       setStep(2);
     } else if (step === 2) {
-      // 2단계에서 다음 버튼 누르면 알림창 띄우기
       setIsAlertOpen(true);
     }
   };
 
-  // 💡 [추가됨] 알림창에서 '예'를 눌렀을 때 실행될 로직
   const handleConfirmPath = () => {
     setIsAlertOpen(false);
     setStep(3); // 3단계로 넘어감
@@ -395,9 +437,9 @@ function CreateProjectModal({
       return;
     }
     if (name.trim().length < 2) {
-    setErrorMessage("프로젝트 이름은 2글자 이상이어야 합니다.");
-    return;
-  }
+      setErrorMessage("프로젝트 이름은 2글자 이상이어야 합니다.");
+      return;
+    }
 
     setCreating(true);
     setErrorMessage("");
@@ -406,7 +448,8 @@ function CreateProjectModal({
       projectName: name.trim(),
       description: description.trim() || undefined,
       localPath: localPath.trim(),
-      department,
+      
+      department: (departments[0] || "BACKEND") as any,
       deadlineDate: deadline || undefined,
       techStacks: mapDetectedInfoToTechStacks(detected),
     };
@@ -521,9 +564,10 @@ function CreateProjectModal({
 
               <div className="space-y-2">
                 <label className="block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
-                  생성자 기본 파트
+                  생성자 기본 파트 (복수 선택 가능)
                 </label>
-                <DepartmentPicker value={department} onChange={setDepartment} />
+                {/* 💡 새로 정의한 MultiDepartmentPicker 컴포넌트로 교체 */}
+                <MultiDepartmentPicker value={departments} onChange={setDepartments} />
               </div>
 
               <div>
@@ -649,7 +693,13 @@ function CreateProjectModal({
                 {[
                   { label: "프로젝트명", value: name },
                   { label: "저장 위치", value: localPath || "-" },
-                  { label: "담당 파트", value: DEPARTMENT_LABELS[department] },
+                  /* 💡 요약 창에서 복수로 선택한 파트들을 쉼표(,) 구분자로 깔끔하게 나열 */
+                  {
+                    label: "담당 파트",
+                    value: departments.length > 0
+                      ? departments.map((d) => DEPARTMENT_LABELS[d]).join(", ")
+                      : "선택 안 함",
+                  },
                   {
                     label: "마감일",
                     value: deadline
@@ -713,7 +763,6 @@ function CreateProjectModal({
           {step < 3 ? (
             <button
               type="button"
-              // 💡 [수정됨] 기존 onClick을 handleNextClick으로 연결
               onClick={handleNextClick}
               disabled={step === 1 ? !canNextStepOne : !canNextStepTwo}
               className="flex-1 rounded-xl py-2.5 text-xs font-semibold transition-all"
@@ -749,7 +798,6 @@ function CreateProjectModal({
         </div>
       </div>
 
-      {/* 💡 [추가됨] 더블체크용 알림창 (AlertDialog) */}
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
