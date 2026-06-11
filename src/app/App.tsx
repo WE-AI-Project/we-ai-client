@@ -609,13 +609,13 @@ export default function App() {
   const renderPage = (nav: NavId) => {
     switch (nav) {
       case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
-      case "Changes": return <ChangesPage onNavigateQA={handleNavigateQA} />;
+      case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage />;
       case "ServerBuild": return <ServerBuildPage />;
-      case "Chat": return <ChatPage onDocsUpdate={setDocCount} />;
+      case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
       case "Calendar": return <CalendarPage />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
-      case "AIQA": return <AIQAPage autoStart />;
+      case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} />;
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;

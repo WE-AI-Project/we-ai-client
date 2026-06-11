@@ -153,7 +153,13 @@ function FileRow({
 // ════════════════════════════════════════
 // ChangesPage — 메인 컴포���트
 // ═══════════════════════════════════════
-export function ChangesPage({ onNavigateQA }: { onNavigateQA?: () => void }) {
+export function ChangesPage({
+  projectId = 0,
+  onNavigateQA,
+}: {
+  projectId?: number | null;
+  onNavigateQA?: () => void;
+}) {
   const [staged,       setStaged]     = useState<Set<string>>(new Set(["1", "2", "3", "4"]));
   const [selectedFile, setSelectedFile] = useState<CommitFile | null>(CHANGE_FILES[0]);
   const [message,      setMessage]    = useState("");
@@ -415,6 +421,7 @@ export function ChangesPage({ onNavigateQA }: { onNavigateQA?: () => void }) {
 
                 {/* ── AI 커밋 메시지 생성기 ── */}
                 <AICommitGenerator
+                  projectId={projectId ?? 0}
                   stagedFiles={stagedFiles}
                   onApply={msg => setMessage(msg)}
                 />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
   FileText, X, CheckCircle2, Download, Mic, MicOff,
@@ -13,6 +14,7 @@ import {
   generateDocBriefing, briefingToMeetingDoc, type BriefingData,
 } from "../data/chatStore";
 import { DocBriefingBubble, BriefingLoadingBubble } from "./DocBriefingBubble";
+import { runAiDebate, type DebateResponse } from "../../api/aiApi";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
@@ -184,6 +186,21 @@ function getAIResponse(input: string): { content: string; kind: AIResponseKind; 
     "프로젝트 학습 데이터에서 관련 정보를 찾고 있어요. 좀 더 구체적인 키워드로 질문해 주세요.",
   ];
   return { content: fallbacks[Math.floor(Math.random() * fallbacks.length)], kind: "text" };
+}
+
+function formatDebateAnswer(response: DebateResponse): string {
+  const agentSummary = [
+    response.oracleAnalysis && `Oracle\n${response.oracleAnalysis}`,
+    response.backendOpinion && `Backend\n${response.backendOpinion}`,
+    response.frontendOpinion && `Frontend\n${response.frontendOpinion}`,
+    response.inspectorOpinion && `Inspector\n${response.inspectorOpinion}`,
+  ].filter(Boolean).join("\n\n---\n\n");
+
+  return response.inspectorOpinion
+    || response.markdown
+    || agentSummary
+    || response.debateHistory
+    || "AI 응답이 비어 있습니다.";
 }
 
 // ══════════════════════════════════════════════════════════
@@ -615,7 +632,13 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
 // ══════════════════════════════════════════════════════════
 const MEETING_MEMBERS = ["병권", "Admin", "QA Bot"];
 
-export function ChatPage({ onDocsUpdate }: { onDocsUpdate?: (count: number) => void }) {
+export function ChatPage({
+  projectId = 0,
+  onDocsUpdate,
+}: {
+  projectId?: number | null;
+  onDocsUpdate?: (count: number) => void;
+}) {
   const [mainTab,      setMainTab]      = useState<"chat" | "ai" | "docs">("chat");
   const [partTab,      setPartTab]      = useState<PartId>("all");
   const [partMessages, setPartMessages] = useState<Record<PartId, ChatMessage[]>>(() => {
@@ -706,25 +729,40 @@ export function ChatPage({ onDocsUpdate }: { onDocsUpdate?: (count: number) => v
   };
 
   // ── AI 채팅 전송 ──
+  const sendAiQuestion = async (text: string) => {
+    const userMsg: AIMsg = { id: genId(), role: "user", content: text, time: new Date().toISOString() };
+    setAIMessages(prev => [...prev, userMsg]);
+    setAITyping(true);
+
+    try {
+      const response = await runAiDebate({
+        projectId,
+        fileName: "main-client-chat",
+        cursorLine: 1,
+        currentCodeSnippet: text,
+        userQuery: text,
+      });
+      const aiMsg: AIMsg = {
+        id: genId(),
+        role: "ai",
+        content: formatDebateAnswer(response),
+        time: new Date().toISOString(),
+        kind: "text",
+        data: response,
+      };
+      setAIMessages(prev => [...prev, aiMsg]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "AI 토론 요청에 실패했습니다.");
+    } finally {
+      setAITyping(false);
+    }
+  };
+
   const handleAISend = () => {
     const text = aiInput.trim();
     if (!text || aiTyping) return;
-    const userMsg: AIMsg = { id: genId(), role: "user", content: text, time: new Date().toISOString() };
-    setAIMessages(prev => [...prev, userMsg]);
     setAIInput("");
-    setAITyping(true);
-    setTimeout(() => {
-      const resp = getAIResponse(text);
-      const aiMsg: AIMsg = {
-        id: genId(), role: "ai",
-        content: resp.content,
-        time: new Date().toISOString(),
-        kind: resp.kind,
-        data: resp.data,
-      };
-      setAIMessages(prev => [...prev, aiMsg]);
-      setAITyping(false);
-    }, 800 + Math.random() * 600);
+    void sendAiQuestion(text);
   };
 
   // ── 파일 공유 (일반) ──
@@ -1084,13 +1122,7 @@ export function ChatPage({ onDocsUpdate }: { onDocsUpdate?: (count: number) => v
                 <button
                   key={q}
                   onClick={() => {
-                    const r = getAIResponse(q);
-                    setAIMessages(prev => [...prev, { id: genId(), role: "user", content: q, time: new Date().toISOString() }]);
-                    setAITyping(true);
-                    setTimeout(() => {
-                      setAIMessages(p => [...p, { id: genId(), role: "ai", content: r.content, time: new Date().toISOString(), kind: r.kind, data: r.data }]);
-                      setAITyping(false);
-                    }, 700);
+                    if (!aiTyping) void sendAiQuestion(q);
                   }}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-medium whitespace-nowrap shrink-0 transition-all"
                   style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}

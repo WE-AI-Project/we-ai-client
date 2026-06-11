@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle,
   Loader2, Bot, Server, Monitor, Cpu, Play, RotateCw,
@@ -9,6 +10,8 @@ import {
 import { getPendingQA, clearPendingQA } from "../data/qaStore";
 import { getLeader, getAllLeaders } from "../data/projectSettingsStore";
 import { AgentControlPage } from "./AgentControlPage";
+import { BACKEND_COMMITS, FRONTEND_COMMITS } from "./commitData";
+import { buildDiffFromCommitFiles, runAiQa, type QaResponse } from "../../api/aiApi";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
@@ -139,6 +142,34 @@ const STATIC_ERRORS: StaticError[] = [
 ];
 
 // ── Phase 2 UI 액션 시나리오 ──
+function mapQaResponseToErrors(response: QaResponse): StaticError[] {
+  const bugReport = response.bugReport ?? response.bug_report ?? "";
+  const optimization = response.optimization ?? "";
+  const commitMsg = response.commitMsg ?? response.commit_msg ?? "";
+
+  return [
+    bugReport && {
+      id: "ai-bug-report",
+      file: "AI 분석 diff",
+      line: 1,
+      col: 1,
+      type: "AI Bug Risk",
+      severity: "critical" as Severity,
+      message: bugReport,
+      fix: optimization || undefined,
+    },
+    commitMsg && {
+      id: "ai-commit-message",
+      file: "AI 추천 커밋",
+      line: 1,
+      col: 1,
+      type: "Recommended Commit",
+      severity: "warning" as Severity,
+      message: commitMsg,
+    },
+  ].filter((item): item is StaticError => Boolean(item));
+}
+
 const UI_ACTIONS: UIAction[] = [
   { id:"a1", step:1,  label:"앱 초기 로딩 확인",          element:"<App />",                   status:"pending" },
   { id:"a2", step:2,  label:"대시보드 렌더링 검사",         element:"<DashboardPage />",         status:"pending" },
@@ -502,7 +533,13 @@ function CommitQARow({ commit }: { commit: CommitQAResult }) {
 // ════════════════════════════════════════
 // 메인 AIQAPage
 // ════════════════════════════════════════
-export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
+export function AIQAPage({
+  projectId = 0,
+  autoStart = false,
+}: {
+  projectId?: number | null;
+  autoStart?: boolean;
+}) {
   // ── 최상단 탭: AI QA / Agent Control ──
   const [mainTab,      setMainTab]      = useState<"qa" | "agents">("qa");
   const [activeTab,    setActiveTab]    = useState<"run" | "commit">("run");
@@ -568,7 +605,7 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
     setClips([]);
     setPhase2Done(false);
     setNotifications([]);
-    runPhase1();
+    void runPhase1FromApi();
   };
 
   const reset = () => {
@@ -585,6 +622,42 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
   };
 
   // ── Phase 1: 정적 분석 시뮬레이션 ──
+  const runPhase1FromApi = async () => {
+    const filesForQa = [
+      ...(BACKEND_COMMITS[0]?.files ?? []),
+      ...(FRONTEND_COMMITS[0]?.files ?? []),
+    ];
+    const scanTargets = filesForQa.map((file) => file.path);
+
+    scanTargets.forEach((file, index) => {
+      setTimeout(() => {
+        setScanCurrent(file);
+        setScanFiles(prev => prev.includes(file) ? prev : [...prev, file]);
+      }, index * 140);
+    });
+
+    try {
+      const response = await runAiQa({
+        projectId,
+        diff: buildDiffFromCommitFiles(filesForQa),
+      });
+      const errors = mapQaResponseToErrors(response);
+      setStaticErrors(errors);
+      if (errors.length > 0) {
+        toast.warning("AI QA 분석에서 확인할 항목이 발견되었습니다.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "AI QA 분석에 실패했습니다.");
+    } finally {
+      setTimeout(() => {
+        setScanCurrent("");
+        setPhase1Done(true);
+        setPhase("phase2");
+        setTimeout(() => runPhase2(), 600);
+      }, Math.max(scanTargets.length * 140, 500));
+    }
+  };
+
   const runPhase1 = () => {
     const FILES = [
       "src/main/java/com/weai/agent/ParserAgent.java",
