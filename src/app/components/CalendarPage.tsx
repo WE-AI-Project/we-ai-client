@@ -24,12 +24,22 @@ const PRIORITIES: SchedulePriority[] = ["high", "medium", "low"];
 const STATUSES: ScheduleStatus[] = ["todo", "in-progress", "done"];
 const WEEK_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
+// ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
+
 interface ScheduleModalProps {
   initial?: Partial<Schedule> | null;
   onSave: (s: Schedule) => void;
   onClose: () => void;
   onColorChange: (dept: string, color: { bg: string; color: string }) => void;
-  onDeptDelete: (dept: string) => void; // 부서 삭제 이벤트를 부모로 전달
+  onDeptDelete: (dept: string) => void; 
   deptColors: Record<string, { bg: string; color: string; light: string }>;
 }
 
@@ -179,7 +189,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
                 return (
                   <div key={d} className="relative group flex h-full">
-                    {/* 메인 부서 버튼 */}
                     <button
                       type="button"
                       onClick={() => { setIsCustomDept(false); set("department", d); }}
@@ -193,7 +202,6 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
                       <span className="block truncate px-1">{d}</span>
                     </button>
 
-                    {/* X 버튼 (마우스를 올렸을 때 투명에서 불투명으로 부드럽게 나타남) */}
                     {!isSystemDept && (
                       <div
                         className="absolute inset-y-0 right-0 flex items-center px-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
@@ -475,6 +483,15 @@ export function CalendarPage() {
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
   const [view, setView] = useState<"month" | "list">("month");
 
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // 백엔드 통신(API)을 대체하는 초기 로딩 지연 효과입니다.
+    // 3초(3000ms) 뒤에 로딩이 끝나면서 자연스럽게 실제 화면이 나타납니다.
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   type DeptColorType = Record<string, {
     bg: string;
     color: string;
@@ -507,7 +524,7 @@ export function CalendarPage() {
     if (!deptToDelete) return;
     setSchedules(prev => {
       const next = prev.filter(s => s.department !== deptToDelete);
-      saveSchedules(next); // 삭제된 결과를 로컬 저장소에 즉시 반영
+      saveSchedules(next);
       return next;
     });
 
@@ -651,70 +668,101 @@ export function CalendarPage() {
             className="flex flex-col gap-1 p-2.5 overflow-y-auto shrink-0"
             style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
           >
-            {dynamicDepts.map(d => {
-              const dc = getDeptColor(d);
-              const cnt = d === "전체" ? schedules.length : schedules.filter(s => s.department === d).length;
-              const sel = deptFilter === d;
+            {isLoading ? (
+              /* [스켈레톤] 좌측 부서 목록 */
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2.5 px-2.5 py-2">
+                  <Skeleton className="w-2 h-2 rounded-full shrink-0" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))
+            ) : (
+              dynamicDepts.map(d => {
+                const dc = getDeptColor(d);
+                const cnt = d === "전체" ? schedules.length : schedules.filter(s => s.department === d).length;
+                const sel = deptFilter === d;
+                const isSystemDept = ["전체", "Frontend", "Backend", "Agent", "DevOps", "QA", "Design"].includes(d);
 
-              const isSystemDept = ["전체", "Frontend", "Backend", "Agent", "DevOps", "QA", "Design"].includes(d);
-
-              return (
-                <div key={d} className="relative group flex h-full">
-                  <button
-                    type="button"
-                    onClick={() => setDeptFilter(d)}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all w-full"
-                    style={{
-                      background: sel ? dc.bg : "transparent",
-                      border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
-                    }}
-                  >
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
-                    <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
-                    <div className="flex items-center shrink-0 min-w-[16px] justify-end">
-                      <span className="text-[9px] font-mono group-hover:hidden" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>
-                        {cnt}
-                      </span>
-                    </div>
-                  </button>
-                  
-                  {/* 사이드바 필터에 있는 부서는 X로 삭제하게 하면 위험할 수 있으나,
-                      요청사항에 맞게 커스텀 부서는 호버시 삭제 버튼이 보이게 연결합니다. */}
-                  {!isSystemDept && (
-                    <div
-                      className="absolute inset-y-0 right-0 px-2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
-                      style={{ background: "transparent" }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDeptToDelete(d);
+                return (
+                  <div key={d} className="relative group flex h-full">
+                    <button
+                      type="button"
+                      onClick={() => setDeptFilter(d)}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all w-full"
+                      style={{
+                        background: sel ? dc.bg : "transparent",
+                        border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
                       }}
                     >
-                      <X className="w-3 h-3 text-red-500 hover:text-red-700" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
+                      <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
+                      <div className="flex items-center shrink-0 min-w-[16px] justify-end">
+                        <span className="text-[9px] font-mono group-hover:hidden" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>
+                          {cnt}
+                        </span>
+                      </div>
+                    </button>
+                    {!isSystemDept && (
+                      <div
+                        className="absolute inset-y-0 right-0 px-2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                        style={{ background: "transparent" }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeptToDelete(d);
+                        }}
+                      >
+                        <X className="w-3 h-3 text-red-500 hover:text-red-700" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
 
           <div className="px-3 py-2.5 shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
-            <div className="grid grid-cols-3 gap-1.5">
-              {[
-                { label: "완료", value: stats.done, color: "#5A8A4A" },
-                { label: "진행", value: stats.inProgress, color: "#C09840" },
-                { label: "예정", value: stats.todo, color: "#9A9B72" },
-              ].map(s => (
-                <div key={s.label} className="rounded-lg p-2 text-center" style={{ background: `${s.color}12` }}>
-                  <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
-                  <p className="text-[8px]" style={{ color: s.color }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
+            {isLoading ? (
+              /* [스켈레톤] 좌측 통계 블록 */
+              <div className="grid grid-cols-3 gap-1.5">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[46px] w-full rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { label: "완료", value: stats.done, color: "#5A8A4A" },
+                  { label: "진행", value: stats.inProgress, color: "#C09840" },
+                  { label: "예정", value: stats.todo, color: "#9A9B72" },
+                ].map(s => (
+                  <div key={s.label} className="rounded-lg p-2 text-center" style={{ background: `${s.color}12` }}>
+                    <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
+                    <p className="text-[8px]" style={{ color: s.color }}>{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
-            {selectedDay ? (
+            {isLoading ? (
+              /* [스켈레톤] 좌측 하단 일정 카드 리스트 */
+              <div className="space-y-3 pt-1">
+                <Skeleton className="h-3 w-24 mb-2 ml-1" />
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="rounded-xl p-3 border" style={{ borderColor: BORDER, background: "rgba(255,255,255,0.5)" }}>
+                    <Skeleton className="h-3 w-3/4 mb-2.5" />
+                    <Skeleton className="h-2 w-1/2 mb-2" />
+                    <Skeleton className="h-2 w-2/3 mb-3" />
+                    <div className="flex gap-1.5 mt-2.5">
+                      <Skeleton className="h-[18px] w-12 rounded-full" />
+                      <Skeleton className="h-[18px] w-10 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : selectedDay ? (
               <>
                 <div className="flex items-center gap-2 mb-2 px-1">
                   <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
@@ -784,13 +832,20 @@ export function CalendarPage() {
             className="flex items-center gap-3 px-5 py-3 shrink-0"
             style={{ borderBottom: `1px solid ${BORDER}`, background: BRIGHT_BEIGE }}
           >
-            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-black/[0.06] transition-all">
+            <button onClick={prevMonth} disabled={isLoading} className="p-1.5 rounded-lg hover:bg-black/[0.06] transition-all disabled:opacity-30">
               <ChevronLeft className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
             </button>
-            <h2 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
-              {year}년 {month}월
-            </h2>
-            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-black/[0.06] transition-all">
+            
+            {isLoading ? (
+               /* [스켈레톤] 헤더 년/월 텍스트 */
+               <Skeleton className="h-4 w-20" />
+            ) : (
+              <h2 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+                {year}년 {month}월
+              </h2>
+            )}
+
+            <button onClick={nextMonth} disabled={isLoading} className="p-1.5 rounded-lg hover:bg-black/[0.06] transition-all disabled:opacity-30">
               <ChevronRight className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
             </button>
 
@@ -801,44 +856,44 @@ export function CalendarPage() {
                 setMonth(now.getMonth() + 1);
                 setSelectedDay(getTodayStr());
               }}
-              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-30"
               style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
             >
               오늘
             </button>
 
             <div className="ml-auto flex items-center gap-3 flex-wrap">
-              {dynamicDepts.filter(d => d !== "전체").map(d => {
-                const dc = deptColors[d] || {
-                  bg: "#f3f4f6",
-                  color: "#4b5563",
-                  light: "#f3f4f6"
-                };
-
-                const cnt = filtered.filter(
-                  s => s.department === d &&
-                    s.startDate.startsWith(`${year}-${String(month).padStart(2, "0")}`)
-                ).length;
-
-                if (cnt === 0 && deptFilter !== "전체" && deptFilter !== d) return null;
-
-                return (
-                  <div key={d} className="flex items-center gap-1">
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: dc.bg }}
-                    />
-                    <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                      {d}
-                    </span>
+              {isLoading ? (
+                /* [스켈레톤] 우측 상단 부서 표시 점들 */
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <Skeleton className="w-2 h-2 rounded-full" />
+                    <Skeleton className="w-8 h-2.5" />
                   </div>
-                );
-              })}
+                ))
+              ) : (
+                dynamicDepts.filter(d => d !== "전체").map(d => {
+                  const dc = deptColors[d] || { bg: "#f3f4f6", color: "#4b5563", light: "#f3f4f6" };
+                  const cnt = filtered.filter(
+                    s => s.department === d && s.startDate.startsWith(`${year}-${String(month).padStart(2, "0")}`)
+                  ).length;
+                  if (cnt === 0 && deptFilter !== "전체" && deptFilter !== d) return null;
+
+                  return (
+                    <div key={d} className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full" style={{ background: dc.bg }} />
+                      <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{d}</span>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <button
               onClick={() => setEditSchedule("new")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all ml-2"
+              disabled={isLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all ml-2 disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, #41431B, #6B7040)", color: "rgba(254,252,245,0.95)", boxShadow: "0 4px 12px rgba(65,67,27,0.22)" }}
             >
               <Plus className="w-3.5 h-3.5" /> 일정 추가
@@ -871,74 +926,90 @@ export function CalendarPage() {
                 overflowY: "auto"
               }}
             >
-              {Array.from({ length: totalCells }).map((_, idx) => {
-                const dayNum = idx - firstWeekDay + 1;
-                const isValid = dayNum >= 1 && dayNum <= daysInMonth;
-                const ds = isValid ? dateStr(year, month, dayNum) : "";
-                const dayEvts = isValid ? (daySchedules[ds] ?? []) : [];
-                const isToday = ds === todayStr;
-                const isSel = ds === selectedDay;
-                const isSun = idx % 7 === 0;
-                const isSat = idx % 7 === 6;
-
-                const startsToday = dayEvts.filter(s => s.startDate === ds);
-                const continues = dayEvts.filter(s => s.startDate !== ds);
-
-                return (
+              {isLoading ? (
+                /* [스켈레톤] 달력 그리드 내부 칸들 */
+                Array.from({ length: totalCells }).map((_, idx) => (
                   <div
-                    key={idx}
-                    onClick={() => isValid && setSelectedDay(isSel ? null : ds)}
-                    className="relative p-1 transition-all overflow-hidden flex flex-col"
-                    style={{
-                      background: !isValid ? `rgba(254,252,245,0.45)`
-                        : isSel ? ACCENT_BG
-                          : BRIGHT_BEIGE,
-                      cursor: isValid ? "pointer" : "default",
-                      height: "100%",
-                      minHeight: 0
-                    }}
+                    key={`skel-${idx}`}
+                    className="relative p-2 transition-all flex flex-col gap-2"
+                    style={{ background: BRIGHT_BEIGE, height: "100%" }}
                   >
-                    {isValid && (
-                      <>
-                        {/* 날짜 숫자 */}
-                        <div className="flex items-center justify-between mb-1 shrink-0">
-                          <span
-                            className="text-[11px] font-semibold w-6 h-6 flex items-center justify-center rounded-full"
-                            style={{
-                              color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
-                              background: isToday ? ACCENT : "transparent",
-                            }}
-                          >
-                            {dayNum}
-                          </span>
-                          {dayEvts.length > 3 && (
-                            <span className="text-[8px]" style={{ color: TEXT_TERTIARY }}>{dayEvts.length}</span>
-                          )}
-                        </div>
-
-                        {/* 이벤트 바 */}
-                        <div className="space-y-0.5 flex-1 overflow-hidden">
-                          {startsToday.slice(0, 3).map(s => (
-                            <EventBar key={s.id} schedule={s} compact />
-                          ))}
-                          {continues.slice(0, Math.max(0, 3 - startsToday.length)).map(s => (
-                            <div
-                              key={s.id}
-                              className="h-1.5 rounded-full opacity-40"
-                              style={{ background: deptColors[s.department]?.color || DEPT_COLOR[s.department]?.color }}
-                            />
-                          ))}
-                          {dayEvts.length > 3 && (
-                            <span className="text-[7px] block" style={{ color: TEXT_TERTIARY }}>
-                              +{dayEvts.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    )}
+                    <Skeleton className="w-5 h-5 rounded-full" />
+                    <div className="space-y-1.5 w-full mt-1">
+                      <Skeleton className="h-3 w-full rounded" />
+                      <Skeleton className="h-3 w-4/5 rounded" />
+                    </div>
                   </div>
-                );
-              })}
+                ))
+              ) : (
+                /* 실제 달력 데이터 */
+                Array.from({ length: totalCells }).map((_, idx) => {
+                  const dayNum = idx - firstWeekDay + 1;
+                  const isValid = dayNum >= 1 && dayNum <= daysInMonth;
+                  const ds = isValid ? dateStr(year, month, dayNum) : "";
+                  const dayEvts = isValid ? (daySchedules[ds] ?? []) : [];
+                  const isToday = ds === todayStr;
+                  const isSel = ds === selectedDay;
+                  const isSun = idx % 7 === 0;
+                  const isSat = idx % 7 === 6;
+
+                  const startsToday = dayEvts.filter(s => s.startDate === ds);
+                  const continues = dayEvts.filter(s => s.startDate !== ds);
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => isValid && setSelectedDay(isSel ? null : ds)}
+                      className="relative p-1 transition-all overflow-hidden flex flex-col"
+                      style={{
+                        background: !isValid ? `rgba(254,252,245,0.45)`
+                          : isSel ? ACCENT_BG
+                            : BRIGHT_BEIGE,
+                        cursor: isValid ? "pointer" : "default",
+                        height: "100%",
+                        minHeight: 0
+                      }}
+                    >
+                      {isValid && (
+                        <>
+                          <div className="flex items-center justify-between mb-1 shrink-0">
+                            <span
+                              className="text-[11px] font-semibold w-6 h-6 flex items-center justify-center rounded-full"
+                              style={{
+                                color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
+                                background: isToday ? ACCENT : "transparent",
+                              }}
+                            >
+                              {dayNum}
+                            </span>
+                            {dayEvts.length > 3 && (
+                              <span className="text-[8px]" style={{ color: TEXT_TERTIARY }}>{dayEvts.length}</span>
+                            )}
+                          </div>
+
+                          <div className="space-y-0.5 flex-1 overflow-hidden">
+                            {startsToday.slice(0, 3).map(s => (
+                              <EventBar key={s.id} schedule={s} compact />
+                            ))}
+                            {continues.slice(0, Math.max(0, 3 - startsToday.length)).map(s => (
+                              <div
+                                key={s.id}
+                                className="h-1.5 rounded-full opacity-40"
+                                style={{ background: deptColors[s.department]?.color || DEPT_COLOR[s.department]?.color }}
+                              />
+                            ))}
+                            {dayEvts.length > 3 && (
+                              <span className="text-[7px] block" style={{ color: TEXT_TERTIARY }}>
+                                +{dayEvts.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {/* ── 하단 간트 뷰 ── */}
@@ -950,76 +1021,84 @@ export function CalendarPage() {
                 background: CREAM
               }}
             >
-              <div className="px-4 pt-2 pb-1 sticky top-0 z-10" style={{ background: CREAM }}>
-                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: TEXT_LABEL }}>
-                  {month}월 간트 뷰
-                </p>
-              </div>
-              <div className="overflow-x-auto px-4 pb-2">
-                <div style={{ minWidth: daysInMonth * 20 }}>
-                  {/* 날짜 눈금 */}
-                  <div className="flex mb-1 sticky top-[22px] z-10" style={{ background: CREAM }}>
-                    {Array.from({ length: daysInMonth }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="flex-none text-center text-[7px]"
-                        style={{
-                          width: 20,
-                          color: dateStr(year, month, i + 1) === todayStr ? ACCENT : TEXT_TERTIARY,
-                          fontWeight: dateStr(year, month, i + 1) === todayStr ? "bold" : "normal",
-                        }}
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
-                  </div>
-                  {/* 부서별 바 */}
-                  {DEPTS.filter(d => d !== "전체").map(d => {
-                    const dc = deptColors[d];
-                    const dScheds = filtered.filter(s => s.department === d);
-                    if (dScheds.length === 0) return null;
-                    return (
-                      <div key={d} className="flex items-center gap-2 mb-1" style={{ height: 14 }}>
-                        <span
-                          className="text-[8px] font-semibold shrink-0"
-                          style={{ color: dc?.color, width: 0, overflow: "visible", whiteSpace: "nowrap", marginLeft: -60 }}
-                        />
-                        <div className="relative flex-1" style={{ height: 12 }}>
-                          {/* 배경 격자 */}
-                          <div className="absolute inset-0 flex" style={{ opacity: 0.2 }}>
-                            {Array.from({ length: daysInMonth }).map((_, i) => (
-                              <div key={i} className="flex-none border-r" style={{ width: 20, borderColor: BORDER }} />
-                            ))}
-                          </div>
-                          {/* 일정 바 */}
-                          {dScheds.map(s => {
-                            const sDay = new Date(s.startDate).getDate();
-                            const eDay = Math.min(daysInMonth, new Date(s.endDate).getDate());
-                            const left = (sDay - 1) * 20;
-                            const width = Math.max(20, (eDay - sDay + 1) * 20);
-                            return (
-                              <div
-                                key={s.id}
-                                className="absolute rounded-full flex items-center px-1"
-                                style={{
-                                  left, width, height: 12, top: 0,
-                                  background: dc?.bg,
-                                  border: `1px solid ${dc?.color}40`,
-                                }}
-                                title={`${s.title}${s.assignee ? ` — ${s.assignee}` : ""}`}
-                              >
-                                <span className="text-[6px] truncate font-semibold" style={{ color: dc?.color }}>
-                                  {s.title}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
+              {isLoading ? (
+                /* [스켈레톤] 하단 간트 뷰 */
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-3 w-24 mb-2" />
+                  <Skeleton className="h-2 w-full" />
+                  <Skeleton className="h-2 w-full" />
+                  <Skeleton className="h-2 w-full" />
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="px-4 pt-2 pb-1 sticky top-0 z-10" style={{ background: CREAM }}>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: TEXT_LABEL }}>
+                      {month}월 간트 뷰
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto px-4 pb-2">
+                    <div style={{ minWidth: daysInMonth * 20 }}>
+                      <div className="flex mb-1 sticky top-[22px] z-10" style={{ background: CREAM }}>
+                        {Array.from({ length: daysInMonth }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="flex-none text-center text-[7px]"
+                            style={{
+                              width: 20,
+                              color: dateStr(year, month, i + 1) === todayStr ? ACCENT : TEXT_TERTIARY,
+                              fontWeight: dateStr(year, month, i + 1) === todayStr ? "bold" : "normal",
+                            }}
+                          >
+                            {i + 1}
+                          </div>
+                        ))}
+                      </div>
+                      {DEPTS.filter(d => d !== "전체").map(d => {
+                        const dc = deptColors[d];
+                        const dScheds = filtered.filter(s => s.department === d);
+                        if (dScheds.length === 0) return null;
+                        return (
+                          <div key={d} className="flex items-center gap-2 mb-1" style={{ height: 14 }}>
+                            <span
+                              className="text-[8px] font-semibold shrink-0"
+                              style={{ color: dc?.color, width: 0, overflow: "visible", whiteSpace: "nowrap", marginLeft: -60 }}
+                            />
+                            <div className="relative flex-1" style={{ height: 12 }}>
+                              <div className="absolute inset-0 flex" style={{ opacity: 0.2 }}>
+                                {Array.from({ length: daysInMonth }).map((_, i) => (
+                                  <div key={i} className="flex-none border-r" style={{ width: 20, borderColor: BORDER }} />
+                                ))}
+                              </div>
+                              {dScheds.map(s => {
+                                const sDay = new Date(s.startDate).getDate();
+                                const eDay = Math.min(daysInMonth, new Date(s.endDate).getDate());
+                                const left = (sDay - 1) * 20;
+                                const width = Math.max(20, (eDay - sDay + 1) * 20);
+                                return (
+                                  <div
+                                    key={s.id}
+                                    className="absolute rounded-full flex items-center px-1"
+                                    style={{
+                                      left, width, height: 12, top: 0,
+                                      background: dc?.bg,
+                                      border: `1px solid ${dc?.color}40`,
+                                    }}
+                                    title={`${s.title}${s.assignee ? ` — ${s.assignee}` : ""}`}
+                                  >
+                                    <span className="text-[6px] truncate font-semibold" style={{ color: dc?.color }}>
+                                      {s.title}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
           </div>
@@ -1034,7 +1113,7 @@ export function CalendarPage() {
             onSave={handleSave}
             onClose={() => setEditSchedule(null)}
             onColorChange={handleDeptColorChange}
-            onDeptDelete={(dept) => setDeptToDelete(dept)} // 🔴 부서 삭제 팝업 요청 연결
+            onDeptDelete={(dept) => setDeptToDelete(dept)}
             deptColors={deptColors}
           />
         )
@@ -1075,7 +1154,7 @@ export function CalendarPage() {
         )
       }
 
-      {/* 🔴 [추가] 부서 삭제 확인 모달 (z-[60] 설정) */}
+      {/* 부서 삭제 확인 모달 */}
       {deptToDelete && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
           <div

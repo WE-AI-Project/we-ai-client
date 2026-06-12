@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, ChevronDown, ChevronUp,
   Check, Copy, Wand2, FileCode2, Zap,
 } from "lucide-react";
 import type { CommitFile } from "./commitData";
+import { buildDiffFromCommitFiles, generateCommitMessage } from "../../api/aiApi";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
@@ -228,6 +230,35 @@ function formatMsg(msg: GeneratedMsg): string {
   return msg.body ? `${header}\n\n${msg.body}` : header;
 }
 
+function normalizeCommitCandidates(response: Awaited<ReturnType<typeof generateCommitMessage>>): GeneratedMsg[] {
+  const candidates = response.candidates?.length
+    ? response.candidates
+    : [{ message: response.message ?? response.commitMessage ?? response.commit_msg }];
+
+  return candidates
+    .map((candidate, index) => {
+      const rawMessage = candidate.message ?? candidate.commitMessage ?? candidate.commit_msg ?? candidate.title ?? "";
+      if (!rawMessage.trim()) return null;
+
+      const [header, ...bodyLines] = rawMessage.trim().split(/\r?\n/);
+      const match = header.match(/^(\w+)(?:\(([^)]+)\))?:\s*(.+)$/);
+      const tag = candidate.type ?? match?.[1] ?? "feat";
+      const scope = candidate.scope ?? match?.[2] ?? "";
+      const title = candidate.title ?? match?.[3] ?? header;
+
+      return {
+        id: String(index + 1),
+        tag,
+        scope,
+        title,
+        body: candidate.body ?? bodyLines.join("\n").trim(),
+        style: index === 0 ? "conventional" : "short",
+        tagColor: TAG_COLORS[tag] ?? ACCENT,
+      } satisfies GeneratedMsg;
+    })
+    .filter((message): message is GeneratedMsg => message !== null);
+}
+
 // ─────────────────────────────────────────────────────────────
 // 서브 컴포넌트
 // ─────────────────────────────────────────────────────────────
@@ -283,9 +314,11 @@ function TypedText({ text, speed = 18 }: { text: string; speed?: number }) {
 // 메인 컴포넌트
 // ─────────────────────────────────────────────────────────────
 export function AICommitGenerator({
+  projectId = 0,
   stagedFiles,
   onApply,
 }: {
+  projectId?: number | null;
   stagedFiles:  CommitFile[];
   onApply:      (msg: string) => void;
 }) {
@@ -328,11 +361,38 @@ export function AICommitGenerator({
     }, 1400 + Math.random() * 400);
   };
 
+  const runGenerateFromApi = async () => {
+    if (loading) return;
+    setLoading(true);
+    setMessages([]);
+    setApplied(null);
+    setRevealed(new Set());
+
+    try {
+      const generated = normalizeCommitCandidates(await generateCommitMessage({
+        projectId,
+        files: stagedFiles.map((file) => file.path),
+        diff: buildDiffFromCommitFiles(stagedFiles),
+      }));
+
+      setMessages(generated);
+      generated.forEach((m, i) => {
+        setTimeout(() => {
+          setRevealed(prev => new Set([...prev, m.id]));
+        }, i * 200);
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "커밋 메시지 생성에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOpen = () => {
     if (!open) {
       setOpen(true);
       if (messages.length === 0 && stagedFiles.length > 0) {
-        setTimeout(runGenerate, 80);
+        setTimeout(() => void runGenerateFromApi(), 80);
       }
     } else {
       setOpen(false);
@@ -431,7 +491,7 @@ export function AICommitGenerator({
             {/* 재생성 버튼 */}
             {!loading && messages.length > 0 && (
               <button
-                onClick={runGenerate}
+                onClick={() => void runGenerateFromApi()}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold transition-all"
                 style={{
                   background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY,
@@ -644,7 +704,7 @@ export function AICommitGenerator({
             <div className="flex flex-col items-center gap-2 py-6">
               <FileCode2 className="w-6 h-6" style={{ color: TEXT_TERTIARY }} />
               <button
-                onClick={runGenerate}
+                onClick={() => void runGenerateFromApi()}
                 className="px-3 py-1.5 rounded-xl text-[10px] font-semibold"
                 style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
               >

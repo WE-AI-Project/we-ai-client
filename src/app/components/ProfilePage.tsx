@@ -8,6 +8,16 @@ import { ProfileEditModal } from "./ProfileEditModal";
 import { loadProfile, ProfileData, AVATAR_GRADIENTS } from "../data/profileStore";
 import { deviconUrl } from "../data/devicons";
 
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
+
 // ── 디자인 토큰 ──
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
@@ -152,6 +162,13 @@ function TechBadge({ name, slug, variant }: { name: string; slug: string; varian
 // 메인 ProfilePage
 // ──────────────────────────────────────────
 export function ProfilePage() {
+  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const stats = useSystemStats();
   const [profile, setProfile] = useState<ProfileData>(loadProfile);
   const [editOpen, setEditOpen] = useState(false);
@@ -178,70 +195,108 @@ export function ProfilePage() {
           {/* ── 프로필 헤더 ── */}
           <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}` }}>
             <div className="flex items-start gap-5">
-              {/* 아바타 */}
-              <div
-                className="w-20 h-20 rounded-2xl flex items-center justify-center shrink-0"
-                style={{ background: gradBg }}
-              >
-                <User className="w-9 h-9 text-white" style={{ opacity: 0.85 }} />
-              </div>
+              {isLoading ? (
+                /* [스켈레톤] 아바타 */
+                <Skeleton className="w-20 h-20 rounded-2xl shrink-0" />
+              ) : (
+                <div
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: gradBg }}
+                >
+                  <User className="w-9 h-9 text-white" style={{ opacity: 0.85 }} />
+                </div>
+              )}
+              
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>{profile.displayName}</h1>
-                  <span
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
-                  >
-                    {profile.role}
-                  </span>
-                </div>
-                {/* 자기소개 */}
-                {profile.bio && (
-                  <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: TEXT_SECONDARY }}>
-                    {profile.bio}
-                  </p>
+                {isLoading ? (
+                  /* [스켈레톤] 프로필 정보 */
+                  <>
+                    <div className="flex items-center gap-3 mb-3">
+                      <Skeleton className="h-6 w-32" />
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                    </div>
+                    <Skeleton className="h-3 w-3/4 mb-4" />
+                    <div className="space-y-2.5">
+                      <Skeleton className="h-3 w-48" />
+                      <Skeleton className="h-3 w-40" />
+                      <Skeleton className="h-3 w-36" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h1 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>{profile.displayName}</h1>
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
+                      >
+                        {profile.role}
+                      </span>
+                    </div>
+                    {/* 자기소개 */}
+                    {profile.bio && (
+                      <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: TEXT_SECONDARY }}>
+                        {profile.bio}
+                      </p>
+                    )}
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <FolderGit2 className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
+                        <span className="text-xs" style={{ color: TEXT_SECONDARY }}>SynAIpse Project Office</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
+                        <span className="text-xs" style={{ color: TEXT_SECONDARY }}>{profile.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
+                        <span className="text-xs" style={{ color: TEXT_SECONDARY }}>{profile.location}</span>
+                      </div>
+                    </div>
+                  </>
                 )}
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <FolderGit2 className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
-                    <span className="text-xs" style={{ color: TEXT_SECONDARY }}>SynAIpse Project Office</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
-                    <span className="text-xs" style={{ color: TEXT_SECONDARY }}>{profile.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
-                    <span className="text-xs" style={{ color: TEXT_SECONDARY }}>{profile.location}</span>
-                  </div>
-                </div>
               </div>
+
               {/* 편집 버튼 */}
-              <button
-                onClick={() => setEditOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0"
-                style={{
-                  background: ACCENT_BG,
-                  border: `1px solid ${ACCENT_BORDER}`,
-                  color: ACCENT,
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(65,67,27,0.12)")}
-                onMouseLeave={e => (e.currentTarget.style.background = ACCENT_BG)}
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit Profile
-              </button>
+              {isLoading ? (
+                <Skeleton className="h-8 w-28 rounded-xl shrink-0" />
+              ) : (
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0"
+                  style={{
+                    background: ACCENT_BG,
+                    border: `1px solid ${ACCENT_BORDER}`,
+                    color: ACCENT,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(65,67,27,0.12)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = ACCENT_BG)}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit Profile
+                </button>
+              )}
             </div>
           </div>
 
           {/* ── 통계 카드 ── */}
           <div className="grid grid-cols-4 gap-2.5">
-            {STATS.map(s => (
-              <div key={s.label} className="rounded-xl p-3.5" style={{ background: s.bg, border: `1px solid ${BORDER}` }}>
-                <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
-              </div>
-            ))}
+            {isLoading ? (
+              /* [스켈레톤] 통계 카드 4개 */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <Skeleton className="h-6 w-10 mb-2" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))
+            ) : (
+              STATS.map(s => (
+                <div key={s.label} className="rounded-xl p-3.5" style={{ background: s.bg, border: `1px solid ${BORDER}` }}>
+                  <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
+                </div>
+              ))
+            )}
           </div>
 
           {/* ── 시스템 모니터 ── */}
@@ -249,118 +304,143 @@ export function ProfilePage() {
             <div className="flex items-center gap-2 px-5 py-3.5" style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(247,247,245,0.85)" }}>
               <Activity className="w-3.5 h-3.5" style={{ color: ACCENT }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>System Monitor</p>
-              <div className="ml-auto flex items-center gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                Live — browser APIs
-              </div>
+              {!isLoading && (
+                <div className="ml-auto flex items-center gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Live — browser APIs
+                </div>
+              )}
             </div>
 
             <div className="p-5 grid grid-cols-3 gap-4">
-              {/* CPU */}
-              <div className="rounded-xl p-4" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Cpu className="w-3.5 h-3.5" style={{ color: ACCENT }} />
-                  <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>CPU</p>
-                  <span className="ml-auto text-[10px] font-mono font-semibold" style={{ color: ACCENT }}>{stats.renderLoad}%</span>
-                </div>
-                <GaugeBar
-                  value={stats.renderLoad}
-                  color={stats.renderLoad > 70 ? "#ef4444" : stats.renderLoad > 40 ? "#f59e0b" : ACCENT}
-                  bg="rgba(65,67,27,0.10)"
-                />
-                <div className="mt-2.5 space-y-1">
-                  <div className="flex justify-between text-[9px]">
-                    <span style={{ color: TEXT_TERTIARY }}>Logical Cores</span>
-                    <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.cpuCores}</span>
+              {isLoading ? (
+                /* [스켈레톤] 모니터 카드 3개 */
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="rounded-xl p-4 bg-black/5 border border-black/5 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Skeleton className="w-16 h-4" />
+                      <Skeleton className="w-10 h-4" />
+                    </div>
+                    <Skeleton className="w-full h-1.5 rounded-full" />
+                    <div className="space-y-2">
+                      <div className="flex justify-between"><Skeleton className="w-16 h-2.5" /><Skeleton className="w-12 h-2.5" /></div>
+                      <div className="flex justify-between"><Skeleton className="w-16 h-2.5" /><Skeleton className="w-12 h-2.5" /></div>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-[9px]">
-                    <span style={{ color: TEXT_TERTIARY }}>Frame Rate</span>
-                    <span className="font-semibold" style={{ color: stats.fps < 30 ? "#ef4444" : stats.fps < 50 ? "#f59e0b" : "#10b981" }}>{stats.fps} fps</span>
+                ))
+              ) : (
+                <>
+                  {/* CPU */}
+                  <div className="rounded-xl p-4" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Cpu className="w-3.5 h-3.5" style={{ color: ACCENT }} />
+                      <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>CPU</p>
+                      <span className="ml-auto text-[10px] font-mono font-semibold" style={{ color: ACCENT }}>{stats.renderLoad}%</span>
+                    </div>
+                    <GaugeBar
+                      value={stats.renderLoad}
+                      color={stats.renderLoad > 70 ? "#ef4444" : stats.renderLoad > 40 ? "#f59e0b" : ACCENT}
+                      bg="rgba(65,67,27,0.10)"
+                    />
+                    <div className="mt-2.5 space-y-1">
+                      <div className="flex justify-between text-[9px]">
+                        <span style={{ color: TEXT_TERTIARY }}>Logical Cores</span>
+                        <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.cpuCores}</span>
+                      </div>
+                      <div className="flex justify-between text-[9px]">
+                        <span style={{ color: TEXT_TERTIARY }}>Frame Rate</span>
+                        <span className="font-semibold" style={{ color: stats.fps < 30 ? "#ef4444" : stats.fps < 50 ? "#f59e0b" : "#10b981" }}>{stats.fps} fps</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Memory */}
-              <div className="rounded-xl p-4" style={{ background: "rgba(90,138,74,0.05)", border: "1px solid rgba(90,138,74,0.15)" }}>
-                <div className="flex items-center gap-2 mb-3">
-                  <MemoryStick className="w-3.5 h-3.5" style={{ color: "#5A8A4A" }} />
-                  <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>Memory</p>
-                  <span className="ml-auto text-[10px] font-mono font-semibold" style={{ color: "#5A8A4A" }}>{memPct > 0 ? `${memPct}%` : "—"}</span>
-                </div>
-                <GaugeBar value={memPct} color={memPct > 80 ? "#ef4444" : memPct > 60 ? "#f59e0b" : "#5A8A4A"} bg="rgba(90,138,74,0.12)" />
-                <div className="mt-2.5 space-y-1">
-                  {stats.heapUsed > 0 ? (
-                    <>
-                      <div className="flex justify-between text-[9px]">
-                        <span style={{ color: TEXT_TERTIARY }}>JS Heap Used</span>
-                        <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{fmtBytes(stats.heapUsed)}</span>
-                      </div>
-                      <div className="flex justify-between text-[9px]">
-                        <span style={{ color: TEXT_TERTIARY }}>Heap Limit</span>
-                        <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{fmtBytes(stats.heapTotal)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between text-[9px]">
-                      <span style={{ color: TEXT_TERTIARY }}>JS Heap</span>
-                      <span style={{ color: TEXT_TERTIARY }}>Not exposed</span>
+                  {/* Memory */}
+                  <div className="rounded-xl p-4" style={{ background: "rgba(90,138,74,0.05)", border: "1px solid rgba(90,138,74,0.15)" }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <MemoryStick className="w-3.5 h-3.5" style={{ color: "#5A8A4A" }} />
+                      <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>Memory</p>
+                      <span className="ml-auto text-[10px] font-mono font-semibold" style={{ color: "#5A8A4A" }}>{memPct > 0 ? `${memPct}%` : "—"}</span>
                     </div>
-                  )}
-                  {stats.deviceMemoryGB != null && (
-                    <div className="flex justify-between text-[9px]">
-                      <span style={{ color: TEXT_TERTIARY }}>Device RAM</span>
-                      <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.deviceMemoryGB} GB</span>
+                    <GaugeBar value={memPct} color={memPct > 80 ? "#ef4444" : memPct > 60 ? "#f59e0b" : "#5A8A4A"} bg="rgba(90,138,74,0.12)" />
+                    <div className="mt-2.5 space-y-1">
+                      {stats.heapUsed > 0 ? (
+                        <>
+                          <div className="flex justify-between text-[9px]">
+                            <span style={{ color: TEXT_TERTIARY }}>JS Heap Used</span>
+                            <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{fmtBytes(stats.heapUsed)}</span>
+                          </div>
+                          <div className="flex justify-between text-[9px]">
+                            <span style={{ color: TEXT_TERTIARY }}>Heap Limit</span>
+                            <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{fmtBytes(stats.heapTotal)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between text-[9px]">
+                          <span style={{ color: TEXT_TERTIARY }}>JS Heap</span>
+                          <span style={{ color: TEXT_TERTIARY }}>Not exposed</span>
+                        </div>
+                      )}
+                      {stats.deviceMemoryGB != null && (
+                        <div className="flex justify-between text-[9px]">
+                          <span style={{ color: TEXT_TERTIARY }}>Device RAM</span>
+                          <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.deviceMemoryGB} GB</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              {/* Network */}
-              <div className="rounded-xl p-4" style={{ background: UI_CYAN_BG, border: "1px solid rgba(6,182,212,0.18)" }}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Wifi className="w-3.5 h-3.5" style={{ color: UI_CYAN }} />
-                  <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>Network &amp; Display</p>
-                </div>
-                <div className="space-y-1.5">
-                  {stats.network ? (
-                    <>
-                      <div className="flex justify-between text-[9px]">
-                        <span style={{ color: TEXT_TERTIARY }}>Effective Type</span>
-                        <span className="font-semibold" style={{ color: UI_CYAN }}>{stats.network.type.toUpperCase()}</span>
-                      </div>
-                      <div className="flex justify-between text-[9px]">
-                        <span style={{ color: TEXT_TERTIARY }}>Downlink</span>
-                        <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.network.downlink} Mbps</span>
-                      </div>
-                      <div className="flex justify-between text-[9px]">
-                        <span style={{ color: TEXT_TERTIARY }}>RTT</span>
-                        <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.network.rtt} ms</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between text-[9px]">
-                      <span style={{ color: TEXT_TERTIARY }}>Network API</span>
-                      <span style={{ color: TEXT_TERTIARY }}>Unavailable</span>
+                  {/* Network */}
+                  <div className="rounded-xl p-4" style={{ background: UI_CYAN_BG, border: "1px solid rgba(6,182,212,0.18)" }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Wifi className="w-3.5 h-3.5" style={{ color: UI_CYAN }} />
+                      <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>Network &amp; Display</p>
                     </div>
-                  )}
-                  <div className="my-1" style={{ borderTop: "1px solid rgba(6,182,212,0.12)" }} />
-                  <div className="flex justify-between text-[9px]">
-                    <span style={{ color: TEXT_TERTIARY }}>Screen</span>
-                    <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{screen.width} × {screen.height}</span>
+                    <div className="space-y-1.5">
+                      {stats.network ? (
+                        <>
+                          <div className="flex justify-between text-[9px]">
+                            <span style={{ color: TEXT_TERTIARY }}>Effective Type</span>
+                            <span className="font-semibold" style={{ color: UI_CYAN }}>{stats.network.type.toUpperCase()}</span>
+                          </div>
+                          <div className="flex justify-between text-[9px]">
+                            <span style={{ color: TEXT_TERTIARY }}>Downlink</span>
+                            <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.network.downlink} Mbps</span>
+                          </div>
+                          <div className="flex justify-between text-[9px]">
+                            <span style={{ color: TEXT_TERTIARY }}>RTT</span>
+                            <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{stats.network.rtt} ms</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between text-[9px]">
+                          <span style={{ color: TEXT_TERTIARY }}>Network API</span>
+                          <span style={{ color: TEXT_TERTIARY }}>Unavailable</span>
+                        </div>
+                      )}
+                      <div className="my-1" style={{ borderTop: "1px solid rgba(6,182,212,0.12)" }} />
+                      <div className="flex justify-between text-[9px]">
+                        <span style={{ color: TEXT_TERTIARY }}>Screen</span>
+                        <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{screen.width} × {screen.height}</span>
+                      </div>
+                      <div className="flex justify-between text-[9px]">
+                        <span style={{ color: TEXT_TERTIARY }}>DPR</span>
+                        <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{window.devicePixelRatio}x</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-[9px]">
-                    <span style={{ color: TEXT_TERTIARY }}>DPR</span>
-                    <span className="font-semibold" style={{ color: TEXT_PRIMARY }}>{window.devicePixelRatio}x</span>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
 
             <div className="px-5 py-3 flex items-center gap-2" style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(247,247,245,0.60)" }}>
               <Monitor className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
-              <p className="text-[9px] font-mono truncate" style={{ color: TEXT_TERTIARY }}>
-                {navigator.userAgent.slice(0, 90)}…
-              </p>
+              {isLoading ? (
+                <Skeleton className="h-2 w-full max-w-sm" />
+              ) : (
+                <p className="text-[9px] font-mono truncate" style={{ color: TEXT_TERTIARY }}>
+                  {navigator.userAgent.slice(0, 90)}…
+                </p>
+              )}
             </div>
           </div>
 
@@ -372,19 +452,29 @@ export function ProfilePage() {
                 <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Development Environment</p>
               </div>
               <div className="space-y-2.5">
-                {[
-                  { k: "Name",           v: profile.displayName },
-                  { k: "Title",          v: profile.role        },
-                  { k: "OS",             v: navigator.platform ?? "Unknown" },
-                  { k: "CPU Cores",      v: `${navigator.hardwareConcurrency} logical` },
-                  { k: "JDK",            v: "17.0.18+8 (LTS)"  },
-                  { k: "Active Profile", v: "dev"               },
-                ].map(row => (
-                  <div key={row.k} className="flex items-center justify-between gap-3">
-                    <span className="text-[10px] shrink-0" style={{ color: TEXT_LABEL }}>{row.k}</span>
-                    <span className="text-[10px] font-medium text-right truncate" style={{ color: TEXT_PRIMARY }}>{row.v}</span>
-                  </div>
-                ))}
+                {isLoading ? (
+                  /* [스켈레톤] Dev Env */
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <Skeleton className="w-16 h-3" />
+                      <Skeleton className="w-24 h-3" />
+                    </div>
+                  ))
+                ) : (
+                  [
+                    { k: "Name",           v: profile.displayName },
+                    { k: "Title",          v: profile.role        },
+                    { k: "OS",             v: navigator.platform ?? "Unknown" },
+                    { k: "CPU Cores",      v: `${navigator.hardwareConcurrency} logical` },
+                    { k: "JDK",            v: "17.0.18+8 (LTS)"  },
+                    { k: "Active Profile", v: "dev"               },
+                  ].map(row => (
+                    <div key={row.k} className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] shrink-0" style={{ color: TEXT_LABEL }}>{row.k}</span>
+                      <span className="text-[10px] font-medium text-right truncate" style={{ color: TEXT_PRIMARY }}>{row.v}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -393,15 +483,25 @@ export function ProfilePage() {
               <div className="flex items-center gap-2 mb-4">
                 <Code2 className="w-3.5 h-3.5" style={{ color: ACCENT }} />
                 <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Primary Tech Stack</p>
-                <button
-                  onClick={() => setEditOpen(true)}
-                  className="ml-auto flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full transition-all"
-                  style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
-                >
-                  <Plus className="w-2.5 h-2.5" /> 편집
-                </button>
+                {!isLoading && (
+                  <button
+                    onClick={() => setEditOpen(true)}
+                    className="ml-auto flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full transition-all"
+                    style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
+                  >
+                    <Plus className="w-2.5 h-2.5" /> 편집
+                  </button>
+                )}
               </div>
-              {profile.techStack.length === 0 ? (
+              
+              {isLoading ? (
+                /* [스켈레톤] Tech Stack 배지 */
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <Skeleton key={i} className="w-20 h-7 rounded-xl" />
+                  ))}
+                </div>
+              ) : profile.techStack.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 gap-2">
                   <Code2 className="w-6 h-6" style={{ color: "rgba(65,67,27,0.20)" }} />
                   <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>기술 스택을 추가하세요</p>
@@ -420,20 +520,33 @@ export function ProfilePage() {
           <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.80)", border: `1px solid ${BORDER}` }}>
             <p className="text-xs font-semibold mb-4" style={{ color: TEXT_PRIMARY }}>Recent Activity</p>
             <div className="space-y-3">
-              {RECENT_ACTIVITIES.map((a, i) => {
-                const Icon = a.icon;
-                return (
+              {isLoading ? (
+                /* [스켈레톤] 최근 활동 리스트 */
+                Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: `${a.color}15` }}>
-                      <Icon className="w-3 h-3" style={{ color: a.color }} />
+                    <Skeleton className="w-6 h-6 rounded-lg shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-1.5 pt-1">
+                      <Skeleton className="h-3 w-3/4" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px]" style={{ color: TEXT_PRIMARY }}>{a.msg}</p>
-                    </div>
-                    <span className="text-[10px] shrink-0" style={{ color: TEXT_TERTIARY }}>{a.time}</span>
+                    <Skeleton className="w-12 h-2.5 shrink-0 mt-1" />
                   </div>
-                );
-              })}
+                ))
+              ) : (
+                RECENT_ACTIVITIES.map((a, i) => {
+                  const Icon = a.icon;
+                  return (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: `${a.color}15` }}>
+                        <Icon className="w-3 h-3" style={{ color: a.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px]" style={{ color: TEXT_PRIMARY }}>{a.msg}</p>
+                      </div>
+                      <span className="text-[10px] shrink-0" style={{ color: TEXT_TERTIARY }}>{a.time}</span>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -441,7 +554,7 @@ export function ProfilePage() {
       </div>
 
       {/* ── 프로필 편집 모달 ── */}
-      {editOpen && (
+      {editOpen && !isLoading && (
         <ProfileEditModal
           profile={profile}
           onSave={p => setProfile(p)}

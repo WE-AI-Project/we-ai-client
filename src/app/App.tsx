@@ -21,6 +21,7 @@ import {
   Sun,
   Orbit,
   X,
+  Menu,
 } from "lucide-react";
 
 // ── 페이지 컴포넌트 ──
@@ -74,6 +75,7 @@ const SIDEBAR_COLLAPSED = 52;
 const SIDEBAR_MIN = 44;
 const SIDEBAR_MAX = 340;
 const COLLAPSE_THRESHOLD = 100;
+const TITLEBAR_DEFAULT = 38; // 💡 여기에 지정한 숫자로 기본 높이와 최대 높이가 자동 통일됩니다.
 
 function genProjectCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -250,6 +252,25 @@ export default function App() {
 
   // ── 타이틀바 보이기/숨기기 상태
   const [showTitleBar, setShowTitleBar] = useState(true);
+
+  const [showSystemMenu, setShowSystemMenu] = useState(false);
+  const systemMenuRef = useRef<HTMLDivElement>(null);
+
+  const [titleBarHeight, setTitleBarHeight] = useState<number>(TITLEBAR_DEFAULT);
+  const isHeaderDragging = useRef(false);
+  const dragHeaderStartY = useRef(0);
+  const dragHeaderStartH = useRef(TITLEBAR_DEFAULT);
+
+  useEffect(() => {  //사이드바 메뉴
+    if (!showSystemMenu) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (systemMenuRef.current && !systemMenuRef.current.contains(e.target as Node)) {
+        setShowSystemMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showSystemMenu]);
 
   useEffect(() => {
     const handleSessionChange = () => {
@@ -484,11 +505,29 @@ export default function App() {
     document.body.style.userSelect = "none";
   }, []);
 
+  const onHeaderResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isHeaderDragging.current = true;
+    dragHeaderStartY.current = e.clientY;
+    dragHeaderStartH.current = showTitleBar ? titleBarHeight : 0;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  }, [titleBarHeight, showTitleBar]);
+
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (isDragging.current) {
         const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragStartW.current + e.clientX - dragStartX.current));
         setSidebarWidth(next);
+      }
+      if (isHeaderDragging.current) {
+        const next = Math.max(0, Math.min(TITLEBAR_DEFAULT, dragHeaderStartH.current + e.clientY - dragHeaderStartY.current));
+        setTitleBarHeight(next);
+        if (next === 0) {
+          setShowTitleBar(false);
+        } else {
+          setShowTitleBar(true);
+        }
       }
       if (isSplitDragging.current && splitContainerRef.current) {
         const rect = splitContainerRef.current.getBoundingClientRect();
@@ -502,6 +541,9 @@ export default function App() {
       if (isDragging.current) {
         isDragging.current = false;
         setSidebarWidth(w => w < COLLAPSE_THRESHOLD ? SIDEBAR_COLLAPSED : w);
+      }
+      if (isHeaderDragging.current) {
+        isHeaderDragging.current = false;
       }
       if (isSplitDragging.current) {
         isSplitDragging.current = false;
@@ -609,13 +651,13 @@ export default function App() {
   const renderPage = (nav: NavId) => {
     switch (nav) {
       case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
-      case "Changes": return <ChangesPage onNavigateQA={handleNavigateQA} />;
+      case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage />;
       case "ServerBuild": return <ServerBuildPage />;
-      case "Chat": return <ChatPage onDocsUpdate={setDocCount} />;
+      case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
       case "Calendar": return <CalendarPage />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
-      case "AIQA": return <AIQAPage autoStart />;
+      case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} />;
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
@@ -688,7 +730,7 @@ export default function App() {
         {/* 탭 내부 페이지 본문 콘텐츠 (가로/세로 스크롤 완벽 지원) */}
         <div className="flex-1 overflow-auto scrollbar-hide relative">
           {tabs.length > 0 ? (
-            <div className="min-w-fit min-h-full">
+            <div className="flex-1 flex flex-col w-full h-full min-w-full min-h-full">
               {renderPage(activeTab)}
             </div>
           ) : (
@@ -728,13 +770,13 @@ export default function App() {
         </div>
 
         {/* 드래그 가능한 가운데 크기 조절바 Divider */}
-        {isSplit && (
+        if (isSplit && (
           <div
             onMouseDown={onSplitResizeMouseDown}
             className="w-1 h-full bg-white/10 hover:bg-[#AEB784]/60 cursor-col-resize z-30 transition-colors shrink-0"
             title="드래그하여 크기 조절"
           />
-        )}
+        ))
 
         {/* 오른쪽 분할 패널 컨테이너 */}
         {isSplit && (
@@ -856,66 +898,88 @@ export default function App() {
       )}
 
       <div
-        className="flex-1 flex flex-col rounded-xl overflow-hidden relative"
+        className="flex-1 flex flex-col overflow-hidden relative"
         style={{
           background: SIDEBAR_BG,
           boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)",
         }}
       >
-        {!showTitleBar && (
+        {(!showTitleBar || titleBarHeight === 0) && (
           <div className="absolute top-3 right-4 z-40 transition-all">
             <NotificationPanel />
           </div>
         )}
 
         {/* 타이틀바 */}
-        {showTitleBar && (
-          <div
-            className="h-11 flex items-center px-4 shrink-0"
-            style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}`, background: GRADIENT_SIDEBAR }}
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
-                <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
+        <div
+          className="flex items-center pl-2 pr-4 shrink-0 relative"
+          style={{
+            height: showTitleBar ? titleBarHeight : 0,
+            borderBottom: (showTitleBar && titleBarHeight > 0) ? `1px solid ${SIDEBAR_BORDER}` : "none",
+            background: (showTitleBar && titleBarHeight > 0) ? GRADIENT_SIDEBAR : "transparent",
+            overflow: (showTitleBar && titleBarHeight > 0) ? "visible" : "hidden",
+            transition: isHeaderDragging.current ? "none" : "height 0.18s ease",
+          }}
+        >
+          {showTitleBar && titleBarHeight > 0 && (
+            <div className="flex items-center w-full h-full pr-0">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: GRADIENT_LOGO }}>
+                  <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
+                </div>
+                <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse Project Office</span>
               </div>
-              <span className="text-xs font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse Project Office</span>
+
+              {projectCode && (
+                <div className="ml-3 flex items-center gap-1 px-2 py-0.5 rounded-lg shrink-0" style={{ background: "rgba(174,183,132,0.12)", border: `1px solid rgba(174,183,132,0.18)` }}>
+                  <Hash className="w-2.5 h-2.5" style={{ color: SIDEBAR_TEXT_HOVER }} />
+                  <span className="text-[9px] font-mono font-semibold tracking-wider" style={{ color: SIDEBAR_TEXT_HOVER }}>{projectCode}</span>
+                </div>
+              )}
+
+              {diffFile && (
+                <div className="ml-4 flex items-center gap-2 text-[11px] shrink-0" style={{ color: SIDEBAR_TEXT }}>
+                  <span>/</span>
+                  <span style={{ color: SIDEBAR_TEXT_ACTIVE }}>{diffFile.name}</span>
+                </div>
+              )}
+
+              <div className="ml-auto flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setShowStandup(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
+                  style={{
+                    background: showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)",
+                    color: "#D4CC9E",
+                    border: `1px solid rgba(174,183,132,0.18)`,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(174,183,132,0.20)"}
+                  onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)"}
+                  title="데일리 스탠드업 브리핑"
+                >
+                  <Sun className="w-3 h-3" />
+                  스탠드업
+                </button>
+
+                <NotificationPanel />
+              </div>
             </div>
+          )}
+        </div>
 
-            {projectCode && (
-              <div className="ml-3 flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ background: "rgba(174,183,132,0.12)", border: `1px solid rgba(174,183,132,0.18)` }}>
-                <Hash className="w-2.5 h-2.5" style={{ color: SIDEBAR_TEXT_HOVER }} />
-                <span className="text-[9px] font-mono font-semibold tracking-wider" style={{ color: SIDEBAR_TEXT_HOVER }}>{projectCode}</span>
-              </div>
-            )}
-
-            {diffFile && (
-              <div className="ml-4 flex items-center gap-2 text-[11px]" style={{ color: SIDEBAR_TEXT }}>
-                <span>/</span>
-                <span style={{ color: SIDEBAR_TEXT_ACTIVE }}>{diffFile.name}</span>
-              </div>
-            )}
-
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                onClick={() => setShowStandup(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
-                style={{
-                  background: showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)",
-                  color: "#D4CC9E",
-                  border: `1px solid rgba(174,183,132,0.18)`,
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(174,183,132,0.20)"}
-                onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(174,183,132,0.20)" : "rgba(174,183,132,0.10)"}
-                title="데일리 스탠드업 브리핑"
-              >
-                <Sun className="w-3 h-3" />
-                스탠드업
-              </button>
-
-              <NotificationPanel />
-            </div>
-          </div>
-        )}
+        <div
+          onMouseDown={onHeaderResizeMouseDown}
+          className="absolute left-0 w-full z-50 transition-colors"
+          style={{
+            cursor: "row-resize",
+            background: "transparent",
+            top: `${showTitleBar ? titleBarHeight : 0}px`,
+            height: showTitleBar ? "4px" : "8px",
+            transform: showTitleBar ? "translateY(-50%)" : "translateY(0)",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = "rgba(174,183,132,0.25)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+        />
 
         {/* 바디 */}
         <div className="flex-1 flex overflow-hidden">
@@ -927,7 +991,7 @@ export default function App() {
               borderRight: `1px solid ${SIDEBAR_BORDER}`,
               background: GRADIENT_SIDEBAR,
               transition: isDragging.current ? "none" : "width 0.18s ease",
-              overflow: "hidden",
+              overflow: showSystemMenu ? "visible" : "hidden",
             }}
           >
             {/* 프로필 버튼 */}
@@ -1043,67 +1107,108 @@ export default function App() {
             </div>
 
             {/* 하단: Leave + Toggle */}
-            <div className={`shrink-0 ${isCollapsed ? "px-1 py-2" : "px-1.5 py-2"}`} style={{ borderTop: `1px solid ${SIDEBAR_BORDER}` }}>
+            <div
+              ref={systemMenuRef}
+              className={`shrink-0 ${isCollapsed ? "px-1 py-2" : "px-1.5 py-2"} relative`}
+              style={{ borderTop: `1px solid ${SIDEBAR_BORDER}` }}
+            >
+              {showSystemMenu && (
+                <div
+                  className="absolute bottom-full left-2 mb-2 w-48 rounded-xl p-1.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  style={{
+                    background: "#1c1c1e",
+                    border: `1px solid ${SIDEBAR_BORDER}`,
+                    boxShadow: "0 -4px 20px rgba(0,0,0,0.45)",
+                  }}
+                >
+                  {/* 1. Titlebar (Hide / Show Titlebar) */}
+                  <button
+                    onClick={() => {
+                      setShowTitleBar(v => {
+                        const next = !v;
+                        if (next) {
+                          setTitleBarHeight(TITLEBAR_DEFAULT);
+                        } else {
+                          setTitleBarHeight(0);
+                        }
+                        return next;
+                      });
+                    }}
+                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-xs transition-all hover:bg-white/[0.06]"
+                    style={{ color: SIDEBAR_TEXT }}
+                  >
+                    {showTitleBar ? (
+                      <>
+                        <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                        <span className="text-[10px]">Hide Titlebar</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                        <span className="text-[10px]">Show Titlebar</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 2. Collapse (Collapse / Expand) */}
+                  <button
+                    onClick={() => { setShowSystemMenu(false); toggleSidebar(); }}
+                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-xs transition-all hover:bg-white/[0.06]"
+                    style={{ color: SIDEBAR_TEXT }}
+                  >
+                    {isCollapsed ? (
+                      <>
+                        <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                        <span className="text-[10px]">Expand</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronLeft className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                        <span className="text-[10px]">Collapse</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 3. Back To Projects */}
+                  <button
+                    onClick={handleLeaveProject}
+                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-xs transition-all hover:bg-white/[0.06]"
+                    style={{ color: "#D4CC9E" }}
+                  >
+                    <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: "#D4CC9E" }} />
+                    <span className="text-xs">Back To Projects</span>
+                  </button>
+
+                  {/* 4. Sign Out */}
+                  <button
+                    onClick={() => void handleLogout()}
+                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-xs transition-all hover:bg-[#B85450]/15"
+                    style={{ color: "#B85450" }}
+                  >
+                    <LogOut className="w-4 h-4 shrink-0" style={{ color: "#B85450" }} />
+                    <span className="text-xs">Sign Out</span>
+                  </button>
+                </div>
+              )}
+
               <div className="relative group">
                 <button
-                  onClick={handleLeaveProject}
+                  onClick={() => setShowSystemMenu(v => !v)}
                   className="w-full flex items-center gap-2 rounded-lg transition-all"
-                  style={{ padding: isCollapsed ? "6px 0" : "6px 8px", justifyContent: isCollapsed ? "center" : "flex-start", color: "#D4CC9E" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(174,183,132,0.10)")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  style={{
+                    padding: isCollapsed ? "7px 0" : "6px 8px",
+                    justifyContent: isCollapsed ? "center" : "flex-start",
+                    color: SIDEBAR_TEXT_ACTIVE,
+                    background: showSystemMenu ? SIDEBAR_ACTIVE : "transparent",
+                  }}
+                  onMouseEnter={e => { if (!showSystemMenu) e.currentTarget.style.background = SIDEBAR_HOVER; }}
+                  onMouseLeave={e => { if (!showSystemMenu) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: "#D4CC9E" }} />
-                  {!isCollapsed && <span className="text-xs">Back To Projects</span>}
+                  <Menu className="w-4 h-4 shrink-0" style={{ color: SIDEBAR_TEXT_ACTIVE }} />
+                  {!isCollapsed && <span className="text-xs font-medium">System Menu</span>}
                 </button>
-                {isCollapsed && <Tooltip label="Back To Projects" />}
+                {isCollapsed && <Tooltip label="시스템 메뉴" />}
               </div>
-
-              <div className="relative group">
-                <button
-                  onClick={() => void handleLogout()}
-                  className="w-full flex items-center gap-2 rounded-lg mt-1 transition-all"
-                  style={{ padding: isCollapsed ? "6px 0" : "6px 8px", justifyContent: isCollapsed ? "center" : "flex-start", color: "#B85450" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(184,84,80,0.10)")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >
-                  <LogOut className="w-4 h-4 shrink-0" style={{ color: "#B85450" }} />
-                  {!isCollapsed && <span className="text-xs">Sign Out</span>}
-                </button>
-                {isCollapsed && <Tooltip label="Sign Out" />}
-              </div>
-
-              <div className="relative group">
-                <button
-                  onClick={() => setShowTitleBar(v => !v)}
-                  className="w-full flex items-center rounded-lg mt-1 transition-all"
-                  style={{ padding: isCollapsed ? "6px 0" : "6px 8px", justifyContent: isCollapsed ? "center" : "flex-start", color: SIDEBAR_TEXT }}
-                  onMouseEnter={e => (e.currentTarget.style.background = SIDEBAR_HOVER)}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >
-                  {showTitleBar ? (
-                    <>
-                      <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
-                      {!isCollapsed && <span className="text-[10px] ml-2">Hide Titlebar</span>}
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
-                      {!isCollapsed && <span className="text-[10px] ml-2">Show Titlebar</span>}
-                    </>
-                  )}
-                </button>
-                {isCollapsed && <Tooltip label={showTitleBar ? "Hide Titlebar" : "Show Titlebar"} />}
-              </div>
-
-              <button
-                onClick={toggleSidebar}
-                className="w-full flex items-center rounded-lg mt-1 transition-all"
-                style={{ padding: isCollapsed ? "6px 0" : "6px 8px", justifyContent: isCollapsed ? "center" : "flex-start", color: SIDEBAR_TEXT }}
-                onMouseEnter={e => (e.currentTarget.style.background = SIDEBAR_HOVER)}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-              >
-                {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <><ChevronLeft className="w-3.5 h-3.5 shrink-0" /><span className="text-[10px] ml-2">Collapse</span></>}
-              </button>
             </div>
 
             {/* 리사이즈 핸들 */}
@@ -1111,7 +1216,7 @@ export default function App() {
               onMouseDown={onResizeMouseDown}
               className="absolute top-0 right-0 h-full w-1 z-20 transition-colors"
               style={{ cursor: "col-resize", background: "transparent" }}
-              onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,91,255,0.25)")}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(174,183,132,0.25)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             />
           </div>

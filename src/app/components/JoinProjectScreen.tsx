@@ -18,9 +18,12 @@ import {
   ShieldCheck,
   UserCircle2,
   X,
+  Trash2,
+  AlertTriangle,
+  FolderGit2
 } from "lucide-react";
 
-// 💡 [추가됨] 만들어둔 공통 알림창 컴포넌트 불러오기 (경로는 실제 위치에 맞게 조정해주세요)
+// 만들어둔 공통 알림창 컴포넌트 불러오기
 import {
   AlertDialog,
   AlertDialogAction,
@@ -169,6 +172,7 @@ function mapDetectedInfoToTechStacks(info: DetectedInfo | null): ProjectTechStac
   });
 }
 
+/* 경고창 없이 폴더 선택 확인 버튼이 바로 활성화되는 공통 컴포넌트 */
 function LocalPathInput({
   value,
   onChange,
@@ -181,24 +185,32 @@ function LocalPathInput({
   required?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpenExplorer = () => {
-    fileInputRef.current?.click();
-  };
+  const handleOpenExplorer = async () => {
+    if ("showDirectoryPicker" in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker();
+        onChange(`C:\\Projects\\${dirHandle.name}`);
+      } catch (error: any) {
+        if (
+          error.name === "SecurityError" ||
+          error.name === "NotAllowedError" ||
+          error.message?.toLowerCase().includes("sensitive") ||
+          error.message?.toLowerCase().includes("system")
+        ) {
+          alert(
+            "⚠️ 브라우저 보안 정책상 '바탕화면 전체'나 '다운로드' 같은 시스템 폴더는 통째로 지정할 수 없습니다.\n\n바탕화면 안에 [새 폴더]를 하나 만드신 후, 생성된 새 폴더를 선택해 주세요"
+          );
+          return;
+        }
 
-  const handleFolderSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const file = files[0] as File & { path?: string; webkitRelativePath?: string };
-      if (file.path) {
-        onChange(file.path.replace(/(\\|\/)[^/\\]+$/, ""));
-      } else if (file.webkitRelativePath) {
-        const topFolder = file.webkitRelativePath.split("/")[0];
-        onChange(`C:\\Projects\\${topFolder}`);
+        if (error.name !== "AbortError") {
+          alert("선택하신 위치는 접근할 수 없습니다. 일반 작업 폴더를 선택하거나 새 폴더를 만들어 선택해 주세요.");
+        }
       }
+    } else {
+      alert("현재 브라우저 환경에서는 폴더 선택 기능을 지원하지 않습니다. 크롬(Chrome) 또는 엣지(Edge) 브라우저를 이용해 주세요.");
     }
-    event.target.value = "";
   };
 
   return (
@@ -219,22 +231,11 @@ function LocalPathInput({
         <input
           readOnly
           value={value}
-          onChange={(event) => onChange(event.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={PATH_EXAMPLES[0]}
-          className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none"
+          className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none cursor-pointer"
           style={{ color: TEXT_PRIMARY }}
-        />
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          // @ts-expect-error browser directory picker attribute
-          webkitdirectory=""
-          directory=""
-          onChange={handleFolderSelect}
         />
 
         {value && (
@@ -250,9 +251,6 @@ function LocalPathInput({
           </button>
         )}
       </div>
-      <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-        예: {PATH_EXAMPLES[0]} 또는 {PATH_EXAMPLES[2]}
-      </p>
     </div>
   );
 }
@@ -331,6 +329,46 @@ function DepartmentPicker({
   );
 }
 
+/* 복수 선택이 가능한 파트 선택 컴포넌트 */
+function MultiDepartmentPicker({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: ProjectDepartment[];
+  onChange: (value: ProjectDepartment[]) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`grid gap-1.5 ${compact ? "grid-cols-4" : "grid-cols-2"}`}>
+      {DEPARTMENTS.map((department) => {
+        const selected = value.includes(department);
+        return (
+          <button
+            key={department}
+            type="button"
+            onClick={() => {
+              if (selected) {
+                onChange(value.filter((d) => d !== department));
+              } else {
+                onChange([...value, department]);
+              }
+            }}
+            className={`rounded-lg font-semibold transition-all ${compact ? "px-2 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"}`}
+            style={{
+              background: selected ? "rgba(65,67,27,0.10)" : "rgba(0,0,0,0.04)",
+              color: selected ? ACCENT : TEXT_TERTIARY,
+              border: `1px solid ${selected ? "rgba(65,67,27,0.18)" : "transparent"}`,
+            }}
+          >
+            {DEPARTMENT_LABELS[department]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function CreateProjectModal({
   onClose,
   onCreate,
@@ -343,14 +381,15 @@ function CreateProjectModal({
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [localPath, setLocalPath] = useState("");
-  const [department, setDepartment] = useState<ProjectDepartment>("BACKEND");
+
+  const [departments, setDepartments] = useState<ProjectDepartment[]>(["BACKEND"]);
+
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
   const [previewCode] = useState(genCode());
   const [creating, setCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // 💡 [추가됨] 알림창 상태 관리
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const totalSteps = 3;
@@ -370,20 +409,17 @@ function CreateProjectModal({
     }, 1000);
   };
 
-  // 💡 [추가됨] 다음 버튼 클릭 시 실행할 로직
   const handleNextClick = () => {
     if (step === 1) {
       setStep(2);
     } else if (step === 2) {
-      // 2단계에서 다음 버튼 누르면 알림창 띄우기
       setIsAlertOpen(true);
     }
   };
 
-  // 💡 [추가됨] 알림창에서 '예'를 눌렀을 때 실행될 로직
   const handleConfirmPath = () => {
     setIsAlertOpen(false);
-    setStep(3); // 3단계로 넘어감
+    setStep(3);
   };
 
   const handleCreate = async () => {
@@ -392,9 +428,9 @@ function CreateProjectModal({
       return;
     }
     if (name.trim().length < 2) {
-    setErrorMessage("프로젝트 이름은 2글자 이상이어야 합니다.");
-    return;
-  }
+      setErrorMessage("프로젝트 이름은 2글자 이상이어야 합니다.");
+      return;
+    }
 
     setCreating(true);
     setErrorMessage("");
@@ -403,7 +439,7 @@ function CreateProjectModal({
       projectName: name.trim(),
       description: description.trim() || undefined,
       localPath: localPath.trim(),
-      department,
+      department: (departments[0] || "BACKEND") as any,
       deadlineDate: deadline || undefined,
       techStacks: mapDetectedInfoToTechStacks(detected),
     };
@@ -518,9 +554,9 @@ function CreateProjectModal({
 
               <div className="space-y-2">
                 <label className="block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
-                  생성자 기본 파트
+                  생성자 기본 파트 (복수 선택 가능)
                 </label>
-                <DepartmentPicker value={department} onChange={setDepartment} />
+                <MultiDepartmentPicker value={departments} onChange={setDepartments} />
               </div>
 
               <div>
@@ -569,7 +605,7 @@ function CreateProjectModal({
                   프로젝트 저장 위치 설정
                 </p>
                 <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
-                  로컬 절대 경로를 입력하면 기술 스택을 자동으로 감지하고, 팀 구성 초안에 반영할 수 있습니다.
+                  박스를 클릭해 원하는 프로젝트 폴더를 지정해 주세요. 폴더를 한 번만 눌러도 하단 확인 버튼이 활성화됩니다.
                 </p>
               </div>
 
@@ -646,7 +682,12 @@ function CreateProjectModal({
                 {[
                   { label: "프로젝트명", value: name },
                   { label: "저장 위치", value: localPath || "-" },
-                  { label: "담당 파트", value: DEPARTMENT_LABELS[department] },
+                  {
+                    label: "담당 파트",
+                    value: departments.length > 0
+                      ? departments.map((d) => DEPARTMENT_LABELS[d]).join(", ")
+                      : "선택 안 함",
+                  },
                   {
                     label: "마감일",
                     value: deadline
@@ -710,7 +751,6 @@ function CreateProjectModal({
           {step < 3 ? (
             <button
               type="button"
-              // 💡 [수정됨] 기존 onClick을 handleNextClick으로 연결
               onClick={handleNextClick}
               disabled={step === 1 ? !canNextStepOne : !canNextStepTwo}
               className="flex-1 rounded-xl py-2.5 text-xs font-semibold transition-all"
@@ -746,7 +786,6 @@ function CreateProjectModal({
         </div>
       </div>
 
-      {/* 💡 [추가됨] 더블체크용 알림창 (AlertDialog) */}
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1018,7 +1057,9 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
   const [codeStep, setCodeStep] = useState<"input" | "path">("input");
   const [codePath, setCodePath] = useState("");
   const [codeDetect, setCodeDetect] = useState<DetectedInfo | null>(null);
-  const [joinDepartment, setJoinDepartment] = useState<ProjectDepartment>("BACKEND");
+
+  const [joinDepartments, setJoinDepartments] = useState<ProjectDepartment[]>(["BACKEND"]);
+
   const [codeJoining, setCodeJoining] = useState(false);
   const [codeError, setCodeError] = useState("");
 
@@ -1063,8 +1104,8 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
   const handleCodeJoin = async () => {
     const normalizedCode = codeInput.trim().toUpperCase();
 
-    if (!normalizedCode) {
-      setCodeError("참여 코드를 입력해주세요.");
+    if (normalizedCode.length !== 8) {
+      setCodeError("참여 코드는 8글자여야 합니다.");
       return;
     }
 
@@ -1080,7 +1121,7 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
     try {
       const joined = await joinProject({
         projectCode: normalizedCode,
-        department: joinDepartment,
+        department: (joinDepartments[0] || "BACKEND") as any,
       });
 
       await refreshProjects();
@@ -1240,14 +1281,15 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                         value={codeInput}
                         onChange={(event) => {
                           setCodeError("");
-                          setCodeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8));
+                          const processedValue = event.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                          setCodeInput(processedValue.slice(0, 8));
                         }}
                         onKeyDown={(event) => {
-                          if (event.key === "Enter") {
+                          if (event.key === "Enter" && codeInput.length === 8) {
                             void handleCodeJoin();
                           }
                         }}
-                        placeholder="WEAI2025"
+                        placeholder="A1B2C3D4"
                         maxLength={8}
                         className="w-full rounded-xl py-2.5 pl-8 pr-3 font-mono text-sm uppercase tracking-widest outline-none"
                         style={{
@@ -1257,14 +1299,15 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                         }}
                       />
                     </div>
+
                     <button
                       type="button"
                       onClick={() => void handleCodeJoin()}
-                      disabled={codeInput.length < 6}
+                      disabled={codeInput.length !== 8}
                       className="shrink-0 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all"
                       style={{
-                        background: codeInput.length >= 6 ? "#41431B" : "rgba(0,0,0,0.07)",
-                        color: codeInput.length >= 6 ? "white" : TEXT_TERTIARY,
+                        background: codeInput.length === 8 ? "#41431B" : "rgba(0,0,0,0.07)",
+                        color: codeInput.length === 8 ? "white" : TEXT_TERTIARY,
                       }}
                     >
                       <ArrowRight className="h-3.5 w-3.5" />
@@ -1275,7 +1318,7 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                     <p className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
                       참여 파트 선택
                     </p>
-                    <DepartmentPicker value={joinDepartment} onChange={setJoinDepartment} compact />
+                    <MultiDepartmentPicker value={joinDepartments} onChange={setJoinDepartments} compact />
                   </div>
                 </div>
               ) : (

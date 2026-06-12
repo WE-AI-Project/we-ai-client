@@ -1,15 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
-import { BarChart2, TrendingUp, GitCommit, CheckSquare, Bot, Calendar } from "lucide-react";
+import { BarChart2, TrendingUp, GitCommit, CheckSquare, Bot } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  UI_GREEN, UI_GREEN_BG7, UI_RED, UI_AMBER, UI_AMBER_BG7, UI_VIOLET, UI_VIOLET_BG7,
-  UI_GRAY_LIGHT, UI_GRAY_BORDER,
-  GRADIENT_HEADER, BTN_DARK,
 } from "../colors";
+
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 // 지난 14일 커밋 + 작업완료 라인 데이터
 const DAILY_ACTIVITY = [
@@ -60,6 +67,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function AnalyticsPage() {
   const [range, setRange] = useState<string>("14 Days");
+  
+  // 🚨 [추가] 초기 로딩 스켈레톤 상태 (3초 대기)
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const sliceCount = range === "7 Days" ? 7 : range === "14 Days" ? 14 : 14;
   const chartData = DAILY_ACTIVITY.slice(-sliceCount);
 
@@ -80,119 +95,194 @@ export function AnalyticsPage() {
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
 
-          {/* 헤더 + 기간 선택 */}
+          {/* ── 헤더 + 기간 선택 ── */}
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <BarChart2 className="w-4 h-4" style={{ color: ACCENT }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Analytics</h1>
               </div>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>프로젝트 활동 · 작업 트렌드 · 에이전트 성능</p>
+              {isLoading ? (
+                <Skeleton className="w-48 h-3 mt-1.5" />
+              ) : (
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>프로젝트 활동 · 작업 트렌드 · 에이전트 성능</p>
+              )}
             </div>
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-              {RANGES.map(r => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{
-                    background: range === r ? "#1c1c1e" : "transparent",
-                    color: range === r ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
-                  }}
-                >
-                  {r}
-                </button>
-              ))}
+              {isLoading ? (
+                /* [스켈레톤] 기간 선택 탭 */
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="w-[52px] h-6 rounded-lg mx-0.5" />
+                ))
+              ) : (
+                RANGES.map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setRange(r)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                    style={{
+                      background: range === r ? "#1c1c1e" : "transparent",
+                      color: range === r ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
+                    }}
+                  >
+                    {r}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
-          {/* 요약 통계 */}
+          {/* ── 요약 통계 ── */}
           <div className="grid grid-cols-4 gap-2.5">
-            {[
-              { label: "Commits",       value: totalCommits, color: ACCENT,    bg: "rgba(99,91,255,0.07)",  icon: GitCommit    },
-              { label: "Tasks Done",    value: totalTasks,   color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: CheckSquare  },
-              { label: "Active Agents", value: activeAgents, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Bot          },
-              { label: "Avg Uptime",    value: `${avgUptime}%`, color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: TrendingUp },
-            ].map(s => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: s.bg }}>
-                    <Icon className="w-3 h-3" style={{ color: s.color }} />
-                  </div>
-                  <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
+            {isLoading ? (
+              /* [스켈레톤] 상단 요약 카드 4개 */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <Skeleton className="w-6 h-6 rounded-lg mb-2" />
+                  <Skeleton className="w-12 h-5 mb-1" />
+                  <Skeleton className="w-20 h-2.5" />
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              [
+                { label: "Commits",       value: totalCommits, color: ACCENT,    bg: "rgba(99,91,255,0.07)",  icon: GitCommit    },
+                { label: "Tasks Done",    value: totalTasks,   color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: CheckSquare  },
+                { label: "Active Agents", value: activeAgents, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Bot          },
+                { label: "Avg Uptime",    value: `${avgUptime}%`, color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: TrendingUp },
+              ].map(s => {
+                const Icon = s.icon;
+                return (
+                  <div key={s.label} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: s.bg }}>
+                      <Icon className="w-3 h-3" style={{ color: s.color }} />
+                    </div>
+                    <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
+                  </div>
+                );
+              })
+            )}
           </div>
 
-          {/* 일별 활동 라인 차트 */}
+          {/* ── 일별 활동 라인 차트 ── */}
           <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Daily Activity — Commits & Task Completions</p>
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart id="analytics-daily-line" data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 10, color: TEXT_TERTIARY }} iconType="circle" iconSize={6} />
-                <Line key="line-commits" type="monotone" dataKey="commits" name="Commits" stroke={ACCENT}    strokeWidth={2} dot={{ r: 2, fill: ACCENT }}    activeDot={{ r: 4 }} />
-                <Line key="line-tasks"   type="monotone" dataKey="tasks"   name="Tasks"   stroke="#10b981"   strokeWidth={2} dot={{ r: 2, fill: "#10b981" }} activeDot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {isLoading ? (
+              /* [스켈레톤] 라인 차트 영역 */
+              <>
+                <Skeleton className="w-64 h-3.5 mb-4" />
+                <Skeleton className="w-full h-[180px] rounded-xl" />
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Daily Activity — Commits & Task Completions</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart id="analytics-daily-line" data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+                    <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 10, color: TEXT_TERTIARY }} iconType="circle" iconSize={6} />
+                    <Line key="line-commits" type="monotone" dataKey="commits" name="Commits" stroke={ACCENT}    strokeWidth={2} dot={{ r: 2, fill: ACCENT }}    activeDot={{ r: 4 }} />
+                    <Line key="line-tasks"   type="monotone" dataKey="tasks"   name="Tasks"   stroke="#10b981"   strokeWidth={2} dot={{ r: 2, fill: "#10b981" }} activeDot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </>
+            )}
           </div>
 
-          {/* 주별 태스크 막대 차트 */}
+          {/* ── 주별 태스크 막대 차트 ── */}
           <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Weekly Task Progress</p>
-            <ResponsiveContainer width="100%" height={150}>
-              <BarChart id="analytics-weekly-bar" data={WEEKLY_TASKS} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={12}>
-                <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="week" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 10, color: TEXT_TERTIARY }} iconType="circle" iconSize={6} />
-                <Bar key="bar-done"    dataKey="done"    name="Done"    fill="#10b981" radius={[3,3,0,0]} />
-                <Bar key="bar-todo"    dataKey="todo"    name="To Do"   fill={ACCENT}  radius={[3,3,0,0]} />
-                <Bar key="bar-backlog" dataKey="backlog" name="Backlog" fill="#d1d5db" radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {isLoading ? (
+              /* [스켈레톤] 막대 차트 영역 */
+              <>
+                <Skeleton className="w-40 h-3.5 mb-4" />
+                <Skeleton className="w-full h-[150px] rounded-xl" />
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Weekly Task Progress</p>
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart id="analytics-weekly-bar" data={WEEKLY_TASKS} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={12}>
+                    <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+                    <XAxis dataKey="week" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 10, color: TEXT_TERTIARY }} iconType="circle" iconSize={6} />
+                    <Bar key="bar-done"    dataKey="done"    name="Done"    fill="#10b981" radius={[3,3,0,0]} />
+                    <Bar key="bar-todo"    dataKey="todo"    name="To Do"   fill={ACCENT}  radius={[3,3,0,0]} />
+                    <Bar key="bar-backlog" dataKey="backlog" name="Backlog" fill="#d1d5db" radius={[3,3,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </>
+            )}
           </div>
 
-          {/* 에이전트 성능 테이블 */}
+          {/* ── 에이전트 성능 테이블 ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             <div className="px-4 py-3" style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(247,247,245,0.8)" }}>
-              <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Agent Performance Summary</p>
+              {isLoading ? (
+                <Skeleton className="w-48 h-3.5" />
+              ) : (
+                <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Agent Performance Summary</p>
+              )}
             </div>
+            
             <div className="grid text-[10px] font-semibold px-4 py-2" style={{ gridTemplateColumns: "1fr 80px 100px 80px 60px", color: TEXT_LABEL, borderBottom: `1px solid ${BORDER}` }}>
-              <span>Agent</span>
-              <span>Status</span>
-              <span>Tasks Done</span>
-              <span>Avg CPU</span>
-              <span>Uptime</span>
+              {isLoading ? (
+                /* [스켈레톤] 테이블 헤더 */
+                <>
+                  <Skeleton className="h-2.5 w-12" />
+                  <Skeleton className="h-2.5 w-10" />
+                  <Skeleton className="h-2.5 w-16" />
+                  <Skeleton className="h-2.5 w-12" />
+                  <Skeleton className="h-2.5 w-10" />
+                </>
+              ) : (
+                <>
+                  <span>Agent</span>
+                  <span>Status</span>
+                  <span>Tasks Done</span>
+                  <span>Avg CPU</span>
+                  <span>Uptime</span>
+                </>
+              )}
             </div>
-            {AGENT_PERF.map((a, i) => (
-              <div
-                key={a.name}
-                className="grid px-4 py-2.5 items-center text-xs hover:bg-black/[0.02] transition-colors"
-                style={{ gridTemplateColumns: "1fr 80px 100px 80px 60px", borderBottom: i < AGENT_PERF.length - 1 ? `1px solid rgba(0,0,0,0.04)` : "none" }}
-              >
-                <span className="font-medium" style={{ color: TEXT_PRIMARY }}>{a.name}</span>
-                <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLOR[a.status] }} />
-                  <span className="capitalize text-[10px]" style={{ color: TEXT_SECONDARY }}>{a.status}</span>
+
+            {isLoading ? (
+              /* [스켈레톤] 테이블 본문 행 (6줄) */
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="grid px-4 py-3 items-center gap-4" style={{ gridTemplateColumns: "1fr 80px 100px 80px 60px", borderBottom: i < 5 ? `1px solid rgba(0,0,0,0.04)` : "none" }}>
+                  <Skeleton className="h-3 w-28" />
+                  <Skeleton className="h-3 w-14 rounded-full" />
+                  <Skeleton className="h-3 w-6" />
+                  <Skeleton className="h-2.5 w-16 rounded-full" />
+                  <Skeleton className="h-3 w-10" />
                 </div>
-                <span className="text-[10px] font-mono" style={{ color: TEXT_PRIMARY }}>{a.tasksCompleted}</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-10 h-1 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.07)" }}>
-                    <div className="h-full rounded-full" style={{ width: `${a.avgCpu}%`, background: a.avgCpu > 70 ? "#ef4444" : ACCENT }} />
+              ))
+            ) : (
+              /* 실제 데이터 렌더링 */
+              AGENT_PERF.map((a, i) => (
+                <div
+                  key={a.name}
+                  className="grid px-4 py-2.5 items-center text-xs hover:bg-black/[0.02] transition-colors"
+                  style={{ gridTemplateColumns: "1fr 80px 100px 80px 60px", borderBottom: i < AGENT_PERF.length - 1 ? `1px solid rgba(0,0,0,0.04)` : "none" }}
+                >
+                  <span className="font-medium" style={{ color: TEXT_PRIMARY }}>{a.name}</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLOR[a.status] }} />
+                    <span className="capitalize text-[10px]" style={{ color: TEXT_SECONDARY }}>{a.status}</span>
                   </div>
-                  <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{a.avgCpu}%</span>
+                  <span className="text-[10px] font-mono" style={{ color: TEXT_PRIMARY }}>{a.tasksCompleted}</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-10 h-1 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.07)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${a.avgCpu}%`, background: a.avgCpu > 70 ? "#ef4444" : ACCENT }} />
+                    </div>
+                    <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{a.avgCpu}%</span>
+                  </div>
+                  <span className="text-[10px] font-mono" style={{ color: TEXT_SECONDARY }}>{a.uptime}</span>
                 </div>
-                <span className="text-[10px] font-mono" style={{ color: TEXT_SECONDARY }}>{a.uptime}</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
         </div>

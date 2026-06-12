@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle,
   Loader2, Bot, Server, Monitor, Cpu, Play, RotateCw,
@@ -9,12 +10,24 @@ import {
 import { getPendingQA, clearPendingQA } from "../data/qaStore";
 import { getLeader, getAllLeaders } from "../data/projectSettingsStore";
 import { AgentControlPage } from "./AgentControlPage";
+import { BACKEND_COMMITS, FRONTEND_COMMITS } from "./commitData";
+import { buildDiffFromCommitFiles, runAiQa, type QaResponse } from "../../api/aiApi";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
   GRADIENT_SIDEBAR, SIDEBAR_BORDER,
 } from "../colors";
+
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 // ── 타입 ──
 type Severity   = "critical" | "warning" | "passed";
@@ -133,12 +146,40 @@ const QA_STATUS_META: Record<CommitQAStatus, { color: string; bg: string; label:
 const STATIC_ERRORS: StaticError[] = [
   { id:"se1", file:"ParserAgent.java",           line:87,  col:12, type:"NullPointerException",          severity:"critical", message:"response 객체가 null일 수 있습니다. null 체크 추가 필요",              fix:"if (response != null) { ... }" },
   { id:"se2", file:"MultiAgentController.java",  line:42,  col:5,  type:"ConcurrentModificationException",severity:"warning",  message:"agentRegistry에 동기화 없이 접근 — synchronized 블록 필요",            fix:"synchronized(agentRegistry) { ... }" },
-  { id:"se3", file:"apiClient.ts",               line:13,  col:3,  type:"UnhandledRejection",             severity:"warning",  message:"fetch() 오류가 catch되지 않음 — .catch() 또는 try/catch 블록 필요",  fix:"try { await fetch(...) } catch(e) { ... }" },
+  { id:"se3", file:"apiClient.ts",               line:13,  col:3,  type:"UnhandledRejection",            severity:"warning",  message:"fetch() 오류가 catch되지 않음 — .catch() 또는 try/catch 블록 필요",  fix:"try { await fetch(...) } catch(e) { ... }" },
   { id:"se4", file:"DataSyncAgent.java",         line:204, col:8,  type:"PotentialMemoryLeak",            severity:"warning",  message:"ExecutorService가 종료되지 않을 수 있음 — shutdown() 호출 누락",       fix:"executor.shutdown();" },
-  { id:"se5", file:"AgentScheduler.java",        line:118, col:22, type:"DeadlockRisk",                   severity:"critical", message:"중첩 synchronized 블록에서 데드락 위험 감지됨",                          fix:"Lock ordering 패턴 적용 필요" },
+  { id:"se5", file:"AgentScheduler.java",        line:118, col:22, type:"DeadlockRisk",                  severity:"critical", message:"중첩 synchronized 블록에서 데드락 위험 감지됨",                         fix:"Lock ordering 패턴 적용 필요" },
 ];
 
 // ── Phase 2 UI 액션 시나리오 ──
+function mapQaResponseToErrors(response: QaResponse): StaticError[] {
+  const bugReport = response.bugReport ?? response.bug_report ?? "";
+  const optimization = response.optimization ?? "";
+  const commitMsg = response.commitMsg ?? response.commit_msg ?? "";
+
+  return [
+    bugReport && {
+      id: "ai-bug-report",
+      file: "AI 분석 diff",
+      line: 1,
+      col: 1,
+      type: "AI Bug Risk",
+      severity: "critical" as Severity,
+      message: bugReport,
+      fix: optimization || undefined,
+    },
+    commitMsg && {
+      id: "ai-commit-message",
+      file: "AI 추천 커밋",
+      line: 1,
+      col: 1,
+      type: "Recommended Commit",
+      severity: "warning" as Severity,
+      message: commitMsg,
+    },
+  ].filter((item): item is StaticError => Boolean(item));
+}
+
 const UI_ACTIONS: UIAction[] = [
   { id:"a1", step:1,  label:"앱 초기 로딩 확인",          element:"<App />",                   status:"pending" },
   { id:"a2", step:2,  label:"대시보드 렌더링 검사",         element:"<DashboardPage />",         status:"pending" },
@@ -413,7 +454,7 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
 // ── CommitQARow ──
 function CommitQARow({ commit }: { commit: CommitQAResult }) {
   const [expanded, setExpanded] = useState(false);
-  const sm    = QA_STATUS_META[commit.qaStatus];
+  const sm  = QA_STATUS_META[commit.qaStatus];
   const Icon  = sm.icon;
   const total = commit.parts.reduce((a,p) => a + p.tests,  0);
   const pass  = commit.parts.reduce((a,p) => a + p.passed, 0);
@@ -502,13 +543,28 @@ function CommitQARow({ commit }: { commit: CommitQAResult }) {
 // ════════════════════════════════════════
 // 메인 AIQAPage
 // ════════════════════════════════════════
-export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
+export function AIQAPage({
+  projectId = 0,
+  autoStart = false,
+}: {
+  projectId?: number | null;
+  autoStart?: boolean;
+}) {
   // ── 최상단 탭: AI QA / Agent Control ──
   const [mainTab,      setMainTab]      = useState<"qa" | "agents">("qa");
   const [activeTab,    setActiveTab]    = useState<"run" | "commit">("run");
   const [phase,        setPhase]        = useState<QAPhase>("idle");
   const [elapsed,      setElapsed]      = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 🚨 [추가] 초기 로딩 스켈레톤 상태
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 🚨 3초 후 초기 로딩 해제 (실전 배포용)
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ── 커밋 정보 ──
   const pendingQA  = getPendingQA();
@@ -546,8 +602,9 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
   }, [phase]);
 
   useEffect(() => {
-    if (autoStart) setTimeout(() => startQA(), 400);
-  }, []);
+    // isLoading 끝난 후 autoStart 처리
+    if (!isLoading && autoStart) setTimeout(() => startQA(), 400);
+  }, [isLoading, autoStart]);
 
   const addNotification = useCallback((n: Omit<Notification, "id" | "time" | "read">) => {
     setNotifications(prev => [{
@@ -568,7 +625,7 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
     setClips([]);
     setPhase2Done(false);
     setNotifications([]);
-    runPhase1();
+    void runPhase1FromApi();
   };
 
   const reset = () => {
@@ -585,6 +642,42 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
   };
 
   // ── Phase 1: 정적 분석 시뮬레이션 ──
+  const runPhase1FromApi = async () => {
+    const filesForQa = [
+      ...(BACKEND_COMMITS[0]?.files ?? []),
+      ...(FRONTEND_COMMITS[0]?.files ?? []),
+    ];
+    const scanTargets = filesForQa.map((file) => file.path);
+
+    scanTargets.forEach((file, index) => {
+      setTimeout(() => {
+        setScanCurrent(file);
+        setScanFiles(prev => prev.includes(file) ? prev : [...prev, file]);
+      }, index * 140);
+    });
+
+    try {
+      const response = await runAiQa({
+        projectId,
+        diff: buildDiffFromCommitFiles(filesForQa),
+      });
+      const errors = mapQaResponseToErrors(response);
+      setStaticErrors(errors);
+      if (errors.length > 0) {
+        toast.warning("AI QA 분석에서 확인할 항목이 발견되었습니다.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "AI QA 분석에 실패했습니다.");
+    } finally {
+      setTimeout(() => {
+        setScanCurrent("");
+        setPhase1Done(true);
+        setPhase("phase2");
+        setTimeout(() => runPhase2(), 600);
+      }, Math.max(scanTargets.length * 140, 500));
+    }
+  };
+
   const runPhase1 = () => {
     const FILES = [
       "src/main/java/com/weai/agent/ParserAgent.java",
@@ -748,26 +841,41 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
               <div className="flex items-center gap-2 flex-wrap">
                 <ShieldCheck className="w-4 h-4" style={{ color: ACCENT }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>AI QA Monitor</h1>
-                {/* 실행 상태 뱃지 */}
-                {phase === "phase1" && (
-                  <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>
-                    <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: ACCENT }} /> PHASE 1 · 코드 분석
-                  </span>
-                )}
-                {phase === "phase2" && (
-                  <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" /> PHASE 2 · UI 에이전트
-                  </span>
-                )}
-                {phase === "done" && (
-                  <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: criticalCount > 0 ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: criticalCount > 0 ? "#ef4444" : "#10b981" }}>
-                    {criticalCount > 0 ? "FAILED" : "PASSED"}
-                  </span>
+                
+                {isLoading ? (
+                  /* [스켈레톤] 헤더 상태 뱃지 영역 */
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                ) : (
+                  <>
+                    {/* 실행 상태 뱃지 */}
+                    {phase === "phase1" && (
+                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: ACCENT }} /> PHASE 1 · 코드 분석
+                      </span>
+                    )}
+                    {phase === "phase2" && (
+                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" /> PHASE 2 · UI 에이전트
+                      </span>
+                    )}
+                    {phase === "done" && (
+                      <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: criticalCount > 0 ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: criticalCount > 0 ? "#ef4444" : "#10b981" }}>
+                        {criticalCount > 0 ? "FAILED" : "PASSED"}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* 커밋 작성자 정보 */}
-              {commitInfo && (
+              {isLoading ? (
+                /* [스켈레톤] 커밋 작성자 정보 */
+                <div className="flex items-center gap-2 mt-2">
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-12 rounded-full" />
+                  <Skeleton className="h-4 w-48 rounded" />
+                </div>
+              ) : commitInfo ? (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:ACCENT_BG, border:`1px solid ${ACCENT_BORDER}` }}>
                     <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background:"rgba(65,67,27,0.10)" }}>
@@ -780,62 +888,76 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
                   </span>
                   <span className="text-[10px] truncate" style={{ color:TEXT_SECONDARY, maxWidth:280 }}>{commitInfo.message}</span>
                 </div>
-              )}
+              ) : null}
 
-              <p className="text-[11px] mt-1" style={{ color:TEXT_TERTIARY }}>
-                {phase === "phase1" ? `파일 스캔 중… ${scanFiles.length}개 완료 · ${elapsedSec}s`
-                : phase === "phase2" ? `UI 에이전트 테스트 ${passedActions + failedActions}/${actions.length} · ${elapsedSec}s`
-                : phase === "done"   ? `완료 — 오류 ${criticalCount + warningCount}건 · UI 오류 ${failedActions}건 · ${elapsedSec}s`
-                : "QA를 시작하거나 커밋별 현황을 확인하세요"}
-              </p>
+              {isLoading ? (
+                <Skeleton className="h-3 w-40 mt-2" />
+              ) : (
+                <p className="text-[11px] mt-1" style={{ color:TEXT_TERTIARY }}>
+                  {phase === "phase1" ? `파일 스캔 중… ${scanFiles.length}개 완료 · ${elapsedSec}s`
+                  : phase === "phase2" ? `UI 에이전트 테스트 ${passedActions + failedActions}/${actions.length} · ${elapsedSec}s`
+                  : phase === "done"   ? `완료 — 오류 ${criticalCount + warningCount}건 · UI 오류 ${failedActions}건 · ${elapsedSec}s`
+                  : "QA를 시작하거나 커밋별 현황을 확인하세요"}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* 알림 버튼 */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotif(s => !s)}
-                  className="p-2 rounded-xl transition-all"
-                  style={{ background: unreadNotif > 0 ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.80)", border:`1px solid ${BORDER}` }}
-                >
-                  <Bell className="w-4 h-4" style={{ color: unreadNotif > 0 ? "#ef4444" : TEXT_SECONDARY }} />
-                </button>
-                {unreadNotif > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center"
-                    style={{ background:"#ef4444", color:"white" }}
-                  >
-                    {unreadNotif}
-                  </span>
-                )}
-              </div>
+              {isLoading ? (
+                /* [스켈레톤] 우측 알림/액션 버튼 */
+                <>
+                  <Skeleton className="w-8 h-8 rounded-xl" />
+                  <Skeleton className="w-20 h-8 rounded-lg" />
+                </>
+              ) : (
+                <>
+                  {/* 알림 버튼 */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowNotif(s => !s)}
+                      className="p-2 rounded-xl transition-all"
+                      style={{ background: unreadNotif > 0 ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.80)", border:`1px solid ${BORDER}` }}
+                    >
+                      <Bell className="w-4 h-4" style={{ color: unreadNotif > 0 ? "#ef4444" : TEXT_SECONDARY }} />
+                    </button>
+                    {unreadNotif > 0 && (
+                      <span
+                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center"
+                        style={{ background:"#ef4444", color:"white" }}
+                      >
+                        {unreadNotif}
+                      </span>
+                    )}
+                  </div>
 
-              {phase === "done" && (
-                <button onClick={reset} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all" style={{ background:"rgba(255,255,255,0.80)", border:`1px solid ${BORDER}`, color:TEXT_SECONDARY }}>
-                  <RotateCw className="w-3 h-3" /> Reset
-                </button>
-              )}
-              {activeTab === "run" && (
-                <button
-                  onClick={startQA}
-                  disabled={phase !== "idle" && phase !== "done"}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{
-                    background: phase !== "idle" && phase !== "done" ? "rgba(0,0,0,0.07)" : ACCENT,
-                    color:      phase !== "idle" && phase !== "done" ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
-                    boxShadow:  phase !== "idle" && phase !== "done" ? "none" : "0 4px 14px rgba(65,67,27,0.25)",
-                    cursor:     phase !== "idle" && phase !== "done" ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {phase !== "idle" && phase !== "done" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                  {phase !== "idle" && phase !== "done" ? "Running…" : "Run QA"}
-                </button>
+                  {phase === "done" && (
+                    <button onClick={reset} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all" style={{ background:"rgba(255,255,255,0.80)", border:`1px solid ${BORDER}`, color:TEXT_SECONDARY }}>
+                      <RotateCw className="w-3 h-3" /> Reset
+                    </button>
+                  )}
+                  {activeTab === "run" && (
+                    <button
+                      onClick={startQA}
+                      disabled={phase !== "idle" && phase !== "done"}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
+                      style={{
+                        background: phase !== "idle" && phase !== "done" ? "rgba(0,0,0,0.07)" : ACCENT,
+                        color:      phase !== "idle" && phase !== "done" ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
+                        boxShadow:  phase !== "idle" && phase !== "done" ? "none" : "0 4px 14px rgba(65,67,27,0.25)",
+                        cursor:     phase !== "idle" && phase !== "done" ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {phase !== "idle" && phase !== "done" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                      {phase !== "idle" && phase !== "done" ? "Running…" : "Run QA"}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
 
           {/* ── 알림 드롭다운 ── */}
-          {showNotif && (
+          {showNotif && !isLoading && (
             <div
               className="rounded-2xl overflow-hidden"
               style={{ background:"rgba(255,255,255,0.95)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)", boxShadow:"0 12px 36px rgba(0,0,0,0.12)" }}
@@ -887,21 +1009,29 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
 
           {/* ── 탭 ── */}
           <div className="flex rounded-xl overflow-hidden p-0.5 gap-0.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
-            {[
-              { id:"run",    label:"QA 실행",      icon:ShieldCheck },
-              { id:"commit", label:"커밋별 QA",    icon:GitCommit   },
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
-                style={{
-                  background: activeTab === tab.id ? "rgba(65,67,27,0.08)" : "transparent",
-                  color:      activeTab === tab.id ? ACCENT : TEXT_SECONDARY,
-                  boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
-                }}
-              >
-                <tab.icon className="w-3.5 h-3.5" />{tab.label}
-              </button>
-            ))}
+            {isLoading ? (
+              /* [스켈레톤] 중앙 탭 메뉴 */
+              <>
+                <Skeleton className="flex-1 h-8 rounded-lg" />
+                <Skeleton className="flex-1 h-8 rounded-lg" />
+              </>
+            ) : (
+              [
+                { id:"run",    label:"QA 실행",      icon:ShieldCheck },
+                { id:"commit", label:"커밋별 QA",    icon:GitCommit   },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
+                  style={{
+                    background: activeTab === tab.id ? "rgba(65,67,27,0.08)" : "transparent",
+                    color:      activeTab === tab.id ? ACCENT : TEXT_SECONDARY,
+                    boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
+                  }}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />{tab.label}
+                </button>
+              ))
+            )}
           </div>
 
           {/* ════ QA 실행 탭 ════ */}
@@ -910,223 +1040,255 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
 
               {/* ── Phase 1: 코드 분석 ── */}
               <div className="rounded-2xl overflow-hidden" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)" }}>
-                <div
-                  className="flex items-center gap-2.5 px-4 py-3"
-                  style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}
-                >
-                  <div
-                    className="w-6 h-6 rounded-lg flex items-center justify-center"
-                    style={{ background: phase1Done ? "rgba(16,185,129,0.10)" : phase === "phase1" ? ACCENT_BG : "rgba(0,0,0,0.05)" }}
-                  >
-                    {phase === "phase1" ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color:ACCENT }} /> : phase1Done ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} /> : <Code2 className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
-                  </div>
-                  <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>Phase 1 — 정적 코드 분석</p>
-                  {phase === "phase1" && <span className="ml-auto text-[9px]" style={{ color:TEXT_TERTIARY }}>스캔 중… {scanFiles.length}개 파일</span>}
-                  {phase1Done && (
-                    <div className="ml-auto flex items-center gap-2">
-                      {criticalCount > 0 && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>{criticalCount} critical</span>}
-                      {warningCount > 0  && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>{warningCount} warning</span>}
+                {isLoading ? (
+                  /* [스켈레톤] Phase 1 패널 */
+                  <>
+                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-black/5">
+                      <Skeleton className="w-6 h-6 rounded-lg" />
+                      <Skeleton className="h-4 w-32" />
                     </div>
-                  )}
-                </div>
-
-                {/* 스캔 중: 파일 목록 */}
-                {(phase === "phase1" || phase1Done) && (
-                  <div className="p-4 space-y-2">
-                    {scanFiles.length === 0 && phase === "phase1" && (
-                      <div className="flex items-center gap-2 py-2">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color:ACCENT }} />
-                        <p className="text-[11px]" style={{ color:TEXT_SECONDARY }}>파일 목록 수집 중…</p>
+                    <div className="p-4 flex flex-col items-center justify-center py-8 gap-2">
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className="flex items-center gap-2.5 px-4 py-3"
+                      style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}
+                    >
+                      <div
+                        className="w-6 h-6 rounded-lg flex items-center justify-center"
+                        style={{ background: phase1Done ? "rgba(16,185,129,0.10)" : phase === "phase1" ? ACCENT_BG : "rgba(0,0,0,0.05)" }}
+                      >
+                        {phase === "phase1" ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color:ACCENT }} /> : phase1Done ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} /> : <Code2 className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
                       </div>
-                    )}
-                    {scanFiles.map((file, i) => {
-                      const err = staticErrors.find(e => file.includes(e.file));
-                      return (
-                        <div key={file} className="flex items-center gap-2.5 rounded-lg px-3 py-2" style={{ background:"rgba(0,0,0,0.025)", border:`1px solid ${BORDER_SUBTLE}` }}>
-                          <FileCode className="w-3 h-3 shrink-0" style={{ color: err ? (err.severity === "critical" ? "#ef4444" : "#f59e0b") : "#10b981" }} />
-                          <span className="flex-1 text-[10px] font-mono truncate" style={{ color:TEXT_PRIMARY }}>{file}</span>
-                          {err ? (
-                            <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded" style={{ background: SEV_COLOR[err.severity].bg, color: SEV_COLOR[err.severity].color }}>
-                              {err.severity}
-                            </span>
-                          ) : (
-                            <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color:"#10b981" }} />
-                          )}
+                      <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>Phase 1 — 정적 코드 분석</p>
+                      {phase === "phase1" && <span className="ml-auto text-[9px]" style={{ color:TEXT_TERTIARY }}>스캔 중… {scanFiles.length}개 파일</span>}
+                      {phase1Done && (
+                        <div className="ml-auto flex items-center gap-2">
+                          {criticalCount > 0 && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>{criticalCount} critical</span>}
+                          {warningCount > 0  && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>{warningCount} warning</span>}
                         </div>
-                      );
-                    })}
-                    {phase === "phase1" && scanCurrent && (
-                      <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background:`${ACCENT}08`, border:`1px solid ${ACCENT}20` }}>
-                        <Loader2 className="w-3 h-3 shrink-0 animate-spin" style={{ color:ACCENT }} />
-                        <span className="text-[10px] font-mono" style={{ color:ACCENT }}>{scanCurrent}</span>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
-                    {/* 오류 목록 */}
-                    {staticErrors.length > 0 && (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color:TEXT_LABEL }}>발견된 오류</p>
-                        {staticErrors.map(err => {
-                          const sc = SEV_COLOR[err.severity];
-                          const EI = err.severity === "critical" ? XCircle : AlertTriangle;
+                    {/* 스캔 중: 파일 목록 */}
+                    {(phase === "phase1" || phase1Done) && (
+                      <div className="p-4 space-y-2">
+                        {scanFiles.length === 0 && phase === "phase1" && (
+                          <div className="flex items-center gap-2 py-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color:ACCENT }} />
+                            <p className="text-[11px]" style={{ color:TEXT_SECONDARY }}>파일 목록 수집 중…</p>
+                          </div>
+                        )}
+                        {scanFiles.map((file, i) => {
+                          const err = staticErrors.find(e => file.includes(e.file));
                           return (
-                            <div key={err.id} className="rounded-xl p-3" style={{ background:sc.bg, border:`1px solid ${sc.color}30` }}>
-                              <div className="flex items-start gap-2">
-                                <EI className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color:sc.color }} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                    <span className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>{err.type}</span>
-                                    <span className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>{err.file}:{err.line}</span>
-                                  </div>
-                                  <p className="text-[10px]" style={{ color:TEXT_SECONDARY }}>{err.message}</p>
-                                  {err.fix && (
-                                    <div className="mt-1.5 px-2 py-1 rounded-lg" style={{ background:"rgba(0,0,0,0.05)" }}>
-                                      <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>💡 수정 제안: {err.fix}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                            <div key={file} className="flex items-center gap-2.5 rounded-lg px-3 py-2" style={{ background:"rgba(0,0,0,0.025)", border:`1px solid ${BORDER_SUBTLE}` }}>
+                              <FileCode className="w-3 h-3 shrink-0" style={{ color: err ? (err.severity === "critical" ? "#ef4444" : "#f59e0b") : "#10b981" }} />
+                              <span className="flex-1 text-[10px] font-mono truncate" style={{ color:TEXT_PRIMARY }}>{file}</span>
+                              {err ? (
+                                <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded" style={{ background: SEV_COLOR[err.severity].bg, color: SEV_COLOR[err.severity].color }}>
+                                  {err.severity}
+                                </span>
+                              ) : (
+                                <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color:"#10b981" }} />
+                              )}
                             </div>
                           );
                         })}
+                        {phase === "phase1" && scanCurrent && (
+                          <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background:`${ACCENT}08`, border:`1px solid ${ACCENT}20` }}>
+                            <Loader2 className="w-3 h-3 shrink-0 animate-spin" style={{ color:ACCENT }} />
+                            <span className="text-[10px] font-mono" style={{ color:ACCENT }}>{scanCurrent}</span>
+                          </div>
+                        )}
+
+                        {/* 오류 목록 */}
+                        {staticErrors.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color:TEXT_LABEL }}>발견된 오류</p>
+                            {staticErrors.map(err => {
+                              const sc = SEV_COLOR[err.severity];
+                              const EI = err.severity === "critical" ? XCircle : AlertTriangle;
+                              return (
+                                <div key={err.id} className="rounded-xl p-3" style={{ background:sc.bg, border:`1px solid ${sc.color}30` }}>
+                                  <div className="flex items-start gap-2">
+                                    <EI className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color:sc.color }} />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                        <span className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>{err.type}</span>
+                                        <span className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>{err.file}:{err.line}</span>
+                                      </div>
+                                      <p className="text-[10px]" style={{ color:TEXT_SECONDARY }}>{err.message}</p>
+                                      {err.fix && (
+                                        <div className="mt-1.5 px-2 py-1 rounded-lg" style={{ background:"rgba(0,0,0,0.05)" }}>
+                                          <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>💡 수정 제안: {err.fix}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {phase === "idle" && (
-                  <div className="flex flex-col items-center justify-center py-8 gap-2">
-                    <Code2 className="w-8 h-8" style={{ color:"rgba(65,67,27,0.25)" }} />
-                    <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>QA 시작 시 파일을 읽고 문법 오류, 런타임 오류를 분석합니다</p>
-                  </div>
+                    {phase === "idle" && (
+                      <div className="flex flex-col items-center justify-center py-8 gap-2">
+                        <Code2 className="w-8 h-8" style={{ color:"rgba(65,67,27,0.25)" }} />
+                        <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>QA 시작 시 파일을 읽고 문법 오류, 런타임 오류를 분석합니다</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* ── Phase 2: UI 에이전트 ── */}
               <div className="rounded-2xl overflow-hidden" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)" }}>
-                <div
-                  className="flex items-center gap-2.5 px-4 py-3"
-                  style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}
-                >
-                  <div
-                    className="w-6 h-6 rounded-lg flex items-center justify-center"
-                    style={{ background: phase2Done ? "rgba(16,185,129,0.10)" : phase === "phase2" ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.05)" }}
-                  >
-                    {phase === "phase2" ? <MousePointer className="w-3.5 h-3.5 animate-bounce" style={{ color:"#f59e0b" }} /> : phase2Done ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} /> : <Monitor className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
-                  </div>
-                  <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>Phase 2 — AI 화면 조작 테스트</p>
-                  <p className="text-[9px] ml-1" style={{ color:TEXT_TERTIARY }}>사람처럼 화면을 직접 조작하며 오류 탐색</p>
-                  {(phase === "phase2" || phase2Done) && (
-                    <div className="ml-auto flex items-center gap-2 text-[9px]">
-                      <span style={{ color:"#10b981" }}>✓{passedActions}</span>
-                      {failedActions > 0 && <span style={{ color:"#ef4444" }}>✗{failedActions}</span>}
+                {isLoading ? (
+                  /* [스켈레톤] Phase 2 패널 */
+                  <>
+                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-black/5">
+                      <Skeleton className="w-6 h-6 rounded-lg" />
+                      <Skeleton className="h-4 w-40" />
                     </div>
-                  )}
-                </div>
-
-                {(phase === "phase2" || phase2Done || (phase === "done")) && (
-                  <div className="p-4">
-                    {/* 액션 스텝 목록 */}
-                    <div className="space-y-1.5">
-                      {actions.map((action, i) => (
-                        <div
-                          key={action.id}
-                          className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all"
-                          style={{
-                            background: activeAction === action.id
-                              ? "rgba(245,158,11,0.08)"
-                              : action.status === "failed" ? "rgba(239,68,68,0.06)"
-                              : action.status === "passed" ? "rgba(16,185,129,0.04)"
-                              : "rgba(0,0,0,0.025)",
-                            border: `1px solid ${
-                              activeAction === action.id ? "rgba(245,158,11,0.25)"
-                              : action.status === "failed" ? "rgba(239,68,68,0.15)"
-                              : action.status === "passed" ? "rgba(16,185,129,0.10)"
-                              : BORDER_SUBTLE
-                            }`,
-                          }}
-                        >
-                          {/* 단계 번호 */}
-                          <span
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0"
-                            style={{
-                              background: action.status === "failed" ? "rgba(239,68,68,0.12)"
-                                : action.status === "passed" ? "rgba(16,185,129,0.10)"
-                                : activeAction === action.id ? "rgba(245,158,11,0.12)"
-                                : "rgba(0,0,0,0.07)",
-                              color: action.status === "failed" ? "#ef4444"
-                                : action.status === "passed" ? "#10b981"
-                                : activeAction === action.id ? "#f59e0b"
-                                : TEXT_TERTIARY,
-                            }}
-                          >
-                            {action.step}
-                          </span>
-
-                          {/* 상태 아이콘 */}
-                          {action.status === "running"  && <Loader2 className="w-3 h-3 shrink-0 animate-spin" style={{ color:"#f59e0b" }} />}
-                          {action.status === "passed"   && <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color:"#10b981" }} />}
-                          {action.status === "failed"   && <XCircle className="w-3 h-3 shrink-0" style={{ color:"#ef4444" }} />}
-                          {action.status === "pending"  && <div className="w-3 h-3 rounded-full shrink-0" style={{ border:"1.5px solid rgba(0,0,0,0.15)" }} />}
-
-                          {/* 레이블 + 요소 */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-medium" style={{ color: action.status === "failed" ? "#ef4444" : TEXT_PRIMARY }}>
-                              {action.label}
-                            </p>
-                            <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>{action.element}</p>
-                            {action.status === "failed" && action.error && (
-                              <p className="text-[9px] mt-0.5 line-clamp-1" style={{ color:"#ef4444" }}>{action.error}</p>
-                            )}
-                          </div>
-
-                          {/* 영상 클립 썸네일 */}
-                          {action.status === "failed" && action.clip && (
-                            <ClipThumbnail
-                              clip={action.clip}
-                              onClick={() => setOpenClip({ clip: action.clip!, action })}
-                            />
-                          )}
+                    <div className="p-4 flex flex-col items-center justify-center py-8 gap-2">
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                      <Skeleton className="h-3 w-56" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className="flex items-center gap-2.5 px-4 py-3"
+                      style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}
+                    >
+                      <div
+                        className="w-6 h-6 rounded-lg flex items-center justify-center"
+                        style={{ background: phase2Done ? "rgba(16,185,129,0.10)" : phase === "phase2" ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.05)" }}
+                      >
+                        {phase === "phase2" ? <MousePointer className="w-3.5 h-3.5 animate-bounce" style={{ color:"#f59e0b" }} /> : phase2Done ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} /> : <Monitor className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
+                      </div>
+                      <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>Phase 2 — AI 화면 조작 테스트</p>
+                      <p className="text-[9px] ml-1" style={{ color:TEXT_TERTIARY }}>사람처럼 화면을 직접 조작하며 오류 탐색</p>
+                      {(phase === "phase2" || phase2Done) && (
+                        <div className="ml-auto flex items-center gap-2 text-[9px]">
+                          <span style={{ color:"#10b981" }}>✓{passedActions}</span>
+                          {failedActions > 0 && <span style={{ color:"#ef4444" }}>✗{failedActions}</span>}
                         </div>
-                      ))}
+                      )}
                     </div>
 
-                    {/* 저장된 오류 클립 목록 */}
-                    {clips.length > 0 && (
-                      <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Video className="w-3.5 h-3.5" style={{ color:"#ef4444" }} />
-                          <p className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>오류 영상 클립 ({clips.length}개)</p>
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                          {clips.map(clip => {
-                            const relAction = actions.find(a => a.clip?.id === clip.id);
-                            return (
-                              <div key={clip.id} className="space-y-1.5">
-                                <ClipThumbnail
-                                  clip={clip}
-                                  onClick={() => relAction && setOpenClip({ clip, action: relAction })}
-                                />
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>
-                                    {clip.errorLabel}
-                                  </span>
-                                  <span className="text-[8px]" style={{ color:TEXT_TERTIARY }}>{clip.ts}</span>
-                                </div>
+                    {(phase === "phase2" || phase2Done || (phase === "done")) && (
+                      <div className="p-4">
+                        {/* 액션 스텝 목록 */}
+                        <div className="space-y-1.5">
+                          {actions.map((action, i) => (
+                            <div
+                              key={action.id}
+                              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all"
+                              style={{
+                                background: activeAction === action.id
+                                  ? "rgba(245,158,11,0.08)"
+                                  : action.status === "failed" ? "rgba(239,68,68,0.06)"
+                                  : action.status === "passed" ? "rgba(16,185,129,0.04)"
+                                  : "rgba(0,0,0,0.025)",
+                                border: `1px solid ${
+                                  activeAction === action.id ? "rgba(245,158,11,0.25)"
+                                  : action.status === "failed" ? "rgba(239,68,68,0.15)"
+                                  : action.status === "passed" ? "rgba(16,185,129,0.10)"
+                                  : BORDER_SUBTLE
+                                }`,
+                              }}
+                            >
+                              {/* 단계 번호 */}
+                              <span
+                                className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0"
+                                style={{
+                                  background: action.status === "failed" ? "rgba(239,68,68,0.12)"
+                                    : action.status === "passed" ? "rgba(16,185,129,0.10)"
+                                    : activeAction === action.id ? "rgba(245,158,11,0.12)"
+                                    : "rgba(0,0,0,0.07)",
+                                  color: action.status === "failed" ? "#ef4444"
+                                    : action.status === "passed" ? "#10b981"
+                                    : activeAction === action.id ? "#f59e0b"
+                                    : TEXT_TERTIARY,
+                                }}
+                              >
+                                {action.step}
+                              </span>
+
+                              {/* 상태 아이콘 */}
+                              {action.status === "running"  && <Loader2 className="w-3 h-3 shrink-0 animate-spin" style={{ color:"#f59e0b" }} />}
+                              {action.status === "passed"   && <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color:"#10b981" }} />}
+                              {action.status === "failed"   && <XCircle className="w-3 h-3 shrink-0" style={{ color:"#ef4444" }} />}
+                              {action.status === "pending"  && <div className="w-3 h-3 rounded-full shrink-0" style={{ border:"1.5px solid rgba(0,0,0,0.15)" }} />}
+
+                              {/* 레이블 + 요소 */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-medium" style={{ color: action.status === "failed" ? "#ef4444" : TEXT_PRIMARY }}>
+                                  {action.label}
+                                </p>
+                                <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>{action.element}</p>
+                                {action.status === "failed" && action.error && (
+                                  <p className="text-[9px] mt-0.5 line-clamp-1" style={{ color:"#ef4444" }}>{action.error}</p>
+                                )}
                               </div>
-                            );
-                          })}
+
+                              {/* 영상 클립 썸네일 */}
+                              {action.status === "failed" && action.clip && (
+                                <ClipThumbnail
+                                  clip={action.clip}
+                                  onClick={() => setOpenClip({ clip: action.clip!, action })}
+                                />
+                              )}
+                            </div>
+                          ))}
                         </div>
+
+                        {/* 저장된 오류 클립 목록 */}
+                        {clips.length > 0 && (
+                          <div className="mt-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Video className="w-3.5 h-3.5" style={{ color:"#ef4444" }} />
+                              <p className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>오류 영상 클립 ({clips.length}개)</p>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              {clips.map(clip => {
+                                const relAction = actions.find(a => a.clip?.id === clip.id);
+                                return (
+                                  <div key={clip.id} className="space-y-1.5">
+                                    <ClipThumbnail
+                                      clip={clip}
+                                      onClick={() => relAction && setOpenClip({ clip, action: relAction })}
+                                    />
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>
+                                        {clip.errorLabel}
+                                      </span>
+                                      <span className="text-[8px]" style={{ color:TEXT_TERTIARY }}>{clip.ts}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {phase === "idle" && (
-                  <div className="flex flex-col items-center justify-center py-8 gap-2">
-                    <MousePointer className="w-8 h-8" style={{ color:"rgba(245,158,11,0.30)" }} />
-                    <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>AI가 직접 화면을 조작하며 사람처럼 QA를 진행합니다</p>
-                  </div>
+                    {phase === "idle" && (
+                      <div className="flex flex-col items-center justify-center py-8 gap-2">
+                        <MousePointer className="w-8 h-8" style={{ color:"rgba(245,158,11,0.30)" }} />
+                        <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>AI가 직접 화면을 조작하며 사람처럼 QA를 진행합니다</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1135,33 +1297,58 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
           {/* ════ 커밋별 QA 탭 ════ */}
           {activeTab === "commit" && (
             <div className="space-y-3">
-              {/* 통계 */}
-              <div className="grid grid-cols-4 gap-2.5">
-                {([["passed","통과",COMMIT_QA_DATA.filter(c=>c.qaStatus==="passed").length,"#10b981"],["failed","실패",COMMIT_QA_DATA.filter(c=>c.qaStatus==="failed").length,"#ef4444"],["partial","부분",COMMIT_QA_DATA.filter(c=>c.qaStatus==="partial").length,"#f59e0b"],["pending","대기",COMMIT_QA_DATA.filter(c=>c.qaStatus==="pending").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
-                  <button
-                    key={status}
-                    onClick={() => setCommitFilter(commitFilter === status ? "all" : status)}
-                    className="rounded-xl p-3 text-left transition-all"
-                    style={{
-                      background: commitFilter === status ? `${color}12` : "rgba(255,255,255,0.80)",
-                      border:     `1px solid ${commitFilter === status ? color + "40" : BORDER}`,
-                    }}
-                  >
-                    <p className="text-xl font-bold" style={{ color }}>{count}</p>
-                    <p className="text-[9px]" style={{ color:TEXT_LABEL }}>{label}</p>
-                  </button>
-                ))}
-              </div>
+              {isLoading ? (
+                /* [스켈레톤] 커밋 통계 및 목록 */
+                <>
+                  <div className="grid grid-cols-4 gap-2.5">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-16 rounded-xl" />
+                    ))}
+                  </div>
+                  <div className="rounded-2xl border border-black/5 bg-white/50 p-4 space-y-4">
+                    <Skeleton className="h-6 w-32 mb-2" />
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="flex gap-3">
+                        <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-3 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* 통계 */}
+                  <div className="grid grid-cols-4 gap-2.5">
+                    {([["passed","통과",COMMIT_QA_DATA.filter(c=>c.qaStatus==="passed").length,"#10b981"],["failed","실패",COMMIT_QA_DATA.filter(c=>c.qaStatus==="failed").length,"#ef4444"],["partial","부분",COMMIT_QA_DATA.filter(c=>c.qaStatus==="partial").length,"#f59e0b"],["pending","대기",COMMIT_QA_DATA.filter(c=>c.qaStatus==="pending").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
+                      <button
+                        key={status}
+                        onClick={() => setCommitFilter(commitFilter === status ? "all" : status)}
+                        className="rounded-xl p-3 text-left transition-all"
+                        style={{
+                          background: commitFilter === status ? `${color}12` : "rgba(255,255,255,0.80)",
+                          border:     `1px solid ${commitFilter === status ? color + "40" : BORDER}`,
+                        }}
+                      >
+                        <p className="text-xl font-bold" style={{ color }}>{count}</p>
+                        <p className="text-[9px]" style={{ color:TEXT_LABEL }}>{label}</p>
+                      </button>
+                    ))}
+                  </div>
 
-              {/* 커밋 목록 */}
-              <div className="rounded-2xl overflow-hidden" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)" }}>
-                <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}>
-                  <GitCommit className="w-3.5 h-3.5" style={{ color:ACCENT }} />
-                  <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>커밋별 QA 현황</p>
-                  <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>{filteredCommits.length}</span>
-                </div>
-                {filteredCommits.map(c => <CommitQARow key={c.id} commit={c} />)}
-              </div>
+                  {/* 커밋 목록 */}
+                  <div className="rounded-2xl overflow-hidden" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)" }}>
+                    <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}>
+                      <GitCommit className="w-3.5 h-3.5" style={{ color:ACCENT }} />
+                      <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>커밋별 QA 현황</p>
+                      <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>{filteredCommits.length}</span>
+                    </div>
+                    {filteredCommits.map(c => <CommitQARow key={c.id} commit={c} />)}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1169,7 +1356,7 @@ export function AIQAPage({ autoStart = false }: { autoStart?: boolean }) {
       </div>
 
       {/* 클립 재생 모달 */}
-      {openClip && (
+      {openClip && !isLoading && (
         <ClipModal
           clip={openClip.clip}
           action={openClip.action}

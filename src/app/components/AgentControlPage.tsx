@@ -1,10 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { Bot, Cpu, MemoryStick, Play, Square, RotateCw, ChevronDown, Terminal, Circle, Filter } from "lucide-react";
-import { PageLoader, TableSkeleton } from "./SkeletonLoader";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
 } from "../colors";
+
+// ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 // ── 에이전트 더미 데이터 ──
 type AgentStatus = "running" | "idle" | "error" | "stopped";
@@ -102,6 +111,15 @@ export function AgentControlPage() {
   const [filterStatus, setFilter]     = useState<AgentStatus | "all">("all");
   const logRef = useRef<HTMLDivElement>(null);
 
+  // 로딩 상태 관리 (백엔드 통신 대체 지연 효과)
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // 3초 뒤에 실제 데이터 표시
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // 에이전트 토글 (running/idle ↔ stopped)
   const toggleAgent = (id: string) => {
     setAgents(prev => prev.map(a => {
@@ -133,7 +151,7 @@ export function AgentControlPage() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [selectedAgent]);
 
-  const content = (
+  return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* 배경 */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
@@ -152,120 +170,187 @@ export function AgentControlPage() {
                 <Bot className="w-4 h-4" style={{ color: ACCENT }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Agent Control</h1>
               </div>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                {agents.filter(a => a.status === "running").length}개 실행 중 ·{" "}
-                {agents.filter(a => a.status === "error").length}개 오류
-              </p>
+
+              {isLoading ? (
+                /* [스켈레톤] 헤더 통계 서브타이틀 */
+                <Skeleton className="h-3 w-32 mt-1.5" />
+              ) : (
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  {agents.filter(a => a.status === "running").length}개 실행 중 ·{" "}
+                  {agents.filter(a => a.status === "error").length}개 오류
+                </p>
+              )}
             </div>
+
             {/* 상태 필터 */}
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-              {(["all", "running", "idle", "error", "stopped"] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold capitalize transition-all"
-                  style={{
-                    background: filterStatus === f ? "#1c1c1e" : "transparent",
-                    color: filterStatus === f ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
-                  }}
-                >
-                  {f}
-                </button>
-              ))}
+              {isLoading ? (
+                /* [스켈레톤] 필터 버튼들 */
+                Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-6 w-12 rounded-lg m-0.5" />
+                ))
+              ) : (
+                (["all", "running", "idle", "error", "stopped"] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-semibold capitalize transition-all"
+                    style={{
+                      background: filterStatus === f ? "#1c1c1e" : "transparent",
+                      color: filterStatus === f ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
           {/* ── 에이전트 카드 목록 ── */}
           <div className="grid grid-cols-2 gap-3 shrink-0">
-            {filtered.map(agent => {
-              const sm = STATUS_META[agent.status];
-              const isSelected = selectedAgent === agent.id;
-              return (
+            {isLoading ? (
+              /* [스켈레톤] 에이전트 카드 (6개 생성) */
+              Array.from({ length: 6 }).map((_, i) => (
                 <div
-                  key={agent.id}
-                  onClick={() => setSelected(isSelected ? null : agent.id)}
-                  className="rounded-2xl p-4 cursor-pointer transition-all"
+                  key={`skel-agent-${i}`}
+                  className="rounded-2xl p-4 transition-all"
                   style={{
-                    background: isSelected ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
-                    border: isSelected ? "1.5px solid rgba(99,91,255,0.25)" : `1px solid ${BORDER}`,
+                    background: "rgba(255,255,255,0.78)",
+                    border: `1px solid ${BORDER}`,
                     backdropFilter: "blur(12px)",
-                    boxShadow: isSelected ? "0 4px 16px rgba(99,91,255,0.08)" : "none",
                   }}
                 >
-                  {/* 헤더 행 */}
-                  <div className="flex items-start justify-between mb-2.5">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: sm.bg }}>
-                        <Bot className="w-4 h-4" style={{ color: sm.color }} />
-                      </div>
+                      <Skeleton className="w-8 h-8 rounded-xl shrink-0" />
                       <div>
-                        <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>{agent.name}</p>
+                        <Skeleton className="h-3 w-24 mb-1" />
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>{agent.shortName}</span>
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: sm.bg, color: sm.color }}>
-                            {sm.label}
-                          </span>
+                          <Skeleton className="h-2 w-10" />
+                          <Skeleton className="h-3 w-12 rounded-full" />
                         </div>
                       </div>
                     </div>
-                    {/* On/Off 토글 — 클릭 버블링 막기 */}
-                    <div onClick={e => e.stopPropagation()}>
-                      <AgentToggle agent={agent} onToggle={() => toggleAgent(agent.id)} />
+                    <Skeleton className="w-10 h-5 rounded-full" />
+                  </div>
+                  
+                  {/* Task Skeleton */}
+                  <Skeleton className="w-3/4 h-2.5 mb-4" />
+
+                  {/* CPU/Mem bars Skeleton */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="w-6 h-2" />
+                      <Skeleton className="flex-1 h-1.5 rounded-full" />
+                      <Skeleton className="w-8 h-2" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="w-6 h-2" />
+                      <Skeleton className="flex-1 h-1.5 rounded-full" />
+                      <Skeleton className="w-8 h-2" />
                     </div>
                   </div>
 
-                  {/* 현재 태스크 */}
-                  <p className="text-[10px] mb-3 line-clamp-1 leading-relaxed" style={{ color: TEXT_SECONDARY }}>
-                    {agent.currentTask}
-                  </p>
-
-                  {/* CPU / Memory 게이지 */}
-                  <div className="space-y-1.5 mb-3">
-                    {[
-                      { label: "CPU",  value: agent.cpu, max: 100, color: agent.cpu > 70 ? "#ef4444" : ACCENT, unit: "%" },
-                      { label: "Mem",  value: agent.mem, max: 1024, color: "#8b5cf6", unit: "MB" },
-                    ].map(g => (
-                      <div key={g.label} className="flex items-center gap-2">
-                        <span className="text-[9px] w-6 shrink-0" style={{ color: TEXT_LABEL }}>{g.label}</span>
-                        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.06)" }}>
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${Math.min(100, (g.value / g.max) * 100)}%`, background: g.color }}
-                          />
-                        </div>
-                        <span className="text-[9px] w-12 text-right font-mono shrink-0" style={{ color: g.color }}>
-                          {g.value}{g.unit}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 하단 메타 + 재시작 버튼 */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                      <span>Port :{agent.port}</span>
-                      <span>·</span>
-                      <span>Up {agent.uptime}</span>
-                      <span>·</span>
-                      <span>{agent.tasksCompleted} tasks</span>
-                    </div>
-                    <button
-                      onClick={e => { e.stopPropagation(); restartAgent(agent.id); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold transition-all hover:bg-black/[0.06]"
-                      style={{ color: TEXT_SECONDARY }}
-                    >
-                      <RotateCw className="w-2.5 h-2.5" /> Restart
-                    </button>
+                  {/* Footer Meta Skeleton */}
+                  <div className="flex items-center justify-between pt-1">
+                    <Skeleton className="w-32 h-2" />
+                    <Skeleton className="w-14 h-5 rounded-lg" />
                   </div>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              /* 실제 에이전트 데이터 렌더링 */
+              filtered.map(agent => {
+                const sm = STATUS_META[agent.status];
+                const isSelected = selectedAgent === agent.id;
+                return (
+                  <div
+                    key={agent.id}
+                    onClick={() => setSelected(isSelected ? null : agent.id)}
+                    className="rounded-2xl p-4 cursor-pointer transition-all"
+                    style={{
+                      background: isSelected ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
+                      border: isSelected ? "1.5px solid rgba(99,91,255,0.25)" : `1px solid ${BORDER}`,
+                      backdropFilter: "blur(12px)",
+                      boxShadow: isSelected ? "0 4px 16px rgba(99,91,255,0.08)" : "none",
+                    }}
+                  >
+                    {/* 헤더 행 */}
+                    <div className="flex items-start justify-between mb-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: sm.bg }}>
+                          <Bot className="w-4 h-4" style={{ color: sm.color }} />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>{agent.name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>{agent.shortName}</span>
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: sm.bg, color: sm.color }}>
+                              {sm.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* On/Off 토글 */}
+                      <div onClick={e => e.stopPropagation()}>
+                        <AgentToggle agent={agent} onToggle={() => toggleAgent(agent.id)} />
+                      </div>
+                    </div>
+
+                    {/* 현재 태스크 */}
+                    <p className="text-[10px] mb-3 line-clamp-1 leading-relaxed" style={{ color: TEXT_SECONDARY }}>
+                      {agent.currentTask}
+                    </p>
+
+                    {/* CPU / Memory 게이지 */}
+                    <div className="space-y-1.5 mb-3">
+                      {[
+                        { label: "CPU",  value: agent.cpu, max: 100, color: agent.cpu > 70 ? "#ef4444" : ACCENT, unit: "%" },
+                        { label: "Mem",  value: agent.mem, max: 1024, color: "#8b5cf6", unit: "MB" },
+                      ].map(g => (
+                        <div key={g.label} className="flex items-center gap-2">
+                          <span className="text-[9px] w-6 shrink-0" style={{ color: TEXT_LABEL }}>{g.label}</span>
+                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.06)" }}>
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${Math.min(100, (g.value / g.max) * 100)}%`, background: g.color }}
+                            />
+                          </div>
+                          <span className="text-[9px] w-12 text-right font-mono shrink-0" style={{ color: g.color }}>
+                            {g.value}{g.unit}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 하단 메타 + 재시작 버튼 */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                        <span>Port :{agent.port}</span>
+                        <span>·</span>
+                        <span>Up {agent.uptime}</span>
+                        <span>·</span>
+                        <span>{agent.tasksCompleted} tasks</span>
+                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); restartAgent(agent.id); }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold transition-all hover:bg-black/[0.06]"
+                        style={{ color: TEXT_SECONDARY }}
+                      >
+                        <RotateCw className="w-2.5 h-2.5" /> Restart
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* ── 개별 에이전트 로그 패널 (선택 시 표시) ── */}
-          {selectedAgent && selectedAgentData && (
+          {!isLoading && selectedAgent && selectedAgentData && (
             <div
-              className="rounded-2xl overflow-hidden flex flex-col shrink-0"
+              className="rounded-2xl overflow-hidden flex flex-col shrink-0 animate-in fade-in slide-in-from-bottom-2 duration-300"
               style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
             >
               {/* 로그 헤더 */}
@@ -285,7 +370,7 @@ export function AgentControlPage() {
                 </span>
                 <button
                   onClick={() => setSelected(null)}
-                  className="text-[9px] ml-2 px-2 py-0.5 rounded"
+                  className="text-[9px] ml-2 px-2 py-0.5 rounded hover:bg-black/10 transition-colors"
                   style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
                 >
                   Close
@@ -315,14 +400,5 @@ export function AgentControlPage() {
         </div>
       </div>
     </div>
-  );
-
-  return (
-    <PageLoader 
-      skeleton={<TableSkeleton rows={6} />}
-      delay={600}
-    >
-      {content}
-    </PageLoader>
   );
 }
