@@ -172,6 +172,7 @@ function mapDetectedInfoToTechStacks(info: DetectedInfo | null): ProjectTechStac
   });
 }
 
+/* 💡 [수정 완료] 타이핑 불가능, 클릭 시 알림창 없이 단일 파일 탐색기 열림, 확인 즉시 자동 입력되는 컴포넌트 */
 function LocalPathInput({
   value,
   onChange,
@@ -183,23 +184,32 @@ function LocalPathInput({
   label?: string;
   required?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenExplorer = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFolderSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      const file = files[0] as File & { path?: string; webkitRelativePath?: string };
-      if (file.path) {
-        onChange(file.path.replace(/(\\|\/)[^/\\]+$/, ""));
-      } else if (file.webkitRelativePath) {
-        const topFolder = file.webkitRelativePath.split("/")[0];
-        onChange(`C:\\Projects\\${topFolder}`);
+      const file = files[0];
+      
+      // 1. Electron이나 특수 빌드 환경에서 실제 로컬 절대경로 취득이 가능한 경우 최우선 세팅
+      const actualPath = (file as any).path;
+      if (actualPath) {
+        onChange(actualPath.replace(/(\\|\/)[^/\\]+$/, ""));
+        return;
       }
+
+      // 2. 일반 브라우저 환경인 경우 선택한 파일명을 기반으로 가상 로컬 경로(C:\Projects\...) 매핑
+      let prjName = file.name.split(".")[0] || "weai-project";
+      if (prjName.toLowerCase() === "package" || prjName.toLowerCase() === "build") {
+        prjName = "my-make-file";
+      }
+      
+      // 고르자마자 즉시 확인 버튼 누른 것처럼 바로 값이 주입됩니다.
+      onChange(`C:\\Projects\\${prjName}`);
     }
     event.target.value = "";
   };
@@ -210,41 +220,39 @@ function LocalPathInput({
         {label}
         {required && <span style={{ color: "#B85450" }}> *</span>}
       </label>
+      
+      {/* 입력 박스 영역 전체를 클릭하면 파일 선택창이 바로 뜨도록 구성 */}
       <div
         onClick={handleOpenExplorer}
         className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 transition-all hover:bg-black/[0.02]"
         style={{
           background: "rgba(65,67,27,0.04)",
-          border: `1.5px solid ${focused ? "rgba(65,67,27,0.35)" : BORDER}`,
+          border: `1.5px solid ${value ? "rgba(65,67,27,0.35)" : BORDER}`,
         }}
       >
         <Folder className="h-4 w-4 shrink-0" style={{ color: value ? ACCENT : TEXT_TERTIARY }} />
+        
         <input
           readOnly
           value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           placeholder={PATH_EXAMPLES[0]}
-          className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none"
+          className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none cursor-pointer"
           style={{ color: TEXT_PRIMARY }}
         />
 
         <input
           ref={fileInputRef}
           type="file"
+          accept=".json,.gradle,.xml,.md,.txt,*"
           className="hidden"
-          // @ts-expect-error browser directory picker attribute
-          webkitdirectory=""
-          directory=""
-          onChange={handleFolderSelect}
+          onChange={handleFileSelect}
         />
 
         {value && (
           <button
             type="button"
             onClick={(event) => {
-              event.stopPropagation();
+              event.stopPropagation(); // 부모 탐색기 열림 방지
               onChange("");
             }}
             className="shrink-0 rounded p-1 hover:bg-black/[0.05]"
@@ -253,9 +261,6 @@ function LocalPathInput({
           </button>
         )}
       </div>
-      <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-        예: {PATH_EXAMPLES[0]} 또는 {PATH_EXAMPLES[2]}
-      </p>
     </div>
   );
 }
@@ -334,7 +339,7 @@ function DepartmentPicker({
   );
 }
 
-/* 복수 선택(Multi-select)이 가능한 파트 선택 컴포넌트 추가 */
+/* 복수 선택이 가능한 파트 선택 컴포넌트 */
 function MultiDepartmentPicker({
   value,
   onChange,
@@ -354,10 +359,8 @@ function MultiDepartmentPicker({
             type="button"
             onClick={() => {
               if (selected) {
-                // 이미 선택되어 있다면 제외 (Toggle off)
                 onChange(value.filter((d) => d !== department));
               } else {
-                // 선택되어 있지 않다면 추가 (Toggle on)
                 onChange([...value, department]);
               }
             }}
@@ -397,7 +400,6 @@ function CreateProjectModal({
   const [creating, setCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // 알림창 상태 관리
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const totalSteps = 3;
@@ -417,7 +419,6 @@ function CreateProjectModal({
     }, 1000);
   };
 
-  // 다음 버튼 클릭 시 실행할 로직
   const handleNextClick = () => {
     if (step === 1) {
       setStep(2);
@@ -428,7 +429,7 @@ function CreateProjectModal({
 
   const handleConfirmPath = () => {
     setIsAlertOpen(false);
-    setStep(3); // 3단계로 넘어감
+    setStep(3);
   };
 
   const handleCreate = async () => {
@@ -448,7 +449,6 @@ function CreateProjectModal({
       projectName: name.trim(),
       description: description.trim() || undefined,
       localPath: localPath.trim(),
-      
       department: (departments[0] || "BACKEND") as any,
       deadlineDate: deadline || undefined,
       techStacks: mapDetectedInfoToTechStacks(detected),
@@ -566,7 +566,6 @@ function CreateProjectModal({
                 <label className="block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
                   생성자 기본 파트 (복수 선택 가능)
                 </label>
-                {/* 💡 새로 정의한 MultiDepartmentPicker 컴포넌트로 교체 */}
                 <MultiDepartmentPicker value={departments} onChange={setDepartments} />
               </div>
 
@@ -616,7 +615,7 @@ function CreateProjectModal({
                   프로젝트 저장 위치 설정
                 </p>
                 <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
-                  로컬 절대 경로를 입력하면 기술 스택을 자동으로 감지하고, 팀 구성 초안에 반영할 수 있습니다.
+                  박스를 클릭하여 설정 파일 하나를 열어주세요. 팝업 경고 없이 가상 절대 경로가 바로 입력되고 분석을 시작합니다.
                 </p>
               </div>
 
@@ -693,7 +692,6 @@ function CreateProjectModal({
                 {[
                   { label: "프로젝트명", value: name },
                   { label: "저장 위치", value: localPath || "-" },
-                  /* 💡 요약 창에서 복수로 선택한 파트들을 쉼표(,) 구분자로 깔끔하게 나열 */
                   {
                     label: "담당 파트",
                     value: departments.length > 0
