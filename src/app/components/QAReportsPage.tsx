@@ -1,12 +1,22 @@
-import { useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
-import { Sparkles, AlertTriangle, CheckCircle2, XCircle, Shield, Circle, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Sparkles, AlertTriangle, CheckCircle2, XCircle, Circle, RefreshCw } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  UI_RED, UI_RED_DARK, UI_RED_BG, UI_RED_BG7, UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
-  UI_GREEN, UI_VIOLET, UI_VIOLET_BG7, UI_GRAY, UI_GRAY_BG, UI_GRAY_BORDER, UI_INDIGO,
-  GRADIENT_HEADER, BTN_DARK, ACCENT,
+  UI_RED, UI_RED_DARK, UI_RED_BG7, UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
+  UI_GREEN, UI_VIOLET, UI_VIOLET_BG7, UI_GRAY, UI_GRAY_BG,
+  ACCENT,
 } from "../colors";
+
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 // 모듈별 테스트 결과 더미 데이터
 const TEST_RESULTS = [
@@ -32,8 +42,8 @@ const ISSUES: Issue[] = [
   { id: "QA-001", severity: "critical", module: "Parser",        title: "JSON Parse Exception — unhandled edge case",         detail: "Null pointer when input starts with '<'. No fallback.", status: "open"      },
   { id: "QA-002", severity: "major",    module: "MultiAgentCtrl",title: "Race condition in agent handshake protocol",          detail: "Two agents may write to shared state simultaneously.",  status: "in-review" },
   { id: "QA-003", severity: "major",    module: "ApiGateway",    title: "Timeout not configured for upstream API calls",       detail: "Requests may hang indefinitely. Add timeout policy.",   status: "open"      },
-  { id: "QA-004", severity: "minor",    module: "Scheduler",     title: "Task retry delay uses hardcoded value",              detail: "Retry interval (5s) should be configurable via yml.",   status: "in-review" },
-  { id: "QA-005", severity: "minor",    module: "DataSync",      title: "Logging level inconsistency",                        detail: "DEBUG logs appear in prod profile. Filter by profile.", status: "resolved"  },
+  { id: "QA-004", severity: "minor",    module: "Scheduler",     title: "Task retry delay uses hardcoded value",               detail: "Retry interval (5s) should be configurable via yml.",   status: "in-review" },
+  { id: "QA-005", severity: "minor",    module: "DataSync",      title: "Logging level inconsistency",                         detail: "DEBUG logs appear in prod profile. Filter by profile.", status: "resolved"  },
   { id: "QA-006", severity: "info",     module: "Logger",        title: "Log rotation archive path is environment-specific",  detail: "Hardcoded Windows path 'logs/' may fail on Linux.",    status: "resolved"  },
   { id: "QA-007", severity: "critical", module: "MultiAgentCtrl",title: "Agent error escalation path not implemented",         detail: "Supervisor callback is a stub method. Needs impl.",     status: "open"      },
 ];
@@ -64,6 +74,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function QAReportsPage() {
+  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [severityFilter, setSeverityFilter] = useState<string>("all");
 
   const totalPassed  = TEST_RESULTS.reduce((s, t) => s + t.passed,  0);
@@ -90,106 +107,175 @@ export function QAReportsPage() {
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
 
-          {/* 헤더 */}
+          {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4" style={{ color: ACCENT }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>AI QA Reports</h1>
               </div>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>SynAIpse Backend Server · Last scan: Today 09:41</p>
+              {isLoading ? (
+                <Skeleton className="h-3 w-48 mt-1.5" />
+              ) : (
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>SynAIpse Backend Server · Last scan: Today 09:41</p>
+              )}
             </div>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold" style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}>
-              <RefreshCw className="w-3 h-3" /> Re-scan
-            </button>
+            
+            {isLoading ? (
+              <Skeleton className="h-7 w-20 rounded-lg" />
+            ) : (
+              <button
+                onClick={() => {
+                  setIsLoading(true);
+                  setTimeout(() => setIsLoading(false), 2000); // 리스캔 시 2초 로딩
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-black/[0.05] transition-all"
+                style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+              >
+                <RefreshCw className="w-3 h-3" /> Re-scan
+              </button>
+            )}
           </div>
 
-          {/* 요약 카드 */}
+          {/* ── 요약 카드 ── */}
           <div className="grid grid-cols-4 gap-2.5">
-            {[
-              { label: "Open Issues",    value: String(openCount),    color: UI_RED, bg: UI_RED_BG7   },
-              { label: "Critical",       value: String(criticalCount),color: UI_RED_DARK, bg: UI_RED_BG7   },
-              { label: "Test Coverage",  value: `${coverage}%`,        color: UI_VIOLET, bg: UI_VIOLET_BG7 },
-              { label: "Risk Score",     value: riskScore,             color: riskColor, bg: `${riskColor}12`         },
-            ].map(c => (
-              <div key={c.label} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-                <p className="text-lg font-bold" style={{ color: c.color }}>{c.value}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{c.label}</p>
-              </div>
-            ))}
+            {isLoading ? (
+              /* [스켈레톤] 상단 요약 통계 카드 4개 */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <Skeleton className="h-6 w-12 mb-2" />
+                  <Skeleton className="h-2.5 w-16" />
+                </div>
+              ))
+            ) : (
+              [
+                { label: "Open Issues",   value: String(openCount),     color: UI_RED, bg: UI_RED_BG7   },
+                { label: "Critical",      value: String(criticalCount), color: UI_RED_DARK, bg: UI_RED_BG7   },
+                { label: "Test Coverage", value: `${coverage}%`,        color: UI_VIOLET, bg: UI_VIOLET_BG7 },
+                { label: "Risk Score",    value: riskScore,             color: riskColor, bg: `${riskColor}12`         },
+              ].map(c => (
+                <div key={c.label} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <p className="text-lg font-bold" style={{ color: c.color }}>{c.value}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{c.label}</p>
+                </div>
+              ))
+            )}
           </div>
 
-          {/* 테스트 결과 막대 차트 */}
+          {/* ── 테스트 결과 막대 차트 ── */}
           <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Test Results by Module</p>
-              <div className="flex items-center gap-3 text-[10px]" style={{ color: TEXT_TERTIARY }}>
-                <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#10b981" }} /> Passed</span>
-                <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#ef4444" }} /> Failed</span>
-                <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#d1d5db" }} /> Skipped</span>
-              </div>
+              {!isLoading && (
+                <div className="flex items-center gap-3 text-[10px]" style={{ color: TEXT_TERTIARY }}>
+                  <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#10b981" }} /> Passed</span>
+                  <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#ef4444" }} /> Failed</span>
+                  <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#d1d5db" }} /> Skipped</span>
+                </div>
+              )}
             </div>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart id="qa-test-results" data={TEST_RESULTS} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={10}>
-                <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="module" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="passed"  name="Passed"  fill="#10b981" radius={[3,3,0,0]} />
-                <Bar dataKey="failed"  name="Failed"  fill="#ef4444" radius={[3,3,0,0]} />
-                <Bar dataKey="skipped" name="Skipped" fill="#d1d5db" radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            
+            {isLoading ? (
+              /* [스켈레톤] 막대 차트 영역 */
+              <Skeleton className="w-full h-[160px] rounded-xl" />
+            ) : (
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart id="qa-test-results" data={TEST_RESULTS} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={10}>
+                  <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+                  <XAxis dataKey="module" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="passed"  name="Passed"  fill="#10b981" radius={[3,3,0,0]} />
+                  <Bar dataKey="failed"  name="Failed"  fill="#ef4444" radius={[3,3,0,0]} />
+                  <Bar dataKey="skipped" name="Skipped" fill="#d1d5db" radius={[3,3,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
-          {/* 이슈 목록 */}
+          {/* ── 이슈 목록 ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             {/* 이슈 목록 헤더 + 필터 */}
-            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
-              <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Issues ({filteredIssues.length})</p>
+            <div className="px-4 py-3 flex items-center justify-between shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
+              {isLoading ? (
+                <Skeleton className="h-4 w-20" />
+              ) : (
+                <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Issues ({filteredIssues.length})</p>
+              )}
+              
               <div className="flex items-center gap-1">
-                {["all", "critical", "major", "minor", "info"].map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setSeverityFilter(f)}
-                    className="px-2 py-0.5 rounded text-[9px] font-semibold capitalize transition-all"
-                    style={{
-                      background: severityFilter === f ? "#1c1c1e" : "rgba(0,0,0,0.05)",
-                      color: severityFilter === f ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
-                    }}
-                  >
-                    {f === "all" ? "All" : f}
-                  </button>
-                ))}
+                {isLoading ? (
+                  /* [스켈레톤] 필터 버튼 */
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-5 w-10 rounded" />
+                  ))
+                ) : (
+                  ["all", "critical", "major", "minor", "info"].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setSeverityFilter(f)}
+                      className="px-2 py-0.5 rounded text-[9px] font-semibold capitalize transition-all"
+                      style={{
+                        background: severityFilter === f ? "#1c1c1e" : "rgba(0,0,0,0.05)",
+                        color: severityFilter === f ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
+                      }}
+                    >
+                      {f === "all" ? "All" : f}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
-            {filteredIssues.map((issue, i) => {
-              const sev = SEV_META[issue.severity];
-              const Icon = sev.icon;
-              const sts = STATUS_META[issue.status];
-              return (
-                <div
-                  key={issue.id}
-                  className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-black/[0.02]"
-                  style={{ borderBottom: i < filteredIssues.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}
-                >
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: sev.bg }}>
-                    <Icon className="w-3.5 h-3.5" style={{ color: sev.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>{issue.id}</span>
-                      <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}>{issue.module}</span>
+            {isLoading ? (
+              /* [스켈레톤] 이슈 목록 5개 */
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3 px-4 py-3" style={{ borderBottom: i < 4 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                  <Skeleton className="w-7 h-7 rounded-lg mt-0.5 shrink-0" />
+                  <div className="flex-1 space-y-2 pt-0.5">
+                    <div className="flex gap-2">
+                      <Skeleton className="h-3 w-12" />
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-3 w-14" />
                     </div>
-                    <p className="text-[11px] font-medium" style={{ color: TEXT_PRIMARY }}>{issue.title}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{issue.detail}</p>
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-2.5 w-1/2" />
                   </div>
-                  <span className="text-[10px] font-semibold shrink-0 mt-0.5" style={{ color: sts.color }}>{sts.label}</span>
+                  <Skeleton className="h-3 w-12 mt-1 shrink-0" />
                 </div>
-              );
-            })}
+              ))
+            ) : filteredIssues.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>해당하는 이슈가 없습니다.</p>
+              </div>
+            ) : (
+              filteredIssues.map((issue, i) => {
+                const sev = SEV_META[issue.severity];
+                const Icon = sev.icon;
+                const sts = STATUS_META[issue.status];
+                return (
+                  <div
+                    key={issue.id}
+                    className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-black/[0.02]"
+                    style={{ borderBottom: i < filteredIssues.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}
+                  >
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: sev.bg }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: sev.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>{issue.id}</span>
+                        <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}>{issue.module}</span>
+                      </div>
+                      <p className="text-[11px] font-medium" style={{ color: TEXT_PRIMARY }}>{issue.title}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{issue.detail}</p>
+                    </div>
+                    <span className="text-[10px] font-semibold shrink-0 mt-0.5" style={{ color: sts.color }}>{sts.label}</span>
+                  </div>
+                );
+              })
+            )}
           </div>
 
         </div>

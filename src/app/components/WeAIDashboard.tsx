@@ -27,9 +27,29 @@ import {
   GRADIENT_INDIGO, BTN_DARK, PANEL_BG, CONTENT_BG,
   LANG_GRADLE, LANG_JAVA, LANG_YML,
 } from "../colors";
+
 const CTA_TEXT = "rgba(248,243,225,0.92)";
 
-// ── 워크스페이스 탭 정의 (홈 + 기존 4개 + Build Tools) ──
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
+
+function DarkSkeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-white/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
+
+// ── 워크스페이스 탭 정의 ──
 const WORKSPACE_TABS = [
   { id: "home",     icon: LayoutDashboard, label: "Dashboard"      },
   { id: "agents",   icon: Bot,             label: "Agents Control" },
@@ -74,22 +94,22 @@ const COMMITS = [
 
 // ── 최근 변경 파일 목록 (Screen B) ──
 const RECENT_FILES = [
-  { path: "build.gradle",               fullPath: "D:\\WE_AI\\build.gradle",                                    change: "Modified", time: "5 mins ago", ext: "gradle" },
+  { path: "build.gradle",             fullPath: "D:\\WE_AI\\build.gradle",                               change: "Modified", time: "5 mins ago", ext: "gradle" },
   { path: "MultiAgentController.java",  fullPath: "D:\\WE_AI\\src\\main\\java\\MultiAgentController.java",      change: "Added",    time: "1 hr ago",   ext: "java"   },
   { path: "application-dev.yml",        fullPath: "D:\\WE_AI\\src\\main\\resources\\application-dev.yml",       change: "Modified", time: "3 hrs ago",  ext: "yml"    },
 ];
 
-// ── 에이전트 목록 (기존 유지) ──
+// ── 에이전트 목록 ──
 const INITIAL_AGENTS = [
   { id: "AGT-01", name: "DataSync Alpha",  status: "running", cpu: 42, mem: 61, task: "Fetching API endpoints",         uptime: "03:21:44" },
   { id: "AGT-02", name: "Classifier Beta", status: "running", cpu: 78, mem: 83, task: "Image classification batch #12", uptime: "01:05:09" },
   { id: "AGT-03", name: "Logger Gamma",    status: "idle",    cpu: 3,  mem: 22, task: "—",                              uptime: "06:47:02" },
   { id: "AGT-04", name: "Parser Delta",    status: "error",   cpu: 0,  mem: 0,  task: "JSON parse error – retrying",    uptime: "00:00:00" },
-  { id: "AGT-05", name: "Scheduler Eps",   status: "running", cpu: 19, mem: 38, task: "Queuing next task batch",         uptime: "02:13:55" },
+  { id: "AGT-05", name: "Scheduler Eps",   status: "running", cpu: 19, mem: 38, task: "Queuing next task batch",        uptime: "02:13:55" },
   { id: "AGT-06", name: "Analyzer Zeta",   status: "idle",    cpu: 5,  mem: 28, task: "—",                              uptime: "04:30:18" },
 ];
 
-// ── 로그 라인 (기존 유지) ──
+// ── 로그 라인 ──
 const INITIAL_LOGS = [
   { ts: "09:41:02", level: "INFO",  agent: "AGT-01", msg: "Connected to upstream API. Fetching /v2/data..." },
   { ts: "09:41:03", level: "INFO",  agent: "AGT-02", msg: "Batch #12 loaded — 4,096 images queued." },
@@ -101,18 +121,18 @@ const INITIAL_LOGS = [
   { ts: "09:41:18", level: "INFO",  agent: "AGT-02", msg: "Processed 512/4096 images (12.5%). ETA: 3m 20s." },
 ];
 
-// ── 작업 대기열 (기존 유지) ──
+// ── 작업 대기열 ──
 const TASKS = [
   { id: "T-001", name: "Schema Migration v3",      agent: "AGT-01", status: "done",       priority: "high",   created: "09:30", eta: "09:38" },
   { id: "T-002", name: "Image Classification #12", agent: "AGT-02", status: "running",    priority: "high",   created: "09:35", eta: "09:45" },
   { id: "T-003", name: "JSON Parse & Validate",    agent: "AGT-04", status: "error",      priority: "normal", created: "09:38", eta: "—"     },
   { id: "T-004", name: "Batch Scheduler Refresh",  agent: "AGT-05", status: "running",    priority: "normal", created: "09:40", eta: "09:42" },
   { id: "T-005", name: "Log Compression",          agent: "AGT-03", status: "done",       priority: "low",    created: "09:20", eta: "09:25" },
-  { id: "T-006", name: "Model Fine-tune Prep",     agent: "—",       status: "scheduled", priority: "high",   created: "—",     eta: "10:00" },
-  { id: "T-007", name: "Report Generation",        agent: "—",       status: "scheduled", priority: "low",    created: "—",     eta: "10:30" },
+  { id: "T-006", name: "Model Fine-tune Prep",     agent: "—",      status: "scheduled",  priority: "high",   created: "—",     eta: "10:00" },
+  { id: "T-007", name: "Report Generation",        agent: "—",      status: "scheduled",  priority: "low",    created: "—",     eta: "10:30" },
 ];
 
-// ── 차트 데이터 생성 (기존 유지) ──
+// ── 차트 데이터 생성 ──
 const generateTrafficData = () =>
   Array.from({ length: 12 }, (_, i) => ({
     time: `${String(9 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 === 0 ? "00" : "30"}`,
@@ -150,16 +170,14 @@ const BUILD_BOOT_LOGS = [
 // ════════════════════════════════════════════
 // 공통 헬퍼 컴포넌트
 // ════════════════════════════════════════════
-
-// 상태 배지
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; dot: string; label: string }> = {
     running:   { bg: UI_GREEN_BG,  color: UI_GREEN_DARK, dot: UI_GREEN, label: "Running"   },
     idle:      { bg: UI_GRAY_BG,   color: UI_GRAY,       dot: UI_GRAY_LIGHT, label: "Idle"      },
-    error:     { bg: UI_RED_BG,    color: UI_RED_DARK,    dot: UI_RED,   label: "Error"     },
-    done:      { bg: UI_GREEN_BG,  color: UI_GREEN_DARK,  dot: UI_GREEN, label: "Done"      },
-    scheduled: { bg: UI_INDIGO_BG, color: UI_INDIGO,      dot: UI_INDIGO, label: "Scheduled" },
-    active:    { bg: UI_GREEN_BG,  color: UI_GREEN_DARK,  dot: UI_GREEN, label: "Active"    },
+    error:     { bg: UI_RED_BG,    color: UI_RED_DARK,   dot: UI_RED,   label: "Error"     },
+    done:      { bg: UI_GREEN_BG,  color: UI_GREEN_DARK, dot: UI_GREEN, label: "Done"      },
+    scheduled: { bg: UI_INDIGO_BG, color: UI_INDIGO,     dot: UI_INDIGO, label: "Scheduled" },
+    active:    { bg: UI_GREEN_BG,  color: UI_GREEN_DARK, dot: UI_GREEN, label: "Active"    },
   };
   const s = map[status.toLowerCase()] ?? map.idle;
   return (
@@ -173,7 +191,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// 우선순위 배지
 function PriorityBadge({ priority }: { priority: string }) {
   const map: Record<string, { bg: string; color: string }> = {
     high:   { bg: "rgba(239,68,68,0.08)",   color: UI_RED_DARK },
@@ -191,7 +208,6 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
-// CPU/메모리 미니 바
 function MiniBar({ value, color }: { value: number; color: string }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -203,7 +219,6 @@ function MiniBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-// 탭 버튼 (워크스페이스 내부)
 function TabBtn({
   tab, active, onClick,
 }: { tab: typeof WORKSPACE_TABS[number]; active: boolean; onClick: () => void }) {
@@ -226,7 +241,6 @@ function TabBtn({
   );
 }
 
-// 섹션 헤더
 function SectionHeader({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="mb-4">
@@ -239,7 +253,7 @@ function SectionHeader({ title, sub }: { title: string; sub?: string }) {
 // ════════════════════════════════════════════
 // Screen A — 프로젝트 진입 (Welcome & Join)
 // ════════════════════════════════════════════
-function ProjectEntry({ onJoin }: { onJoin: (project: typeof PROJECTS[number]) => void }) {
+function ProjectEntry({ onJoin, isLoading }: { onJoin: (project: typeof PROJECTS[number]) => void, isLoading: boolean }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -251,11 +265,7 @@ function ProjectEntry({ onJoin }: { onJoin: (project: typeof PROJECTS[number]) =
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 그라데이션 배경 */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: GRADIENT_PAGE }}
-      />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
       <div className="absolute inset-0 pointer-events-none">
         <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
         <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,152,64,0.14) 0%, transparent 70%)", filter: "blur(50px)" }} />
@@ -285,106 +295,130 @@ function ProjectEntry({ onJoin }: { onJoin: (project: typeof PROJECTS[number]) =
 
           {/* 검색 + Create 버튼 */}
           <div className="flex gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search projects..."
-                className="w-full pl-7 pr-3 py-2 text-xs rounded-lg outline-none"
-                style={{ background: PANEL_BG, border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
-              />
-            </div>
-            <button
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: CTA_BG, color: CTA_TEXT }}
-            >
-              <Plus className="w-3 h-3" />
-              Create New
-            </button>
+            {isLoading ? (
+              <>
+                <Skeleton className="flex-1 h-8 rounded-lg" />
+                <Skeleton className="w-24 h-8 rounded-lg" />
+              </>
+            ) : (
+              <>
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search projects..."
+                    className="w-full pl-7 pr-3 py-2 text-xs rounded-lg outline-none"
+                    style={{ background: PANEL_BG, border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                  />
+                </div>
+                <button
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+                  style={{ background: CTA_BG, color: CTA_TEXT }}
+                >
+                  <Plus className="w-3 h-3" /> Create New
+                </button>
+              </>
+            )}
           </div>
 
           {/* 프로젝트 목록 */}
           <div className="space-y-2 mb-5">
-            {filtered.map(project => {
-              const isSelected = selected === project.id;
-              return (
-                <div
-                  key={project.id}
-                  onClick={() => setSelected(isSelected ? null : project.id)}
-                  className="rounded-xl p-4 cursor-pointer transition-all"
-                  style={{
-                    background: isSelected
-                      ? "linear-gradient(135deg, rgba(224,231,255,0.5), rgba(232,213,245,0.4))"
-                      : "rgba(247,247,245,0.8)",
-                    border: isSelected ? "1px solid rgba(99,91,255,0.25)" : `1px solid ${BORDER}`,
-                  }}
-                >
+            {isLoading ? (
+              /* [스켈레톤] 프로젝트 카드 */
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="rounded-xl p-4 transition-all" style={{ background: "rgba(247,247,245,0.8)", border: `1px solid ${BORDER}` }}>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      {/* 프로젝트 아이콘 */}
-                      <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: isSelected ? "rgba(99,91,255,0.12)" : "rgba(0,0,0,0.05)" }}
-                      >
-                        <Code2 className="w-4 h-4" style={{ color: isSelected ? ACCENT : TEXT_SECONDARY }} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>{project.name}</span>
-                          <StatusBadge status={project.status} />
-                        </div>
-                        <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{project.desc}</p>
-                        <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
-                            <span style={{ color: TEXT_LABEL }}>Role:</span> {project.role}
-                          </span>
-                          <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
-                            <span style={{ color: TEXT_LABEL }}>Stack:</span> {project.lang}
-                          </span>
-                          <span className="flex items-center gap-1 text-[10px]" style={{ color: TEXT_TERTIARY }}>
-                            <Users className="w-2.5 h-2.5" /> {project.members}
-                          </span>
-                        </div>
+                    <div className="flex items-start gap-3 min-w-0 w-full">
+                      <Skeleton className="w-9 h-9 rounded-lg shrink-0" />
+                      <div className="flex-1 space-y-2 pt-1">
+                        <div className="flex gap-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-4 w-12 rounded-full" /></div>
+                        <Skeleton className="h-2.5 w-64" />
+                        <div className="flex gap-3 pt-1"><Skeleton className="h-2.5 w-16" /><Skeleton className="h-2.5 w-20" /><Skeleton className="h-2.5 w-12" /></div>
                       </div>
                     </div>
-                    {/* 라디오 인디케이터 */}
-                    <div
-                      className="w-4 h-4 rounded-full shrink-0 mt-0.5 flex items-center justify-center transition-all"
-                      style={{
-                        border: isSelected ? "none" : `1.5px solid ${BORDER}`,
-                        background: isSelected ? ACCENT : "transparent",
-                      }}
-                    >
-                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                    </div>
+                    <Skeleton className="w-4 h-4 rounded-full shrink-0" />
                   </div>
-
-                  {/* 선택 시 스프린트 정보 노출 */}
-                  {isSelected && (
-                    <div
-                      className="mt-3 pt-3 flex items-center gap-3"
-                      style={{ borderTop: "1px solid rgba(99,91,255,0.12)" }}
-                    >
-                      <Target className="w-3 h-3 shrink-0" style={{ color: ACCENT }} />
-                      <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
-                        Current Sprint: <strong style={{ color: TEXT_PRIMARY }}>{project.sprint}</strong>
-                      </span>
-                      <span className="ml-auto text-[10px]" style={{ color: TEXT_TERTIARY }}>
-                        Last activity {project.lastActivity}
-                      </span>
-                    </div>
-                  )}
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              filtered.map(project => {
+                const isSelected = selected === project.id;
+                return (
+                  <div
+                    key={project.id}
+                    onClick={() => setSelected(isSelected ? null : project.id)}
+                    className="rounded-xl p-4 cursor-pointer transition-all"
+                    style={{
+                      background: isSelected
+                        ? "linear-gradient(135deg, rgba(224,231,255,0.5), rgba(232,213,245,0.4))"
+                        : "rgba(247,247,245,0.8)",
+                      border: isSelected ? "1px solid rgba(99,91,255,0.25)" : `1px solid ${BORDER}`,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: isSelected ? "rgba(99,91,255,0.12)" : "rgba(0,0,0,0.05)" }}
+                        >
+                          <Code2 className="w-4 h-4" style={{ color: isSelected ? ACCENT : TEXT_SECONDARY }} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>{project.name}</span>
+                            <StatusBadge status={project.status} />
+                          </div>
+                          <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{project.desc}</p>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
+                              <span style={{ color: TEXT_LABEL }}>Role:</span> {project.role}
+                            </span>
+                            <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
+                              <span style={{ color: TEXT_LABEL }}>Stack:</span> {project.lang}
+                            </span>
+                            <span className="flex items-center gap-1 text-[10px]" style={{ color: TEXT_TERTIARY }}>
+                              <Users className="w-2.5 h-2.5" /> {project.members}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className="w-4 h-4 rounded-full shrink-0 mt-0.5 flex items-center justify-center transition-all"
+                        style={{
+                          border: isSelected ? "none" : `1.5px solid ${BORDER}`,
+                          background: isSelected ? ACCENT : "transparent",
+                        }}
+                      >
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <div
+                        className="mt-3 pt-3 flex items-center gap-3"
+                        style={{ borderTop: "1px solid rgba(99,91,255,0.12)" }}
+                      >
+                        <Target className="w-3 h-3 shrink-0" style={{ color: ACCENT }} />
+                        <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
+                          Current Sprint: <strong style={{ color: TEXT_PRIMARY }}>{project.sprint}</strong>
+                        </span>
+                        <span className="ml-auto text-[10px]" style={{ color: TEXT_TERTIARY }}>
+                          Last activity {project.lastActivity}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Join 버튼 */}
           <button
-            onClick={() => selectedProject && onJoin(selectedProject)}
-            disabled={!selected}
-            className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all"
+            onClick={() => selectedProject && !isLoading && onJoin(selectedProject)}
+            disabled={!selected || isLoading}
+            className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
             style={{
               background: selected ? CTA_BG : "rgba(0,0,0,0.05)",
               color: selected ? CTA_TEXT : TEXT_TERTIARY,
@@ -402,8 +436,7 @@ function ProjectEntry({ onJoin }: { onJoin: (project: typeof PROJECTS[number]) =
 // ════════════════════════════════════════════
 // Screen B (Home Tab) — 프로젝트 워크스페이스 홈
 // ════════════════════════════════════════════
-function WorkspaceHome({ project }: { project: typeof PROJECTS[number] }) {
-  // 빠른 통계 카드
+function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number], isLoading?: boolean }) {
   const quickStats = [
     { label: "Commits Today",   value: "3",    color: ACCENT,    bg: "rgba(99,91,255,0.07)"  },
     { label: "Files Changed",   value: "3",    color: UI_VIOLET, bg: UI_VIOLET_BG7 },
@@ -417,19 +450,35 @@ function WorkspaceHome({ project }: { project: typeof PROJECTS[number] }) {
 
   return (
     <div className="space-y-4">
-      <SectionHeader
-        title={`${project.name}`}
-        sub={`Sprint: ${project.sprint}  ·  ${project.members} members  ·  Role: ${project.role}`}
-      />
+      {isLoading ? (
+        <div className="mb-4 space-y-2">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-3 w-64" />
+        </div>
+      ) : (
+        <SectionHeader
+          title={`${project.name}`}
+          sub={`Sprint: ${project.sprint}  ·  ${project.members} members  ·  Role: ${project.role}`}
+        />
+      )}
 
       {/* 빠른 통계 */}
-      <div className="grid grid-cols-4 gap-2.5">
-        {quickStats.map(s => (
-          <div key={s.label} className="rounded-xl p-3.5" style={{ background: s.bg, border: `1px solid ${BORDER}` }}>
-            <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-4 gap-2.5 mb-4">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+             <div key={i} className="rounded-xl p-3.5 border bg-white/50 space-y-2">
+               <Skeleton className="h-5 w-10" />
+               <Skeleton className="h-3 w-16" />
+             </div>
+          ))
+        ) : (
+          quickStats.map(s => (
+            <div key={s.label} className="rounded-xl p-3.5" style={{ background: s.bg, border: `1px solid ${BORDER}` }}>
+              <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
+            </div>
+          ))
+        )}
       </div>
 
       {/* 2-컬럼 그리드: 커밋 + 변경 파일 */}
@@ -440,32 +489,46 @@ function WorkspaceHome({ project }: { project: typeof PROJECTS[number] }) {
             <GitCommit className="w-3.5 h-3.5" style={{ color: ACCENT }} />
             <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Recent Commits</p>
           </div>
-          <div className="space-y-2.5">
-            {COMMITS.map((c, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <span
-                  className="text-[9px] font-mono px-1.5 py-0.5 rounded shrink-0 mt-0.5"
-                  style={{ background: "rgba(99,91,255,0.08)", color: ACCENT }}
-                >
-                  {c.hash}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[11px] truncate" style={{ color: TEXT_PRIMARY }}>{c.msg}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>{c.author}</span>
-                    <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>·</span>
-                    <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>{c.time}</span>
-                    <span
-                      className="text-[9px] px-1 py-0.5 rounded"
-                      style={{ background: "rgba(0,0,0,0.05)", color: TEXT_TERTIARY }}
-                    >
-                      {c.branch}
-                    </span>
+          {isLoading ? (
+            <div className="space-y-3 pt-1">
+              {Array.from({length: 3}).map((_, i) => (
+                <div key={i} className="flex gap-2.5">
+                  <Skeleton className="w-12 h-4 rounded mt-0.5" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-2.5 w-1/2" />
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {COMMITS.map((c, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                    style={{ background: "rgba(99,91,255,0.08)", color: ACCENT }}
+                  >
+                    {c.hash}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] truncate" style={{ color: TEXT_PRIMARY }}>{c.msg}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>{c.author}</span>
+                      <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>·</span>
+                      <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>{c.time}</span>
+                      <span
+                        className="text-[9px] px-1 py-0.5 rounded"
+                        style={{ background: "rgba(0,0,0,0.05)", color: TEXT_TERTIARY }}
+                      >
+                        {c.branch}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Recently Changed Files */}
@@ -474,59 +537,84 @@ function WorkspaceHome({ project }: { project: typeof PROJECTS[number] }) {
             <FileText className="w-3.5 h-3.5" style={{ color: UI_VIOLET }} />
             <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Recently Changed Files</p>
           </div>
-          <div className="space-y-2.5">
-            {RECENT_FILES.map((f, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <span
-                  className="text-[9px] font-mono px-1.5 py-0.5 rounded shrink-0 mt-0.5 font-semibold"
-                  style={{ background: `${fileExtColor[f.ext]}18`, color: fileExtColor[f.ext] }}
-                >
-                  .{f.ext}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium truncate" style={{ color: TEXT_PRIMARY }}>{f.path}</p>
-                  <p className="text-[10px] truncate mt-0.5" style={{ color: TEXT_TERTIARY }}>{f.fullPath}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span
-                      className="text-[9px] font-semibold"
-                      style={{ color: f.change === "Added" ? UI_GREEN : UI_AMBER }}
-                    >
-                      {f.change}
-                    </span>
-                    <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>{f.time}</span>
+          {isLoading ? (
+            <div className="space-y-3 pt-1">
+              {Array.from({length: 3}).map((_, i) => (
+                <div key={i} className="flex gap-2.5">
+                  <Skeleton className="w-10 h-4 rounded mt-0.5" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-2.5 w-3/4" />
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {RECENT_FILES.map((f, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded shrink-0 mt-0.5 font-semibold"
+                    style={{ background: `${fileExtColor[f.ext]}18`, color: fileExtColor[f.ext] }}
+                  >
+                    .{f.ext}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium truncate" style={{ color: TEXT_PRIMARY }}>{f.path}</p>
+                    <p className="text-[10px] truncate mt-0.5" style={{ color: TEXT_TERTIARY }}>{f.fullPath}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span
+                        className="text-[9px] font-semibold"
+                        style={{ color: f.change === "Added" ? UI_GREEN : UI_AMBER }}
+                      >
+                        {f.change}
+                      </span>
+                      <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>{f.time}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* 2-컬럼 그리드: 에이전트 상태(미니) + 서버 상태 */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 mt-3">
         {/* Multi-Agent Status (미니) */}
         <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}` }}>
           <div className="flex items-center gap-2 mb-3">
             <Bot className="w-3.5 h-3.5" style={{ color: UI_GREEN }} />
             <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Multi-Agent Status</p>
           </div>
-          <div className="space-y-1.5">
-            {INITIAL_AGENTS.slice(0, 4).map(a => (
-              <div key={a.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Circle
-                    className="w-1.5 h-1.5 shrink-0 fill-current"
-                    style={{ color: a.status === "running" ? UI_GREEN : a.status === "error" ? UI_RED : UI_GRAY_LIGHT }}
-                  />
-                  <span className="text-[11px] truncate" style={{ color: TEXT_PRIMARY }}>{a.name}</span>
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                 <div key={i} className="flex justify-between items-center">
+                   <div className="flex items-center gap-2"><Skeleton className="w-2 h-2 rounded-full"/><Skeleton className="w-24 h-2.5"/></div>
+                   <div className="flex gap-2"><Skeleton className="w-16 h-2.5"/><Skeleton className="w-10 h-3 rounded-full"/></div>
+                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {INITIAL_AGENTS.slice(0, 4).map(a => (
+                <div key={a.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Circle
+                      className="w-1.5 h-1.5 shrink-0 fill-current"
+                      style={{ color: a.status === "running" ? UI_GREEN : a.status === "error" ? UI_RED : UI_GRAY_LIGHT }}
+                    />
+                    <span className="text-[11px] truncate" style={{ color: TEXT_PRIMARY }}>{a.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>{a.task.slice(0, 18)}{a.task.length > 18 ? "…" : ""}</span>
+                    <StatusBadge status={a.status} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>{a.task.slice(0, 18)}{a.task.length > 18 ? "…" : ""}</span>
-                  <StatusBadge status={a.status} />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Server Status */}
@@ -535,26 +623,37 @@ function WorkspaceHome({ project }: { project: typeof PROJECTS[number] }) {
             <Server className="w-3.5 h-3.5" style={{ color: UI_GREEN_DARK }} />
             <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Server Status</p>
           </div>
-          <div className="space-y-2">
-            {[
-              { label: "Server",         value: "UP",           ok: true  },
-              { label: "Active Profile", value: "'dev'",        ok: true  },
-              { label: "JDK",            value: "17.0.18+8",   ok: true  },
-              { label: "Port",           value: "8080",         ok: true  },
-              { label: "Context Path",   value: "/",            ok: true  },
-            ].map(row => (
-              <div key={row.label} className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: TEXT_LABEL }}>{row.label}</span>
-                <div className="flex items-center gap-1.5">
-                  {row.ok
-                    ? <CheckCircle2 className="w-3 h-3" style={{ color: UI_GREEN }} />
-                    : <AlertCircle className="w-3 h-3" style={{ color: UI_RED }} />
-                  }
-                  <span className="text-[11px] font-mono font-medium" style={{ color: TEXT_PRIMARY }}>{row.value}</span>
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                 <div key={i} className="flex justify-between items-center">
+                   <Skeleton className="w-16 h-2.5" />
+                   <div className="flex items-center gap-1.5"><Skeleton className="w-3 h-3 rounded-full"/><Skeleton className="w-16 h-2.5"/></div>
+                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {[
+                { label: "Server",         value: "UP",          ok: true  },
+                { label: "Active Profile", value: "'dev'",        ok: true  },
+                { label: "JDK",            value: "17.0.18+8",   ok: true  },
+                { label: "Port",           value: "8080",        ok: true  },
+                { label: "Context Path",   value: "/",            ok: true  },
+              ].map(row => (
+                <div key={row.label} className="flex items-center justify-between">
+                  <span className="text-[10px]" style={{ color: TEXT_LABEL }}>{row.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    {row.ok
+                      ? <CheckCircle2 className="w-3 h-3" style={{ color: UI_GREEN }} />
+                      : <AlertCircle className="w-3 h-3" style={{ color: UI_RED }} />
+                    }
+                    <span className="text-[11px] font-mono font-medium" style={{ color: TEXT_PRIMARY }}>{row.value}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -562,9 +661,9 @@ function WorkspaceHome({ project }: { project: typeof PROJECTS[number] }) {
 }
 
 // ════════════════════════════════════════════
-// Agents Control 탭 (기존 AgentMonitor 유지)
+// Agents Control 탭 
 // ════════════════════════════════════════════
-function AgentMonitor() {
+function AgentMonitor({ isLoading }: { isLoading?: boolean }) {
   const [agents, setAgents] = useState(INITIAL_AGENTS);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -591,82 +690,110 @@ function AgentMonitor() {
     <div>
       <SectionHeader title="Agents Control" sub="에이전트 상태 · CPU/메모리 · 현재 작업 실시간 모니터링" />
       <div className="flex items-center gap-2 mb-4">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search agent..."
-            className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg outline-none"
-            style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
-          />
-        </div>
-        {["all", "running", "idle", "error"].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all capitalize"
-            style={{
-              background: filter === f ? CTA_BG : "rgba(255,255,255,0.7)",
-              color: filter === f ? CTA_TEXT : TEXT_SECONDARY,
-              border: `1px solid ${BORDER}`,
-            }}
-          >
-            {f === "all" ? "All" : f}
-          </button>
-        ))}
+        {isLoading ? (
+          <div className="flex gap-2 w-full">
+             <Skeleton className="w-64 h-7 rounded-lg" />
+             {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="w-16 h-7 rounded-lg" />)}
+          </div>
+        ) : (
+          <>
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search agent..."
+                className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg outline-none"
+                style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              />
+            </div>
+            {["all", "running", "idle", "error"].map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all capitalize"
+                style={{
+                  background: filter === f ? CTA_BG : "rgba(255,255,255,0.7)",
+                  color: filter === f ? CTA_TEXT : TEXT_SECONDARY,
+                  border: `1px solid ${BORDER}`,
+                }}
+              >
+                {f === "all" ? "All" : f}
+              </button>
+            ))}
+          </>
+        )}
       </div>
+
       <div className="grid grid-cols-1 gap-2.5">
-        {filtered.map(agent => (
-          <div key={agent.id} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}`, backdropFilter: "blur(8px)" }}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, #e0e7ff, #e8d5f5, #fce7f3)" }}>
-                  <Bot className="w-4 h-4" style={{ color: ACCENT }} />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>{agent.name}</span>
-                    <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{agent.id}</span>
-                    <StatusBadge status={agent.status} />
+        {isLoading ? (
+           Array.from({ length: 5 }).map((_, i) => (
+             <div key={i} className="rounded-xl p-3.5 border bg-white/75 flex items-start gap-3">
+               <div className="flex gap-2.5 w-full">
+                 <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                 <div className="flex-1 space-y-1.5 pt-0.5">
+                    <div className="flex items-center gap-2"><Skeleton className="h-3 w-24" /><Skeleton className="h-2.5 w-12" /></div>
+                    <Skeleton className="h-2.5 w-48" />
+                    <div className="flex items-center gap-4 pt-1"><Skeleton className="h-2.5 w-20" /><Skeleton className="h-2.5 w-20" /><Skeleton className="h-2.5 w-12" /></div>
+                 </div>
+               </div>
+               <div className="flex gap-1 shrink-0">
+                  <Skeleton className="w-6 h-6 rounded-md" /><Skeleton className="w-6 h-6 rounded-md" /><Skeleton className="w-6 h-6 rounded-md" />
+               </div>
+             </div>
+           ))
+        ) : (
+          filtered.map(agent => (
+            <div key={agent.id} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}`, backdropFilter: "blur(8px)" }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, #e0e7ff, #e8d5f5, #fce7f3)" }}>
+                    <Bot className="w-4 h-4" style={{ color: ACCENT }} />
                   </div>
-                  <p className="text-[10px] mt-0.5 truncate" style={{ color: TEXT_SECONDARY }}>{agent.task}</p>
-                  <div className="flex items-center gap-4 mt-1.5">
-                    <div className="flex items-center gap-1">
-                      <Cpu className="w-2.5 h-2.5" style={{ color: TEXT_TERTIARY }} />
-                      <MiniBar value={agent.cpu} color={agent.cpu > 70 ? "#ef4444" : ACCENT} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>{agent.name}</span>
+                      <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{agent.id}</span>
+                      <StatusBadge status={agent.status} />
                     </div>
-                    <div className="flex items-center gap-1">
-                      <MemoryStick className="w-2.5 h-2.5" style={{ color: TEXT_TERTIARY }} />
-                      <MiniBar value={agent.mem} color={agent.mem > 75 ? "#f59e0b" : "#8b5cf6"} />
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: TEXT_SECONDARY }}>{agent.task}</p>
+                    <div className="flex items-center gap-4 mt-1.5">
+                      <div className="flex items-center gap-1">
+                        <Cpu className="w-2.5 h-2.5" style={{ color: TEXT_TERTIARY }} />
+                        <MiniBar value={agent.cpu} color={agent.cpu > 70 ? "#ef4444" : ACCENT} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MemoryStick className="w-2.5 h-2.5" style={{ color: TEXT_TERTIARY }} />
+                        <MiniBar value={agent.mem} color={agent.mem > 75 ? "#f59e0b" : "#8b5cf6"} />
+                      </div>
+                      <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>⏱ {agent.uptime}</span>
                     </div>
-                    <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>⏱ {agent.uptime}</span>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => handleAction(agent.id, "start")} title="Start" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(16,185,129,0.10)", color: "#059669" }}>
-                  <Play className="w-3 h-3 fill-current" />
-                </button>
-                <button onClick={() => handleAction(agent.id, "stop")} title="Stop" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(239,68,68,0.10)", color: "#dc2626" }}>
-                  <Square className="w-3 h-3 fill-current" />
-                </button>
-                <button onClick={() => handleAction(agent.id, "restart")} title="Restart" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
-                  <RotateCcw className="w-3 h-3" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => handleAction(agent.id, "start")} title="Start" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(16,185,129,0.10)", color: "#059669" }}>
+                    <Play className="w-3 h-3 fill-current" />
+                  </button>
+                  <button onClick={() => handleAction(agent.id, "stop")} title="Stop" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(239,68,68,0.10)", color: "#dc2626" }}>
+                    <Square className="w-3 h-3 fill-current" />
+                  </button>
+                  <button onClick={() => handleAction(agent.id, "restart")} title="Restart" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
+                    <RotateCcw className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
 }
 
 // ════════════════════════════════════════════
-// Server Logs 탭 (기존 TerminalLogs 유지)
+// Server Logs 탭 
 // ════════════════════════════════════════════
-function TerminalLogs() {
+function TerminalLogs({ isLoading }: { isLoading?: boolean }) {
   const [logs, setLogs] = useState(INITIAL_LOGS);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -676,6 +803,7 @@ function TerminalLogs() {
   }, [logs]);
 
   useEffect(() => {
+    if (isLoading) return;
     const msgs = [
       { level: "INFO",  agent: "AGT-02", msg: "Processed 1024/4096 images (25%)." },
       { level: "INFO",  agent: "AGT-01", msg: "Schema transform complete. Writing to DB." },
@@ -690,12 +818,12 @@ function TerminalLogs() {
       idx++;
     }, 3000);
     return () => clearInterval(id);
-  }, []);
+  }, [isLoading]);
 
   const levelColor: Record<string, string> = { INFO: "#10b981", WARN: "#f59e0b", ERROR: "#ef4444" };
 
   const handleCmd = (e: React.KeyboardEvent) => {
-    if (e.key !== "Enter" || !input.trim()) return;
+    if (e.key !== "Enter" || !input.trim() || isLoading) return;
     const now = new Date();
     const ts = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
     setLogs(prev => [...prev, { ts, level: "CMD", agent: "USER", msg: `> ${input.trim()}` }]);
@@ -706,41 +834,60 @@ function TerminalLogs() {
     <div className="flex flex-col h-full">
       <SectionHeader title="Server Logs" sub="에이전트 통신 및 서버 활동 실시간 로그" />
       <div
-        className="flex-1 rounded-xl overflow-y-auto font-mono text-[11px] p-4 space-y-0.5"
+        className="flex-1 rounded-xl overflow-y-auto font-mono text-[11px] p-4 space-y-1"
         style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.06)", minHeight: 320, maxHeight: 420 }}
       >
-        {logs.map((log, i) => (
-          <div key={i} className="flex gap-2.5 leading-5 hover:bg-white/5 px-1 rounded transition-colors">
-            <span style={{ color: "#4b5563" }}>{log.ts}</span>
-            <span className="font-semibold w-10 shrink-0" style={{ color: log.level === "CMD" ? "#635bff" : levelColor[log.level] ?? "#9ca3af" }}>
-              {log.level}
-            </span>
-            <span style={{ color: "#6366f1" }}>[{log.agent}]</span>
-            <span style={{ color: "#d1d5db" }}>{log.msg}</span>
-          </div>
-        ))}
+        {isLoading ? (
+          /* [스켈레톤] 터미널 내부 로그 뷰 */
+          Array.from({ length: 15 }).map((_, i) => (
+             <div key={i} className="flex gap-3 px-1 py-0.5">
+               <DarkSkeleton className="w-16 h-2.5" />
+               <DarkSkeleton className="w-10 h-2.5" />
+               <DarkSkeleton className="w-20 h-2.5" />
+               <DarkSkeleton className="flex-1 h-2.5" />
+             </div>
+          ))
+        ) : (
+          logs.map((log, i) => (
+            <div key={i} className="flex gap-2.5 leading-5 hover:bg-white/5 px-1 rounded transition-colors">
+              <span style={{ color: "#4b5563" }}>{log.ts}</span>
+              <span className="font-semibold w-10 shrink-0" style={{ color: log.level === "CMD" ? "#635bff" : levelColor[log.level] ?? "#9ca3af" }}>
+                {log.level}
+              </span>
+              <span style={{ color: "#6366f1" }}>[{log.agent}]</span>
+              <span style={{ color: "#d1d5db" }}>{log.msg}</span>
+            </div>
+          ))
+        )}
         <div ref={bottomRef} />
       </div>
-      <div className="mt-2 flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <span className="text-xs font-mono" style={{ color: "#635bff" }}>$</span>
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleCmd}
-          placeholder="Enter command and press Enter..."
-          className="flex-1 bg-transparent outline-none text-xs font-mono"
-          style={{ color: "#d1d5db" }}
-        />
-        <Zap className="w-3 h-3" style={{ color: "#4b5563" }} />
-      </div>
+      
+      {isLoading ? (
+         <div className="mt-2 rounded-xl px-4 py-3 bg-[#0f1117]">
+           <DarkSkeleton className="w-full h-3" />
+         </div>
+      ) : (
+        <div className="mt-2 flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <span className="text-xs font-mono" style={{ color: "#635bff" }}>$</span>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleCmd}
+            placeholder="Enter command and press Enter..."
+            className="flex-1 bg-transparent outline-none text-xs font-mono"
+            style={{ color: "#d1d5db" }}
+          />
+          <Zap className="w-3 h-3" style={{ color: "#4b5563" }} />
+        </div>
+      )}
     </div>
   );
 }
 
 // ════════════════════════════════════════════
-// Task Queue 탭 (기존 유지)
+// Task Queue 탭
 // ════════════════════════════════════════════
-function TaskQueue() {
+function TaskQueue({ isLoading }: { isLoading?: boolean }) {
   const [tasks] = useState(TASKS);
   const [sortField, setSortField] = useState<"status" | "priority">("status");
   const [sortAsc, setSortAsc] = useState(true);
@@ -766,52 +913,78 @@ function TaskQueue() {
     <div>
       <SectionHeader title="Task Queue" sub="예약 · 진행 · 완료 작업 현황" />
       <div className="grid grid-cols-4 gap-2 mb-5">
-        {[
-          { label: "Running",   count: counts.running,   color: "#10b981", bg: "rgba(16,185,129,0.08)"  },
-          { label: "Scheduled", count: counts.scheduled, color: ACCENT,    bg: "rgba(99,91,255,0.08)"   },
-          { label: "Done",      count: counts.done,      color: "#6b7280", bg: "rgba(107,114,128,0.08)" },
-          { label: "Error",     count: counts.error,     color: "#ef4444", bg: "rgba(239,68,68,0.08)"   },
-        ].map(c => (
-          <div key={c.label} className="rounded-xl p-3 text-center" style={{ background: c.bg, border: `1px solid ${BORDER}` }}>
-            <p className="text-xl font-bold" style={{ color: c.color }}>{c.count}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{c.label}</p>
-          </div>
-        ))}
+        {isLoading ? (
+           Array.from({ length: 4 }).map((_, i) => (
+             <div key={i} className="p-3 rounded-xl border bg-white/50 space-y-2">
+                <Skeleton className="w-10 h-6 mb-1 mx-auto" />
+                <Skeleton className="w-16 h-2.5 mx-auto" />
+             </div>
+           ))
+        ) : (
+          [
+            { label: "Running",   count: counts.running,   color: "#10b981", bg: "rgba(16,185,129,0.08)"  },
+            { label: "Scheduled", count: counts.scheduled, color: ACCENT,    bg: "rgba(99,91,255,0.08)"   },
+            { label: "Done",      count: counts.done,      color: "#6b7280", bg: "rgba(107,114,128,0.08)" },
+            { label: "Error",     count: counts.error,     color: "#ef4444", bg: "rgba(239,68,68,0.08)"   },
+          ].map(c => (
+            <div key={c.label} className="rounded-xl p-3 text-center" style={{ background: c.bg, border: `1px solid ${BORDER}` }}>
+              <p className="text-xl font-bold" style={{ color: c.color }}>{c.count}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{c.label}</p>
+            </div>
+          ))
+        )}
       </div>
+
       <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${BORDER}`, background: "rgba(255,255,255,0.75)" }}>
         <div className="grid text-[10px] font-semibold px-4 py-2.5" style={{ gridTemplateColumns: "80px 1fr 90px 80px 70px 70px 70px", color: TEXT_LABEL, borderBottom: `1px solid ${BORDER}`, background: "rgba(247,247,245,0.8)" }}>
           <span>ID</span>
           <span>Task Name</span>
           <span>Agent</span>
-          <button className="flex items-center gap-1 text-left" onClick={() => toggleSort("status")}>
+          <button className="flex items-center gap-1 text-left" onClick={() => !isLoading && toggleSort("status")}>
             Status {sortField === "status" ? (sortAsc ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />) : null}
           </button>
-          <button className="flex items-center gap-1 text-left" onClick={() => toggleSort("priority")}>
+          <button className="flex items-center gap-1 text-left" onClick={() => !isLoading && toggleSort("priority")}>
             Priority {sortField === "priority" ? (sortAsc ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />) : null}
           </button>
           <span>Created</span>
           <span>ETA</span>
         </div>
-        {sorted.map((task, i) => (
-          <div key={task.id} className="grid px-4 py-2.5 items-center text-xs transition-colors hover:bg-black/[0.02]" style={{ gridTemplateColumns: "80px 1fr 90px 80px 70px 70px 70px", borderBottom: i < sorted.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-            <span className="font-mono text-[10px]" style={{ color: TEXT_TERTIARY }}>{task.id}</span>
-            <span className="font-medium truncate pr-3" style={{ color: TEXT_PRIMARY }}>{task.name}</span>
-            <span className="font-mono text-[10px]" style={{ color: TEXT_SECONDARY }}>{task.agent}</span>
-            <StatusBadge status={task.status} />
-            <PriorityBadge priority={task.priority} />
-            <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{task.created}</span>
-            <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{task.eta}</span>
-          </div>
-        ))}
+        
+        {isLoading ? (
+           /* [스켈레톤] 태스크 큐 목록 */
+           Array.from({ length: 6 }).map((_, i) => (
+             <div key={i} className="grid px-4 py-3 border-b border-black/5 items-center" style={{ gridTemplateColumns: "80px 1fr 90px 80px 70px 70px 70px" }}>
+                <Skeleton className="w-10 h-3" />
+                <div className="pr-4"><Skeleton className="w-full h-3" /></div>
+                <Skeleton className="w-16 h-3" />
+                <Skeleton className="w-14 h-4 rounded-full" />
+                <Skeleton className="w-12 h-4 rounded-full" />
+                <Skeleton className="w-10 h-3" />
+                <Skeleton className="w-10 h-3" />
+             </div>
+           ))
+        ) : (
+          sorted.map((task, i) => (
+            <div key={task.id} className="grid px-4 py-2.5 items-center text-xs transition-colors hover:bg-black/[0.02]" style={{ gridTemplateColumns: "80px 1fr 90px 80px 70px 70px 70px", borderBottom: i < sorted.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+              <span className="font-mono text-[10px]" style={{ color: TEXT_TERTIARY }}>{task.id}</span>
+              <span className="font-medium truncate pr-3" style={{ color: TEXT_PRIMARY }}>{task.name}</span>
+              <span className="font-mono text-[10px]" style={{ color: TEXT_SECONDARY }}>{task.agent}</span>
+              <StatusBadge status={task.status} />
+              <PriorityBadge priority={task.priority} />
+              <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{task.created}</span>
+              <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{task.eta}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
 // ════════════════════════════════════════════
-// System Overview 탭 (기존 유지)
+// System Overview 탭
 // ════════════════════════════════════════════
-function SystemOverview() {
+function SystemOverview({ isLoading }: { isLoading?: boolean }) {
   const [trafficData] = useState(generateTrafficData);
   const [efficiencyData] = useState(generateEfficiencyData);
 
@@ -837,59 +1010,79 @@ function SystemOverview() {
   return (
     <div className="space-y-5">
       <SectionHeader title="System Overview" sub="서버 트래픽 · 에이전트 효율 · 시스템 가동 현황" />
+      
       <div className="grid grid-cols-4 gap-2.5">
-        {statCards.map(c => (
-          <div key={c.label} className="rounded-xl p-3.5" style={{ background: c.bg, border: `1px solid ${BORDER}` }}>
-            <p className="text-sm font-bold" style={{ color: c.color }}>{c.value}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{c.label}</p>
-          </div>
-        ))}
+        {isLoading ? (
+           Array.from({ length: 4 }).map((_, i) => (
+             <div key={i} className="rounded-xl p-3.5 border bg-white/50 space-y-2">
+               <Skeleton className="h-4 w-20" />
+               <Skeleton className="h-2.5 w-16" />
+             </div>
+           ))
+        ) : (
+          statCards.map(c => (
+            <div key={c.label} className="rounded-xl p-3.5" style={{ background: c.bg, border: `1px solid ${BORDER}` }}>
+              <p className="text-sm font-bold" style={{ color: c.color }}>{c.value}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{c.label}</p>
+            </div>
+          ))
+        )}
       </div>
+
       <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}` }}>
         <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Server Traffic (RPS & Latency)</p>
-        <ResponsiveContainer width="100%" height={180}>
-          <LineChart id="weai-traffic-line" data={trafficData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
-            <XAxis dataKey="time" tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Line type="monotone" dataKey="rps" name="RPS" stroke={ACCENT} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: ACCENT }} />
-            <Line type="monotone" dataKey="latency" name="Latency(ms)" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#f59e0b" }} />
-          </LineChart>
-        </ResponsiveContainer>
+        {isLoading ? (
+           <Skeleton className="w-full h-[180px] rounded-lg" />
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart id="weai-traffic-line" data={trafficData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+              <XAxis dataKey="time" tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Line type="monotone" dataKey="rps" name="RPS" stroke={ACCENT} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: ACCENT }} />
+              <Line type="monotone" dataKey="latency" name="Latency(ms)" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#f59e0b" }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
+
       <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}` }}>
         <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Agent Efficiency (%)</p>
-        <ResponsiveContainer width="100%" height={150}>
-          <BarChart id="weai-efficiency-bar" data={efficiencyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-            <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="efficiency" name="Efficiency" radius={[4, 4, 0, 0]} fill="url(#barGrad2)" />
-            <defs>
-              <linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
-                <stop offset="100%" stopColor="#635bff" stopOpacity={0.6} />
-              </linearGradient>
-            </defs>
-          </BarChart>
-        </ResponsiveContainer>
+        {isLoading ? (
+           <Skeleton className="w-full h-[150px] rounded-lg" />
+        ) : (
+          <ResponsiveContainer width="100%" height={150}>
+            <BarChart id="weai-efficiency-bar" data={efficiencyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="efficiency" name="Efficiency" radius={[4, 4, 0, 0]} fill="url(#barGrad2)" />
+              <defs>
+                <linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
+                  <stop offset="100%" stopColor="#635bff" stopOpacity={0.6} />
+                </linearGradient>
+              </defs>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );
 }
 
 // ════════════════════════════════════════════
-// Build Tools 탭 (NEW — Gradle / Spring Boot)
+// Build Tools 탭
 // ════════════════════════════════════════════
-function BuildTools() {
+function BuildTools({ isLoading }: { isLoading?: boolean }) {
   const [serverUp, setServerUp] = useState(true);
   const [buildRunning, setBuildRunning] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState(BUILD_BOOT_LOGS);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "auto" }); }, [consoleLogs]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "auto" }); }, [consoleLogs, isLoading]);
 
   const gradleCmd = (cmd: string) => {
     setBuildRunning(true);
@@ -939,20 +1132,24 @@ function BuildTools() {
               <Activity className="w-3.5 h-3.5" style={{ color: serverUp ? "#10b981" : "#ef4444" }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Server Status</p>
             </div>
-            <StatusBadge status={serverUp ? "running" : "error"} />
+            {!isLoading && <StatusBadge status={serverUp ? "running" : "error"} />}
           </div>
           <div className="space-y-1.5">
-            {[
-              { k: "Process",    v: serverUp ? "gradlew.bat bootRun" : "—"     },
-              { k: "Profile",    v: "$env:SPRING_PROFILES_ACTIVE = 'dev'"       },
-              { k: "Port",       v: "http://localhost:8080"                     },
-              { k: "Uptime",     v: serverUp ? "18d 06h 22m" : "—"             },
-            ].map(r => (
-              <div key={r.k} className="flex items-center gap-2">
-                <span className="text-[10px] w-16 shrink-0" style={{ color: TEXT_LABEL }}>{r.k}</span>
-                <span className="text-[10px] font-mono truncate" style={{ color: TEXT_PRIMARY }}>{r.v}</span>
-              </div>
-            ))}
+            {isLoading ? (
+               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)
+            ) : (
+              [
+                { k: "Process",    v: serverUp ? "gradlew.bat bootRun" : "—"     },
+                { k: "Profile",    v: "$env:SPRING_PROFILES_ACTIVE = 'dev'"       },
+                { k: "Port",       v: "http://localhost:8080"                     },
+                { k: "Uptime",     v: serverUp ? "18d 06h 22m" : "—"             },
+              ].map(r => (
+                <div key={r.k} className="flex items-center gap-2">
+                  <span className="text-[10px] w-16 shrink-0" style={{ color: TEXT_LABEL }}>{r.k}</span>
+                  <span className="text-[10px] font-mono truncate" style={{ color: TEXT_PRIMARY }}>{r.v}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -963,18 +1160,22 @@ function BuildTools() {
             <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Environment</p>
           </div>
           <div className="space-y-1.5">
-            {[
-              { k: "OS",      v: "Windows 11 Pro"          },
-              { k: "JDK",     v: "17.0.18+8 (LTS)"         },
-              { k: "Gradle",  v: "8.7"                     },
-              { k: "Profile", v: "dev"                     },
-              { k: "Spring",  v: "Boot 3.2.4 / Java 17"   },
-            ].map(r => (
-              <div key={r.k} className="flex items-center gap-2">
-                <span className="text-[10px] w-14 shrink-0" style={{ color: TEXT_LABEL }}>{r.k}</span>
-                <span className="text-[10px] font-mono" style={{ color: TEXT_PRIMARY }}>{r.v}</span>
-              </div>
-            ))}
+            {isLoading ? (
+               Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)
+            ) : (
+              [
+                { k: "OS",      v: "Windows 11 Pro"          },
+                { k: "JDK",     v: "17.0.18+8 (LTS)"         },
+                { k: "Gradle",  v: "8.7"                     },
+                { k: "Profile", v: "dev"                     },
+                { k: "Spring",  v: "Boot 3.2.4 / Java 17"   },
+              ].map(r => (
+                <div key={r.k} className="flex items-center gap-2">
+                  <span className="text-[10px] w-14 shrink-0" style={{ color: TEXT_LABEL }}>{r.k}</span>
+                  <span className="text-[10px] font-mono" style={{ color: TEXT_PRIMARY }}>{r.v}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -982,34 +1183,40 @@ function BuildTools() {
       {/* Gradle 명령어 버튼들 */}
       <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}` }}>
         <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Gradle Commands</p>
-        <div className="flex flex-wrap gap-2">
-          {gradleCommands.map(({ cmd, label, icon: Icon, color, bg, desc }) => (
-            <button
-              key={cmd}
-              onClick={() => gradleCmd(cmd)}
-              disabled={buildRunning}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
-              style={{
-                background: bg,
-                border: `1px solid ${color}30`,
-                opacity: buildRunning ? 0.5 : 1,
-                cursor: buildRunning ? "not-allowed" : "pointer",
-              }}
-            >
-              <Icon className="w-3.5 h-3.5" style={{ color }} />
-              <div className="text-left">
-                <p className="text-[11px] font-semibold" style={{ color }}>./gradlew {label}</p>
-                <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{desc}</p>
+        {isLoading ? (
+           <div className="flex gap-2">
+             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="w-24 h-9 rounded-lg" />)}
+           </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {gradleCommands.map(({ cmd, label, icon: Icon, color, bg, desc }) => (
+              <button
+                key={cmd}
+                onClick={() => gradleCmd(cmd)}
+                disabled={buildRunning}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
+                style={{
+                  background: bg,
+                  border: `1px solid ${color}30`,
+                  opacity: buildRunning ? 0.5 : 1,
+                  cursor: buildRunning ? "not-allowed" : "pointer",
+                }}
+              >
+                <Icon className="w-3.5 h-3.5" style={{ color }} />
+                <div className="text-left">
+                  <p className="text-[11px] font-semibold" style={{ color }}>./gradlew {label}</p>
+                  <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{desc}</p>
+                </div>
+              </button>
+            ))}
+            {buildRunning && (
+              <div className="flex items-center gap-1.5 px-3 py-2">
+                <RefreshCw className="w-3 h-3 animate-spin" style={{ color: TEXT_TERTIARY }} />
+                <span className="text-[11px]" style={{ color: TEXT_TERTIARY }}>Running...</span>
               </div>
-            </button>
-          ))}
-          {buildRunning && (
-            <div className="flex items-center gap-1.5 px-3 py-2">
-              <RefreshCw className="w-3 h-3 animate-spin" style={{ color: TEXT_TERTIARY }} />
-              <span className="text-[11px]" style={{ color: TEXT_TERTIARY }}>Running...</span>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 빌드 콘솔 */}
@@ -1017,13 +1224,22 @@ function BuildTools() {
         <p className="text-xs font-semibold mb-2" style={{ color: TEXT_PRIMARY }}>Build Console</p>
         <div
           className="rounded-xl overflow-y-auto font-mono text-[10px] p-4 space-y-0.5"
-          style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.06)", maxHeight: 220 }}
+          style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.06)", height: 220 }}
         >
-          {consoleLogs.map((line, i) => (
-            <div key={i} className="leading-4" style={{ color: line.includes("BUILD SUCCESSFUL") ? "#10b981" : line.includes("ERROR") ? "#ef4444" : line.startsWith(" .") || line.startsWith(" /") || line.startsWith("(") || line.startsWith("=") || line.startsWith("'") ? "#635bff" : "#9ca3af" }}>
-              {line || " "}
-            </div>
-          ))}
+          {isLoading ? (
+             <div className="space-y-2.5">
+                <DarkSkeleton className="w-1/2 h-3" />
+                <DarkSkeleton className="w-3/4 h-3" />
+                <DarkSkeleton className="w-1/3 h-3" />
+                <DarkSkeleton className="w-full h-3" />
+             </div>
+          ) : (
+            consoleLogs.map((line, i) => (
+              <div key={i} className="leading-4" style={{ color: line.includes("BUILD SUCCESSFUL") ? "#10b981" : line.includes("ERROR") ? "#ef4444" : line.startsWith(" .") || line.startsWith(" /") || line.startsWith("(") || line.startsWith("=") || line.startsWith("'") ? "#635bff" : "#9ca3af" }}>
+                {line || " "}
+              </div>
+            ))
+          )}
           <div ref={bottomRef} />
         </div>
       </div>
@@ -1033,35 +1249,45 @@ function BuildTools() {
 
 // ════════════════════════════════════════════
 // WE&AI 대시보드 루트
-// 뷰 상태: "entry" (Screen A) → "workspace" (Screen B with tabs)
 // ════════════════════════════════════════════
 export function WeAIDashboard() {
-  // entry: 프로젝트 선택 화면 / workspace: 프로젝트 워크스페이스
   const [view, setView] = useState<"entry" | "workspace">("entry");
   const [activeProject, setActiveProject] = useState<typeof PROJECTS[number] | null>(null);
   const [activeTab, setActiveTab] = useState("home");
 
-  // 프로젝트 선택 후 워크스페이스 진입
+  // 🚨 [추가] 프로젝트 목록(entry) 로딩 시뮬레이션
+  const [isLoadingEntry, setIsLoadingEntry] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoadingEntry(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 🚨 [추가] 워크스페이스 진입 시 스켈레톤 로딩 관리
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(false);
+
   const handleJoin = (project: typeof PROJECTS[number]) => {
     setActiveProject(project);
     setView("workspace");
     setActiveTab("home");
+    // 워크스페이스 진입 시 3초 동안 스켈레톤을 보여줌
+    setIsLoadingWorkspace(true);
+    setTimeout(() => setIsLoadingWorkspace(false), 3000);
   };
 
   // Screen A — 프로젝트 진입 화면
   if (view === "entry") {
-    return <ProjectEntry onJoin={handleJoin} />;
+    return <ProjectEntry onJoin={handleJoin} isLoading={isLoadingEntry} />;
   }
 
   // Screen B — 프로젝트 워크스페이스
   const renderTab = () => {
     switch (activeTab) {
-      case "home":     return <WorkspaceHome project={activeProject!} />;
-      case "agents":   return <AgentMonitor />;
-      case "terminal": return <TerminalLogs />;
-      case "queue":    return <TaskQueue />;
-      case "overview": return <SystemOverview />;
-      case "build":    return <BuildTools />;
+      case "home":     return <WorkspaceHome project={activeProject!} isLoading={isLoadingWorkspace} />;
+      case "agents":   return <AgentMonitor isLoading={isLoadingWorkspace} />;
+      case "terminal": return <TerminalLogs isLoading={isLoadingWorkspace} />;
+      case "queue":    return <TaskQueue isLoading={isLoadingWorkspace} />;
+      case "overview": return <SystemOverview isLoading={isLoadingWorkspace} />;
+      case "build":    return <BuildTools isLoading={isLoadingWorkspace} />;
       default:         return null;
     }
   };
@@ -1083,9 +1309,11 @@ export function WeAIDashboard() {
         className="relative z-10 flex items-center gap-1 px-4 pt-3 pb-2.5 shrink-0 flex-wrap"
         style={{ borderBottom: `1px solid ${BORDER}` }}
       >
-        {/* 프로젝트 선택 화면으로 돌아가기 */}
         <button
-          onClick={() => setView("entry")}
+          onClick={() => {
+            setView("entry");
+            setIsLoadingEntry(false); // 다시 나갈 때는 로딩 생략
+          }}
           className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs transition-all mr-2 shrink-0"
           style={{ color: TEXT_SECONDARY, background: "rgba(0,0,0,0.04)" }}
         >
@@ -1093,7 +1321,6 @@ export function WeAIDashboard() {
           <span>Projects</span>
         </button>
 
-        {/* 프로젝트명 표시 */}
         <div className="flex items-center gap-2 mr-3 shrink-0">
           <div
             className="w-5 h-5 rounded-md flex items-center justify-center"
@@ -1111,22 +1338,21 @@ export function WeAIDashboard() {
           </div>
         </div>
 
-        {/* 구분선 */}
         <div className="w-px h-4 mr-1 shrink-0" style={{ background: BORDER }} />
 
-        {/* 탭 버튼들 */}
         <div className="flex items-center gap-1 overflow-x-auto">
           {WORKSPACE_TABS.map(tab => (
             <TabBtn
               key={tab.id}
               tab={tab}
               active={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (!isLoadingWorkspace) setActiveTab(tab.id);
+              }}
             />
           ))}
         </div>
 
-        {/* 오른쪽: 멤버 수 */}
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           <Users className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
           <span className="text-[10px]" style={{ color: TEXT_TERTIARY }}>{activeProject?.members} members</span>

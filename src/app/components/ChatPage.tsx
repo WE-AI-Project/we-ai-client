@@ -22,6 +22,16 @@ import {
   OLIVE_DARK,
 } from "../colors";
 
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
+
 // ══════════════════════════════════════════════════════════
 // 프로젝트 지식 데이터 (AI 탭에서 사용)
 // ══════════════════════════════════════════════════════════
@@ -639,6 +649,13 @@ export function ChatPage({
   projectId?: number | null;
   onDocsUpdate?: (count: number) => void;
 }) {
+  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [mainTab,      setMainTab]      = useState<"chat" | "ai" | "docs">("chat");
   const [partTab,      setPartTab]      = useState<PartId>("all");
   const [partMessages, setPartMessages] = useState<Record<PartId, ChatMessage[]>>(() => {
@@ -781,24 +798,20 @@ export function ChatPage({
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "file";
     e.target.value = "";
 
-    // 1. 파일 공유 메시지 먼저
     addPartMessage({
       sender: "병권", avatar: "병", role: "me",
       content: "", type: "file",
       fileName: file.name, fileType: ext,
     });
 
-    // 2. 로딩 상태 시작
     setBriefingLoading(file.name);
     setTimeout(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, 80);
 
-    // 3. AI 브리핑 생성 (2~3초 시뮬레이션)
     const delay = 2200 + Math.random() * 800;
     setTimeout(() => {
       const briefing   = generateDocBriefing(file.name, ext);
       const meetingDoc = briefingToMeetingDoc(briefing);
 
-      // 로딩 해제 + 브리핑 메시지 추가
       setBriefingLoading(null);
       addPartMessage({
         sender: "WE&AI", avatar: "AI", role: "other",
@@ -807,7 +820,6 @@ export function ChatPage({
         briefing,
       });
 
-      // 4. Docs 저장
       setTimeout(() => {
         setDocs(prev => {
           const next = [meetingDoc, ...prev];
@@ -861,67 +873,79 @@ export function ChatPage({
           style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}
         >
           <div className="flex items-center gap-0.5 mr-3">
-            {[
-              { id: "chat", icon: MessageCircle, label: "Chat" },
-              { id: "ai",   icon: Bot,           label: "AI" },
-              { id: "docs", icon: FileText,       label: `Docs${docs.length > 0 ? ` (${docs.length})` : ""}` },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setMainTab(tab.id as any)}
-                className="flex items-center gap-1.5 px-3 h-full text-[11px] font-semibold transition-all border-b-2"
-                style={{
-                  height: 44,
-                  color: mainTab === tab.id ? OLIVE_DARK : TEXT_TERTIARY,
-                  borderBottomColor: mainTab === tab.id ? OLIVE_DARK : "transparent",
-                  background: tab.id === "ai" && mainTab === "ai" ? "rgba(65,67,27,0.05)" : "transparent",
-                }}
-              >
-                <tab.icon className="w-3.5 h-3.5" />
-                {tab.label}
-                {tab.id === "ai" && (
-                  <span className="ml-0.5 text-[8px] px-1 py-0.5 rounded-full font-bold" style={{ background: "rgba(65,67,27,0.12)", color: OLIVE_DARK }}>AI</span>
-                )}
-              </button>
-            ))}
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Skeleton className="w-16 h-7 rounded-lg" />
+                <Skeleton className="w-16 h-7 rounded-lg" />
+                <Skeleton className="w-20 h-7 rounded-lg" />
+              </div>
+            ) : (
+              [
+                { id: "chat", icon: MessageCircle, label: "Chat" },
+                { id: "ai",   icon: Bot,           label: "AI" },
+                { id: "docs", icon: FileText,       label: `Docs${docs.length > 0 ? ` (${docs.length})` : ""}` },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setMainTab(tab.id as any)}
+                  className="flex items-center gap-1.5 px-3 h-full text-[11px] font-semibold transition-all border-b-2"
+                  style={{
+                    height: 44,
+                    color: mainTab === tab.id ? OLIVE_DARK : TEXT_TERTIARY,
+                    borderBottomColor: mainTab === tab.id ? OLIVE_DARK : "transparent",
+                    background: tab.id === "ai" && mainTab === "ai" ? "rgba(65,67,27,0.05)" : "transparent",
+                  }}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                  {tab.id === "ai" && (
+                    <span className="ml-0.5 text-[8px] px-1 py-0.5 rounded-full font-bold" style={{ background: "rgba(65,67,27,0.12)", color: OLIVE_DARK }}>AI</span>
+                  )}
+                </button>
+              ))
+            )}
           </div>
 
           {/* 오른쪽: 회의 컨트롤 */}
           <div className="ml-auto flex items-center gap-2">
-            {isMeeting && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.10)" }}>
-                <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                <span className="text-[10px] font-semibold" style={{ color: "#ef4444" }}>REC {formatElapsed(elapsed)}</span>
-              </div>
-            )}
-            {savingDoc && (
-              <div className="flex items-center gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                <Loader2 className="w-3 h-3 animate-spin" /> 저장 중…
-              </div>
-            )}
-            {docSaved && !savingDoc && (
-              <div className="flex items-center gap-1.5 text-[9px]" style={{ color: "#5A8A4A" }}>
-                <CheckCircle2 className="w-3 h-3" /> 저장됨
-              </div>
-            )}
-            {isMeeting && (
-              <button onClick={() => setMicOn(m => !m)} className="p-1.5 rounded-lg transition-all"
-                style={{ background: micOn ? "rgba(16,185,129,0.12)" : "rgba(0,0,0,0.05)" }}>
-                {micOn ? <Mic className="w-3.5 h-3.5" style={{ color: "#10b981" }} /> : <MicOff className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />}
-              </button>
-            )}
-            {mainTab === "chat" && (
-              <button
-                onClick={isMeeting ? endMeeting : startMeeting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-                style={{
-                  background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(65,67,27,0.08)",
-                  color:      isMeeting ? "#ef4444" : OLIVE_DARK,
-                  border:     `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(65,67,27,0.15)"}`,
-                }}
-              >
-                {isMeeting ? <><VideoOff className="w-3.5 h-3.5" /> 회의 종료</> : <><Video className="w-3.5 h-3.5" /> 회의 시작</>}
-              </button>
+            {!isLoading && (
+              <>
+                {isMeeting && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.10)" }}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                    <span className="text-[10px] font-semibold" style={{ color: "#ef4444" }}>REC {formatElapsed(elapsed)}</span>
+                  </div>
+                )}
+                {savingDoc && (
+                  <div className="flex items-center gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                    <Loader2 className="w-3 h-3 animate-spin" /> 저장 중…
+                  </div>
+                )}
+                {docSaved && !savingDoc && (
+                  <div className="flex items-center gap-1.5 text-[9px]" style={{ color: "#5A8A4A" }}>
+                    <CheckCircle2 className="w-3 h-3" /> 저장됨
+                  </div>
+                )}
+                {isMeeting && (
+                  <button onClick={() => setMicOn(m => !m)} className="p-1.5 rounded-lg transition-all"
+                    style={{ background: micOn ? "rgba(16,185,129,0.12)" : "rgba(0,0,0,0.05)" }}>
+                    {micOn ? <Mic className="w-3.5 h-3.5" style={{ color: "#10b981" }} /> : <MicOff className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />}
+                  </button>
+                )}
+                {mainTab === "chat" && (
+                  <button
+                    onClick={isMeeting ? endMeeting : startMeeting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                    style={{
+                      background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(65,67,27,0.08)",
+                      color:      isMeeting ? "#ef4444" : OLIVE_DARK,
+                      border:     `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(65,67,27,0.15)"}`,
+                    }}
+                  >
+                    {isMeeting ? <><VideoOff className="w-3.5 h-3.5" /> 회의 종료</> : <><Video className="w-3.5 h-3.5" /> 회의 시작</>}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -934,35 +958,41 @@ export function ChatPage({
               className="flex items-center gap-1 px-3 h-10 shrink-0 overflow-x-auto"
               style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}
             >
-              {(Object.entries(PART_CONFIG) as [PartId, typeof PART_CONFIG[PartId]][]).map(([id, cfg]) => {
-                const Icon = cfg.icon;
-                const isActive = partTab === id;
-                const memberCount = id === "all" ? PROJECT_TEAM.length : PROJECT_TEAM.filter(m => m.partId === id).length;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => setPartTab(id)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 transition-all"
-                    style={{
-                      background: isActive ? cfg.bg : "transparent",
-                      color:      isActive ? cfg.color : TEXT_TERTIARY,
-                      border:     `1px solid ${isActive ? "rgba(0,0,0,0.08)" : "transparent"}`,
-                    }}
-                  >
-                    <Icon className="w-3 h-3" />
-                    {cfg.labelKo}
-                    <span
-                      className="text-[8px] px-1 py-0.5 rounded-full ml-0.5"
-                      style={{ background: isActive ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)", color: isActive ? cfg.color : TEXT_TERTIARY }}
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="w-20 h-6 rounded-lg mx-1" />
+                ))
+              ) : (
+                (Object.entries(PART_CONFIG) as [PartId, typeof PART_CONFIG[PartId]][]).map(([id, cfg]) => {
+                  const Icon = cfg.icon;
+                  const isActive = partTab === id;
+                  const memberCount = id === "all" ? PROJECT_TEAM.length : PROJECT_TEAM.filter(m => m.partId === id).length;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setPartTab(id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 transition-all"
+                      style={{
+                        background: isActive ? cfg.bg : "transparent",
+                        color:      isActive ? cfg.color : TEXT_TERTIARY,
+                        border:     `1px solid ${isActive ? "rgba(0,0,0,0.08)" : "transparent"}`,
+                      }}
                     >
-                      {memberCount}
-                    </span>
-                  </button>
-                );
-              })}
+                      <Icon className="w-3 h-3" />
+                      {cfg.labelKo}
+                      <span
+                        className="text-[8px] px-1 py-0.5 rounded-full ml-0.5"
+                        style={{ background: isActive ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)", color: isActive ? cfg.color : TEXT_TERTIARY }}
+                      >
+                        {memberCount}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
 
               <div className="ml-auto flex items-center gap-1 shrink-0">
-                {(partTab === "all" ? PROJECT_TEAM : PROJECT_TEAM.filter(m => m.partId === partTab)).slice(0, 4).map(m => (
+                {!isLoading && (partTab === "all" ? PROJECT_TEAM : PROJECT_TEAM.filter(m => m.partId === partTab)).slice(0, 4).map(m => (
                   <div
                     key={m.name}
                     title={`${m.name} — ${m.role}`}
@@ -975,53 +1005,47 @@ export function ChatPage({
               </div>
             </div>
 
-            {/* 회의 배너 */}
-            {isMeeting && (
-              <div className="flex items-center gap-3 px-4 py-2 shrink-0"
-                style={{ background: "rgba(184,84,80,0.07)", borderBottom: `1px solid rgba(184,84,80,0.12)` }}>
-                <Users className="w-3.5 h-3.5 shrink-0" style={{ color: "#ef4444" }} />
-                <span className="text-[10px] font-semibold" style={{ color: "#ef4444" }}>회의 진행 중</span>
-                <div className="flex items-center gap-1.5 ml-2">
-                  {MEETING_MEMBERS.map(m => (
-                    <div key={m} className="flex items-center gap-1">
-                      <Avatar name={m} size={5} />
-                      <span className="text-[9px]" style={{ color: TEXT_SECONDARY }}>{m}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="ml-auto flex items-center gap-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                  <Clock className="w-3 h-3" />{formatElapsed(elapsed)}
-                </div>
-              </div>
-            )}
-
             {/* 메시지 목록 */}
             <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {currentMessages.map(msg => (
-                <MessageBubble
-                  key={msg.id}
-                  msg={msg}
-                  onViewDoc={() => {
-                    setMainTab("docs");
-                  }}
-                />
-              ))}
-              {/* AI 브리핑 로딩 버블 */}
-              {briefingLoading && <BriefingLoadingBubble fileName={briefingLoading} />}
-              {typing && (
-                <div className="flex gap-2 items-end mb-3">
-                  <Avatar name="Admin" />
-                  <div className="rounded-2xl px-4 py-3" style={{ background: "rgba(255,255,255,0.90)", border: `1px solid ${BORDER}` }}>
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map(i => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full"
-                          style={{ background: TEXT_TERTIARY, animation: `bounce 1s ${i * 0.15}s infinite` }} />
-                      ))}
-                    </div>
-                  </div>
+              {isLoading ? (
+                /* [스켈레톤] 채팅 버블들 */
+                <div className="space-y-4">
+                  {Array.from({ length: 4 }).map((_, i) => {
+                    const isMe = i % 2 !== 0;
+                    return (
+                      <div key={i} className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} items-end`}>
+                        {!isMe && <Skeleton className="w-7 h-7 rounded-full shrink-0" />}
+                        <Skeleton className={`h-12 rounded-2xl ${isMe ? "w-48" : "w-64"}`} />
+                      </div>
+                    );
+                  })}
                 </div>
+              ) : (
+                <>
+                  {currentMessages.map(msg => (
+                    <MessageBubble
+                      key={msg.id}
+                      msg={msg}
+                      onViewDoc={() => setMainTab("docs")}
+                    />
+                  ))}
+                  {briefingLoading && <BriefingLoadingBubble fileName={briefingLoading} />}
+                  {typing && (
+                    <div className="flex gap-2 items-end mb-3">
+                      <Avatar name="Admin" />
+                      <div className="rounded-2xl px-4 py-3" style={{ background: "rgba(255,255,255,0.90)", border: `1px solid ${BORDER}` }}>
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map(i => (
+                            <div key={i} className="w-1.5 h-1.5 rounded-full"
+                              style={{ background: TEXT_TERTIARY, animation: `bounce 1s ${i * 0.15}s infinite` }} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={bottomRef} />
+                </>
               )}
-              <div ref={bottomRef} />
             </div>
 
             {/* 입력창 */}
@@ -1031,56 +1055,42 @@ export function ChatPage({
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  placeholder={`${PART_CONFIG[partTab].labelKo} 채널에 메시지 입력...`}
+                  disabled={isLoading}
+                  placeholder={isLoading ? "채팅 불러오는 중..." : `${PART_CONFIG[partTab].labelKo} 채널에 메시지 입력...`}
                   rows={2}
-                  className="flex-1 resize-none outline-none text-[11px] leading-relaxed"
+                  className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
                   style={{ background: "transparent", color: TEXT_PRIMARY }}
                 />
                 <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
-                  {/* 일반 파일 첨부 */}
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-1.5 rounded-lg hover:bg-black/[0.05]"
-                    title="파일 첨부"
+                    disabled={isLoading}
+                    className="p-1.5 rounded-lg hover:bg-black/[0.05] disabled:opacity-50"
                   >
                     <Paperclip className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
                   </button>
                   <input ref={fileInputRef} type="file" className="hidden" onChange={handleFile} />
 
-                  {/* ✦ AI 문서 브리핑 버튼 */}
                   <button
                     onClick={() => briefFileRef.current?.click()}
-                    disabled={!!briefingLoading}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
+                    disabled={!!briefingLoading || isLoading}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-semibold transition-all disabled:opacity-50"
                     style={{
                       background: briefingLoading ? "rgba(0,0,0,0.04)" : "rgba(65,67,27,0.08)",
                       color:      briefingLoading ? TEXT_TERTIARY : OLIVE_DARK,
                       border:     `1px solid ${briefingLoading ? BORDER : "rgba(65,67,27,0.18)"}`,
-                      cursor:     briefingLoading ? "not-allowed" : "pointer",
+                      cursor:     briefingLoading || isLoading ? "not-allowed" : "pointer",
                     }}
-                    onMouseEnter={e => { if (!briefingLoading) e.currentTarget.style.background = "rgba(65,67,27,0.14)"; }}
-                    onMouseLeave={e => { if (!briefingLoading) e.currentTarget.style.background = "rgba(65,67,27,0.08)"; }}
-                    title="AI 문서 한글 브리핑 생성"
                   >
-                    {briefingLoading
-                      ? <Loader2 className="w-3 h-3 animate-spin" />
-                      : <BookOpen className="w-3 h-3" />
-                    }
+                    {briefingLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BookOpen className="w-3 h-3" />}
                     {briefingLoading ? "분석 중..." : "AI 문서 분석"}
                   </button>
-                  <input
-                    ref={briefFileRef}
-                    type="file"
-                    className="hidden"
-                    accept=".java,.ts,.tsx,.yml,.yaml,.gradle,.env,.pdf,.md,.mdx,.css,.txt,.json"
-                    onChange={handleBriefingFile}
-                  />
+                  <input ref={briefFileRef} type="file" className="hidden" accept=".java,.ts,.tsx,.yml,.yaml,.gradle,.env,.pdf,.md,.mdx,.css,.txt,.json" onChange={handleBriefingFile} />
 
-                  {/* 전송 버튼 */}
                   <button
                     onClick={handleSend}
-                    disabled={!input.trim()}
-                    className="w-7 h-7 rounded-xl flex items-center justify-center transition-all"
+                    disabled={!input.trim() || isLoading}
+                    className="w-7 h-7 rounded-xl flex items-center justify-center transition-all disabled:opacity-50"
                     style={{ background: input.trim() ? OLIVE_DARK : "rgba(0,0,0,0.06)" }}
                   >
                     <Send className="w-3.5 h-3.5" style={{ color: input.trim() ? "white" : TEXT_TERTIARY }} />
@@ -1115,44 +1125,57 @@ export function ChatPage({
               className="flex items-center gap-2 px-3 py-2 shrink-0 overflow-x-auto"
               style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}
             >
-              {[
-                "전체 팀원 보여줘", "프론트엔드 담당 누구야?", "백엔드 팀 알려줘",
-                "프로젝트 현황은?", "병권님 프로필", "담당 업무 목록",
-              ].map(q => (
-                <button
-                  key={q}
-                  onClick={() => {
-                    if (!aiTyping) void sendAiQuestion(q);
-                  }}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-medium whitespace-nowrap shrink-0 transition-all"
-                  style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,67,27,0.14)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(65,67,27,0.07)"; }}
-                >
-                  {q}
-                </button>
-              ))}
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="w-24 h-6 rounded-full shrink-0" />
+                ))
+              ) : (
+                [
+                  "전체 팀원 보여줘", "프론트엔드 담당 누구야?", "백엔드 팀 알려줘",
+                  "프로젝트 현황은?", "병권님 프로필", "담당 업무 목록",
+                ].map(q => (
+                  <button
+                    key={q}
+                    onClick={() => { if (!aiTyping) void sendAiQuestion(q); }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-medium whitespace-nowrap shrink-0 transition-all"
+                    style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,67,27,0.14)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(65,67,27,0.07)"; }}
+                  >
+                    {q}
+                  </button>
+                ))
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
-              {aiTyping && (
+              {isLoading ? (
                 <div className="flex gap-2.5 items-start mb-4">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
-                    <Bot className="w-3.5 h-3.5" style={{ color: "white" }} />
-                  </div>
-                  <div className="rounded-2xl px-4 py-3 mt-0.5" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}` }}>
-                    <div className="flex gap-1 items-center">
-                      {[0, 1, 2].map(i => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full"
-                          style={{ background: OLIVE_DARK, opacity: 0.5, animation: `bounce 1s ${i * 0.15}s infinite` }} />
-                      ))}
-                      <span className="ml-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>분석 중...</span>
-                    </div>
-                  </div>
+                  <Skeleton className="w-7 h-7 rounded-full shrink-0" />
+                  <Skeleton className="h-16 w-3/4 rounded-2xl" />
                 </div>
+              ) : (
+                <>
+                  {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
+                  {aiTyping && (
+                    <div className="flex gap-2.5 items-start mb-4">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
+                        <Bot className="w-3.5 h-3.5" style={{ color: "white" }} />
+                      </div>
+                      <div className="rounded-2xl px-4 py-3 mt-0.5" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}` }}>
+                        <div className="flex gap-1 items-center">
+                          {[0, 1, 2].map(i => (
+                            <div key={i} className="w-1.5 h-1.5 rounded-full"
+                              style={{ background: OLIVE_DARK, opacity: 0.5, animation: `bounce 1s ${i * 0.15}s infinite` }} />
+                          ))}
+                          <span className="ml-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>분석 중...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={aiBottomRef} />
+                </>
               )}
-              <div ref={aiBottomRef} />
             </div>
 
             <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}>
@@ -1165,15 +1188,16 @@ export function ChatPage({
                   value={aiInput}
                   onChange={e => setAIInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAISend(); } }}
+                  disabled={isLoading}
                   placeholder="프로젝트 AI에게 질문하세요... (예: 지수님 프로필 보여줘)"
                   rows={2}
-                  className="flex-1 resize-none outline-none text-[11px] leading-relaxed"
+                  className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
                   style={{ background: "transparent", color: TEXT_PRIMARY }}
                 />
                 <button
                   onClick={handleAISend}
-                  disabled={!aiInput.trim() || aiTyping}
-                  className="w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0 mb-0.5"
+                  disabled={!aiInput.trim() || aiTyping || isLoading}
+                  className="w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0 mb-0.5 disabled:opacity-50"
                   style={{ background: aiInput.trim() && !aiTyping ? OLIVE_DARK : "rgba(0,0,0,0.06)" }}
                 >
                   <Send className="w-3.5 h-3.5" style={{ color: aiInput.trim() && !aiTyping ? "white" : TEXT_TERTIARY }} />
@@ -1192,19 +1216,30 @@ export function ChatPage({
             >
               <FileText className="w-4 h-4 shrink-0" style={{ color: OLIVE_DARK }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Meeting Docs</p>
-              <span
-                className="text-[9px] px-2 py-0.5 rounded-full font-semibold"
-                style={{ background: "rgba(65,67,27,0.08)", color: OLIVE_DARK }}
-              >
-                {docs.length}개 문서
-              </span>
+              {!isLoading && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(65,67,27,0.08)", color: OLIVE_DARK }}>
+                  {docs.length}개 문서
+                </span>
+              )}
               <div className="ml-auto flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3" style={{ color: OLIVE_DARK, opacity: 0.6 }} />
                 <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>AI 한글화 문서 포함</span>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {docs.length === 0 ? (
+              {isLoading ? (
+                /* [스켈레톤] 문서 카드들 */
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="rounded-xl p-3 border bg-white/50 border-black/5 space-y-2">
+                    <div className="flex gap-2 items-center">
+                      <Skeleton className="w-6 h-6 rounded-lg" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-3/4" />
+                  </div>
+                ))
+              ) : docs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
                   <FileText className="w-10 h-10" style={{ color: "rgba(65,67,27,0.15)" }} />
                   <p className="text-[12px] font-semibold" style={{ color: TEXT_TERTIARY }}>저장된 문서가 없습니다</p>

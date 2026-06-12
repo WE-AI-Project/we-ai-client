@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GitCommit, Plus, Minus, GitBranch, Server, Monitor, Users, Clock, ChevronRight } from "lucide-react";
 import { BACKEND_COMMITS, FRONTEND_COMMITS } from "./commitData";
 import type { Commit, CommitFile } from "./commitData";
@@ -10,6 +10,26 @@ import {
 } from "../colors";
 
 const PANEL_BG = CREAM;
+
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
+
+// ── 🚨 [추가] 어두운 배경(Diff Viewer 등)용 스켈레톤 ──
+function DarkSkeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-white/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 const EXT_COLOR: Record<string, { bg: string; color: string }> = {
   java:   { bg: "rgba(245,158,11,0.10)",  color: "#f59e0b" },
@@ -139,7 +159,7 @@ function FileItem({
 // ── 커밋 컬럼 + 파일 컬럼 묶음 ──
 function RepoPane({
   label, icon: Icon, iconColor, commits, selectedCommitId, selectedFileId,
-  onSelectCommit, onSelectFile,
+  onSelectCommit, onSelectFile, isLoading,
 }: {
   label: string; icon: any; iconColor: string;
   commits: Commit[];
@@ -147,6 +167,7 @@ function RepoPane({
   selectedFileId:   string | null;
   onSelectCommit: (c: Commit) => void;
   onSelectFile:   (f: CommitFile) => void;
+  isLoading: boolean;
 }) {
   const selectedCommit = commits.find(c => c.id === selectedCommitId) ?? null;
 
@@ -165,14 +186,32 @@ function RepoPane({
           <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>main</span>
         </div>
         <div className="flex-1 overflow-y-auto" style={{ background: "#ffffff" }}>
-          {commits.map(c => (
-            <CommitItem
-              key={c.id}
-              commit={c}
-              selected={selectedCommitId === c.id}
-              onClick={() => onSelectCommit(c)}
-            />
-          ))}
+          {isLoading ? (
+            /* [스켈레톤] 커밋 리스트 */
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="px-3 py-3 border-b" style={{ borderColor: BORDER_SUBTLE }}>
+                <div className="flex items-center justify-between mb-2">
+                  <Skeleton className="w-10 h-3" />
+                  <Skeleton className="w-8 h-2" />
+                </div>
+                <Skeleton className="w-full h-3 mb-1" />
+                <Skeleton className="w-3/4 h-3 mb-3" />
+                <div className="flex items-center justify-between">
+                  <Skeleton className="w-12 h-3" />
+                  <Skeleton className="w-16 h-3" />
+                </div>
+              </div>
+            ))
+          ) : (
+            commits.map(c => (
+              <CommitItem
+                key={c.id}
+                commit={c}
+                selected={selectedCommitId === c.id}
+                onClick={() => onSelectCommit(c)}
+              />
+            ))
+          )}
         </div>
       </div>
 
@@ -185,14 +224,30 @@ function RepoPane({
           <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
             Changed Files
           </p>
-          {selectedCommit && (
+          {selectedCommit && !isLoading && (
             <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
               {selectedCommit.files.length}
             </span>
           )}
         </div>
         <div className="flex-1 overflow-y-auto" style={{ background: "#ffffff" }}>
-          {selectedCommit ? (
+          {isLoading ? (
+            /* [스켈레톤] 변경 파일 리스트 */
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="px-3 py-3 border-b" style={{ borderColor: BORDER_SUBTLE }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Skeleton className="w-6 h-4" />
+                  <Skeleton className="flex-1 h-3" />
+                  <Skeleton className="w-3 h-3" />
+                </div>
+                <Skeleton className="w-full h-2 mb-3" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="flex-1 h-1.5 rounded-full" />
+                  <Skeleton className="w-10 h-2" />
+                </div>
+              </div>
+            ))
+          ) : selectedCommit ? (
             selectedCommit.files.map(f => (
               <FileItem
                 key={f.id}
@@ -214,6 +269,13 @@ function RepoPane({
 
 // ── 메인 페이지 ──
 export function CommitDiffPage() {
+  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [mode, setMode] = useState<RepoMode>("split");
 
   // Backend 상태
@@ -245,31 +307,42 @@ export function CommitDiffPage() {
           className="flex items-center gap-0.5 p-0.5 rounded-lg ml-4"
           style={{ background: "rgba(0,0,0,0.06)", border: `1px solid ${BORDER}` }}
         >
-          {(["backend", "split", "frontend"] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-all"
-              style={{
-                background: mode === m ? "white" : "transparent",
-                color: mode === m ? TEXT_PRIMARY : TEXT_TERTIARY,
-                boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              }}
-            >
-              {m === "backend"  && <Server  className="w-3 h-3" />}
-              {m === "split"    && <><Server className="w-2.5 h-2.5" /><span>/</span><Monitor className="w-2.5 h-2.5" /></>}
-              {m === "frontend" && <Monitor className="w-3 h-3" />}
-              {m === "backend" ? "Backend" : m === "frontend" ? "Frontend" : "Split"}
-            </button>
-          ))}
+          {isLoading ? (
+            /* [스켈레톤] 토글 버튼 영역 */
+            <Skeleton className="w-40 h-6 rounded-md" />
+          ) : (
+            (["backend", "split", "frontend"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-all"
+                style={{
+                  background: mode === m ? "white" : "transparent",
+                  color: mode === m ? TEXT_PRIMARY : TEXT_TERTIARY,
+                  boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                }}
+              >
+                {m === "backend"  && <Server  className="w-3 h-3" />}
+                {m === "split"    && <><Server className="w-2.5 h-2.5" /><span>/</span><Monitor className="w-2.5 h-2.5" /></>}
+                {m === "frontend" && <Monitor className="w-3 h-3" />}
+                {m === "backend" ? "Backend" : m === "frontend" ? "Frontend" : "Split"}
+              </button>
+            ))
+          )}
         </div>
 
         {/* 통계 */}
         <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: TEXT_TERTIARY }}>
-          <span>{BACKEND_COMMITS.length + FRONTEND_COMMITS.length} commits total</span>
-          <span>·</span>
-          <span style={{ color: "#10b981" }}>+{BACKEND_COMMITS.concat(FRONTEND_COMMITS).flatMap(c => c.files).reduce((s, f) => s + f.additions, 0)} lines</span>
-          <span style={{ color: "#ef4444" }}>−{BACKEND_COMMITS.concat(FRONTEND_COMMITS).flatMap(c => c.files).reduce((s, f) => s + f.deletions, 0)} lines</span>
+          {isLoading ? (
+            <Skeleton className="w-48 h-3" />
+          ) : (
+            <>
+              <span>{BACKEND_COMMITS.length + FRONTEND_COMMITS.length} commits total</span>
+              <span>·</span>
+              <span style={{ color: "#10b981" }}>+{BACKEND_COMMITS.concat(FRONTEND_COMMITS).flatMap(c => c.files).reduce((s, f) => s + f.additions, 0)} lines</span>
+              <span style={{ color: "#ef4444" }}>−{BACKEND_COMMITS.concat(FRONTEND_COMMITS).flatMap(c => c.files).reduce((s, f) => s + f.deletions, 0)} lines</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -289,6 +362,7 @@ export function CommitDiffPage() {
               selectedFileId={selBEFile?.id ?? null}
               onSelectCommit={c => { setSelBECommit(c.id); setSelBEFile(c.files[0] ?? null); }}
               onSelectFile={f => setSelBEFile(f)}
+              isLoading={isLoading}
             />
           )}
           {/* Frontend 패널 */}
@@ -302,73 +376,124 @@ export function CommitDiffPage() {
               selectedFileId={selFEFile?.id ?? null}
               onSelectCommit={c => { setSelFECommit(c.id); setSelFEFile(c.files[0] ?? null); }}
               onSelectFile={f => setSelFEFile(f)}
+              isLoading={isLoading}
             />
           )}
         </div>
 
         {/* ── 오른쪽: Diff Viewer ── */}
         <div className="flex-1 flex flex-col overflow-hidden" style={{ minWidth: 0, background: "#0d1117" }}>
-          {/* split 모드에서 어느 쪽 파일인지 탭 표시 */}
-          {mode === "split" && (selBEFile || selFEFile) && (
-            <div
-              className="flex items-center gap-0 shrink-0"
-              style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
-            >
-              <button
-                onClick={() => {}}
-                className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-semibold transition-all"
-                style={{
-                  color: selBEFile ? "#c9d1d9" : "#8b949e",
-                  borderBottom: selBEFile ? "2px solid #635bff" : "2px solid transparent",
-                  background: selBEFile ? "rgba(99,91,255,0.08)" : "transparent",
-                }}
-              >
-                <Server className="w-3 h-3" style={{ color: ACCENT }} />
-                {selBEFile?.name ?? "Backend"}
-              </button>
-              <button
-                onClick={() => {}}
-                className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-semibold transition-all"
-                style={{
-                  color: selFEFile ? "#c9d1d9" : "#8b949e",
-                  borderBottom: selFEFile ? "2px solid #06b6d4" : "2px solid transparent",
-                  background: selFEFile ? "rgba(6,182,212,0.08)" : "transparent",
-                }}
-              >
-                <Monitor className="w-3 h-3" style={{ color: "#06b6d4" }} />
-                {selFEFile?.name ?? "Frontend"}
-              </button>
-            </div>
-          )}
-
-          {/* split 모드: 위아래로 두 diff */}
-          {mode === "split" ? (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-hidden" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                {selBEFile
-                  ? <FileDiffViewer file={selBEFile} />
-                  : <div className="flex items-center justify-center h-full"><p className="text-[11px]" style={{ color: "#8b949e" }}>백엔드 파일을 선택하세요</p></div>
-                }
-              </div>
-              <div className="flex-1 overflow-hidden">
-                {selFEFile
-                  ? <FileDiffViewer file={selFEFile} />
-                  : <div className="flex items-center justify-center h-full"><p className="text-[11px]" style={{ color: "#8b949e" }}>프론트엔드 파일을 선택하세요</p></div>
-                }
-              </div>
+          
+          {isLoading ? (
+            /* [스켈레톤] Diff Viewer 전체 영역 */
+            <div className="flex-1 flex flex-col">
+              {mode === "split" && (
+                <div className="flex items-center gap-0 shrink-0 border-b border-white/10 bg-[#161b22] px-4 h-9">
+                  <DarkSkeleton className="w-24 h-5" />
+                  <DarkSkeleton className="w-24 h-5 ml-4" />
+                </div>
+              )}
+              {mode === "split" ? (
+                <>
+                  <div className="flex-1 p-6 space-y-4 border-b border-white/10">
+                    <DarkSkeleton className="h-5 w-1/3" />
+                    <DarkSkeleton className="h-3 w-1/4" />
+                    <div className="mt-6 space-y-2">
+                      <DarkSkeleton className="h-3 w-3/4" />
+                      <DarkSkeleton className="h-3 w-1/2" />
+                      <DarkSkeleton className="h-3 w-5/6" />
+                    </div>
+                  </div>
+                  <div className="flex-1 p-6 space-y-4">
+                    <DarkSkeleton className="h-5 w-1/3" />
+                    <DarkSkeleton className="h-3 w-1/4" />
+                    <div className="mt-6 space-y-2">
+                      <DarkSkeleton className="h-3 w-3/4" />
+                      <DarkSkeleton className="h-3 w-1/2" />
+                      <DarkSkeleton className="h-3 w-5/6" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 p-8 space-y-5">
+                  <DarkSkeleton className="h-6 w-1/3" />
+                  <DarkSkeleton className="h-4 w-1/4" />
+                  <div className="mt-8 space-y-3">
+                    <DarkSkeleton className="h-4 w-3/4" />
+                    <DarkSkeleton className="h-4 w-1/2" />
+                    <DarkSkeleton className="h-4 w-5/6" />
+                    <DarkSkeleton className="h-4 w-2/3" />
+                    <DarkSkeleton className="h-4 w-full" />
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="flex-1 overflow-hidden">
-              {activeDiff
-                ? <FileDiffViewer file={activeDiff} />
-                : (
-                  <div className="flex flex-col items-center justify-center h-full gap-3">
-                    <GitCommit className="w-8 h-8" style={{ color: "#30363d" }} />
-                    <p className="text-[12px]" style={{ color: "#8b949e" }}>파일을 선택하면 변경 내용이 표시됩니다</p>
+            /* 실제 Diff Viewer 데이터 렌더링 */
+            <>
+              {/* split 모드에서 어느 쪽 파일인지 탭 표시 */}
+              {mode === "split" && (selBEFile || selFEFile) && (
+                <div
+                  className="flex items-center gap-0 shrink-0"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
+                >
+                  <button
+                    onClick={() => {}}
+                    className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-semibold transition-all"
+                    style={{
+                      color: selBEFile ? "#c9d1d9" : "#8b949e",
+                      borderBottom: selBEFile ? "2px solid #635bff" : "2px solid transparent",
+                      background: selBEFile ? "rgba(99,91,255,0.08)" : "transparent",
+                    }}
+                  >
+                    <Server className="w-3 h-3" style={{ color: ACCENT }} />
+                    {selBEFile?.name ?? "Backend"}
+                  </button>
+                  <button
+                    onClick={() => {}}
+                    className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-semibold transition-all"
+                    style={{
+                      color: selFEFile ? "#c9d1d9" : "#8b949e",
+                      borderBottom: selFEFile ? "2px solid #06b6d4" : "2px solid transparent",
+                      background: selFEFile ? "rgba(6,182,212,0.08)" : "transparent",
+                    }}
+                  >
+                    <Monitor className="w-3 h-3" style={{ color: "#06b6d4" }} />
+                    {selFEFile?.name ?? "Frontend"}
+                  </button>
+                </div>
+              )}
+
+              {/* split 모드: 위아래로 두 diff */}
+              {mode === "split" ? (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-hidden" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    {selBEFile
+                      ? <FileDiffViewer file={selBEFile} />
+                      : <div className="flex items-center justify-center h-full"><p className="text-[11px]" style={{ color: "#8b949e" }}>백엔드 파일을 선택하세요</p></div>
+                    }
                   </div>
-                )
-              }
-            </div>
+                  <div className="flex-1 overflow-hidden">
+                    {selFEFile
+                      ? <FileDiffViewer file={selFEFile} />
+                      : <div className="flex items-center justify-center h-full"><p className="text-[11px]" style={{ color: "#8b949e" }}>프론트엔드 파일을 선택하세요</p></div>
+                    }
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-hidden">
+                  {activeDiff
+                    ? <FileDiffViewer file={activeDiff} />
+                    : (
+                      <div className="flex flex-col items-center justify-center h-full gap-3">
+                        <GitCommit className="w-8 h-8" style={{ color: "#30363d" }} />
+                        <p className="text-[12px]" style={{ color: "#8b949e" }}>파일을 선택하면 변경 내용이 표시됩니다</p>
+                      </div>
+                    )
+                  }
+                </div>
+              )}
+            </>
           )}
         </div>
 

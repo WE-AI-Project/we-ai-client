@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, AlertCircle, GitCommit, CheckCircle2, Server, Bot, Circle, CheckCheck, Settings } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   UI_RED, UI_RED_BG, UI_GREEN, UI_GREEN_BG, UI_GRAY, UI_GRAY_BG, UI_INDIGO, UI_INDIGO_BG,
   GRADIENT_HEADER,
 } from "../colors";
+
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 type Notif = {
   id: number;
@@ -72,6 +82,13 @@ function NotifItem({ notif, onRead }: { notif: Notif; onRead: (id: number) => vo
 }
 
 export function NotificationsPage() {
+  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [todayNotifs, setTodayNotifs] = useState(TODAY_NOTIFS);
   const [yesterdayNotifs, setYesterdayNotifs] = useState(YESTERDAY_NOTIFS);
 
@@ -99,70 +116,124 @@ export function NotificationsPage() {
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-2xl mx-auto space-y-4">
 
-          {/* 헤더 */}
+          {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Notifications</h1>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                {unreadCount > 0 ? `${unreadCount}개의 읽지 않은 알림` : "모든 알림을 확인했습니다"}
-              </p>
+              {isLoading ? (
+                <Skeleton className="h-3 w-32 mt-1.5" />
+              ) : (
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  {unreadCount > 0 ? `${unreadCount}개의 읽지 않은 알림` : "모든 알림을 확인했습니다"}
+                </p>
+              )}
             </div>
-            <button
-              onClick={markAllRead}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-              style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
-            >
-              <CheckCheck className="w-3 h-3" />
-              Mark all read
-            </button>
+            
+            {isLoading ? (
+              <Skeleton className="h-8 w-28 rounded-lg" />
+            ) : (
+              <button
+                onClick={markAllRead}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
+                style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+              >
+                <CheckCheck className="w-3 h-3" />
+                Mark all read
+              </button>
+            )}
           </div>
 
-          {/* 알림 타입 요약 */}
+          {/* ── 알림 타입 요약 카드 ── */}
           <div className="grid grid-cols-4 gap-2">
-            {Object.entries(TYPE_META).map(([type, meta]) => {
-              const count = [...todayNotifs, ...yesterdayNotifs].filter(n => n.type === type).length;
-              const Icon = meta.icon;
-              return (
-                <div key={type} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: meta.bg }}>
-                    <Icon className="w-3 h-3" style={{ color: meta.color }} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold" style={{ color: meta.color }}>{count}</p>
-                    <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{meta.label}</p>
+            {isLoading ? (
+              /* [스켈레톤] 요약 카드 4개 */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <Skeleton className="w-6 h-6 rounded-lg shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-3 w-6" />
+                    <Skeleton className="h-2 w-12" />
                   </div>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              Object.entries(TYPE_META).map(([type, meta]) => {
+                const count = [...todayNotifs, ...yesterdayNotifs].filter(n => n.type === type).length;
+                const Icon = meta.icon;
+                return (
+                  <div key={type} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: meta.bg }}>
+                      <Icon className="w-3 h-3" style={{ color: meta.color }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: meta.color }}>{count}</p>
+                      <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{meta.label}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
-          {/* 오늘 알림 */}
+          {/* ── 오늘 알림 리스트 ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
               <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY }}>Today</p>
-              {unreadCount > 0 && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "rgba(99,91,255,0.12)", color: ACCENT }}>
+              {!isLoading && unreadCount > 0 && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "rgba(99,91,255,0.12)", color: UI_INDIGO }}>
                   {unreadCount} new
                 </span>
               )}
             </div>
-            {todayNotifs.map((n, i) => (
-              <div key={n.id} style={{ borderBottom: i < todayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                <NotifItem notif={n} onRead={markRead} />
-              </div>
-            ))}
+            
+            {isLoading ? (
+              /* [스켈레톤] 알림 리스트 (오늘) */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3 px-4 py-3.5" style={{ borderBottom: i < 3 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                  <Skeleton className="w-8 h-8 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2 pt-0.5">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2.5 w-full" />
+                  </div>
+                  <Skeleton className="w-8 h-2 shrink-0 mt-1" />
+                </div>
+              ))
+            ) : (
+              todayNotifs.map((n, i) => (
+                <div key={n.id} style={{ borderBottom: i < todayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                  <NotifItem notif={n} onRead={markRead} />
+                </div>
+              ))
+            )}
           </div>
 
-          {/* 어제 알림 */}
+          {/* ── 어제 알림 리스트 ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             <div className="px-4 py-2.5" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
               <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY }}>Yesterday</p>
             </div>
-            {yesterdayNotifs.map((n, i) => (
-              <div key={n.id} style={{ borderBottom: i < yesterdayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                <NotifItem notif={n} onRead={markRead} />
-              </div>
-            ))}
+            
+            {isLoading ? (
+              /* [스켈레톤] 알림 리스트 (어제) */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3 px-4 py-3.5" style={{ borderBottom: i < 3 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                  <Skeleton className="w-8 h-8 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2 pt-0.5">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2.5 w-full" />
+                  </div>
+                  <Skeleton className="w-8 h-2 shrink-0 mt-1" />
+                </div>
+              ))
+            ) : (
+              yesterdayNotifs.map((n, i) => (
+                <div key={n.id} style={{ borderBottom: i < yesterdayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                  <NotifItem notif={n} onRead={markRead} />
+                </div>
+              ))
+            )}
           </div>
 
         </div>

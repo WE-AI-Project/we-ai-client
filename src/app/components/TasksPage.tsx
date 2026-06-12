@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CheckSquare, Circle, Clock, Search, ChevronDown, Plus, Tag, User } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   UI_RED_DARK, UI_AMBER_DARK, UI_GRAY, UI_GRAY_LIGHT, UI_AMBER, UI_GREEN, UI_RED, UI_INDIGO,
-  UI_INDIGO_BG, GRADIENT_HEADER, BTN_DARK,
+  UI_INDIGO_BG, GRADIENT_HEADER, BTN_DARK, ACCENT,
 } from "../colors";
+
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 type Task = {
   id: string;
@@ -50,6 +60,13 @@ const STATUS_STYLE: Record<Task["status"], { color: string; dot: string }> = {
 };
 
 export function TasksPage() {
+  // 🚨 [추가] 초기 로딩 3초 타이머
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [activeTab, setActiveTab] = useState<string>("All");
   const [search, setSearch] = useState("");
 
@@ -78,62 +95,106 @@ export function TasksPage() {
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
 
-          {/* 헤더 */}
+          {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>My Tasks</h1>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{TASKS.length}개 작업 · {TASKS.filter(t => t.status !== "done").length}개 미완료</p>
+              {isLoading ? (
+                <Skeleton className="h-3 w-32 mt-1.5" />
+              ) : (
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  {TASKS.length}개 작업 · {TASKS.filter(t => t.status !== "done").length}개 미완료
+                </p>
+              )}
             </div>
-            <button
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
-              style={{ background: BTN_DARK, color: "rgba(255,255,255,0.92)" }}
-            >
-              <Plus className="w-3 h-3" /> New Task
-            </button>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24 rounded-lg" />
+            ) : (
+              <button
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
+                style={{ background: BTN_DARK, color: "rgba(255,255,255,0.92)" }}
+              >
+                <Plus className="w-3 h-3" /> New Task
+              </button>
+            )}
           </div>
 
-          {/* 필터 & 검색 */}
+          {/* ── 필터 & 검색 ── */}
           <div className="rounded-2xl p-4 space-y-3" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            {/* 상태 탭 */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              {STATUS_TABS.map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{
-                    background: activeTab === tab
-                      ? "linear-gradient(135deg, rgba(224,231,255,0.8), rgba(232,213,245,0.7))"
-                      : "rgba(0,0,0,0.04)",
-                    color: activeTab === tab ? ACCENT : TEXT_SECONDARY,
-                    border: activeTab === tab ? "1px solid rgba(99,91,255,0.2)" : "1px solid transparent",
-                  }}
-                >
-                  {tab}
-                  <span
-                    className="px-1 py-0.5 rounded text-[9px]"
-                    style={{ background: activeTab === tab ? "rgba(99,91,255,0.12)" : "rgba(0,0,0,0.06)", color: activeTab === tab ? UI_INDIGO : TEXT_TERTIARY }}
-                  >
-                    {counts[tab] ?? 0}
-                  </span>
-                </button>
-              ))}
-              <div className="relative ml-auto">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-                <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search tasks..."
-                  className="pl-7 pr-3 py-1.5 text-[10px] rounded-lg outline-none w-44"
-                  style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
-                />
-              </div>
+              {isLoading ? (
+                /* [스켈레톤] 상태 탭 필터 */
+                <div className="flex gap-1.5 w-full">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-6 w-16 rounded-lg" />
+                  ))}
+                  <div className="ml-auto">
+                    <Skeleton className="h-7 w-44 rounded-lg" />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* 상태 탭 */}
+                  {STATUS_TABS.map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                      style={{
+                        background: activeTab === tab
+                          ? "linear-gradient(135deg, rgba(224,231,255,0.8), rgba(232,213,245,0.7))"
+                          : "rgba(0,0,0,0.04)",
+                        color: activeTab === tab ? ACCENT : TEXT_SECONDARY,
+                        border: activeTab === tab ? "1px solid rgba(99,91,255,0.2)" : "1px solid transparent",
+                      }}
+                    >
+                      {tab}
+                      <span
+                        className="px-1 py-0.5 rounded text-[9px]"
+                        style={{ background: activeTab === tab ? "rgba(99,91,255,0.12)" : "rgba(0,0,0,0.06)", color: activeTab === tab ? UI_INDIGO : TEXT_TERTIARY }}
+                      >
+                        {counts[tab] ?? 0}
+                      </span>
+                    </button>
+                  ))}
+                  <div className="relative ml-auto">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                    <input
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Search tasks..."
+                      className="pl-7 pr-3 py-1.5 text-[10px] rounded-lg outline-none w-44 transition-colors"
+                      style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                      onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
+                      onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* 태스크 목록 */}
+          {/* ── 태스크 목록 ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              /* [스켈레톤] 태스크 아이템 목록 (6개) */
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: i < 5 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                  <Skeleton className="w-4 h-4 rounded-full shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-3/4" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-2.5 w-10" />
+                      <Skeleton className="h-2.5 w-20" />
+                    </div>
+                  </div>
+                  <Skeleton className="w-12 h-4 rounded shrink-0" />
+                  <Skeleton className="w-12 h-5 rounded-full shrink-0" />
+                  <Skeleton className="w-10 h-4 rounded shrink-0" />
+                  <Skeleton className="w-14 h-3 shrink-0" />
+                </div>
+              ))
+            ) : filtered.length === 0 ? (
               <div className="py-12 text-center">
                 <CheckSquare className="w-8 h-8 mx-auto mb-2" style={{ color: TEXT_TERTIARY }} />
                 <p className="text-xs" style={{ color: TEXT_TERTIARY }}>No tasks found</p>
