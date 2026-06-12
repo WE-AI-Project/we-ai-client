@@ -172,7 +172,7 @@ function mapDetectedInfoToTechStacks(info: DetectedInfo | null): ProjectTechStac
   });
 }
 
-/* 💡 [수정 완료] 타이핑 불가능, 클릭 시 알림창 없이 단일 파일 탐색기 열림, 확인 즉시 자동 입력되는 컴포넌트 */
+/* 경고창 없이 폴더 선택 확인 버튼이 바로 활성화되는 공통 컴포넌트 */
 function LocalPathInput({
   value,
   onChange,
@@ -184,34 +184,33 @@ function LocalPathInput({
   label?: string;
   required?: boolean;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
 
-  const handleOpenExplorer = () => {
-    fileInputRef.current?.click();
-  };
+  const handleOpenExplorer = async () => {
+    if ("showDirectoryPicker" in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker();
+        onChange(`C:\\Projects\\${dirHandle.name}`);
+      } catch (error: any) {
+        if (
+          error.name === "SecurityError" ||
+          error.name === "NotAllowedError" ||
+          error.message?.toLowerCase().includes("sensitive") ||
+          error.message?.toLowerCase().includes("system")
+        ) {
+          alert(
+            "⚠️ 브라우저 보안 정책상 '바탕화면 전체'나 '다운로드' 같은 시스템 폴더는 통째로 지정할 수 없습니다.\n\n바탕화면 안에 [새 폴더]를 하나 만드신 후, 생성된 새 폴더를 선택해 주세요"
+          );
+          return;
+        }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      
-      // 1. Electron이나 특수 빌드 환경에서 실제 로컬 절대경로 취득이 가능한 경우 최우선 세팅
-      const actualPath = (file as any).path;
-      if (actualPath) {
-        onChange(actualPath.replace(/(\\|\/)[^/\\]+$/, ""));
-        return;
+        if (error.name !== "AbortError") {
+          alert("선택하신 위치는 접근할 수 없습니다. 일반 작업 폴더를 선택하거나 새 폴더를 만들어 선택해 주세요.");
+        }
       }
-
-      // 2. 일반 브라우저 환경인 경우 선택한 파일명을 기반으로 가상 로컬 경로(C:\Projects\...) 매핑
-      let prjName = file.name.split(".")[0] || "weai-project";
-      if (prjName.toLowerCase() === "package" || prjName.toLowerCase() === "build") {
-        prjName = "my-make-file";
-      }
-      
-      // 고르자마자 즉시 확인 버튼 누른 것처럼 바로 값이 주입됩니다.
-      onChange(`C:\\Projects\\${prjName}`);
+    } else {
+      alert("현재 브라우저 환경에서는 폴더 선택 기능을 지원하지 않습니다. 크롬(Chrome) 또는 엣지(Edge) 브라우저를 이용해 주세요.");
     }
-    event.target.value = "";
   };
 
   return (
@@ -220,39 +219,30 @@ function LocalPathInput({
         {label}
         {required && <span style={{ color: "#B85450" }}> *</span>}
       </label>
-      
-      {/* 입력 박스 영역 전체를 클릭하면 파일 선택창이 바로 뜨도록 구성 */}
       <div
         onClick={handleOpenExplorer}
         className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 transition-all hover:bg-black/[0.02]"
         style={{
           background: "rgba(65,67,27,0.04)",
-          border: `1.5px solid ${value ? "rgba(65,67,27,0.35)" : BORDER}`,
+          border: `1.5px solid ${focused ? "rgba(65,67,27,0.35)" : BORDER}`,
         }}
       >
         <Folder className="h-4 w-4 shrink-0" style={{ color: value ? ACCENT : TEXT_TERTIARY }} />
-        
         <input
           readOnly
           value={value}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={PATH_EXAMPLES[0]}
           className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none cursor-pointer"
           style={{ color: TEXT_PRIMARY }}
-        />
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,.gradle,.xml,.md,.txt,*"
-          className="hidden"
-          onChange={handleFileSelect}
         />
 
         {value && (
           <button
             type="button"
             onClick={(event) => {
-              event.stopPropagation(); // 부모 탐색기 열림 방지
+              event.stopPropagation();
               onChange("");
             }}
             className="shrink-0 rounded p-1 hover:bg-black/[0.05]"
@@ -391,9 +381,9 @@ function CreateProjectModal({
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [localPath, setLocalPath] = useState("");
-  
+
   const [departments, setDepartments] = useState<ProjectDepartment[]>(["BACKEND"]);
-  
+
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
   const [previewCode] = useState(genCode());
@@ -615,7 +605,7 @@ function CreateProjectModal({
                   프로젝트 저장 위치 설정
                 </p>
                 <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
-                  박스를 클릭하여 설정 파일 하나를 열어주세요. 팝업 경고 없이 가상 절대 경로가 바로 입력되고 분석을 시작합니다.
+                  박스를 클릭해 원하는 프로젝트 폴더를 지정해 주세요. 폴더를 한 번만 눌러도 하단 확인 버튼이 활성화됩니다.
                 </p>
               </div>
 
@@ -1067,7 +1057,9 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
   const [codeStep, setCodeStep] = useState<"input" | "path">("input");
   const [codePath, setCodePath] = useState("");
   const [codeDetect, setCodeDetect] = useState<DetectedInfo | null>(null);
-  const [joinDepartment, setJoinDepartment] = useState<ProjectDepartment>("BACKEND");
+
+  const [joinDepartments, setJoinDepartments] = useState<ProjectDepartment[]>(["BACKEND"]);
+
   const [codeJoining, setCodeJoining] = useState(false);
   const [codeError, setCodeError] = useState("");
 
@@ -1112,8 +1104,8 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
   const handleCodeJoin = async () => {
     const normalizedCode = codeInput.trim().toUpperCase();
 
-    if (!normalizedCode) {
-      setCodeError("참여 코드를 입력해주세요.");
+    if (normalizedCode.length !== 8) {
+      setCodeError("참여 코드는 8글자여야 합니다.");
       return;
     }
 
@@ -1129,7 +1121,7 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
     try {
       const joined = await joinProject({
         projectCode: normalizedCode,
-        department: joinDepartment,
+        department: (joinDepartments[0] || "BACKEND") as any,
       });
 
       await refreshProjects();
@@ -1289,14 +1281,15 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                         value={codeInput}
                         onChange={(event) => {
                           setCodeError("");
-                          setCodeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8));
+                          const processedValue = event.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                          setCodeInput(processedValue.slice(0, 8));
                         }}
                         onKeyDown={(event) => {
-                          if (event.key === "Enter") {
+                          if (event.key === "Enter" && codeInput.length === 8) {
                             void handleCodeJoin();
                           }
                         }}
-                        placeholder="WEAI2025"
+                        placeholder="A1B2C3D4"
                         maxLength={8}
                         className="w-full rounded-xl py-2.5 pl-8 pr-3 font-mono text-sm uppercase tracking-widest outline-none"
                         style={{
@@ -1306,14 +1299,15 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                         }}
                       />
                     </div>
+
                     <button
                       type="button"
                       onClick={() => void handleCodeJoin()}
-                      disabled={codeInput.length < 6}
+                      disabled={codeInput.length !== 8}
                       className="shrink-0 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all"
                       style={{
-                        background: codeInput.length >= 6 ? "#41431B" : "rgba(0,0,0,0.07)",
-                        color: codeInput.length >= 6 ? "white" : TEXT_TERTIARY,
+                        background: codeInput.length === 8 ? "#41431B" : "rgba(0,0,0,0.07)",
+                        color: codeInput.length === 8 ? "white" : TEXT_TERTIARY,
                       }}
                     >
                       <ArrowRight className="h-3.5 w-3.5" />
@@ -1324,7 +1318,7 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                     <p className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
                       참여 파트 선택
                     </p>
-                    <DepartmentPicker value={joinDepartment} onChange={setJoinDepartment} compact />
+                    <MultiDepartmentPicker value={joinDepartments} onChange={setJoinDepartments} compact />
                   </div>
                 </div>
               ) : (
