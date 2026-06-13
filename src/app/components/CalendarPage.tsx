@@ -705,8 +705,8 @@ export function CalendarPage() {
                     >
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
                       <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
-                      <div className="flex items-center shrink-0 min-w-[16px] justify-end">
-                        <span className="text-[9px] font-mono group-hover:hidden" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>
+                      <div className={`flex items-center shrink-0 min-w-[16px] justify-end transition-all duration-200 ${!isSystemDept ? "group-hover:pr-5" : ""}`}>
+                        <span className="text-[9px] font-mono" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>
                           {cnt}
                         </span>
                       </div>
