@@ -13,13 +13,23 @@ import {
   ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
 } from "../colors";
 
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
+
 // ── 런타임 읽기 전용 정보 ──
 const RUNTIME_INFO = [
   { label: "JDK Version",    value: "17.0.18+8 (LTS)"                       },
-  { label: "Build Tool",     value: "Gradle 8.7"                             },
-  { label: "Spring Boot",    value: "3.2.5"                                  },
-  { label: "Active Profile", value: "dev"                                    },
-  { label: "OS",             value: "Windows 11 Pro (Build 22631)"           },
+  { label: "Build Tool",     value: "Gradle 8.7"                            },
+  { label: "Spring Boot",    value: "3.2.5"                                 },
+  { label: "Active Profile", value: "dev"                                   },
+  { label: "OS",             value: "Windows 11 Pro (Build 22631)"          },
   { label: "JVM Args",       value: "-Xms256m -Xmx1g -Dfile.encoding=UTF-8" },
 ];
 
@@ -190,6 +200,13 @@ function EnvFileViewer({
 
 // ── 메인 ──
 export function EnvironmentSettingsPage() {
+  // 🚨 [추가] 초기 로딩 3초 타이머
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [envVars,        setEnvVars]        = useState<EnvVar[]>(() => loadEnvVars());
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
   const [saved,          setSaved]          = useState(false);
@@ -201,7 +218,7 @@ export function EnvironmentSettingsPage() {
   useEffect(() => {
     const p = envVars.find(v => v.key === "SPRING_PROFILES_ACTIVE")?.value ?? "dev";
     if (p === "dev" || p === "prod" || p === "test") setProfile(p);
-  }, []);
+  }, [envVars]);
 
   // .env 파일 내용 미리 생성
   useEffect(() => {
@@ -275,96 +292,123 @@ export function EnvironmentSettingsPage() {
         <div className="max-w-3xl mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Environment Settings</h1>
               </div>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                Spring 환경 변수 · JDK 정보 · 프로파일 관리 · .env 파일 편집
-              </p>
+              {isLoading ? (
+                <Skeleton className="h-3 w-64 mt-1.5" />
+              ) : (
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  Spring 환경 변수 · JDK 정보 · 프로파일 관리 · .env 파일 편집
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              {/* .env 파일 보기 */}
-              <button
-                onClick={() => setShowEnvFile(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
-                style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
-              >
-                <FileText className="w-3 h-3" /> .env 파일
-              </button>
-              {/* 업로드 */}
-              <label
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer"
-                style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
-              >
-                <Upload className="w-3 h-3" /> .env 업로드
-                <input type="file" accept=".env,text/plain" className="hidden" onChange={handleFileUpload} />
-              </label>
-              {/* 리셋 */}
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
-                style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
-              >
-                <RefreshCw className="w-3 h-3" /> 초기화
-              </button>
-              {/* 저장 */}
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
-                style={{ background: saved ? "#10b981" : "#1c1c1e", color: "rgba(255,255,255,0.92)" }}
-              >
-                <Save className="w-3 h-3" />
-                {saved ? "저장됨!" : "Apply Changes"}
-              </button>
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              {isLoading ? (
+                /* [스켈레톤] 헤더 액션 버튼 4개 */
+                Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-8 w-20 rounded-lg" />
+                ))
+              ) : (
+                <>
+                  {/* .env 파일 보기 */}
+                  <button
+                    onClick={() => setShowEnvFile(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
+                    style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
+                  >
+                    <FileText className="w-3 h-3" /> .env 파일
+                  </button>
+                  {/* 업로드 */}
+                  <label
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer"
+                    style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
+                  >
+                    <Upload className="w-3 h-3" /> .env 업로드
+                    <input type="file" accept=".env,text/plain" className="hidden" onChange={handleFileUpload} />
+                  </label>
+                  {/* 리셋 */}
+                  <button
+                    onClick={handleReset}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
+                    style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
+                  >
+                    <RefreshCw className="w-3 h-3" /> 초기화
+                  </button>
+                  {/* 저장 */}
+                  <button
+                    onClick={handleSave}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+                    style={{ background: saved ? "#10b981" : "#1c1c1e", color: "rgba(255,255,255,0.92)" }}
+                  >
+                    <Save className="w-3 h-3" />
+                    {saved ? "저장됨!" : "Apply Changes"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
           {/* ── Active Spring Profile ── */}
           <div className="rounded-2xl p-4" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Active Spring Profile</p>
-            <div className="flex items-center gap-2 mb-3">
-              {(["dev", "prod", "test"] as const).map(p => {
-                const pc = PROFILE_COLORS[p];
-                return (
-                  <button
-                    key={p}
-                    onClick={() => handleProfileChange(p)}
-                    className="flex-1 py-2.5 rounded-xl text-xs font-semibold uppercase transition-all"
-                    style={{
-                      background: profile === p ? pc.bg : "rgba(0,0,0,0.04)",
-                      color:      profile === p ? pc.color : TEXT_SECONDARY,
-                      border:     `1.5px solid ${profile === p ? pc.color + "40" : "transparent"}`,
-                    }}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
-            {/* PowerShell 커맨드 */}
-            <div
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-mono text-[10px]"
-              style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.06)", color: "#c9d1d9" }}
-            >
-              <span style={{ color: "#7ee787" }}>$</span>
-              <span className="flex-1">
-                <span style={{ color: "#79c0ff" }}>$env:SPRING_PROFILES_ACTIVE</span>
-                <span style={{ color: "#ff7b72" }}> = </span>
-                <span style={{ color: "#a5d6ff" }}>"{profile}"</span>
-                <span style={{ color: "#8b949e" }}>; </span>
-                <span style={{ color: "#7ee787" }}>./gradlew.bat bootRun</span>
-              </span>
-              <CopyBtn value={`$env:SPRING_PROFILES_ACTIVE = "${profile}"; ./gradlew.bat bootRun`} />
-            </div>
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Skeleton className="flex-1 h-9 rounded-xl" />
+                  <Skeleton className="flex-1 h-9 rounded-xl" />
+                  <Skeleton className="flex-1 h-9 rounded-xl" />
+                </div>
+                <Skeleton className="h-8 w-full rounded-xl" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-3">
+                  {(["dev", "prod", "test"] as const).map(p => {
+                    const pc = PROFILE_COLORS[p];
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => handleProfileChange(p)}
+                        className="flex-1 py-2.5 rounded-xl text-xs font-semibold uppercase transition-all"
+                        style={{
+                          background: profile === p ? pc.bg : "rgba(0,0,0,0.04)",
+                          color:      profile === p ? pc.color : TEXT_SECONDARY,
+                          border:     `1.5px solid ${profile === p ? pc.color + "40" : "transparent"}`,
+                        }}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* PowerShell 커맨드 */}
+                <div
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-mono text-[10px]"
+                  style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.06)", color: "#c9d1d9" }}
+                >
+                  <span style={{ color: "#7ee787" }}>$</span>
+                  <span className="flex-1 truncate">
+                    <span style={{ color: "#79c0ff" }}>$env:SPRING_PROFILES_ACTIVE</span>
+                    <span style={{ color: "#ff7b72" }}> = </span>
+                    <span style={{ color: "#a5d6ff" }}>"{profile}"</span>
+                    <span style={{ color: "#8b949e" }}>; </span>
+                    <span style={{ color: "#7ee787" }}>./gradlew.bat bootRun</span>
+                  </span>
+                  <CopyBtn value={`$env:SPRING_PROFILES_ACTIVE = "${profile}"; ./gradlew.bat bootRun`} />
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── 런타임 정보 (Read-only) ── */}
@@ -372,26 +416,36 @@ export function EnvironmentSettingsPage() {
             <div className="flex items-center gap-2 mb-3">
               <RefreshCw className="w-3.5 h-3.5" style={{ color: ACCENT }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Runtime Environment</p>
-              <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_TERTIARY }}>Read-only</span>
+              {!isLoading && <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_TERTIARY }}>Read-only</span>}
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-              {RUNTIME_INFO.map(r => (
-                <div key={r.label} className="flex items-start justify-between gap-2">
-                  <span className="text-[10px] shrink-0" style={{ color: TEXT_LABEL }}>{r.label}</span>
-                  <div className="flex items-center gap-1 min-w-0">
-                    <span className="text-[10px] font-mono truncate text-right" style={{ color: TEXT_PRIMARY }}>{r.value}</span>
-                    <CopyBtn value={r.value} />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <Skeleton className="w-20 h-3" />
+                    <Skeleton className="w-32 h-3" />
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                RUNTIME_INFO.map(r => (
+                  <div key={r.label} className="flex items-start justify-between gap-2">
+                    <span className="text-[10px] shrink-0" style={{ color: TEXT_LABEL }}>{r.label}</span>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] font-mono truncate text-right" style={{ color: TEXT_PRIMARY }}>{r.value}</span>
+                      <CopyBtn value={r.value} />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           {/* ── 환경 변수 테이블 ── */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+          <div className="rounded-2xl overflow-hidden flex flex-col" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             {/* 테이블 헤더 */}
             <div
-              className="grid px-4 py-2.5 text-[10px] font-semibold"
+              className="grid px-4 py-2.5 text-[10px] font-semibold shrink-0"
               style={{
                 gridTemplateColumns: "200px 1fr 200px 40px",
                 borderBottom: `1px solid ${BORDER}`,
@@ -402,97 +456,121 @@ export function EnvironmentSettingsPage() {
               <span>KEY</span><span>VALUE</span><span>DESCRIPTION</span><span />
             </div>
 
-            {envVars.map((v, i) => {
-              const isSecret  = v.secret;
-              const showVal   = visibleSecrets.has(v.key);
-              return (
-                <div
-                  key={v.key}
-                  className="grid px-4 py-3 items-center transition-colors"
-                  style={{
-                    gridTemplateColumns: "200px 1fr 200px 40px",
-                    borderBottom: i < envVars.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.015)")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >
-                  {/* 키 */}
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {isSecret && (
-                      <span className="text-[8px] font-semibold px-1 py-0.5 rounded shrink-0" style={{ background: "rgba(245,158,11,0.10)", color: "#d97706" }}>
-                        SECRET
-                      </span>
-                    )}
-                    <span className="text-[10px] font-mono truncate" style={{ color: ACCENT }}>{v.key}</span>
-                  </div>
-
-                  {/* 값 */}
-                  <div className="flex items-center gap-1.5 px-2 min-w-0">
-                    {v.editable ? (
-                      <input
-                        type={isSecret && !showVal ? "password" : "text"}
-                        value={v.value}
-                        onChange={e => updateValue(v.key, e.target.value)}
-                        className="flex-1 px-2 py-1 text-[10px] font-mono rounded outline-none min-w-0 transition-all"
+            <div className="flex-1 overflow-x-auto">
+              <div style={{ minWidth: 600 }}>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="grid px-4 py-4 items-center"
+                      style={{
+                        gridTemplateColumns: "200px 1fr 200px 40px",
+                        borderBottom: i < 4 ? `1px solid ${BORDER_SUBTLE}` : "none",
+                      }}
+                    >
+                      <Skeleton className="w-32 h-3" />
+                      <div className="px-2 w-full"><Skeleton className="w-full h-6 rounded" /></div>
+                      <Skeleton className="w-40 h-3 px-2" />
+                      <Skeleton className="w-5 h-5 mx-auto" />
+                    </div>
+                  ))
+                ) : (
+                  envVars.map((v, i) => {
+                    const isSecret  = v.secret;
+                    const showVal   = visibleSecrets.has(v.key);
+                    return (
+                      <div
+                        key={v.key}
+                        className="grid px-4 py-3 items-center transition-colors"
                         style={{
-                          background: "rgba(0,0,0,0.04)",
-                          border: `1px solid ${BORDER}`,
-                          color: TEXT_PRIMARY,
+                          gridTemplateColumns: "200px 1fr 200px 40px",
+                          borderBottom: i < envVars.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
                         }}
-                        onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
-                        onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
-                      />
-                    ) : (
-                      <span className="text-[10px] font-mono truncate" style={{ color: TEXT_SECONDARY }}>
-                        {isSecret && !showVal ? "••••••••••••" : v.value}
-                      </span>
-                    )}
-                    {isSecret && (
-                      <button onClick={() => toggleSecret(v.key)} className="p-1 rounded shrink-0 hover:bg-black/[0.06]">
-                        {showVal
-                          ? <EyeOff className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-                          : <Eye    className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />}
-                      </button>
-                    )}
-                    <CopyBtn value={v.value} />
-                  </div>
-
-                  {/* 설명 */}
-                  <span className="text-[9px] truncate px-2" style={{ color: TEXT_TERTIARY }}>{v.desc}</span>
-
-                  {/* 삭제 */}
-                  <div className="flex justify-center">
-                    {v.editable ? (
-                      <button
-                        onClick={() => removeVar(v.key)}
-                        className="p-1 rounded transition-all hover:bg-red-50"
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.015)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                       >
-                        <Trash2 className="w-3 h-3" style={{ color: "#9ca3af" }} />
-                      </button>
-                    ) : (
-                      <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>—</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                        {/* 키 */}
+                        <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                          {isSecret && (
+                            <span className="text-[8px] font-semibold px-1 py-0.5 rounded shrink-0" style={{ background: "rgba(245,158,11,0.10)", color: "#d97706" }}>
+                              SECRET
+                            </span>
+                          )}
+                          <span className="text-[10px] font-mono truncate" style={{ color: ACCENT }}>{v.key}</span>
+                        </div>
+
+                        {/* 값 */}
+                        <div className="flex items-center gap-1.5 px-2 min-w-0">
+                          {v.editable ? (
+                            <input
+                              type={isSecret && !showVal ? "password" : "text"}
+                              value={v.value}
+                              onChange={e => updateValue(v.key, e.target.value)}
+                              className="flex-1 px-2 py-1 text-[10px] font-mono rounded outline-none min-w-0 transition-all"
+                              style={{
+                                background: "rgba(0,0,0,0.04)",
+                                border: `1px solid ${BORDER}`,
+                                color: TEXT_PRIMARY,
+                              }}
+                              onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
+                              onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
+                            />
+                          ) : (
+                            <span className="text-[10px] font-mono truncate" style={{ color: TEXT_SECONDARY }}>
+                              {isSecret && !showVal ? "••••••••••••" : v.value}
+                            </span>
+                          )}
+                          {isSecret && (
+                            <button onClick={() => toggleSecret(v.key)} className="p-1 rounded shrink-0 hover:bg-black/[0.06]">
+                              {showVal
+                                ? <EyeOff className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                                : <Eye    className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />}
+                            </button>
+                          )}
+                          <CopyBtn value={v.value} />
+                        </div>
+
+                        {/* 설명 */}
+                        <span className="text-[9px] truncate px-2" style={{ color: TEXT_TERTIARY }}>{v.desc}</span>
+
+                        {/* 삭제 */}
+                        <div className="flex justify-center">
+                          {v.editable ? (
+                            <button
+                              onClick={() => removeVar(v.key)}
+                              className="p-1 rounded transition-all hover:bg-red-50"
+                            >
+                              <Trash2 className="w-3 h-3" style={{ color: "#9ca3af" }} />
+                            </button>
+                          ) : (
+                            <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>—</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
 
             {/* 새 환경변수 추가 */}
-            <div className="px-4 py-3 flex items-center justify-between" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
-              <button
-                onClick={() => setEnvVars(prev => [
-                  ...prev,
-                  { key: "NEW_VAR", value: "", secret: false, editable: true, desc: "" },
-                ])}
-                className="flex items-center gap-2 text-[10px] font-semibold transition-all hover:opacity-70"
-                style={{ color: ACCENT }}
-              >
-                <Plus className="w-3.5 h-3.5" /> Add variable
-              </button>
-              <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                {envVars.length}개 변수 · localStorage 저장
-              </span>
-            </div>
+            {!isLoading && (
+              <div className="px-4 py-3 flex items-center justify-between shrink-0" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
+                <button
+                  onClick={() => setEnvVars(prev => [
+                    ...prev,
+                    { key: "NEW_VAR", value: "", secret: false, editable: true, desc: "" },
+                  ])}
+                  className="flex items-center gap-2 text-[10px] font-semibold transition-all hover:opacity-70"
+                  style={{ color: ACCENT }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add variable
+                </button>
+                <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                  {envVars.length}개 변수 · localStorage 저장
+                </span>
+              </div>
+            )}
           </div>
 
         </div>

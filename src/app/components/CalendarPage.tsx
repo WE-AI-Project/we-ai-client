@@ -813,7 +813,6 @@ export function CalendarPage() {
                       schedule={s}
                       deptColors={deptColors}
                       onEdit={s => setEditSchedule(s)}
-                       guide={s}
                       onDelete={(s) => setScheduleToDelete(s)}
                     />
                   ))

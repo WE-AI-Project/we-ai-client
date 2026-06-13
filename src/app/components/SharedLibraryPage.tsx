@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BookOpen, Search, FileText, Link, Download, File, Code2, BookMarked, Layers } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
@@ -6,6 +6,16 @@ import {
   UI_VIOLET, UI_VIOLET_BG8, UI_VIOLET_BG7, UI_INDIGO,
   GRADIENT_HEADER, BTN_DARK,
 } from "../colors";
+
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
 type Resource = {
   id: string;
@@ -47,6 +57,13 @@ const CAT_META: Record<Resource["category"], { color: string; bg: string }> = {
 };
 
 export function SharedLibraryPage() {
+  // 🚨 [추가] 초기 로딩 3초 타이머
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
@@ -72,128 +89,185 @@ export function SharedLibraryPage() {
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
 
-          {/* 헤더 */}
+          {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" style={{ color: "#8b5cf6" }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Shared Library</h1>
               </div>
-              <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>팀 문서 · 가이드 · 레퍼런스 · 템플릿</p>
+              {isLoading ? (
+                <Skeleton className="h-3 w-48 mt-1.5" />
+              ) : (
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>팀 문서 · 가이드 · 레퍼런스 · 템플릿</p>
+              )}
             </div>
           </div>
 
-          {/* 통계 바 */}
+          {/* ── 통계 바 ── */}
           <div className="grid grid-cols-4 gap-2">
-            {[
-              { label: "Total Resources", value: RESOURCES.length, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Layers    },
-              { label: "Docs",            value: catCounts.Docs ?? 0,      color: ACCENT,    bg: "rgba(99,91,255,0.07)",  icon: FileText  },
-              { label: "Guides",          value: catCounts.Guide ?? 0,     color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: BookMarked},
-              { label: "Templates",       value: catCounts.Template ?? 0,  color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: File      },
-            ].map(s => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: s.bg }}>
-                    <Icon className="w-3.5 h-3.5" style={{ color: s.color }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
-                    <p className="text-[9px]" style={{ color: TEXT_LABEL }}>{s.label}</p>
+            {isLoading ? (
+              /* [스켈레톤] 상단 요약 카드 4개 */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <Skeleton className="w-7 h-7 rounded-lg shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-3.5 w-8" />
+                    <Skeleton className="h-2 w-16" />
                   </div>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              [
+                { label: "Total Resources", value: RESOURCES.length, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Layers    },
+                { label: "Docs",            value: catCounts.Docs ?? 0,      color: ACCENT,    bg: "rgba(99,91,255,0.07)",  icon: FileText  },
+                { label: "Guides",          value: catCounts.Guide ?? 0,     color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: BookMarked},
+                { label: "Templates",       value: catCounts.Template ?? 0,  color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: File      },
+              ].map(s => {
+                const Icon = s.icon;
+                return (
+                  <div key={s.label} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: s.bg }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: s.color }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
+                      <p className="text-[9px]" style={{ color: TEXT_LABEL }}>{s.label}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
-          {/* 검색 + 카테고리 필터 */}
+          {/* ── 검색 + 카테고리 필터 ── */}
           <div className="rounded-2xl p-3.5 flex items-center gap-3 flex-wrap" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <div className="relative flex-1 min-w-48">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search library..."
-                className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg outline-none"
-                style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{
-                    background: activeCategory === cat ? "#1c1c1e" : "rgba(0,0,0,0.05)",
-                    color: activeCategory === cat ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
-                  }}
-                >
-                  {cat}
-                  <span className="text-[9px] opacity-60">{catCounts[cat] ?? 0}</span>
-                </button>
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex w-full items-center gap-3 flex-wrap">
+                <Skeleton className="flex-1 min-w-48 h-8 rounded-lg" />
+                <div className="flex gap-1.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="w-12 h-6 rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="relative flex-1 min-w-48">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search library..."
+                    className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg outline-none"
+                    style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {CATEGORIES.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                      style={{
+                        background: activeCategory === cat ? "#1c1c1e" : "rgba(0,0,0,0.05)",
+                        color: activeCategory === cat ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
+                      }}
+                    >
+                      {cat}
+                      <span className="text-[9px] opacity-60">{catCounts[cat] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* 리소스 카드 그리드 */}
+          {/* ── 리소스 카드 그리드 ── */}
           <div className="grid grid-cols-2 gap-3">
-            {filtered.map(r => {
-              const fm = FILE_META[r.fileType];
-              const cm = CAT_META[r.category];
-              const FIcon = fm.icon;
-              return (
-                <div
-                  key={r.id}
-                  className="rounded-2xl p-4 cursor-pointer transition-all hover:scale-[1.01]"
-                  style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
-                >
-                  {/* 헤더 */}
-                  <div className="flex items-start justify-between gap-2 mb-2.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: fm.bg }}>
-                        <FIcon className="w-4 h-4" style={{ color: fm.color }} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold truncate" style={{ color: TEXT_PRIMARY }}>{r.title}</p>
-                        <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: cm.bg, color: cm.color }}>
-                          {r.category}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: fm.bg, color: fm.color }}>
-                      .{r.fileType}
-                    </span>
-                  </div>
-
-                  {/* 설명 */}
-                  <p className="text-[10px] leading-relaxed line-clamp-2 mb-3" style={{ color: TEXT_SECONDARY }}>{r.desc}</p>
-
-                  {/* 메타 */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                      <span>by {r.author}</span>
-                      <span>·</span>
-                      <span>{r.updated}</span>
-                    </div>
+            {isLoading ? (
+              /* [스켈레톤] 문서 카드 그리드 (6개) */
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-2xl p-4 transition-all" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{r.views} views</span>
-                      <button className="w-5 h-5 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(0,0,0,0.05)" }}>
-                        <Download className="w-2.5 h-2.5" style={{ color: TEXT_SECONDARY }} />
-                      </button>
+                      <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3 w-32" />
+                        <Skeleton className="h-3 w-12 rounded" />
+                      </div>
+                    </div>
+                    <Skeleton className="w-8 h-4 rounded shrink-0" />
+                  </div>
+                  <div className="space-y-1.5 mb-4">
+                    <Skeleton className="h-2.5 w-full" />
+                    <Skeleton className="h-2.5 w-4/5" />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <Skeleton className="h-2.5 w-24" />
+                    <div className="flex gap-2 items-center">
+                      <Skeleton className="h-2.5 w-12" />
+                      <Skeleton className="w-5 h-5 rounded-md" />
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ))
+            ) : filtered.length === 0 ? (
+              <div className="col-span-2 py-12 text-center rounded-2xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                <BookOpen className="w-8 h-8 mx-auto mb-2" style={{ color: TEXT_TERTIARY }} />
+                <p className="text-xs" style={{ color: TEXT_TERTIARY }}>No resources found</p>
+              </div>
+            ) : (
+              filtered.map(r => {
+                const fm = FILE_META[r.fileType];
+                const cm = CAT_META[r.category];
+                const FIcon = fm.icon;
+                return (
+                  <div
+                    key={r.id}
+                    className="rounded-2xl p-4 cursor-pointer transition-all hover:scale-[1.01]"
+                    style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
+                  >
+                    {/* 헤더 */}
+                    <div className="flex items-start justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: fm.bg }}>
+                          <FIcon className="w-4 h-4" style={{ color: fm.color }} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold truncate" style={{ color: TEXT_PRIMARY }}>{r.title}</p>
+                          <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded inline-block mt-0.5" style={{ background: cm.bg, color: cm.color }}>
+                            {r.category}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: fm.bg, color: fm.color }}>
+                        .{r.fileType}
+                      </span>
+                    </div>
 
-          {filtered.length === 0 && (
-            <div className="py-12 text-center rounded-2xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-              <BookOpen className="w-8 h-8 mx-auto mb-2" style={{ color: TEXT_TERTIARY }} />
-              <p className="text-xs" style={{ color: TEXT_TERTIARY }}>No resources found</p>
-            </div>
-          )}
+                    {/* 설명 */}
+                    <p className="text-[10px] leading-relaxed line-clamp-2 mb-3" style={{ color: TEXT_SECONDARY }}>{r.desc}</p>
+
+                    {/* 메타 */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                        <span>by {r.author}</span>
+                        <span>·</span>
+                        <span>{r.updated}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{r.views} views</span>
+                        <button className="w-5 h-5 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(0,0,0,0.05)" }}>
+                          <Download className="w-2.5 h-2.5" style={{ color: TEXT_SECONDARY }} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
 
         </div>
       </div>

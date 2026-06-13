@@ -728,7 +728,7 @@ export default function App() {
         </div>
 
         {/* 탭 내부 페이지 본문 콘텐츠 (가로/세로 스크롤 완벽 지원) */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="flex-1 overflow-auto scrollbar-hide relative">
           {tabs.length > 0 ? (
             <div className="flex-1 flex flex-col w-full h-full min-w-full min-h-full">
               {renderPage(activeTab)}
@@ -770,13 +770,13 @@ export default function App() {
         </div>
 
         {/* 드래그 가능한 가운데 크기 조절바 Divider */}
-        {isSplit && (
+        if (isSplit && (
           <div
             onMouseDown={onSplitResizeMouseDown}
             className="w-1 h-full bg-white/10 hover:bg-[#AEB784]/60 cursor-col-resize z-30 transition-colors shrink-0"
             title="드래그하여 크기 조절"
           />
-        )}
+        ))
 
         {/* 오른쪽 분할 패널 컨테이너 */}
         {isSplit && (
@@ -1029,7 +1029,7 @@ export default function App() {
             </div>
 
             {/* 스크롤 영역 */}
-            <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
               {!isCollapsed && (
                 <div className="px-2.5 pt-2.5 pb-2" style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
                   <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: SIDEBAR_TEXT_LABEL }}>Current Project</p>

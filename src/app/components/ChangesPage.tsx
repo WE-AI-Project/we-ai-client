@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   GitCommit, GitBranch, Upload, CheckCircle2, X,
   ShieldCheck, Plus, RotateCcw,
@@ -16,8 +16,17 @@ import {
 } from "../colors";
 import { ConventionGuardModal } from "./ConventionGuardModal";
 
-// ── 디자인 토큰 ──
+// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      style={style}
+    />
+  );
+}
 
+// ── 디자인 토큰 ──
 const EXT_COLOR: Record<string, { bg: string; color: string }> = {
   java:   { bg: "rgba(192,152,64,0.10)",  color: "#C09840" },
   gradle: { bg: "rgba(65,67,27,0.08)",    color: ACCENT    },
@@ -150,9 +159,6 @@ function FileRow({
   );
 }
 
-// ════════════════════════════════════════
-// ChangesPage — 메인 컴포���트
-// ═══════════════════════════════════════
 export function ChangesPage({
   projectId = 0,
   onNavigateQA,
@@ -160,6 +166,13 @@ export function ChangesPage({
   projectId?: number | null;
   onNavigateQA?: () => void;
 }) {
+  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [staged,       setStaged]     = useState<Set<string>>(new Set(["1", "2", "3", "4"]));
   const [selectedFile, setSelectedFile] = useState<CommitFile | null>(CHANGE_FILES[0]);
   const [message,      setMessage]    = useState("");
@@ -254,10 +267,12 @@ export function ChangesPage({
           {/* 브랜치 버튼 — 클릭하면 시각화 토글 */}
           <button
             onClick={() => {
+              if (isLoading) return;
               setShowBranch(b => !b);
               setSelectedFile(null);
             }}
-            className="flex items-center gap-1.5 ml-3 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all"
+            disabled={isLoading}
+            className="flex items-center gap-1.5 ml-3 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all disabled:opacity-50"
             style={{
               background: showBranch
                 ? "linear-gradient(135deg, rgba(224,231,255,0.85), rgba(221,214,254,0.75))"
@@ -278,26 +293,32 @@ export function ChangesPage({
           )}
 
           <div className="ml-auto flex items-center gap-3 text-[10px]">
-            <span style={{ color: TEXT_TERTIARY }}>{CHANGE_FILES.length} files changed</span>
-            <span style={{ color: "#10b981" }}>+{totalAdd}</span>
-            <span style={{ color: "#ef4444" }}>−{totalDel}</span>
-
-            {!showBranch && (
+            {isLoading ? (
+              <Skeleton className="h-3 w-40" />
+            ) : (
               <>
-                <button
-                  onClick={stageAll}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
-                  style={{ background: "rgba(99,91,255,0.08)", color: ACCENT, border: "1px solid rgba(99,91,255,0.16)" }}
-                >
-                  Stage All
-                </button>
-                <button
-                  onClick={unstageAll}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
-                  style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
-                >
-                  Unstage All
-                </button>
+                <span style={{ color: TEXT_TERTIARY }}>{CHANGE_FILES.length} files changed</span>
+                <span style={{ color: "#10b981" }}>+{totalAdd}</span>
+                <span style={{ color: "#ef4444" }}>−{totalDel}</span>
+
+                {!showBranch && (
+                  <>
+                    <button
+                      onClick={stageAll}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
+                      style={{ background: "rgba(99,91,255,0.08)", color: ACCENT, border: "1px solid rgba(99,91,255,0.16)" }}
+                    >
+                      Stage All
+                    </button>
+                    <button
+                      onClick={unstageAll}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
+                      style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
+                    >
+                      Unstage All
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -320,8 +341,9 @@ export function ChangesPage({
                 {/* Staged 섹션 */}
                 <div>
                   <button
-                    onClick={() => setStagedOpen(o => !o)}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all"
+                    onClick={() => { if (!isLoading) setStagedOpen(o => !o); }}
+                    disabled={isLoading}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all disabled:opacity-50"
                     style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.9)" }}
                   >
                     {stagedOpen
@@ -329,34 +351,45 @@ export function ChangesPage({
                       : <ChevronRight className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
                     }
                     <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: TEXT_LABEL }}>Staged</span>
-                    <span className="ml-auto text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
-                      {stagedFiles.length}
-                    </span>
+                    {!isLoading && (
+                      <span className="ml-auto text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
+                        {stagedFiles.length}
+                      </span>
+                    )}
                   </button>
 
-                  {stagedOpen && stagedFiles.map(file => (
-                    <FileRow
-                      key={file.id}
-                      file={file}
-                      staged
-                      selected={selectedFile?.id === file.id}
-                      onToggle={e => toggleStage(e, file.id)}
-                      onSelect={() => setSelectedFile(file)}
-                    />
-                  ))}
-
-                  {stagedOpen && stagedFiles.length === 0 && (
+                  {stagedOpen && isLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-black/5">
+                        <Skeleton className="w-3.5 h-3.5 rounded" />
+                        <Skeleton className="w-6 h-3 rounded" />
+                        <Skeleton className="flex-1 h-3" />
+                      </div>
+                    ))
+                  ) : stagedOpen && stagedFiles.length > 0 ? (
+                    stagedFiles.map(file => (
+                      <FileRow
+                        key={file.id}
+                        file={file}
+                        staged
+                        selected={selectedFile?.id === file.id}
+                        onToggle={e => toggleStage(e, file.id)}
+                        onSelect={() => setSelectedFile(file)}
+                      />
+                    ))
+                  ) : stagedOpen && stagedFiles.length === 0 ? (
                     <div className="px-4 py-4 text-center">
                       <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>스테이징된 파일 없음</p>
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Unstaged 섹션 */}
                 <div>
                   <button
-                    onClick={() => setUnstagedOpen(o => !o)}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all"
+                    onClick={() => { if (!isLoading) setUnstagedOpen(o => !o); }}
+                    disabled={isLoading}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all disabled:opacity-50"
                     style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.9)", borderTop: `1px solid ${BORDER_SUBTLE}` }}
                   >
                     {unstagedOpen
@@ -364,31 +397,41 @@ export function ChangesPage({
                       : <ChevronRight className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
                     }
                     <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: TEXT_LABEL }}>Unstaged</span>
-                    <span className="ml-auto text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_TERTIARY }}>
-                      {unstagedFiles.length}
-                    </span>
+                    {!isLoading && (
+                      <span className="ml-auto text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_TERTIARY }}>
+                        {unstagedFiles.length}
+                      </span>
+                    )}
                   </button>
 
-                  {unstagedOpen && unstagedFiles.map(file => (
-                    <FileRow
-                      key={file.id}
-                      file={file}
-                      staged={false}
-                      selected={selectedFile?.id === file.id}
-                      onToggle={e => toggleStage(e, file.id)}
-                      onSelect={() => setSelectedFile(file)}
-                    />
-                  ))}
-
-                  {unstagedOpen && unstagedFiles.length === 0 && (
+                  {unstagedOpen && isLoading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-black/5">
+                        <Skeleton className="w-3.5 h-3.5 rounded" />
+                        <Skeleton className="w-6 h-3 rounded" />
+                        <Skeleton className="flex-1 h-3" />
+                      </div>
+                    ))
+                  ) : unstagedOpen && unstagedFiles.length > 0 ? (
+                    unstagedFiles.map(file => (
+                      <FileRow
+                        key={file.id}
+                        file={file}
+                        staged={false}
+                        selected={selectedFile?.id === file.id}
+                        onToggle={e => toggleStage(e, file.id)}
+                        onSelect={() => setSelectedFile(file)}
+                      />
+                    ))
+                  ) : unstagedOpen && unstagedFiles.length === 0 ? (
                     <div className="px-4 py-4 text-center">
                       <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>모든 파일이 스테이징됨</p>
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
-                {/* 커밋 히스토리 */}
-                {history.length > 0 && (
+                {/* 커밋 히스토리 (로딩 끝나고 데이터 있을 때만) */}
+                {!isLoading && history.length > 0 && (
                   <div className="px-3 pt-3 pb-2" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
                     <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: TEXT_LABEL }}>Recent Commits</p>
                     <div className="space-y-1.5">
@@ -405,106 +448,132 @@ export function ChangesPage({
 
               {/* ── 커밋 메시지 + 버튼 ── */}
               <div className="shrink-0 p-3 space-y-2.5" style={{ borderTop: `1px solid ${BORDER}` }}>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                    style={{ background: "linear-gradient(135deg, #e0e7ff, #fce7f3)" }}
-                  >
-                    <span className="text-[8px] font-bold" style={{ color: ACCENT }}>병</span>
+                {isLoading ? (
+                  <div className="space-y-2.5">
+                    <Skeleton className="h-6 w-1/2 rounded-full" />
+                    <Skeleton className="h-16 w-full rounded-xl" />
+                    <Skeleton className="h-8 w-full rounded-xl" />
                   </div>
-                  <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>병권</span>
-                  <div className="flex items-center gap-1 ml-auto">
-                    <GitBranch className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-                    <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>main</span>
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                        style={{ background: "linear-gradient(135deg, #e0e7ff, #fce7f3)" }}
+                      >
+                        <span className="text-[8px] font-bold" style={{ color: ACCENT }}>병</span>
+                      </div>
+                      <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>병권</span>
+                      <div className="flex items-center gap-1 ml-auto">
+                        <GitBranch className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                        <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>main</span>
+                      </div>
+                    </div>
 
-                {/* ── AI 커밋 메시지 생성기 ── */}
-                <AICommitGenerator
-                  projectId={projectId ?? 0}
-                  stagedFiles={stagedFiles}
-                  onApply={msg => setMessage(msg)}
-                />
+                    {/* ── AI 커밋 메시지 생성기 ── */}
+                    <AICommitGenerator
+                      projectId={projectId ?? 0}
+                      stagedFiles={stagedFiles}
+                      onApply={msg => setMessage(msg)}
+                    />
 
-                <textarea
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  placeholder="커밋 메시지를 입력하세요 (필수)"
-                  rows={3}
-                  className="w-full px-3 py-2 text-[11px] rounded-xl outline-none resize-none transition-all"
-                  style={{
-                    background: "rgba(255,255,255,0.9)",
-                    border: `1px solid ${message.trim() ? "rgba(99,91,255,0.3)" : BORDER}`,
-                    color: TEXT_PRIMARY,
-                    lineHeight: "1.5",
-                  }}
-                />
+                    <textarea
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      placeholder="커밋 메시지를 입력하세요 (필수)"
+                      rows={3}
+                      className="w-full px-3 py-2 text-[11px] rounded-xl outline-none resize-none transition-all"
+                      style={{
+                        background: "rgba(255,255,255,0.9)",
+                        border: `1px solid ${message.trim() ? "rgba(99,91,255,0.3)" : BORDER}`,
+                        color: TEXT_PRIMARY,
+                        lineHeight: "1.5",
+                      }}
+                    />
 
-                <div className="flex items-center gap-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                  <FileCode2 className="w-3 h-3 shrink-0" />
-                  <span>{stagedCount} file{stagedCount !== 1 ? "s" : ""} staged</span>
-                  <span className="ml-auto" style={{ color: "#10b981" }}>+{stagedFiles.reduce((s, f) => s + f.additions, 0)}</span>
-                  <span style={{ color: "#ef4444" }}>−{stagedFiles.reduce((s, f) => s + f.deletions, 0)}</span>
-                </div>
+                    <div className="flex items-center gap-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                      <FileCode2 className="w-3 h-3 shrink-0" />
+                      <span>{stagedCount} file{stagedCount !== 1 ? "s" : ""} staged</span>
+                      <span className="ml-auto" style={{ color: "#10b981" }}>+{stagedFiles.reduce((s, f) => s + f.additions, 0)}</span>
+                      <span style={{ color: "#ef4444" }}>−{stagedFiles.reduce((s, f) => s + f.deletions, 0)}</span>
+                    </div>
 
-                <button
-                  onClick={handleCommitClick}
-                  disabled={!stagedCount || !message.trim()}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold transition-all"
-                  style={{
-                    background: stagedCount > 0 && message.trim()
-                      ? "linear-gradient(135deg, #635bff 0%, #8b5cf6 50%, #a855f7 100%)"
-                      : "rgba(0,0,0,0.07)",
-                    color: stagedCount > 0 && message.trim()
-                      ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-                    boxShadow: stagedCount > 0 && message.trim()
-                      ? "0 4px 16px rgba(99,91,255,0.28)" : "none",
-                    cursor: stagedCount > 0 && message.trim() ? "pointer" : "not-allowed",
-                  }}
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Commit &amp; Push to main
-                </button>
+                    <button
+                      onClick={handleCommitClick}
+                      disabled={!stagedCount || !message.trim()}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold transition-all"
+                      style={{
+                        background: stagedCount > 0 && message.trim()
+                          ? "linear-gradient(135deg, #635bff 0%, #8b5cf6 50%, #a855f7 100%)"
+                          : "rgba(0,0,0,0.07)",
+                        color: stagedCount > 0 && message.trim()
+                          ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
+                        boxShadow: stagedCount > 0 && message.trim()
+                          ? "0 4px 16px rgba(99,91,255,0.28)" : "none",
+                        cursor: stagedCount > 0 && message.trim() ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Commit &amp; Push to main
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
             {/* ── 오른쪽: Diff Viewer ── */}
             <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#0d1117" }}>
-              {selectedFile && (
-                <div
-                  className="flex items-center gap-3 px-4 py-2 shrink-0"
-                  style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
-                >
-                  <span className="text-[10px] font-semibold" style={{ color: "#c9d1d9" }}>{selectedFile.name}</span>
-                  <span className="text-[9px] font-mono truncate" style={{ color: "#8b949e" }}>{selectedFile.path}</span>
-                  <div className="ml-auto flex items-center gap-2 text-[9px]">
-                    <span style={{ color: "#3fb950" }}>+{selectedFile.additions}</span>
-                    <span style={{ color: "#f85149" }}>−{selectedFile.deletions}</span>
-                    <span
-                      className="px-1.5 py-0.5 rounded text-[8px] font-semibold"
-                      style={{
-                        background: STATUS_META[selectedFile.status].bg,
-                        color:      STATUS_META[selectedFile.status].color,
-                      }}
-                    >
-                      {selectedFile.status.toUpperCase()}
-                    </span>
+              {isLoading ? (
+                /* [스켈레톤] 우측 Diff 영역 전체 */
+                <div className="flex-1 p-6 space-y-4">
+                  <Skeleton className="h-6 w-1/3 bg-white/10" />
+                  <Skeleton className="h-4 w-1/4 bg-white/5" />
+                  <div className="mt-8 space-y-2">
+                    <Skeleton className="h-4 w-3/4 bg-white/5" />
+                    <Skeleton className="h-4 w-1/2 bg-white/5" />
+                    <Skeleton className="h-4 w-5/6 bg-white/5" />
+                    <Skeleton className="h-4 w-2/3 bg-white/5" />
                   </div>
                 </div>
-              )}
-
-              {selectedFile ? (
-                <FileDiffViewer file={selectedFile} />
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-                    <GitCommit className="w-8 h-8" style={{ color: "#30363d" }} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[13px] font-semibold mb-1" style={{ color: "#6e7681" }}>파일을 선택하세요</p>
-                    <p className="text-[11px]" style={{ color: "#484f58" }}>왼쪽 목록에서 파일을 클릭하면 변경 내용이 표시됩니다</p>
-                  </div>
-                </div>
+                <>
+                  {selectedFile && (
+                    <div
+                      className="flex items-center gap-3 px-4 py-2 shrink-0"
+                      style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
+                    >
+                      <span className="text-[10px] font-semibold" style={{ color: "#c9d1d9" }}>{selectedFile.name}</span>
+                      <span className="text-[9px] font-mono truncate" style={{ color: "#8b949e" }}>{selectedFile.path}</span>
+                      <div className="ml-auto flex items-center gap-2 text-[9px]">
+                        <span style={{ color: "#3fb950" }}>+{selectedFile.additions}</span>
+                        <span style={{ color: "#f85149" }}>−{selectedFile.deletions}</span>
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] font-semibold"
+                          style={{
+                            background: STATUS_META[selectedFile.status].bg,
+                            color:      STATUS_META[selectedFile.status].color,
+                          }}
+                        >
+                          {selectedFile.status.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedFile ? (
+                    <FileDiffViewer file={selectedFile} />
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.04)" }}>
+                        <GitCommit className="w-8 h-8" style={{ color: "#30363d" }} />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[13px] font-semibold mb-1" style={{ color: "#6e7681" }}>파일을 선택하세요</p>
+                        <p className="text-[11px]" style={{ color: "#484f58" }}>왼쪽 목록에서 파일을 클릭하면 변경 내용이 표시됩니다</p>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
