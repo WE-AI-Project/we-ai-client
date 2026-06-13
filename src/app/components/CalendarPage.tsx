@@ -479,6 +479,7 @@ export function CalendarPage() {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [deptFilter, setDeptFilter] = useState<Dept>("전체");
+  const [statusFilter, setStatusFilter] = useState<ScheduleStatus | "전체">("전체");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
   const [view, setView] = useState<"month" | "list">("month");
@@ -486,8 +487,6 @@ export function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 백엔드 통신(API)을 대체하는 초기 로딩 지연 효과입니다.
-    // 3초(3000ms) 뒤에 로딩이 끝나면서 자연스럽게 실제 화면이 나타납니다.
     const timer = setTimeout(() => setIsLoading(false), 3000);
     return () => clearTimeout(timer);
   }, []);
@@ -541,11 +540,20 @@ export function CalendarPage() {
   const todayStr = getTodayStr();
   const [scheduleToDelete, setScheduleToDelete] = useState<Schedule | null>(null);
 
-  const filtered = useMemo(() =>
+  // 1차 필터링: 선택된 부서 기준
+  const deptFiltered = useMemo(() =>
     deptFilter === "전체"
       ? schedules
       : schedules.filter(s => s.department === deptFilter),
     [schedules, deptFilter]
+  );
+
+  // 2차 필터링: 선택된 부서 데이터 위해 상태 필터링 추가
+  const filtered = useMemo(() =>
+    statusFilter === "전체"
+      ? deptFiltered
+      : deptFiltered.filter(s => s.status === statusFilter),
+    [deptFiltered, statusFilter]
   );
 
   const daysInMonth = getDaysInMonth(year, month);
@@ -593,12 +601,13 @@ export function CalendarPage() {
     setSelectedDay(null);
   };
 
-  const stats = {
-    total: filtered.length,
-    done: filtered.filter(s => s.status === "done").length,
-    inProgress: filtered.filter(s => s.status === "in-progress").length,
-    todo: filtered.filter(s => s.status === "todo").length,
-  };
+  // 통계 집계는 부서 필터링 본체(deptFiltered)를 기준으로 두어 상태 토글 시에도 수치가 고정되도록 개선
+  const stats = useMemo(() => ({
+    total: deptFiltered.length,
+    done: deptFiltered.filter(s => s.status === "done").length,
+    inProgress: deptFiltered.filter(s => s.status === "in-progress").length,
+    todo: deptFiltered.filter(s => s.status === "todo").length,
+  }), [deptFiltered]);
 
   function EventBar({ schedule, compact = false }: { schedule: Schedule; compact?: boolean }) {
     const dc = deptColors[schedule.department as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
@@ -721,6 +730,7 @@ export function CalendarPage() {
             )}
           </div>
 
+          {/* ── 상단 정보 집계 영역: 클릭 인터랙션 및 필터 바인딩 적용 ── */}
           <div className="px-3 py-2.5 shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
             {isLoading ? (
               /* [스켈레톤] 좌측 통계 블록 */
@@ -732,15 +742,27 @@ export function CalendarPage() {
             ) : (
               <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { label: "완료", value: stats.done, color: "#5A8A4A" },
-                  { label: "진행", value: stats.inProgress, color: "#C09840" },
-                  { label: "예정", value: stats.todo, color: "#9A9B72" },
-                ].map(s => (
-                  <div key={s.label} className="rounded-lg p-2 text-center" style={{ background: `${s.color}12` }}>
-                    <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
-                    <p className="text-[8px]" style={{ color: s.color }}>{s.label}</p>
-                  </div>
-                ))}
+                  { id: "todo" as const, label: "예정", value: stats.todo, color: "#898989" },
+                  { id: "in-progress" as const, label: "진행", value: stats.inProgress, color: "#f1cc9c" },
+                  { id: "done" as const, label: "완료", value: stats.done, color: "#809678" },
+                ].map(s => {
+                  const isSelected = statusFilter === s.id;
+                  return (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => setStatusFilter(prev => prev === s.id ? "전체" : s.id)}
+                      className="rounded-lg p-2 text-center transition-all cursor-pointer hover:opacity-90"
+                      style={{
+                        background: isSelected ? s.color : `${s.color}12`,
+                        border: `1px solid ${isSelected ? "transparent" : `${s.color}30`}`,
+                      }}
+                    >
+                      <p className="text-sm font-bold" style={{ color: isSelected ? "#ffffff" : s.color }}>{s.value}</p>
+                      <p className="text-[8px]" style={{ color: isSelected ? "rgba(255,255,255,0.9)" : s.color }}>{s.label}</p>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -799,7 +821,7 @@ export function CalendarPage() {
             ) : (
               <>
                 <p className="text-[9px] font-semibold uppercase tracking-wider px-1 mb-1" style={{ color: TEXT_LABEL }}>
-                  {deptFilter === "전체" ? "전체" : deptFilter} 일정 ({filtered.length})
+                  {deptFilter === "전체" ? "전체" : deptFilter} {statusFilter !== "전체" ? STATUS_META[statusFilter].label : ""} 일정 ({filtered.length})
                 </p>
                 {filtered.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 gap-2">
@@ -1113,7 +1135,7 @@ export function CalendarPage() {
             onSave={handleSave}
             onClose={() => setEditSchedule(null)}
             onColorChange={handleDeptColorChange}
-            onDeptDelete={(dept) => setDeptToDelete(dept)}
+            onDeptDelete={(dept) => setDeptToDelete(dept)} // 부서 삭제 팝업 요청 연결
             deptColors={deptColors}
           />
         )
