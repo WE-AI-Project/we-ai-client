@@ -75,7 +75,7 @@ const SIDEBAR_COLLAPSED = 52;
 const SIDEBAR_MIN = 44;
 const SIDEBAR_MAX = 340;
 const COLLAPSE_THRESHOLD = 100;
-const TITLEBAR_DEFAULT = 38; // 💡 여기에 지정한 숫자로 기본 높이와 최대 높이가 자동 통일됩니다.
+const TITLEBAR_DEFAULT = 38;
 
 function genProjectCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -224,16 +224,14 @@ export default function App() {
   const [projectCode, setProjectCode] = useState("");
   const [localPath, setLocalPath] = useState("");
 
-  // ── 명시적 Left / Right 패널 상태 관리 구조 ──
   const [leftTabs, setLeftTabs] = useState<NavId[]>(["Dashboard"]);
   const [rightTabs, setRightTabs] = useState<NavId[]>([]);
   const [activeLeftTab, setActiveLeftTab] = useState<NavId>("Dashboard");
   const [activeRightTab, setActiveRightTab] = useState<NavId>("Chat");
-  const [isSplit, setIsSplit] = useState(false); // 분할 화면 활성화 여부
-  const [activePanel, setActivePanel] = useState<"left" | "right">("left"); // 현재 포커스 패널
-  const [splitPercent, setSplitPercent] = useState<number>(50); // 분할 비율 (%)
+  const [isSplit, setIsSplit] = useState(false);
+  const [activePanel, setActivePanel] = useState<"left" | "right">("left");
+  const [splitPercent, setSplitPercent] = useState<number>(50);
 
-  // 드래그 앤 드롭 상태 추적
   const [isDraggingTab, setIsDraggingTab] = useState(false);
   const [draggedTab, setDraggedTab] = useState<{ id: NavId; from: "left" | "right" } | null>(null);
 
@@ -243,16 +241,10 @@ export default function App() {
   const [sidebarProfile, setSidebarProfile] = useState(() => loadProfile());
   const [docCount, setDocCount] = useState(() => loadDocs().length);
 
-  // ── 데일리 스탠드업 ──
   const [showStandup, setShowStandup] = useState(false);
-
-  // ── 사이드바 너비 ──
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
   const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
-
-  // ── 타이틀바 보이기/숨기기 상태
   const [showTitleBar, setShowTitleBar] = useState(true);
-
   const [showSystemMenu, setShowSystemMenu] = useState(false);
   const systemMenuRef = useRef<HTMLDivElement>(null);
 
@@ -261,7 +253,7 @@ export default function App() {
   const dragHeaderStartY = useRef(0);
   const dragHeaderStartH = useRef(TITLEBAR_DEFAULT);
 
-  useEffect(() => {  //사이드바 메뉴
+  useEffect(() => {
     if (!showSystemMenu) return;
     const handleOutsideClick = (e: MouseEvent) => {
       if (systemMenuRef.current && !systemMenuRef.current.contains(e.target as Node)) {
@@ -391,7 +383,6 @@ export default function App() {
     };
   }, [projectId]);
 
-  // ── 사이드바 메뉴 클릭 핸들러
   const handleNavClick = (id: NavId) => {
     setDiffFile(null);
     if (!isSplit || activePanel === "left") {
@@ -405,7 +396,6 @@ export default function App() {
     }
   };
 
-  // ── 드래그 앤 드롭 분할 제어 엔진
   const handleTabDrop = (target: "left" | "right" | "split-left" | "split-right") => {
     if (!draggedTab) return;
     const { id: tabId, from: source } = draggedTab;
@@ -413,12 +403,10 @@ export default function App() {
     setIsDraggingTab(false);
     setDraggedTab(null);
 
-    // 단일 탭인 상태에서 분할을 시도하면 분할하지 않고 원상 유지
     if ((target === "split-left" || target === "split-right") && leftTabs.length <= 1) {
       return;
     }
 
-    // 좌측 분할 영역에 떨어트린 경우
     if (target === "split-left") {
       const remaining = leftTabs.filter(t => t !== tabId);
       setLeftTabs([tabId]);
@@ -431,7 +419,6 @@ export default function App() {
       return;
     }
 
-    // 우측 분할 영역에 떨어트린 경우
     if (target === "split-right") {
       const remaining = leftTabs.filter(t => t !== tabId);
       setLeftTabs(remaining);
@@ -446,7 +433,6 @@ export default function App() {
 
     if (source === target) return;
 
-    // 왼쪽에서 오른쪽 패널로 탭을 병합 이동한 경우
     if (source === "left" && target === "right") {
       const nextLeft = leftTabs.filter(t => t !== tabId);
       if (nextLeft.length === 0) {
@@ -463,8 +449,6 @@ export default function App() {
         setActivePanel("right");
       }
     }
-
-    // 오른쪽에서 왼쪽 패널로 탭을 병합 이동한 경우
     else if (source === "right" && target === "left") {
       const nextRight = rightTabs.filter(t => t !== tabId);
       if (!leftTabs.includes(tabId)) setLeftTabs([...leftTabs, tabId]);
@@ -481,7 +465,6 @@ export default function App() {
     }
   };
 
-  // ── 리사이즈 처리 드래그 이벤트 엔진들
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragStartW = useRef(SIDEBAR_EXPANDED);
@@ -559,7 +542,6 @@ export default function App() {
 
   const toggleSidebar = () => setSidebarWidth(w => w <= COLLAPSE_THRESHOLD ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED);
 
-  // ── 프로젝트 참여 ──
   const handleAuthenticated = (session: AuthSession, user: CurrentUser) => {
     setAuthSession(session);
     setCurrentUser(user);
@@ -647,7 +629,6 @@ export default function App() {
     setShowStandup(false);
   };
 
-  // ── 페이지 렌더 ──
   const renderPage = (nav: NavId) => {
     switch (nav) {
       case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
@@ -665,13 +646,12 @@ export default function App() {
     }
   };
 
-  // 공통 패널 컴포넌트 렌더러
+  // 공통 패널 컴포넌트 렌더러 (탭 닫기 로직 수정)
   const renderPanel = (
     panelType: "left" | "right",
     tabs: NavId[],
     activeTab: NavId,
-    setActiveTab: (id: NavId) => void,
-    setTabs: React.Dispatch<React.SetStateAction<NavId[]>>
+    setActiveTab: (id: NavId) => void
   ) => {
     const isFocused = activePanel === panelType;
 
@@ -683,7 +663,6 @@ export default function App() {
         onDragOver={(e) => e.preventDefault()}
         onDrop={() => handleTabDrop(panelType)}
       >
-        {/* VS Code 스타일 상단 탭 헤더 바 */}
         <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
           {tabs.map(tId => (
             <div
@@ -714,20 +693,42 @@ export default function App() {
                 onClick={(e) => {
                   e.stopPropagation();
                   const nextTabs = tabs.filter(t => t !== tId);
-                  setTabs(nextTabs);
-                  if (nextTabs.length > 0) {
-                    if (activeTab === tId) setActiveTab(nextTabs[nextTabs.length - 1]);
+                  
+                  // ✨ 화면 자동 병합(Un-split) 처리 로직
+                  if (panelType === "left") {
+                    if (nextTabs.length === 0 && isSplit) {
+                      // 왼쪽 화면이 다 꺼졌을 때 오른쪽 탭들을 왼쪽으로 당겨오고 분할 해제
+                      setLeftTabs([...rightTabs]);
+                      setActiveLeftTab(activeRightTab);
+                      setRightTabs([]);
+                      setIsSplit(false);
+                      setActivePanel("left");
+                    } else {
+                      setLeftTabs(nextTabs);
+                      if (nextTabs.length > 0 && activeTab === tId) {
+                        setActiveLeftTab(nextTabs[nextTabs.length - 1]);
+                      }
+                    }
+                  } else {
+                    if (nextTabs.length === 0) {
+                      // 오른쪽 화면이 다 꺼졌을 때 분할 해제
+                      setRightTabs([]);
+                      setIsSplit(false);
+                      setActivePanel("left");
+                    } else {
+                      setRightTabs(nextTabs);
+                      if (activeTab === tId) {
+                        setActiveRightTab(nextTabs[nextTabs.length - 1]);
+                      }
+                    }
                   }
                 }}
               />
             </div>
           ))}
-
-          {/* 우측 상단 닫기 유틸리티 영역 (개별 닫기 버튼 비활성화) */}
           <div className="ml-auto px-3 flex items-center gap-2" />
         </div>
 
-        {/* 탭 내부 페이지 본문 콘텐츠 (가로/세로 스크롤 완벽 지원) */}
         <div className="flex-1 overflow-auto scrollbar-hide relative">
           {tabs.length > 0 ? (
             <div className="flex-1 flex flex-col w-full h-full min-w-full min-h-full">
@@ -743,7 +744,6 @@ export default function App() {
     );
   };
 
-  // ── 레이아웃 빌더 ──
   const renderContent = () => {
     if (diffFile) {
       return (
@@ -761,36 +761,33 @@ export default function App() {
 
     return (
       <div ref={splitContainerRef} className="flex-1 flex overflow-hidden relative">
-        {/* 왼쪽 주 패널 컨테이너 */}
         <div
           style={{ width: isSplit ? `${splitPercent}%` : "100%" }}
           className="h-full flex flex-col overflow-hidden shrink-0"
         >
-          {renderPanel("left", leftTabs, activeLeftTab, setActiveLeftTab, setLeftTabs)}
+          {renderPanel("left", leftTabs, activeLeftTab, setActiveLeftTab)}
         </div>
 
-        {/* 드래그 가능한 가운데 크기 조절바 Divider */}
-        if (isSplit && (
+        {isSplit && (
           <div
             onMouseDown={onSplitResizeMouseDown}
-            className="w-1 h-full bg-white/10 hover:bg-[#AEB784]/60 cursor-col-resize z-30 transition-colors shrink-0"
+            className="absolute top-0 bottom-0 w-2 hover:bg-[#AEB784]/60 cursor-col-resize z-30 transition-colors"
+            style={{ left: `calc(${splitPercent}% - 4px)` }}
             title="드래그하여 크기 조절"
           />
-        ))
+        )}
 
-        {/* 오른쪽 분할 패널 컨테이너 */}
         {isSplit && (
           <div
             style={{ width: `${100 - splitPercent}%` }}
             className="h-full flex flex-col overflow-hidden shrink-0"
           >
-            {renderPanel("right", rightTabs, activeRightTab, setActiveRightTab, setRightTabs)}
+            {renderPanel("right", rightTabs, activeRightTab, setActiveRightTab)}
           </div>
         )}
 
         {!isSplit && isDraggingTab && (
           <div className="absolute inset-0 flex z-40 pointer-events-none animate-in fade-in duration-150">
-            {/* 좌측 분할 구역 가이드 박스 */}
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => handleTabDrop("split-left")}
@@ -802,7 +799,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 우측 분할 구역 가이드 박스 */}
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => handleTabDrop("split-right")}
@@ -819,7 +815,6 @@ export default function App() {
     );
   };
 
-  // ── 외부 페이지 렌더링 분기 분리 ──
   if (authBootstrapping) {
     return (
       <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
@@ -884,10 +879,8 @@ export default function App() {
 
   const currentActiveTab = activePanel === "left" ? activeLeftTab : activeRightTab;
 
-  // ── Workspace 화면 ──
   return (
     <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
-      {/* ══ 데일리 스탠드업 팝업 ══ */}
       {showStandup && (
         <DailyStandupModal
           userName="병권"
@@ -910,7 +903,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 타이틀바 */}
         <div
           className="flex items-center pl-2 pr-4 shrink-0 relative"
           style={{
@@ -981,9 +973,7 @@ export default function App() {
           onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
         />
 
-        {/* 바디 */}
         <div className="flex-1 flex overflow-hidden">
-          {/* ════════ 글로벌 사이드바 ════════ */}
           <div
             className="flex flex-col shrink-0 relative"
             style={{
@@ -994,7 +984,6 @@ export default function App() {
               overflow: showSystemMenu ? "visible" : "hidden",
             }}
           >
-            {/* 프로필 버튼 */}
             <div className={`shrink-0 ${isCollapsed ? "py-1.5" : "p-3"}`} style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
               {isCollapsed ? (
                 <div className="relative group">
@@ -1028,7 +1017,6 @@ export default function App() {
               )}
             </div>
 
-            {/* 스크롤 영역 */}
             <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
               {!isCollapsed && (
                 <div className="px-2.5 pt-2.5 pb-2" style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
@@ -1062,7 +1050,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* MAIN 메뉴 */}
               <div className={`pt-2.5 pb-2 ${isCollapsed ? "px-1" : "px-1.5"}`}>
                 <SectionLabel collapsed={isCollapsed}>MAIN</SectionLabel>
                 <nav className="space-y-0.5">
@@ -1088,7 +1075,6 @@ export default function App() {
                 </nav>
               </div>
 
-              {/* SYSTEM 메뉴 */}
               <div className={`pb-2 ${isCollapsed ? "px-1" : "px-1.5"}`}>
                 <SectionLabel collapsed={isCollapsed}>SYSTEM</SectionLabel>
                 <nav className="space-y-0.5">
@@ -1106,7 +1092,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 하단: Leave + Toggle */}
             <div
               ref={systemMenuRef}
               className={`shrink-0 ${isCollapsed ? "px-1 py-2" : "px-1.5 py-2"} relative`}
@@ -1121,7 +1106,6 @@ export default function App() {
                     boxShadow: "0 -4px 20px rgba(0,0,0,0.45)",
                   }}
                 >
-                  {/* 1. Titlebar (Hide / Show Titlebar) */}
                   <button
                     onClick={() => {
                       setShowTitleBar(v => {
@@ -1150,7 +1134,6 @@ export default function App() {
                     )}
                   </button>
 
-                  {/* 2. Collapse (Collapse / Expand) */}
                   <button
                     onClick={() => { setShowSystemMenu(false); toggleSidebar(); }}
                     className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-xs transition-all hover:bg-white/[0.06]"
@@ -1169,7 +1152,6 @@ export default function App() {
                     )}
                   </button>
 
-                  {/* 3. Back To Projects */}
                   <button
                     onClick={handleLeaveProject}
                     className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-xs transition-all hover:bg-white/[0.06]"
@@ -1179,7 +1161,6 @@ export default function App() {
                     <span className="text-xs">Back To Projects</span>
                   </button>
 
-                  {/* 4. Sign Out */}
                   <button
                     onClick={() => void handleLogout()}
                     className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-xs transition-all hover:bg-[#B85450]/15"
@@ -1211,7 +1192,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 리사이즈 핸들 */}
             <div
               onMouseDown={onResizeMouseDown}
               className="absolute top-0 right-0 h-full w-1 z-20 transition-colors"
@@ -1221,11 +1201,9 @@ export default function App() {
             />
           </div>
 
-          {/* ── 메인 콘텐츠 ── */}
           {renderContent()}
         </div>
 
-        {/* 로딩 오버레이 */}
         {isLoading && (
           <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ background: "#F5F4F1" }}>
             <style>{`
@@ -1239,7 +1217,7 @@ export default function App() {
               <div style={{ position: "relative", width: 80, height: 80 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid rgba(65,67,27,0.08)", borderTopColor: "#AEB784", borderRightColor: "#AEB784", animation: "_spin 2s linear infinite" }} />
                 <div style={{ position: "absolute", inset: 7, borderRadius: "50%", border: "2px solid rgba(65,67,27,0.06)", borderBottomColor: "#41431B", borderLeftColor: "#41431B", animation: "_spinRev 1.2s linear infinite" }} />
-                <div style={{ position: "absolute", inset: 16, borderRadius: 12, background: "#41431B", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(65,67,27,0.30)" }}>
+                <div style={{ position: "absolute", inset: 16, borderRadius: 12, background: "#41431B", display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(65,67,27,0.30)" }}>
                   <FolderGit2 style={{ width: 22, height: 22, color: "white" }} />
                 </div>
               </div>

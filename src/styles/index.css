@@ -6,7 +6,7 @@
    [응용 프로그램 맞춤형 스크롤바 제어 설정]
 ---------------------------------------------------- */
 
-/* 1. 응용 프로그램 메인 창(Window) 자체의 스크롤을 원천 차단 */
+/* 1. 응용 프로그램 메인 창(Window) 자체의 뼈대 스크롤 원천 차단 */
 html, body, #root {
   width: 100vw;
   height: 100vh;
@@ -15,14 +15,22 @@ html, body, #root {
   padding: 0;
 }
 
-/* 2. 스크롤이 필요한 내부 영역의 스크롤바 숨기기 (Tailwind 유틸리티 추가) */
+/* 2. 앱 전체 모든 요소의 스크롤바 완전히 숨기기 (스크롤 동작은 정상 유지) */
+* {
+  -ms-overflow-style: none;  /* IE, Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none;             /* Chrome, Safari, Opera, Electron 등 대부분의 브라우저 */
+}
+
+/* 3. 명시적으로 사용하고 싶을 때를 대비한 Tailwind 유틸리티 클래스 (선택 사항) */
 @layer utilities {
   .scrollbar-hide {
-    -ms-overflow-style: none; /* Windows WebView2 등 */
+    -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
-  /* Electron(Chromium) 및 대부분의 데스크톱 웹뷰 엔진 적용 */
   .scrollbar-hide::-webkit-scrollbar {
     display: none; 
   }
