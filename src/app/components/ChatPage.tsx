@@ -14,7 +14,7 @@ import {
   generateDocBriefing, briefingToMeetingDoc, type BriefingData,
 } from "../data/chatStore";
 import { DocBriefingBubble, BriefingLoadingBubble } from "./DocBriefingBubble";
-import { runAiDebate, type DebateResponse } from "../../api/aiApi";
+import { runAiChat, type AiChatResponse } from "../../api/aiApi";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
@@ -198,19 +198,19 @@ function getAIResponse(input: string): { content: string; kind: AIResponseKind; 
   return { content: fallbacks[Math.floor(Math.random() * fallbacks.length)], kind: "text" };
 }
 
-function formatDebateAnswer(response: DebateResponse): string {
-  const agentSummary = [
-    response.oracleAnalysis && `Oracle\n${response.oracleAnalysis}`,
-    response.backendOpinion && `Backend\n${response.backendOpinion}`,
-    response.frontendOpinion && `Frontend\n${response.frontendOpinion}`,
-    response.inspectorOpinion && `Inspector\n${response.inspectorOpinion}`,
-  ].filter(Boolean).join("\n\n---\n\n");
+function formatAiChatAnswer(response: AiChatResponse): string {
+  const answer = response.answer?.trim();
+  const contexts = (response.contexts ?? []).filter(Boolean);
 
-  return response.inspectorOpinion
-    || response.markdown
-    || agentSummary
-    || response.debateHistory
-    || "AI 응답이 비어 있습니다.";
+  if (!answer && contexts.length === 0) {
+    return "AI 응답이 비어 있습니다.";
+  }
+
+  if (contexts.length === 0) {
+    return answer || "AI 응답이 비어 있습니다.";
+  }
+
+  return `${answer || "답변"}\n\n참고 컨텍스트\n${contexts.map((context) => `- ${context}`).join("\n")}`;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -684,7 +684,7 @@ export function ChatPage({
     {
       id: genId(),
       role: "ai",
-      content: "안녕하세요! WE&AI 프로젝트 AI 어시스턴트입니다 🤖\n\n프로젝트 전체 데이터를 학습했어요. 팀원 정보, 파트 담당, 업무 현황 등을 자유롭게 물어보세요!\n\n예: \"백엔드 담당 누구야?\", \"지수님 프로필 보여줘\", \"전체 팀원 알려줘\"",
+      content: "안녕하세요! WE&AI 프로젝트 AI 어시스턴트입니다.\n\n이 탭은 /api/v1/ai/chat 기반으로 프로젝트 문서와 RAG 컨텍스트를 참고해 답변합니다.\n\n예: \"프로젝트 핵심 API 설명해줘\", \"최근 일정 진행 상황 요약해줘\", \"마일스톤 현황 알려줘\"",
       time: new Date().toISOString(),
       kind: "text",
     },
@@ -752,24 +752,21 @@ export function ChatPage({
     setAITyping(true);
 
     try {
-      const response = await runAiDebate({
+      const response = await runAiChat({
         projectId,
-        fileName: "main-client-chat",
-        cursorLine: 1,
-        currentCodeSnippet: text,
-        userQuery: text,
+        question: text,
       });
       const aiMsg: AIMsg = {
         id: genId(),
         role: "ai",
-        content: formatDebateAnswer(response),
+        content: formatAiChatAnswer(response),
         time: new Date().toISOString(),
         kind: "text",
         data: response,
       };
       setAIMessages(prev => [...prev, aiMsg]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "AI 토론 요청에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "AI 채팅 요청에 실패했습니다.");
     } finally {
       setAITyping(false);
     }
@@ -1113,7 +1110,7 @@ export function ChatPage({
               </div>
               <div>
                 <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>WE&AI Project Assistant</p>
-                <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>프로젝트 전체 데이터 학습됨 · 팀원 {PROJECT_TEAM.length}명</p>
+                <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG Chat · /api/v1/ai/chat 연동</p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: UI_GREEN }} />
@@ -1131,8 +1128,8 @@ export function ChatPage({
                 ))
               ) : (
                 [
-                  "전체 팀원 보여줘", "프론트엔드 담당 누구야?", "백엔드 팀 알려줘",
-                  "프로젝트 현황은?", "병권님 프로필", "담당 업무 목록",
+                  "프로젝트 핵심 API 설명해줘", "최근 일정 진행 상황 요약해줘", "마일스톤 현황 알려줘",
+                  "백엔드 진행률 알려줘", "기술 스택 정리해줘", "최근 활동 요약해줘",
                 ].map(q => (
                   <button
                     key={q}

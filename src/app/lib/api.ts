@@ -213,6 +213,24 @@ export type ProjectTechStackInput = {
   isRequired?: boolean;
 };
 
+export type ProjectUpdatePayload = {
+  projectName?: string;
+  description?: string;
+  repositoryUrl?: string;
+  localPath?: string;
+  startDate?: string | null;
+  targetDate?: string | null;
+  status?: ProjectStatus;
+};
+
+export type ProjectMemberRoleUpdatePayload = {
+  role: ProjectMemberRole;
+};
+
+export type ProjectMemberDepartmentUpdatePayload = {
+  department: ProjectDepartment;
+};
+
 export type ProjectTechStackList = {
   projectId: number;
   techStacks: ProjectTechStack[];
@@ -232,9 +250,108 @@ export type ProjectSchedule = {
   createdAt: string;
 };
 
+export type ProjectScheduleCreatePayload = {
+  title: string;
+  description?: string;
+  assigneeId?: number | null;
+  department: ProjectDepartment;
+  startDate: string;
+  endDate: string;
+  priority?: ProjectSchedulePriority;
+  status?: ProjectScheduleStatus;
+};
+
+export type ProjectScheduleUpdatePayload = {
+  title?: string;
+  description?: string | null;
+  assigneeId?: number | null;
+  department?: ProjectDepartment;
+  startDate?: string | null;
+  endDate?: string | null;
+  priority?: ProjectSchedulePriority;
+  status?: ProjectScheduleStatus;
+};
+
+export type ProjectScheduleStatusUpdatePayload = {
+  status: ProjectScheduleStatus;
+};
+
+export type ProjectScheduleFilterParams = {
+  department?: ProjectDepartment | null;
+  status?: ProjectScheduleStatus | null;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
 export type ProjectScheduleList = {
   projectId: number;
   schedules: ProjectSchedule[];
+};
+
+export type ProjectRepositoryType = "BACKEND" | "FRONTEND";
+export type ProjectCommitFileStatus = "ADDED" | "MODIFIED" | "DELETED";
+
+export type ProjectCommitSummary = {
+  commitHash: string;
+  shortCommitHash: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  committedAt: string;
+  changedFileCount: number;
+  additions: number;
+  deletions: number;
+};
+
+export type ProjectCommitList = {
+  projectId: number;
+  repositoryType: ProjectRepositoryType;
+  limit: number;
+  commits: ProjectCommitSummary[];
+};
+
+export type ProjectCommitDetail = {
+  projectId: number;
+  repositoryType: ProjectRepositoryType;
+  commitHash: string;
+  shortCommitHash: string;
+  message: string;
+  body?: string | null;
+  authorName: string;
+  authorEmail: string;
+  committedAt: string;
+  changedFileCount: number;
+  additions: number;
+  deletions: number;
+};
+
+export type ProjectCommitChangedFile = {
+  path: string;
+  fileName: string;
+  extension: string;
+  status: ProjectCommitFileStatus;
+  additions: number;
+  deletions: number;
+};
+
+export type ProjectCommitFileList = {
+  projectId: number;
+  repositoryType: ProjectRepositoryType;
+  commitHash: string;
+  files: ProjectCommitChangedFile[];
+};
+
+export type ProjectCommitFileDiff = {
+  projectId: number;
+  repositoryType: ProjectRepositoryType;
+  commitHash: string;
+  filePath: string;
+  fileName: string;
+  extension: string;
+  status: ProjectCommitFileStatus;
+  additions: number;
+  deletions: number;
+  diff: string;
 };
 
 export type ProjectActivity = {  //프로젝트 최근 활동
@@ -307,56 +424,58 @@ export async function fetchProjectDepartmentStatus(projectId: number): Promise<P
   return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
 }
 
-export type ProjectUpdatePayload = {  //프로젝트 정보 수정
-  projectName?: string;
-  description?: string;
-  repositoryUrl?: string;
-  localPath?: string;
-};
-
-export async function updateProject(projectId: number, payload: ProjectUpdatePayload): Promise<ProjectDetail> {  //프로젝트 정보 수정
-  return request<ProjectDetail>(`/api/v1/projects/${projectId}`, {
-    method: "PATCH",
-    body: payload,
-  });
+export async function fetchProjectCommits(
+  projectId: number,
+  repositoryType: ProjectRepositoryType,
+  limit = 20
+): Promise<ProjectCommitList> {
+  return request<ProjectCommitList>(
+    `/api/v1/projects/${projectId}/commits${buildQueryString({ repositoryType, limit })}`
+  );
 }
 
-export async function addProjectTechStack(projectId: number, payload: ProjectTechStackInput): Promise<ProjectTechStack> {  //기술 스택 추가
-  return request<ProjectTechStack>(`/api/v1/projects/${projectId}/tech-stacks`, {
-    method: "POST",
-    body: payload,
-  });
+export async function fetchFilteredProjectCommits(
+  projectId: number,
+  repositoryType: ProjectRepositoryType,
+  limit = 20
+): Promise<ProjectCommitList> {
+  return request<ProjectCommitList>(
+    `/api/v1/projects/${projectId}/commits/filter${buildQueryString({ repositoryType, limit })}`
+  );
 }
 
-export async function updateProjectTechStack(projectId: number, techStackId: number, payload: ProjectTechStackInput): Promise<ProjectTechStack> {  //기술 스택 수정
-  return request<ProjectTechStack>(`/api/v1/projects/${projectId}/tech-stacks/${techStackId}`, {
-    method: "PATCH",
-    body: payload,
-  });
+export async function fetchProjectCommitDetail(
+  projectId: number,
+  repositoryType: ProjectRepositoryType,
+  commitHash: string
+): Promise<ProjectCommitDetail> {
+  return request<ProjectCommitDetail>(
+    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}${buildQueryString({ repositoryType })}`
+  );
 }
 
-export async function deleteProjectTechStack(projectId: number, techStackId: number): Promise<void> {  //기술 스택 삭제
-  return request<void>(`/api/v1/projects/${projectId}/tech-stacks/${techStackId}`, {
-    method: "DELETE",
-  });
+export async function fetchProjectCommitFiles(
+  projectId: number,
+  repositoryType: ProjectRepositoryType,
+  commitHash: string
+): Promise<ProjectCommitFileList> {
+  return request<ProjectCommitFileList>(
+    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/files${buildQueryString({ repositoryType })}`
+  );
 }
 
-export async function fetchProjectMemberDetail(projectId: number, memberId: number): Promise<ProjectMember> {  //멤버 상세 조회
-  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}`);
-}
-
-export async function updateProjectMemberRole(projectId: number, memberId: number, role: ProjectMemberRole): Promise<ProjectMember> {  //멤버 역할 변경
-  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}/role`, {
-    method: "PATCH",
-    body: { role },
-  });
-}
-
-export async function updateProjectMemberDepartment(projectId: number, memberId: number, department: ProjectDepartment): Promise<ProjectMember> {  //멤버 부서 변경
-  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}/department`, {
-    method: "PATCH",
-    body: { department },
-  });
+export async function fetchProjectCommitFileDiff(
+  projectId: number,
+  repositoryType: ProjectRepositoryType,
+  commitHash: string,
+  filePath: string
+): Promise<ProjectCommitFileDiff> {
+  return request<ProjectCommitFileDiff>(
+    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/diff${buildQueryString({
+      repositoryType,
+      filePath,
+    })}`
+  );
 }
 
 export type LoginPayload = {
@@ -420,6 +539,21 @@ function isApiEnvelope<T>(payload: unknown): payload is ApiEnvelope<T> {
 
 function normalizePath(path: string): string {
   return path.startsWith("/") ? path : `/${path}`;
+}
+
+function buildQueryString(params: Record<string, string | number | null | undefined>): string {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value == null || value === "") {
+      return;
+    }
+
+    searchParams.set(key, String(value));
+  });
+
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : "";
 }
 
 function prepareBody(body: ApiRequestInit["body"], headers: Headers): BodyInit | null | undefined {
@@ -735,14 +869,149 @@ export async function fetchProjectDashboard(projectId: number): Promise<ProjectD
   return request<ProjectDashboard>(`/api/v1/projects/${projectId}/dashboard`);
 }
 
+export async function updateProject(
+  projectId: number,
+  payload: ProjectUpdatePayload
+): Promise<ProjectDetail> {
+  return request<ProjectDetail>(`/api/v1/projects/${projectId}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export async function fetchProjectMembers(projectId: number): Promise<ProjectMemberList> {
   return request<ProjectMemberList>(`/api/v1/projects/${projectId}/members`);
+}
+
+export async function fetchProjectMemberDetail(
+  projectId: number,
+  memberId: number
+): Promise<ProjectMember> {
+  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}`);
+}
+
+export async function updateProjectMemberRole(
+  projectId: number,
+  memberId: number,
+  payload: ProjectMemberRoleUpdatePayload | ProjectMemberRole
+): Promise<ProjectMember> {
+  const requestBody =
+    typeof payload === "string"
+      ? { role: payload }
+      : payload;
+
+  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}/role`, {
+    method: "PATCH",
+    body: requestBody,
+  });
+}
+
+export async function updateProjectMemberDepartment(
+  projectId: number,
+  memberId: number,
+  payload: ProjectMemberDepartmentUpdatePayload | ProjectDepartment
+): Promise<ProjectMember> {
+  const requestBody =
+    typeof payload === "string"
+      ? { department: payload }
+      : payload;
+
+  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}/department`, {
+    method: "PATCH",
+    body: requestBody,
+  });
 }
 
 export async function fetchProjectTechStacks(projectId: number): Promise<ProjectTechStackList> {
   return request<ProjectTechStackList>(`/api/v1/projects/${projectId}/tech-stacks`);
 }
 
+export async function createProjectTechStack(
+  projectId: number,
+  payload: ProjectTechStackInput
+): Promise<ProjectTechStack> {
+  return request<ProjectTechStack>(`/api/v1/projects/${projectId}/tech-stacks`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function addProjectTechStack(
+  projectId: number,
+  payload: ProjectTechStackInput
+): Promise<ProjectTechStack> {
+  return createProjectTechStack(projectId, payload);
+}
+
+export async function updateProjectTechStack(
+  projectId: number,
+  techStackId: number,
+  payload: ProjectTechStackInput
+): Promise<ProjectTechStack> {
+  return request<ProjectTechStack>(`/api/v1/projects/${projectId}/tech-stacks/${techStackId}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function deleteProjectTechStack(projectId: number, techStackId: number): Promise<void> {
+  await request<void>(`/api/v1/projects/${projectId}/tech-stacks/${techStackId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchProjectSchedules(projectId: number): Promise<ProjectScheduleList> {
   return request<ProjectScheduleList>(`/api/v1/projects/${projectId}/schedules`);
+}
+
+export async function fetchFilteredProjectSchedules(
+  projectId: number,
+  params: ProjectScheduleFilterParams = {}
+): Promise<ProjectScheduleList> {
+  const queryString = buildQueryString({
+    department: params.department,
+    status: params.status,
+    startDate: params.startDate,
+    endDate: params.endDate,
+  });
+
+  return request<ProjectScheduleList>(`/api/v1/projects/${projectId}/schedules/filter${queryString}`);
+}
+
+export async function createProjectSchedule(
+  projectId: number,
+  payload: ProjectScheduleCreatePayload
+): Promise<ProjectSchedule> {
+  return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateProjectSchedule(
+  projectId: number,
+  scheduleId: number,
+  payload: ProjectScheduleUpdatePayload
+): Promise<ProjectSchedule> {
+  return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function updateProjectScheduleStatus(
+  projectId: number,
+  scheduleId: number,
+  payload: ProjectScheduleStatusUpdatePayload
+): Promise<ProjectSchedule> {
+  return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}/status`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function deleteProjectSchedule(projectId: number, scheduleId: number): Promise<void> {
+  await request<void>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
+    method: "DELETE",
+  });
 }

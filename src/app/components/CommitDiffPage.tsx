@@ -1,265 +1,436 @@
-import { useState, useEffect } from "react";
-import { GitCommit, Plus, Minus, GitBranch, Server, Monitor, Users, Clock, ChevronRight } from "lucide-react";
-import { BACKEND_COMMITS, FRONTEND_COMMITS } from "./commitData";
-import type { Commit, CommitFile } from "./commitData";
-import { FileDiffViewer } from "./FileDiffViewer";
-
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1, CREAM,
+  ChevronRight,
+  FolderCode,
+  GitBranch,
+  GitCommit,
+  Monitor,
+  Server,
+  User,
+} from "lucide-react";
+import { toast } from "sonner";
+import type { CommitFile, DiffLine } from "./commitData";
+import { FileDiffViewer } from "./FileDiffViewer";
+import {
+  fetchFilteredProjectCommits,
+  fetchProjectCommitDetail,
+  fetchProjectCommitFileDiff,
+  fetchProjectCommitFiles,
+  formatApiError,
+  type ProjectCommitChangedFile,
+  type ProjectCommitDetail,
+  type ProjectCommitFileDiff,
+  type ProjectCommitSummary,
+  type ProjectRepositoryType,
+} from "../lib/api";
+import {
+  ACCENT,
+  BORDER,
+  BORDER_SUBTLE,
+  CREAM,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  TEXT_TERTIARY,
 } from "../colors";
+
+type RepoMode = "backend" | "split" | "frontend";
+type RepoKey = "backend" | "frontend";
+
+type RepoState = {
+  loading: boolean;
+  error: string | null;
+  commits: ProjectCommitSummary[];
+  selectedCommitHash: string | null;
+  selectedFilePath: string | null;
+  loadingCommitHash: string | null;
+  loadingDiffKey: string | null;
+  commitDetails: Record<string, ProjectCommitDetail>;
+  commitFiles: Record<string, CommitFile[]>;
+};
+
+type RepoConfig = {
+  repositoryType: ProjectRepositoryType;
+  label: string;
+  accent: string;
+  icon: typeof Server;
+};
 
 const PANEL_BG = CREAM;
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
-function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <div
-      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
-      style={style}
-    />
-  );
-}
-
-// ── 🚨 [추가] 어두운 배경(Diff Viewer 등)용 스켈레톤 ──
-function DarkSkeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <div
-      className={`animate-pulse rounded-md bg-white/10 ${className || ""}`}
-      style={style}
-    />
-  );
-}
-
-const EXT_COLOR: Record<string, { bg: string; color: string }> = {
-  java:   { bg: "rgba(245,158,11,0.10)",  color: "#f59e0b" },
-  gradle: { bg: "rgba(99,91,255,0.08)",   color: ACCENT    },
-  yml:    { bg: "rgba(16,185,129,0.08)",  color: "#10b981" },
-  ts:     { bg: "rgba(59,130,246,0.08)",  color: "#3b82f6" },
-  tsx:    { bg: "rgba(6,182,212,0.08)",   color: "#06b6d4" },
-  css:    { bg: "rgba(236,72,153,0.08)",  color: "#ec4899" },
-  env:    { bg: "rgba(107,114,128,0.08)", color: "#6b7280" },
+const REPO_CONFIG: Record<RepoKey, RepoConfig> = {
+  backend: {
+    repositoryType: "BACKEND",
+    label: "Backend (Java/Spring)",
+    accent: ACCENT,
+    icon: Server,
+  },
+  frontend: {
+    repositoryType: "FRONTEND",
+    label: "Frontend (React/TS)",
+    accent: "#06b6d4",
+    icon: Monitor,
+  },
 };
 
-type RepoMode = "backend" | "frontend" | "split";
+function createInitialRepoState(): RepoState {
+  return {
+    loading: false,
+    error: null,
+    commits: [],
+    selectedCommitHash: null,
+    selectedFilePath: null,
+    loadingCommitHash: null,
+    loadingDiffKey: null,
+    commitDetails: {},
+    commitFiles: {},
+  };
+}
 
-// ── 커밋 아이템 ──
-function CommitItem({
-  commit, selected, onClick,
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-black/10 ${className}`} />;
+}
+
+function DarkSkeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-white/10 ${className}`} />;
+}
+
+function toCommitFileStatus(status: string): CommitFile["status"] {
+  const normalized = status.trim().toUpperCase();
+  if (normalized === "ADDED") {
+    return "added";
+  }
+  if (normalized === "DELETED") {
+    return "deleted";
+  }
+  return "modified";
+}
+
+function parseUnifiedDiff(diffText: string): DiffLine[] {
+  if (!diffText.trim()) {
+    return [];
+  }
+
+  const diffLines: DiffLine[] = [];
+  let oldLineNumber = 0;
+  let newLineNumber = 0;
+
+  for (const line of diffText.split(/\r?\n/)) {
+    if (line.startsWith("@@")) {
+      const match = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        oldLineNumber = Number(match[1]);
+        newLineNumber = Number(match[2]);
+      }
+      diffLines.push({ type: "hunk", content: line });
+      continue;
+    }
+
+    if (
+      line.startsWith("diff --git ") ||
+      line.startsWith("index ") ||
+      line.startsWith("--- ") ||
+      line.startsWith("+++ ") ||
+      line.startsWith("new file mode ") ||
+      line.startsWith("deleted file mode ") ||
+      line.startsWith("similarity index ") ||
+      line.startsWith("rename from ") ||
+      line.startsWith("rename to ") ||
+      line.startsWith("Binary files ") ||
+      line.startsWith("\\ No newline at end of file")
+    ) {
+      continue;
+    }
+
+    if (line.startsWith("+")) {
+      diffLines.push({
+        type: "added",
+        newNum: newLineNumber || undefined,
+        content: line.slice(1),
+      });
+      newLineNumber += 1;
+      continue;
+    }
+
+    if (line.startsWith("-")) {
+      diffLines.push({
+        type: "removed",
+        oldNum: oldLineNumber || undefined,
+        content: line.slice(1),
+      });
+      oldLineNumber += 1;
+      continue;
+    }
+
+    if (line.startsWith(" ")) {
+      diffLines.push({
+        type: "context",
+        oldNum: oldLineNumber || undefined,
+        newNum: newLineNumber || undefined,
+        content: line.slice(1),
+      });
+      oldLineNumber += 1;
+      newLineNumber += 1;
+    }
+  }
+
+  return diffLines;
+}
+
+function mapCommitFile(file: ProjectCommitChangedFile): CommitFile {
+  return {
+    id: file.path,
+    name: file.fileName,
+    path: file.path,
+    ext: file.extension || (file.fileName.includes(".") ? file.fileName.split(".").pop() ?? "" : ""),
+    status: toCommitFileStatus(file.status),
+    additions: file.additions,
+    deletions: file.deletions,
+    diff: [],
+  };
+}
+
+function mergeCommitDiff(file: CommitFile, response: ProjectCommitFileDiff): CommitFile {
+  return {
+    ...file,
+    ext: response.extension || file.ext,
+    status: toCommitFileStatus(response.status),
+    additions: response.additions,
+    deletions: response.deletions,
+    diff: parseUnifiedDiff(response.diff),
+  };
+}
+
+function formatCommittedAt(rawValue?: string | null): string {
+  if (!rawValue) {
+    return "-";
+  }
+
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) {
+    return rawValue;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatCommitHeader(detail?: ProjectCommitDetail | null): string {
+  if (!detail) {
+    return "커밋을 선택하면 상세 정보가 표시됩니다.";
+  }
+
+  return `${detail.shortCommitHash} · ${detail.authorName} · ${formatCommittedAt(detail.committedAt)}`;
+}
+
+function getSelectedFile(state: RepoState): CommitFile | null {
+  if (!state.selectedCommitHash || !state.selectedFilePath) {
+    return null;
+  }
+
+  const files = state.commitFiles[state.selectedCommitHash] ?? [];
+  return files.find((file) => file.path === state.selectedFilePath) ?? null;
+}
+
+function CommitRow({
+  accent,
+  commit,
+  selected,
+  onClick,
 }: {
-  commit: Commit; selected: boolean; onClick: () => void;
+  accent: string;
+  commit: ProjectCommitSummary;
+  selected: boolean;
+  onClick: () => void;
 }) {
-  const totalAdded   = commit.files.reduce((s, f) => s + f.additions, 0);
-  const totalDeleted = commit.files.reduce((s, f) => s + f.deletions, 0);
   return (
     <button
+      type="button"
       onClick={onClick}
       className="w-full px-3 py-2.5 text-left transition-all"
       style={{
         borderBottom: `1px solid ${BORDER_SUBTLE}`,
         background: selected ? "rgba(99,91,255,0.05)" : "transparent",
-        borderLeft: selected ? "2.5px solid" : "2.5px solid transparent",
-        borderImage: selected
-          ? "linear-gradient(180deg, #635bff 0%, #8b5cf6 40%, #ec4899 80%, #fbbf24 100%) 1"
-          : "none",
+        borderLeft: selected ? `2px solid ${accent}` : "2px solid transparent",
       }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "rgba(0,0,0,0.025)"; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
     >
-      {/* 해시 + 시간 */}
-      <div className="flex items-center gap-1.5 mb-1">
+      <div className="mb-1 flex items-center gap-2">
         <span
-          className="font-mono text-[9px] px-1.5 py-0.5 rounded"
-          style={{ background: selected ? "rgba(99,91,255,0.10)" : "rgba(0,0,0,0.05)", color: selected ? ACCENT : TEXT_TERTIARY }}
+          className="rounded px-1.5 py-0.5 font-mono text-[9px]"
+          style={{ background: "rgba(0,0,0,0.05)", color: selected ? ACCENT : TEXT_TERTIARY }}
         >
-          [{commit.hash.slice(0, 7)}]
+          {commit.shortCommitHash}
         </span>
-        <span className="text-[9px] ml-auto" style={{ color: TEXT_TERTIARY }}>{commit.time}</span>
+        <span className="ml-auto text-[9px]" style={{ color: TEXT_TERTIARY }}>
+          {formatCommittedAt(commit.committedAt)}
+        </span>
       </div>
-      {/* 메시지 */}
-      <p className="text-[11px] font-medium leading-snug mb-1 line-clamp-2" style={{ color: selected ? TEXT_PRIMARY : TEXT_SECONDARY }}>
+
+      <p className="mb-1 line-clamp-2 text-[11px] font-medium" style={{ color: TEXT_PRIMARY }}>
         {commit.message}
       </p>
-      {/* 작성자 + 통계 */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #e0e7ff, #fce7f3)" }}>
-            <span className="text-[7px] font-bold" style={{ color: ACCENT }}>{commit.author[0]}</span>
-          </div>
-          <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{commit.author}</span>
-        </div>
-        <div className="flex items-center gap-1.5 ml-auto text-[9px]">
-          {totalAdded   > 0 && <span style={{ color: "#10b981" }}>+{totalAdded}</span>}
-          {totalDeleted > 0 && <span style={{ color: "#ef4444" }}>−{totalDeleted}</span>}
-          <span style={{ color: TEXT_TERTIARY }}>{commit.files.length} file{commit.files.length !== 1 ? "s" : ""}</span>
-        </div>
+
+      <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+        <span className="inline-flex items-center gap-1">
+          <User className="h-2.5 w-2.5" />
+          {commit.authorName}
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1">
+          <span style={{ color: "#10b981" }}>+{commit.additions}</span>
+          <span style={{ color: "#ef4444" }}>-{commit.deletions}</span>
+          <span>{commit.changedFileCount} files</span>
+        </span>
       </div>
     </button>
   );
 }
 
-// ── 파일 아이템 (Changed Files) ──
-function FileItem({
-  file, selected, onClick,
+function FileRow({
+  accent,
+  file,
+  selected,
+  onClick,
 }: {
-  file: CommitFile; selected: boolean; onClick: () => void;
+  accent: string;
+  file: CommitFile;
+  selected: boolean;
+  onClick: () => void;
 }) {
-  const ec = EXT_COLOR[file.ext] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY };
-  const statusColor = file.status === "added" ? "#10b981" : file.status === "deleted" ? "#ef4444" : "#f59e0b";
+  const statusColor =
+    file.status === "added" ? "#10b981" : file.status === "deleted" ? "#ef4444" : "#f59e0b";
   const statusLabel = file.status === "added" ? "A" : file.status === "deleted" ? "D" : "M";
-  const total = file.additions + file.deletions;
 
   return (
     <button
+      type="button"
       onClick={onClick}
       className="w-full px-3 py-2.5 text-left transition-all"
       style={{
         borderBottom: `1px solid ${BORDER_SUBTLE}`,
         background: selected ? "rgba(99,91,255,0.05)" : "transparent",
-        borderLeft: selected ? "2.5px solid" : "2.5px solid transparent",
-        borderImage: selected
-          ? "linear-gradient(180deg, #635bff 0%, #8b5cf6 40%, #ec4899 80%, #fbbf24 100%) 1"
-          : "none",
+        borderLeft: selected ? `2px solid ${accent}` : "2px solid transparent",
       }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "rgba(0,0,0,0.025)"; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
     >
-      {/* 파일명 + 상태 */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={ec}>.{file.ext}</span>
-        <span className="text-[11px] font-medium flex-1 truncate" style={{ color: selected ? TEXT_PRIMARY : TEXT_SECONDARY }}>{file.name}</span>
-        <span className="text-[9px] font-bold shrink-0" style={{ color: statusColor }}>{statusLabel}</span>
+      <div className="mb-1 flex items-center gap-2">
+        <FolderCode className="h-3.5 w-3.5 shrink-0" style={{ color: TEXT_TERTIARY }} />
+        <span className="flex-1 truncate text-[11px] font-medium" style={{ color: TEXT_PRIMARY }}>
+          {file.name}
+        </span>
+        <span className="text-[9px] font-bold" style={{ color: statusColor }}>
+          {statusLabel}
+        </span>
       </div>
-
-      {/* 경로 */}
-      <p className="text-[9px] truncate mb-2" style={{ color: TEXT_TERTIARY }}>{file.path}</p>
-
-      {/* +/- 바 */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.07)" }}>
-          {total > 0 && (
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${(file.additions / total) * 100}%`,
-                background: "linear-gradient(90deg, #238636, #2ea043)",
-              }}
-            />
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 text-[9px]">
-          <span style={{ color: "#10b981" }}>+{file.additions}</span>
-          <span style={{ color: "#ef4444" }}>−{file.deletions}</span>
-        </div>
+      <p className="mb-1 truncate text-[9px]" style={{ color: TEXT_TERTIARY }}>
+        {file.path}
+      </p>
+      <div className="flex items-center gap-2 text-[9px]">
+        <span style={{ color: "#10b981" }}>+{file.additions}</span>
+        <span style={{ color: "#ef4444" }}>-{file.deletions}</span>
       </div>
     </button>
   );
 }
 
-// ── 커밋 컬럼 + 파일 컬럼 묶음 ──
-function RepoPane({
-  label, icon: Icon, iconColor, commits, selectedCommitId, selectedFileId,
-  onSelectCommit, onSelectFile, isLoading,
+function RepoColumn({
+  accent,
+  label,
+  icon: Icon,
+  state,
+  selectedDetail,
+  onSelectCommit,
+  onSelectFile,
 }: {
-  label: string; icon: any; iconColor: string;
-  commits: Commit[];
-  selectedCommitId: string | null;
-  selectedFileId:   string | null;
-  onSelectCommit: (c: Commit) => void;
-  onSelectFile:   (f: CommitFile) => void;
-  isLoading: boolean;
+  accent: string;
+  label: string;
+  icon: typeof Server;
+  state: RepoState;
+  selectedDetail: ProjectCommitDetail | null;
+  onSelectCommit: (commitHash: string) => void;
+  onSelectFile: (filePath: string) => void;
 }) {
-  const selectedCommit = commits.find(c => c.id === selectedCommitId) ?? null;
+  const files = state.selectedCommitHash ? state.commitFiles[state.selectedCommitHash] ?? [] : [];
 
   return (
-    <div className="flex shrink-0 overflow-hidden" style={{ width: 420 }}>
-      {/* 커밋 리스트 */}
-      <div className="flex flex-col shrink-0 overflow-hidden" style={{ width: 210, borderRight: `1px solid ${BORDER}` }}>
-        {/* 헤더 */}
-        <div
-          className="flex items-center gap-2 px-3 py-2 shrink-0"
-          style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,250,250,1)" }}
-        >
-          <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: iconColor }} />
-          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>{label}</p>
-          <GitBranch className="w-3 h-3 ml-auto" style={{ color: TEXT_TERTIARY }} />
-          <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>main</span>
+    <div className="flex min-w-0 shrink-0 overflow-hidden" style={{ width: 420, borderRight: `1px solid ${BORDER}` }}>
+      <div className="flex w-[210px] shrink-0 flex-col overflow-hidden" style={{ borderRight: `1px solid ${BORDER}` }}>
+        <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
+          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+            {label}
+          </p>
+          <GitBranch className="ml-auto h-3 w-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
         </div>
-        <div className="flex-1 overflow-y-auto" style={{ background: "#ffffff" }}>
-          {isLoading ? (
-            /* [스켈레톤] 커밋 리스트 */
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="px-3 py-3 border-b" style={{ borderColor: BORDER_SUBTLE }}>
-                <div className="flex items-center justify-between mb-2">
-                  <Skeleton className="w-10 h-3" />
-                  <Skeleton className="w-8 h-2" />
+
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
+          {state.loading ? (
+            <div className="space-y-3 px-3 py-3">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <Skeleton className="h-3 w-12" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
                 </div>
-                <Skeleton className="w-full h-3 mb-1" />
-                <Skeleton className="w-3/4 h-3 mb-3" />
-                <div className="flex items-center justify-between">
-                  <Skeleton className="w-12 h-3" />
-                  <Skeleton className="w-16 h-3" />
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
+          ) : state.error ? (
+            <div className="px-3 py-4 text-[11px]" style={{ color: "#b91c1c" }}>
+              {state.error}
+            </div>
+          ) : state.commits.length === 0 ? (
+            <div className="px-3 py-4 text-[11px]" style={{ color: TEXT_TERTIARY }}>
+              조회된 커밋이 없습니다.
+            </div>
           ) : (
-            commits.map(c => (
-              <CommitItem
-                key={c.id}
-                commit={c}
-                selected={selectedCommitId === c.id}
-                onClick={() => onSelectCommit(c)}
+            state.commits.map((commit) => (
+              <CommitRow
+                key={commit.commitHash}
+                accent={accent}
+                commit={commit}
+                selected={state.selectedCommitHash === commit.commitHash}
+                onClick={() => onSelectCommit(commit.commitHash)}
               />
             ))
           )}
         </div>
       </div>
 
-      {/* 변경 파일 리스트 */}
-      <div className="flex flex-col shrink-0 overflow-hidden" style={{ width: 210, borderRight: `1px solid ${BORDER}` }}>
-        <div
-          className="flex items-center gap-2 px-3 py-2 shrink-0"
-          style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,250,250,1)" }}
-        >
-          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
-            Changed Files
+      <div className="flex w-[210px] shrink-0 flex-col overflow-hidden">
+        <div className="px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+            {selectedDetail?.message ?? "Changed Files"}
           </p>
-          {selectedCommit && !isLoading && (
-            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
-              {selectedCommit.files.length}
-            </span>
-          )}
+          <p className="mt-1 truncate text-[9px]" style={{ color: TEXT_TERTIARY }}>
+            {formatCommitHeader(selectedDetail)}
+          </p>
         </div>
-        <div className="flex-1 overflow-y-auto" style={{ background: "#ffffff" }}>
-          {isLoading ? (
-            /* [스켈레톤] 변경 파일 리스트 */
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="px-3 py-3 border-b" style={{ borderColor: BORDER_SUBTLE }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Skeleton className="w-6 h-4" />
-                  <Skeleton className="flex-1 h-3" />
-                  <Skeleton className="w-3 h-3" />
+
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
+          {state.loadingCommitHash ? (
+            <div className="space-y-3 px-3 py-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
                 </div>
-                <Skeleton className="w-full h-2 mb-3" />
-                <div className="flex items-center gap-2">
-                  <Skeleton className="flex-1 h-1.5 rounded-full" />
-                  <Skeleton className="w-10 h-2" />
-                </div>
-              </div>
-            ))
-          ) : selectedCommit ? (
-            selectedCommit.files.map(f => (
-              <FileItem
-                key={f.id}
-                file={f}
-                selected={selectedFileId === f.id}
-                onClick={() => onSelectFile(f)}
+              ))}
+            </div>
+          ) : files.length === 0 ? (
+            <div className="px-3 py-4 text-[11px]" style={{ color: TEXT_TERTIARY }}>
+              변경 파일이 없습니다.
+            </div>
+          ) : (
+            files.map((file) => (
+              <FileRow
+                key={file.path}
+                accent={accent}
+                file={file}
+                selected={state.selectedFilePath === file.path}
+                onClick={() => onSelectFile(file.path)}
               />
             ))
-          ) : (
-            <div className="flex items-center justify-center h-24">
-              <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>커밋을 선택하세요</p>
-            </div>
           )}
         </div>
       </div>
@@ -267,237 +438,383 @@ function RepoPane({
   );
 }
 
-// ── 메인 페이지 ──
-export function CommitDiffPage() {
-  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+function DiffPanel({
+  title,
+  accent,
+  file,
+  loading,
+  emptyMessage,
+}: {
+  title: string;
+  accent: string;
+  file: CommitFile | null;
+  loading: boolean;
+  emptyMessage: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col bg-[#0d1117]">
+        <div className="flex h-9 items-center gap-2 border-b border-white/10 px-4">
+          <DarkSkeleton className="h-4 w-32" />
+        </div>
+        <div className="space-y-3 p-5">
+          <DarkSkeleton className="h-4 w-1/3" />
+          <DarkSkeleton className="h-4 w-2/3" />
+          <DarkSkeleton className="h-4 w-1/2" />
+        </div>
+      </div>
+    );
+  }
 
-  const [mode, setMode] = useState<RepoMode>("split");
-
-  // Backend 상태
-  const [selBECommit, setSelBECommit] = useState<string | null>(BACKEND_COMMITS[0].id);
-  const [selBEFile,   setSelBEFile]   = useState<CommitFile | null>(BACKEND_COMMITS[0].files[0]);
-
-  // Frontend 상태
-  const [selFECommit, setSelFECommit] = useState<string | null>(FRONTEND_COMMITS[0].id);
-  const [selFEFile,   setSelFEFile]   = useState<CommitFile | null>(FRONTEND_COMMITS[0].files[0]);
-
-  // 현재 표시할 diff
-  const activeDiff = mode === "frontend" ? selFEFile : selBEFile;
+  if (!file) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#0d1117] text-center">
+        <GitCommit className="h-8 w-8" style={{ color: "#30363d" }} />
+        <div>
+          <p className="text-[12px] font-semibold" style={{ color: "#c9d1d9" }}>
+            {title}
+          </p>
+          <p className="mt-1 text-[11px]" style={{ color: "#8b949e" }}>
+            {emptyMessage}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경: 흰색 */}
+    <div className="flex h-full flex-col bg-[#0d1117]">
+      <div className="flex h-9 items-center gap-2 border-b border-white/10 px-4">
+        <span className="text-[10px] font-semibold" style={{ color: accent }}>
+          {title}
+        </span>
+        <ChevronRight className="h-3 w-3" style={{ color: "#8b949e" }} />
+        <span className="truncate text-[10px]" style={{ color: "#c9d1d9" }}>
+          {file.name}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <FileDiffViewer file={file} />
+      </div>
+    </div>
+  );
+}
+
+export function CommitDiffPage({ projectId }: { projectId: number | null }) {
+  const [mode, setMode] = useState<RepoMode>("split");
+  const [repoStates, setRepoStates] = useState<Record<RepoKey, RepoState>>({
+    backend: createInitialRepoState(),
+    frontend: createInitialRepoState(),
+  });
+
+  const setRepoState = useCallback((repoKey: RepoKey, updater: (state: RepoState) => RepoState) => {
+    setRepoStates((current) => ({
+      ...current,
+      [repoKey]: updater(current[repoKey]),
+    }));
+  }, []);
+
+  const loadCommitDiff = useCallback(async (
+    repoKey: RepoKey,
+    commitHash: string,
+    filePath: string
+  ) => {
+    if (!projectId) {
+      return;
+    }
+
+    const repositoryType = REPO_CONFIG[repoKey].repositoryType;
+    const loadingDiffKey = `${commitHash}:${filePath}`;
+
+    setRepoState(repoKey, (state) => ({
+      ...state,
+      selectedFilePath: filePath,
+      loadingDiffKey,
+    }));
+
+    try {
+      const diffResponse = await fetchProjectCommitFileDiff(projectId, repositoryType, commitHash, filePath);
+
+      setRepoState(repoKey, (state) => {
+        const files = state.commitFiles[commitHash] ?? [];
+        return {
+          ...state,
+          selectedFilePath: filePath,
+          loadingDiffKey: null,
+          commitFiles: {
+            ...state.commitFiles,
+            [commitHash]: files.map((file) =>
+              file.path === filePath ? mergeCommitDiff(file, diffResponse) : file
+            ),
+          },
+        };
+      });
+    } catch (error) {
+      setRepoState(repoKey, (state) => ({
+        ...state,
+        loadingDiffKey: null,
+      }));
+      toast.error(formatApiError(error));
+    }
+  }, [projectId, setRepoState]);
+
+  const loadCommitSelection = useCallback(async (
+    repoKey: RepoKey,
+    commitHash: string,
+    preferredFilePath?: string | null
+  ) => {
+    if (!projectId) {
+      return;
+    }
+
+    const repositoryType = REPO_CONFIG[repoKey].repositoryType;
+
+    setRepoState(repoKey, (state) => ({
+      ...state,
+      selectedCommitHash: commitHash,
+      selectedFilePath: null,
+      loadingCommitHash: commitHash,
+      error: null,
+    }));
+
+    try {
+      const [detailResponse, filesResponse] = await Promise.all([
+        fetchProjectCommitDetail(projectId, repositoryType, commitHash),
+        fetchProjectCommitFiles(projectId, repositoryType, commitHash),
+      ]);
+
+      const mappedFiles = filesResponse.files.map(mapCommitFile);
+      const selectedFilePath =
+        preferredFilePath && mappedFiles.some((file) => file.path === preferredFilePath)
+          ? preferredFilePath
+          : mappedFiles[0]?.path ?? null;
+
+      let nextFiles = mappedFiles;
+      if (selectedFilePath) {
+        const diffResponse = await fetchProjectCommitFileDiff(projectId, repositoryType, commitHash, selectedFilePath);
+        nextFiles = mappedFiles.map((file) =>
+          file.path === selectedFilePath ? mergeCommitDiff(file, diffResponse) : file
+        );
+      }
+
+      setRepoState(repoKey, (state) => ({
+        ...state,
+        selectedCommitHash: commitHash,
+        selectedFilePath,
+        loadingCommitHash: null,
+        loadingDiffKey: null,
+        commitDetails: {
+          ...state.commitDetails,
+          [commitHash]: detailResponse,
+        },
+        commitFiles: {
+          ...state.commitFiles,
+          [commitHash]: nextFiles,
+        },
+      }));
+    } catch (error) {
+      setRepoState(repoKey, (state) => ({
+        ...state,
+        loadingCommitHash: null,
+        loadingDiffKey: null,
+        error: formatApiError(error),
+      }));
+      toast.error(formatApiError(error));
+    }
+  }, [projectId, setRepoState]);
+
+  const loadRepository = useCallback(async (repoKey: RepoKey) => {
+    if (!projectId) {
+      setRepoState(repoKey, () => createInitialRepoState());
+      return;
+    }
+
+    const repositoryType = REPO_CONFIG[repoKey].repositoryType;
+    setRepoState(repoKey, () => ({
+      ...createInitialRepoState(),
+      loading: true,
+    }));
+
+    try {
+      const response = await fetchFilteredProjectCommits(projectId, repositoryType, 15);
+      const firstCommitHash = response.commits[0]?.commitHash ?? null;
+
+      setRepoState(repoKey, (state) => ({
+        ...state,
+        loading: false,
+        error: null,
+        commits: response.commits,
+        selectedCommitHash: firstCommitHash,
+        selectedFilePath: null,
+      }));
+
+      if (firstCommitHash) {
+        await loadCommitSelection(repoKey, firstCommitHash);
+      }
+    } catch (error) {
+      setRepoState(repoKey, () => ({
+        ...createInitialRepoState(),
+        loading: false,
+        error: formatApiError(error),
+      }));
+    }
+  }, [loadCommitSelection, projectId, setRepoState]);
+
+  useEffect(() => {
+    void loadRepository("backend");
+    void loadRepository("frontend");
+  }, [loadRepository]);
+
+  const backendState = repoStates.backend;
+  const frontendState = repoStates.frontend;
+  const backendDetail = backendState.selectedCommitHash
+    ? backendState.commitDetails[backendState.selectedCommitHash] ?? null
+    : null;
+  const frontendDetail = frontendState.selectedCommitHash
+    ? frontendState.commitDetails[frontendState.selectedCommitHash] ?? null
+    : null;
+  const backendFile = getSelectedFile(backendState);
+  const frontendFile = getSelectedFile(frontendState);
+
+  const totalStats = useMemo(() => {
+    const allCommits = [...backendState.commits, ...frontendState.commits];
+    return {
+      commitCount: allCommits.length,
+      additions: allCommits.reduce((sum, commit) => sum + commit.additions, 0),
+      deletions: allCommits.reduce((sum, commit) => sum + commit.deletions, 0),
+    };
+  }, [backendState.commits, frontendState.commits]);
+
+  const singleModeFile = mode === "frontend" ? frontendFile : backendFile;
+  const singleModeLoading = mode === "frontend"
+    ? Boolean(frontendState.loading || frontendState.loadingCommitHash || frontendState.loadingDiffKey)
+    : Boolean(backendState.loading || backendState.loadingCommitHash || backendState.loadingDiffKey);
+  const canShowContent = Boolean(projectId);
+
+  return (
+    <div className="relative flex flex-1 flex-col overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" style={{ background: "#ffffff" }} />
 
-      {/* ── 타이틀바 ── */}
       <div
-        className="flex items-center gap-3 px-4 h-10 shrink-0 relative z-10"
+        className="relative z-10 flex h-10 shrink-0 items-center gap-3 px-4"
         style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,250,250,0.98)" }}
       >
-        <GitCommit className="w-3.5 h-3.5" style={{ color: ACCENT }} />
-        <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Commit History</p>
+        <GitCommit className="h-3.5 w-3.5" style={{ color: ACCENT }} />
+        <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>
+          Commit History
+        </p>
 
-        {/* 레포 모드 토글 */}
         <div
-          className="flex items-center gap-0.5 p-0.5 rounded-lg ml-4"
+          className="ml-2 flex items-center gap-1 rounded-lg p-0.5"
           style={{ background: "rgba(0,0,0,0.06)", border: `1px solid ${BORDER}` }}
         >
-          {isLoading ? (
-            /* [스켈레톤] 토글 버튼 영역 */
-            <Skeleton className="w-40 h-6 rounded-md" />
-          ) : (
-            (["backend", "split", "frontend"] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-all"
-                style={{
-                  background: mode === m ? "white" : "transparent",
-                  color: mode === m ? TEXT_PRIMARY : TEXT_TERTIARY,
-                  boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                }}
-              >
-                {m === "backend"  && <Server  className="w-3 h-3" />}
-                {m === "split"    && <><Server className="w-2.5 h-2.5" /><span>/</span><Monitor className="w-2.5 h-2.5" /></>}
-                {m === "frontend" && <Monitor className="w-3 h-3" />}
-                {m === "backend" ? "Backend" : m === "frontend" ? "Frontend" : "Split"}
-              </button>
-            ))
-          )}
+          {(["backend", "split", "frontend"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              className="rounded-md px-2.5 py-1 text-[10px] font-semibold capitalize transition-all"
+              style={{
+                background: mode === value ? "#ffffff" : "transparent",
+                color: mode === value ? TEXT_PRIMARY : TEXT_TERTIARY,
+                boxShadow: mode === value ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {value === "backend" ? "Backend" : value === "frontend" ? "Frontend" : "Split"}
+            </button>
+          ))}
         </div>
 
-        {/* 통계 */}
         <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: TEXT_TERTIARY }}>
-          {isLoading ? (
-            <Skeleton className="w-48 h-3" />
-          ) : (
-            <>
-              <span>{BACKEND_COMMITS.length + FRONTEND_COMMITS.length} commits total</span>
-              <span>·</span>
-              <span style={{ color: "#10b981" }}>+{BACKEND_COMMITS.concat(FRONTEND_COMMITS).flatMap(c => c.files).reduce((s, f) => s + f.additions, 0)} lines</span>
-              <span style={{ color: "#ef4444" }}>−{BACKEND_COMMITS.concat(FRONTEND_COMMITS).flatMap(c => c.files).reduce((s, f) => s + f.deletions, 0)} lines</span>
-            </>
-          )}
+          <span>{totalStats.commitCount} commits</span>
+          <span style={{ color: "#10b981" }}>+{totalStats.additions}</span>
+          <span style={{ color: "#ef4444" }}>-{totalStats.deletions}</span>
         </div>
       </div>
 
-      {/* ── 3-col 바디 ── */}
-      <div className="flex-1 flex overflow-hidden relative z-10">
-
-        {/* ── 왼쪽: 레포 패널 ── */}
-        <div className="flex overflow-hidden shrink-0" style={{ borderRight: `1px solid ${BORDER}` }}>
-          {/* Backend 패널 */}
-          {(mode === "backend" || mode === "split") && (
-            <RepoPane
-              label="Backend (Java/Spring)"
-              icon={Server}
-              iconColor={ACCENT}
-              commits={BACKEND_COMMITS}
-              selectedCommitId={selBECommit}
-              selectedFileId={selBEFile?.id ?? null}
-              onSelectCommit={c => { setSelBECommit(c.id); setSelBEFile(c.files[0] ?? null); }}
-              onSelectFile={f => setSelBEFile(f)}
-              isLoading={isLoading}
-            />
-          )}
-          {/* Frontend 패널 */}
-          {(mode === "frontend" || mode === "split") && (
-            <RepoPane
-              label="Frontend (React/TS)"
-              icon={Monitor}
-              iconColor="#06b6d4"
-              commits={FRONTEND_COMMITS}
-              selectedCommitId={selFECommit}
-              selectedFileId={selFEFile?.id ?? null}
-              onSelectCommit={c => { setSelFECommit(c.id); setSelFEFile(c.files[0] ?? null); }}
-              onSelectFile={f => setSelFEFile(f)}
-              isLoading={isLoading}
-            />
-          )}
+      {!canShowContent ? (
+        <div className="relative z-10 flex flex-1 items-center justify-center" style={{ background: PANEL_BG }}>
+          <div className="text-center">
+            <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+              프로젝트를 먼저 선택해주세요.
+            </p>
+            <p className="mt-2 text-xs" style={{ color: TEXT_TERTIARY }}>
+              커밋 히스토리는 활성 프로젝트를 기준으로 조회됩니다.
+            </p>
+          </div>
         </div>
-
-        {/* ── 오른쪽: Diff Viewer ── */}
-        <div className="flex-1 flex flex-col overflow-hidden" style={{ minWidth: 0, background: "#0d1117" }}>
-          
-          {isLoading ? (
-            /* [스켈레톤] Diff Viewer 전체 영역 */
-            <div className="flex-1 flex flex-col">
-              {mode === "split" && (
-                <div className="flex items-center gap-0 shrink-0 border-b border-white/10 bg-[#161b22] px-4 h-9">
-                  <DarkSkeleton className="w-24 h-5" />
-                  <DarkSkeleton className="w-24 h-5 ml-4" />
-                </div>
-              )}
-              {mode === "split" ? (
-                <>
-                  <div className="flex-1 p-6 space-y-4 border-b border-white/10">
-                    <DarkSkeleton className="h-5 w-1/3" />
-                    <DarkSkeleton className="h-3 w-1/4" />
-                    <div className="mt-6 space-y-2">
-                      <DarkSkeleton className="h-3 w-3/4" />
-                      <DarkSkeleton className="h-3 w-1/2" />
-                      <DarkSkeleton className="h-3 w-5/6" />
-                    </div>
-                  </div>
-                  <div className="flex-1 p-6 space-y-4">
-                    <DarkSkeleton className="h-5 w-1/3" />
-                    <DarkSkeleton className="h-3 w-1/4" />
-                    <div className="mt-6 space-y-2">
-                      <DarkSkeleton className="h-3 w-3/4" />
-                      <DarkSkeleton className="h-3 w-1/2" />
-                      <DarkSkeleton className="h-3 w-5/6" />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 p-8 space-y-5">
-                  <DarkSkeleton className="h-6 w-1/3" />
-                  <DarkSkeleton className="h-4 w-1/4" />
-                  <div className="mt-8 space-y-3">
-                    <DarkSkeleton className="h-4 w-3/4" />
-                    <DarkSkeleton className="h-4 w-1/2" />
-                    <DarkSkeleton className="h-4 w-5/6" />
-                    <DarkSkeleton className="h-4 w-2/3" />
-                    <DarkSkeleton className="h-4 w-full" />
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* 실제 Diff Viewer 데이터 렌더링 */
-            <>
-              {/* split 모드에서 어느 쪽 파일인지 탭 표시 */}
-              {mode === "split" && (selBEFile || selFEFile) && (
-                <div
-                  className="flex items-center gap-0 shrink-0"
-                  style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
-                >
-                  <button
-                    onClick={() => {}}
-                    className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-semibold transition-all"
-                    style={{
-                      color: selBEFile ? "#c9d1d9" : "#8b949e",
-                      borderBottom: selBEFile ? "2px solid #635bff" : "2px solid transparent",
-                      background: selBEFile ? "rgba(99,91,255,0.08)" : "transparent",
-                    }}
-                  >
-                    <Server className="w-3 h-3" style={{ color: ACCENT }} />
-                    {selBEFile?.name ?? "Backend"}
-                  </button>
-                  <button
-                    onClick={() => {}}
-                    className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-semibold transition-all"
-                    style={{
-                      color: selFEFile ? "#c9d1d9" : "#8b949e",
-                      borderBottom: selFEFile ? "2px solid #06b6d4" : "2px solid transparent",
-                      background: selFEFile ? "rgba(6,182,212,0.08)" : "transparent",
-                    }}
-                  >
-                    <Monitor className="w-3 h-3" style={{ color: "#06b6d4" }} />
-                    {selFEFile?.name ?? "Frontend"}
-                  </button>
-                </div>
-              )}
-
-              {/* split 모드: 위아래로 두 diff */}
-              {mode === "split" ? (
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <div className="flex-1 overflow-hidden" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    {selBEFile
-                      ? <FileDiffViewer file={selBEFile} />
-                      : <div className="flex items-center justify-center h-full"><p className="text-[11px]" style={{ color: "#8b949e" }}>백엔드 파일을 선택하세요</p></div>
-                    }
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    {selFEFile
-                      ? <FileDiffViewer file={selFEFile} />
-                      : <div className="flex items-center justify-center h-full"><p className="text-[11px]" style={{ color: "#8b949e" }}>프론트엔드 파일을 선택하세요</p></div>
-                    }
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 overflow-hidden">
-                  {activeDiff
-                    ? <FileDiffViewer file={activeDiff} />
-                    : (
-                      <div className="flex flex-col items-center justify-center h-full gap-3">
-                        <GitCommit className="w-8 h-8" style={{ color: "#30363d" }} />
-                        <p className="text-[12px]" style={{ color: "#8b949e" }}>파일을 선택하면 변경 내용이 표시됩니다</p>
-                      </div>
-                    )
+      ) : (
+        <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
+          <div className="flex shrink-0 overflow-hidden" style={{ borderRight: `1px solid ${BORDER}` }}>
+            {(mode === "backend" || mode === "split") && (
+              <RepoColumn
+                accent={REPO_CONFIG.backend.accent}
+                label={REPO_CONFIG.backend.label}
+                icon={REPO_CONFIG.backend.icon}
+                state={backendState}
+                selectedDetail={backendDetail}
+                onSelectCommit={(commitHash) => void loadCommitSelection("backend", commitHash)}
+                onSelectFile={(filePath) => {
+                  if (!backendState.selectedCommitHash) {
+                    return;
                   }
-                </div>
-              )}
-            </>
-          )}
-        </div>
+                  void loadCommitDiff("backend", backendState.selectedCommitHash, filePath);
+                }}
+              />
+            )}
 
-      </div>
+            {(mode === "frontend" || mode === "split") && (
+              <RepoColumn
+                accent={REPO_CONFIG.frontend.accent}
+                label={REPO_CONFIG.frontend.label}
+                icon={REPO_CONFIG.frontend.icon}
+                state={frontendState}
+                selectedDetail={frontendDetail}
+                onSelectCommit={(commitHash) => void loadCommitSelection("frontend", commitHash)}
+                onSelectFile={(filePath) => {
+                  if (!frontendState.selectedCommitHash) {
+                    return;
+                  }
+                  void loadCommitDiff("frontend", frontendState.selectedCommitHash, filePath);
+                }}
+              />
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1 overflow-hidden bg-[#0d1117]">
+            {mode === "split" ? (
+              <div className="flex h-full flex-col overflow-hidden">
+                <div className="min-h-0 flex-1 overflow-hidden" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <DiffPanel
+                    title="Backend Diff"
+                    accent={REPO_CONFIG.backend.accent}
+                    file={backendFile}
+                    loading={Boolean(backendState.loading || backendState.loadingCommitHash || backendState.loadingDiffKey)}
+                    emptyMessage="백엔드 파일을 선택하면 Diff가 표시됩니다."
+                  />
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <DiffPanel
+                    title="Frontend Diff"
+                    accent={REPO_CONFIG.frontend.accent}
+                    file={frontendFile}
+                    loading={Boolean(frontendState.loading || frontendState.loadingCommitHash || frontendState.loadingDiffKey)}
+                    emptyMessage="프론트엔드 파일을 선택하면 Diff가 표시됩니다."
+                  />
+                </div>
+              </div>
+            ) : (
+              <DiffPanel
+                title={mode === "frontend" ? "Frontend Diff" : "Backend Diff"}
+                accent={mode === "frontend" ? REPO_CONFIG.frontend.accent : REPO_CONFIG.backend.accent}
+                file={singleModeFile}
+                loading={singleModeLoading}
+                emptyMessage="파일을 선택하면 Diff가 표시됩니다."
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

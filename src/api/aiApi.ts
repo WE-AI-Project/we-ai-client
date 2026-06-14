@@ -80,6 +80,16 @@ export type QaResponse = {
   commit_msg?: string;
 };
 
+export type AiChatRequest = {
+  projectId?: number | null;
+  question: string;
+};
+
+export type AiChatResponse = {
+  answer: string;
+  contexts?: string[];
+};
+
 export class AiApiError extends Error {
   constructor(
     message: string,
@@ -145,6 +155,16 @@ export async function runAiQa(request: QaRequest): Promise<QaResponse> {
     body: {
       ...request,
       projectId: resolveProjectId(request.projectId),
+    },
+  });
+}
+
+export async function runAiChat(request: AiChatRequest): Promise<AiChatResponse> {
+  return aiRequest<AiChatResponse>("/api/v1/ai/chat", {
+    method: "POST",
+    body: {
+      projectId: resolveProjectId(request.projectId),
+      question: request.question,
     },
   });
 }
