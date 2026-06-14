@@ -307,6 +307,58 @@ export async function fetchProjectDepartmentStatus(projectId: number): Promise<P
   return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
 }
 
+export type ProjectUpdatePayload = {  //프로젝트 정보 수정
+  projectName?: string;
+  description?: string;
+  repositoryUrl?: string;
+  localPath?: string;
+};
+
+export async function updateProject(projectId: number, payload: ProjectUpdatePayload): Promise<ProjectDetail> {  //프로젝트 정보 수정
+  return request<ProjectDetail>(`/api/v1/projects/${projectId}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function addProjectTechStack(projectId: number, payload: ProjectTechStackInput): Promise<ProjectTechStack> {  //기술 스택 추가
+  return request<ProjectTechStack>(`/api/v1/projects/${projectId}/tech-stacks`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateProjectTechStack(projectId: number, techStackId: number, payload: ProjectTechStackInput): Promise<ProjectTechStack> {  //기술 스택 수정
+  return request<ProjectTechStack>(`/api/v1/projects/${projectId}/tech-stacks/${techStackId}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function deleteProjectTechStack(projectId: number, techStackId: number): Promise<void> {  //기술 스택 삭제
+  return request<void>(`/api/v1/projects/${projectId}/tech-stacks/${techStackId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchProjectMemberDetail(projectId: number, memberId: number): Promise<ProjectMember> {  //멤버 상세 조회
+  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}`);
+}
+
+export async function updateProjectMemberRole(projectId: number, memberId: number, role: ProjectMemberRole): Promise<ProjectMember> {  //멤버 역할 변경
+  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}/role`, {
+    method: "PATCH",
+    body: { role },
+  });
+}
+
+export async function updateProjectMemberDepartment(projectId: number, memberId: number, department: ProjectDepartment): Promise<ProjectMember> {  //멤버 부서 변경
+  return request<ProjectMember>(`/api/v1/projects/${projectId}/members/${memberId}/department`, {
+    method: "PATCH",
+    body: { department },
+  });
+}
+
 export type LoginPayload = {
   email: string;
   password: string;
