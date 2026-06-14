@@ -1,7 +1,6 @@
 import { clearSession, loadSession } from "../app/lib/api";
 import type { CommitFile } from "../app/components/commitData";
 
-const DEFAULT_PROJECT_ID = 0;
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8080";
 const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
 
@@ -102,9 +101,10 @@ export class AiApiError extends Error {
 }
 
 export function resolveProjectId(projectId?: number | null): number {
-  return typeof projectId === "number" && Number.isFinite(projectId)
-    ? projectId
-    : DEFAULT_PROJECT_ID;
+  if (typeof projectId !== "number" || !Number.isSafeInteger(projectId) || projectId <= 0) {
+    throw new AiApiError("AI 기능을 사용하려면 프로젝트를 먼저 선택해 주세요.", 400, "PROJECT_REQUIRED");
+  }
+  return projectId;
 }
 
 export function buildDiffFromCommitFiles(files: CommitFile[]): string {

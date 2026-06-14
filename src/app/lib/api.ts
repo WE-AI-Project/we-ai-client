@@ -231,6 +231,21 @@ export type ProjectMemberDepartmentUpdatePayload = {
   department: ProjectDepartment;
 };
 
+export type ProjectStackDetection = {
+  localPath: string;
+  stack: string[];
+  framework: string;
+  language: string;
+  build: string;
+  techStacks: Array<{
+    name: string;
+    version?: string | null;
+    category: ProjectTechStackCategory;
+    isRequired: boolean;
+  }>;
+  detectedFiles: string[];
+};
+
 export type ProjectTechStackList = {
   projectId: number;
   techStacks: ProjectTechStack[];
@@ -851,6 +866,13 @@ export async function createProject(payload: ProjectCreatePayload): Promise<Proj
   return request<ProjectCreateResponse>("/api/v1/projects", {
     method: "POST",
     body: payload,
+  });
+}
+
+export async function detectProjectStack(localPath: string): Promise<ProjectStackDetection> {
+  return request<ProjectStackDetection>("/api/v1/projects/detect-stack", {
+    method: "POST",
+    body: { localPath },
   });
 }
 
