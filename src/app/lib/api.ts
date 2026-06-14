@@ -626,7 +626,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init: ApiRequestInit = {},
   options: RequestOptions = {}

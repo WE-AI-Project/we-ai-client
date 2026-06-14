@@ -1,15 +1,5 @@
-import { clearSession, loadSession } from "../app/lib/api";
+import { ApiError, request } from "../app/lib/api";
 import type { CommitFile } from "../app/components/commitData";
-
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8080";
-const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
-
-type ApiEnvelope<T> = {
-  success?: boolean;
-  code?: string;
-  message?: string;
-  data?: T;
-};
 
 export type DebateTurn = {
   round?: number;
@@ -173,65 +163,12 @@ async function aiRequest<T>(
   path: string,
   init: Omit<RequestInit, "body"> & { body?: Record<string, unknown> }
 ): Promise<T> {
-  const session = loadSession();
-  const token = session?.accessToken;
-  if (!token) {
-    handleUnauthorized();
-    throw new AiApiError("로그인이 필요합니다.", 401, "UNAUTHORIZED");
-  }
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...init.headers,
-    },
-    body: init.body ? JSON.stringify(init.body) : undefined,
-  });
-
-  if (response.status === 401) {
-    handleUnauthorized();
-    throw new AiApiError("세션이 만료되었습니다. 다시 로그인해 주세요.", 401, "UNAUTHORIZED");
-  }
-
-  const payload = await parsePayload<T>(response);
-  if (!response.ok) {
-    const envelope = payload as ApiEnvelope<T>;
-    throw new AiApiError(
-      envelope?.message || `AI API 요청이 실패했습니다. (${response.status})`,
-      response.status,
-      envelope?.code || "HTTP_ERROR"
-    );
-  }
-
-  if (isEnvelope<T>(payload)) {
-    if (payload.success === false) {
-      throw new AiApiError(payload.message || "AI API 요청이 실패했습니다.", response.status, payload.code);
+  try {
+    return await request<T>(path, init);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw new AiApiError(error.message, error.status, error.code);
     }
-    return payload.data as T;
-  }
-
-  return payload as T;
-}
-
-async function parsePayload<T>(response: Response): Promise<T | ApiEnvelope<T>> {
-  const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
-    return response.json().catch(() => ({}));
-  }
-  const text = await response.text().catch(() => "");
-  return { message: text } as ApiEnvelope<T>;
-}
-
-function isEnvelope<T>(payload: unknown): payload is ApiEnvelope<T> {
-  return !!payload && typeof payload === "object" && ("data" in payload || "success" in payload);
-}
-
-function handleUnauthorized(): void {
-  clearSession();
-  if (typeof window !== "undefined" && window.location.pathname !== "/") {
-    window.location.assign("/");
+    throw error;
   }
 }

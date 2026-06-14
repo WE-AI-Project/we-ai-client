@@ -584,13 +584,25 @@ function CreateProjectModal({
                 )}
               </button>
 
+              {errorMessage && (
+                <div
+                  className="flex items-start gap-2 rounded-xl px-3 py-2.5"
+                  style={{ background: "rgba(184,84,80,0.06)", border: "1px solid rgba(184,84,80,0.18)" }}
+                >
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: "#B85450" }} />
+                  <p className="text-[10px]" style={{ color: "#B85450" }}>
+                    {errorMessage}
+                  </p>
+                </div>
+              )}
+
               {detected && <DetectResult info={detected} path={localPath} />}
 
               {!detected && !detecting && localPath && (
                 <div className="flex items-start gap-2 px-1">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: TEXT_TERTIARY }} />
                   <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                    위 버튼을 눌러 경로를 분석하면 기술 스택이 자동으로 감지됩니다.
+                    배포 환경에서는 서버가 접근할 수 있는 경로만 분석할 수 있습니다. 내 PC의 경로는 서버에서 직접 읽을 수 없습니다.
                   </p>
                 </div>
               )}
