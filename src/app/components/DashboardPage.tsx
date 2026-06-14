@@ -7,7 +7,18 @@ import {
   ListTodo,
   RefreshCw,
   Users,
+  TrendingUp,
+  Milestone,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import {
   ACCENT,
   ACCENT_BG,
@@ -25,10 +36,18 @@ import {
   ProjectDepartment,
   ProjectScheduleStatus,
   fetchProjectDashboard,
+  fetchProjectActivities,
+  fetchProjectProgress,
+  fetchProjectMilestones,
+  fetchProjectDepartmentStatus,
+  ProjectActivity,
+  ProjectProgressStats,
+  ProjectMilestone,
+  DepartmentStatusDetail,
   formatApiError,
 } from "../lib/api";
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+// ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -88,10 +107,14 @@ type Props = {
 
 export function DashboardPage({ projectId, projectName }: Props) {
   const [dashboard, setDashboard] = useState<ProjectDashboard | null>(null);
+  const [activities, setActivities] = useState<ProjectActivity[]>([]);
+  const [progressStats, setProgressStats] = useState<ProjectProgressStats | null>(null);
+  const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
+  const [deptStatus, setDeptStatus] = useState<DepartmentStatusDetail[]>([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🚨 [추가] 3초 스켈레톤 UI 유지를 위한 시뮬레이션 타이머
+  // 3초 스켈레톤 UI 유지를 위한 시뮬레이션 타이머
   const [isSimulating, setIsSimulating] = useState(true);
 
   useEffect(() => {
@@ -104,6 +127,10 @@ export function DashboardPage({ projectId, projectName }: Props) {
   const loadDashboard = async () => {
     if (!projectId) {
       setDashboard(null);
+      setActivities([]);
+      setProgressStats(null);
+      setMilestones([]);
+      setDeptStatus([]);
       setLoading(false);
       return;
     }
@@ -111,8 +138,19 @@ export function DashboardPage({ projectId, projectName }: Props) {
     setLoading(true);
 
     try {
-      const nextDashboard = await fetchProjectDashboard(projectId);
+      const [nextDashboard, activityList, nextProgress, milestoneList, deptStatusList] = await Promise.all([
+        fetchProjectDashboard(projectId),
+        fetchProjectActivities(projectId),
+        fetchProjectProgress(projectId),
+        fetchProjectMilestones(projectId),
+        fetchProjectDepartmentStatus(projectId),
+      ]);
+      
       setDashboard(nextDashboard);
+      setActivities(activityList.activities || []);
+      setProgressStats(nextProgress);
+      setMilestones(milestoneList.milestones || []);
+      setDeptStatus(deptStatusList.departments || []); 
       setError(null);
     } catch (loadError) {
       setError(formatApiError(loadError));
@@ -160,8 +198,8 @@ export function DashboardPage({ projectId, projectName }: Props) {
           <button
             onClick={() => void loadDashboard()}
             type="button"
-            className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
-            style={{ background: ACCENT, color: "white" }}
+            className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: ACCENT }}
           >
             <RefreshCw className="h-4 w-4" />
             다시 시도
@@ -171,8 +209,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
     );
   }
 
-  // 🚨 데이터 페칭 로딩이거나, 3초 타이머가 덜 끝났거나, 대시보드 데이터가 아직 없을 때 스켈레톤 표시
-  const showSkeleton = loading || isSimulating || !dashboard;
+  const showSkeleton = loading || isSimulating || !dashboard || !progressStats;
 
   return (
     <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
@@ -189,7 +226,6 @@ export function DashboardPage({ projectId, projectName }: Props) {
                 Project Dashboard
               </p>
               {showSkeleton ? (
-                /* [스켈레톤] 프로젝트 타이틀 & 뱃지 */
                 <div className="mt-3">
                   <Skeleton className="h-8 w-64 mb-4" />
                   <div className="flex flex-wrap gap-2">
@@ -229,8 +265,8 @@ export function DashboardPage({ projectId, projectName }: Props) {
               }}
               disabled={showSkeleton}
               type="button"
-              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50"
-              style={{ background: ACCENT, color: "white" }}
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 text-white"
+              style={{ background: ACCENT }}
             >
               <RefreshCw className={`h-4 w-4 ${showSkeleton ? "animate-spin" : ""}`} />
               새로고침
@@ -238,10 +274,9 @@ export function DashboardPage({ projectId, projectName }: Props) {
           </div>
         </section>
 
-        {/* ── 통계 요약 카드 (StatCards) ── */}
+        {/* ── 통계 요약 카드 ── */}
         <section className="grid gap-4 md:grid-cols-4">
           {showSkeleton ? (
-            /* [스켈레톤] 요약 카드 4개 */
             Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-2xl border px-4 py-4" style={{ background: "rgba(255,255,255,0.88)", borderColor: BORDER }}>
                 <Skeleton className="w-16 h-3 mb-4" />
@@ -256,6 +291,54 @@ export function DashboardPage({ projectId, projectName }: Props) {
               <StatCard label="Progress" value={progressLabel} tone={ACCENT} />
             </>
           )}
+        </section>
+
+        {/* ── 진행률 통계 트렌드 차트 ── */}
+        <section
+          className="rounded-[28px] border px-5 py-5"
+          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+        >
+          <div className="mb-4 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" style={{ color: ACCENT }} />
+            <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+              주차별 진행률 통계 트렌드
+            </h2>
+          </div>
+
+          <div className="h-[180px] w-full">
+            {showSkeleton ? (
+              <Skeleton className="w-full h-full rounded-2xl" />
+            ) : progressStats?.weeklyTrends && progressStats.weeklyTrends.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={progressStats.weeklyTrends} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 10, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(255,255,255,0.96)",
+                      border: `1px solid ${BORDER}`,
+                      borderRadius: "12px",
+                      fontSize: "11px",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="progressRate"
+                    name="진행률 (%)"
+                    stroke={ACCENT}
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: ACCENT }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm py-4" style={{ color: TEXT_TERTIARY }}>
+                아직 누적된 주차별 진행률 통계 트렌드 데이터가 없습니다.
+              </p>
+            )}
+          </div>
         </section>
 
         {/* ── 2단 컬럼 (부서별 진행률 & 최근 일정) ── */}
@@ -275,7 +358,6 @@ export function DashboardPage({ projectId, projectName }: Props) {
 
             <div className="space-y-4">
               {showSkeleton ? (
-                /* [스켈레톤] 부서별 진행률 막대 */
                 Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="space-y-2">
                     <div className="flex items-start justify-between gap-3">
@@ -334,7 +416,6 @@ export function DashboardPage({ projectId, projectName }: Props) {
 
             <div className="space-y-3">
               {showSkeleton ? (
-                /* [스켈레톤] 최근 일정 리스트 카드 */
                 Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="rounded-2xl border px-4 py-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
                     <div className="flex items-start justify-between gap-3">
@@ -385,7 +466,226 @@ export function DashboardPage({ projectId, projectName }: Props) {
           </div>
         </section>
 
-        {/* ── 하단 요약 (Summary) ── */}
+        <section
+          className="rounded-[28px] border px-5 py-5"
+          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+        >
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="h-4 w-4" style={{ color: ACCENT }} />
+            <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+              파트별 상세 현황
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+            {showSkeleton ? (
+              /* [스켈레톤] 파트별 카드 홀더 */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border px-4 py-4 space-y-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div className="flex justify-between">
+                    <Skeleton className="w-16 h-4" />
+                    <Skeleton className="w-10 h-4 rounded-full" />
+                  </div>
+                  <Skeleton className="w-12 h-6" />
+                  <Skeleton className="w-full h-2 rounded-full" />
+                  <Skeleton className="w-24 h-3" />
+                </div>
+              ))
+            ) : deptStatus.length === 0 ? (
+              <p className="text-sm col-span-full" style={{ color: TEXT_TERTIARY }}>
+                아직 집계된 파트별 현황 정보가 없습니다.
+              </p>
+            ) : (
+              deptStatus.map((item) => (
+                <div
+                  key={item.department}
+                  className="rounded-2xl border p-4 flex flex-col justify-between animate-in fade-in duration-200"
+                  style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+                        {DEPARTMENT_LABELS[item.department]}
+                      </p>
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          color: item.status === "COMPLETED" ? "#5A8A4A" : item.status === "DELAYED" ? "#B85450" : ACCENT,
+                          background: item.status === "COMPLETED" ? "rgba(90,138,74,0.12)" : item.status === "DELAYED" ? "rgba(184,84,80,0.12)" : ACCENT_BG,
+                        }}
+                      >
+                        {item.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 mb-4">
+                      <span className="text-2xl font-bold font-mono" style={{ color: ACCENT }}>{item.progressRate}%</span>
+                      <span className="text-[11px] ml-1.5" style={{ color: TEXT_TERTIARY }}>완료율</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${item.progressRate}%`, background: item.status === "DELAYED" ? "#B85450" : ACCENT }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]" style={{ color: TEXT_TERTIARY }}>
+                      <span>멤버 {item.memberCount}명</span>
+                      <span>일정 {item.completedScheduleCount}/{item.totalScheduleCount}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* ── 프로젝트 마일스톤 ── */}
+        <section
+          className="rounded-[28px] border px-5 py-5"
+          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+        >
+          <div className="mb-4 flex items-center gap-2">
+            <Milestone className="h-4 w-4" style={{ color: ACCENT }} />
+            <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+              프로젝트 마일스톤
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            {showSkeleton ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border px-4 py-3.5 space-y-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div className="flex justify-between">
+                    <Skeleton className="w-1/2 h-4" />
+                    <Skeleton className="w-12 h-4 rounded-full" />
+                  </div>
+                  <Skeleton className="w-full h-2 rounded-full" />
+                  <Skeleton className="w-24 h-3" />
+                </div>
+              ))
+            ) : milestones.length === 0 ? (
+              <p className="text-sm col-span-full" style={{ color: TEXT_TERTIARY }}>
+                아직 등록된 프로젝트 마일스톤 목적지가 없습니다.
+              </p>
+            ) : (
+              milestones.map((milestone) => (
+                <div
+                  key={milestone.milestoneId}
+                  className="rounded-2xl border p-4 flex flex-col justify-between"
+                  style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-sm font-semibold truncate" style={{ color: TEXT_PRIMARY }}>
+                        {milestone.title}
+                      </p>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          color: milestone.status === "COMPLETED" ? "#5A8A4A" : milestone.status === "IN_PROGRESS" ? ACCENT : "#C09840",
+                          background: milestone.status === "COMPLETED" ? "rgba(90,138,74,0.12)" : milestone.status === "IN_PROGRESS" ? ACCENT_BG : "rgba(192,152,64,0.12)",
+                        }}
+                      >
+                        {milestone.status}
+                      </span>
+                    </div>
+                    {milestone.description && (
+                      <p className="text-xs mb-4 line-clamp-2" style={{ color: TEXT_SECONDARY }}>
+                        {milestone.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 mt-auto">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span style={{ color: TEXT_TERTIARY }}>진행도</span>
+                      <span className="font-bold font-mono" style={{ color: ACCENT }}>{milestone.progressRate}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${milestone.progressRate}%`, background: milestone.status === "COMPLETED" ? "#5A8A4A" : ACCENT }}
+                      />
+                    </div>
+                    {milestone.dueDate && (
+                      <p className="text-[10px] text-right pt-1 font-mono" style={{ color: TEXT_TERTIARY }}>
+                        목표일: {milestone.dueDate}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* ── 최근 활동 ── */}
+        <section
+          className="rounded-[28px] border px-5 py-5"
+          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+        >
+          <div className="mb-4 flex items-center gap-2">
+            <Activity className="h-4 w-4" style={{ color: ACCENT }} />
+            <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+              최근 활동
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {showSkeleton ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border px-4 py-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2 flex-1 pt-1">
+                      <Skeleton className="w-2/3 h-3.5" />
+                      <Skeleton className="w-1/2 h-3" />
+                    </div>
+                    <Skeleton className="w-14 h-5 rounded-full shrink-0" />
+                  </div>
+                </div>
+              ))
+            ) : activities.length === 0 ? (
+              <p className="text-sm" style={{ color: TEXT_TERTIARY }}>
+                아직 기록된 최근 활동이 없습니다.
+              </p>
+            ) : (
+              activities.map((activity) => (
+                <div
+                  key={activity.activityId}
+                  className="rounded-2xl border px-4 py-3"
+                  style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+                        {activity.title}
+                      </p>
+                      {activity.description && (
+                        <p className="mt-1 text-xs" style={{ color: TEXT_SECONDARY }}>
+                          {activity.description}
+                        </p>
+                      )}
+                      <p className="mt-1 text-[11px]" style={{ color: TEXT_TERTIARY }}>
+                        작성자: {activity.memberName} · {activity.createdAt}
+                      </p>
+                    </div>
+                    <span
+                      className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                      style={{
+                        color: activity.activityType === "COMMIT" ? "#5A8A4A" : ACCENT,
+                        background: activity.activityType === "COMMIT" ? "rgba(90,138,74,0.12)" : ACCENT_BG,
+                      }}
+                    >
+                      {activity.activityType}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* ── 하단 요약 ── */}
         <section
           className="rounded-[28px] border px-5 py-5"
           style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
@@ -399,7 +699,6 @@ export function DashboardPage({ projectId, projectName }: Props) {
 
           <div className="grid gap-3 md:grid-cols-3">
             {showSkeleton ? (
-              /* [스켈레톤] 하단 요약 카드 3개 */
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
                   <Skeleton className="w-24 h-3 mb-3" />

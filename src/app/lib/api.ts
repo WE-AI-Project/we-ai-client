@@ -237,6 +237,76 @@ export type ProjectScheduleList = {
   schedules: ProjectSchedule[];
 };
 
+export type ProjectActivity = {  //프로젝트 최근 활동
+  activityId: number;
+  title: string;
+  description?: string | null;
+  activityType: string;
+  memberId: number;
+  memberName: string;
+  createdAt: string;
+};
+
+export type ProjectActivityList = { //프로젝트 최근 활동
+  projectId: number;
+  activities: ProjectActivity[];
+};
+
+export async function fetchProjectActivities(projectId: number): Promise<ProjectActivityList> {  //프로젝트 최근 활동 함수
+  return request<ProjectActivityList>(`/api/v1/projects/${projectId}/dashboard/activities`);
+}
+
+export type WeeklyProgressTrend = {  //프로젝트 진행률 통계 조회
+  week: string;
+  progressRate: number;
+};
+
+export type ProjectProgressStats = {  //프로젝트 진행률 통계 조회
+  projectId: number;
+  progressRate: number;
+  weeklyTrends: WeeklyProgressTrend[];
+};
+
+export async function fetchProjectProgress(projectId: number): Promise<ProjectProgressStats> {  //프로젝트 진행률 통계 함수
+  return request<ProjectProgressStats>(`/api/v1/projects/${projectId}/dashboard/progress`);
+}
+
+export type ProjectMilestone = {  //프로젝트 마일스톤 목록 조회
+  milestoneId: number;
+  title: string;
+  description?: string | null;
+  dueDate?: string | null;
+  status: string; 
+  progressRate: number;
+};
+
+export type ProjectMilestoneList = {  //프로젝트 마일스톤 목록 조회
+  projectId: number;
+  milestones: ProjectMilestone[];
+};
+
+export async function fetchProjectMilestones(projectId: number): Promise<ProjectMilestoneList> {  //프로젝트 마일스톤 목록 조회 함수
+  return request<ProjectMilestoneList>(`/api/v1/projects/${projectId}/dashboard/milestones`);
+}
+
+export type DepartmentStatusDetail = {  //프로젝트 파트별 현황 조회
+  department: ProjectDepartment;
+  memberCount: number;
+  totalScheduleCount: number;
+  completedScheduleCount: number;
+  progressRate: number;
+  status: string;
+};
+
+export type ProjectDepartmentStatusList = {  //프로젝트 파트별 현황 조회
+  projectId: number;
+  departments: DepartmentStatusDetail[];
+};
+
+export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {  //프로젝트 파트별 현황 조회
+  return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
+}
+
 export type LoginPayload = {
   email: string;
   password: string;
