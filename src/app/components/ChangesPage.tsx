@@ -63,7 +63,7 @@ function QAModal({
           <div className="px-3 py-2 rounded-xl text-left font-mono text-[10px] mb-6" style={{ background: "rgba(0,0,0,0.04)", color: TEXT_SECONDARY }}>{commitMsg}</div>
           <div className="flex gap-2.5">
             <button onClick={onQANo}  className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}>아니오, 바로 커밋</button>
-            <button onClick={onQAYes} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "linear-gradient(135deg, #635bff, #8b5cf6)", color: "rgba(255,255,255,0.95)", boxShadow: "0 4px 14px rgba(99,91,255,0.28)" }}>예, AI QA 실행</button>
+            <button onClick={onQAYes} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "linear-gradient(135deg, #41431B, #62683A)", color: "rgba(255,255,255,0.95)", boxShadow: "0 4px 14px rgba(65,67,27,0.24)" }}>예, AI QA 실행</button>
           </div>
         </div>
       </div>
@@ -114,12 +114,10 @@ function FileRow({
       className="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all"
       style={{
         borderBottom: `1px solid ${BORDER_SUBTLE}`,
-        background: selected ? "rgba(99,91,255,0.05)" : "transparent",
+        background: selected ? "rgba(65,67,27,0.08)" : "transparent",
         // 선택 시 왼쪽 그라데이션 border
         borderLeft: selected ? "2.5px solid" : "2.5px solid transparent",
-        borderImage: selected
-          ? "linear-gradient(180deg, #635bff 0%, #8b5cf6 45%, #ec4899 80%, #fbbf24 100%) 1"
-          : "none",
+        borderImage: selected ? "linear-gradient(180deg, #41431B, #AEB784) 1" : "none",
       }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "rgba(0,0,0,0.025)"; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
@@ -259,7 +257,7 @@ export function ChangesPage({
         {/* ── 타이틀바 ── */}
         <div
           className="flex items-center gap-3 px-5 h-11 shrink-0"
-          style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,250,250,0.98)" }}
+          style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(251,252,250,0.98)" }}
         >
           <GitCommit className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
           <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Changes</p>
@@ -274,11 +272,9 @@ export function ChangesPage({
             disabled={isLoading}
             className="flex items-center gap-1.5 ml-3 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all disabled:opacity-50"
             style={{
-              background: showBranch
-                ? "linear-gradient(135deg, rgba(224,231,255,0.85), rgba(221,214,254,0.75))"
-                : "rgba(0,0,0,0.04)",
+              background: showBranch ? "rgba(65,67,27,0.10)" : "rgba(32,35,27,0.05)",
               color:      showBranch ? ACCENT : TEXT_PRIMARY,
-              border:     `1px solid ${showBranch ? "rgba(99,91,255,0.25)" : BORDER}`,
+              border:     `1px solid ${showBranch ? ACCENT_BORDER : BORDER}`,
             }}
           >
             <GitBranch className="w-3.5 h-3.5" />
@@ -287,7 +283,7 @@ export function ChangesPage({
           </button>
 
           {showBranch && (
-            <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: "rgba(99,91,255,0.08)", color: ACCENT }}>
+            <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: ACCENT_BG, color: ACCENT }}>
               Branch Graph 활성화됨
             </span>
           )}
@@ -306,7 +302,7 @@ export function ChangesPage({
                     <button
                       onClick={stageAll}
                       className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
-                      style={{ background: "rgba(99,91,255,0.08)", color: ACCENT, border: "1px solid rgba(99,91,255,0.16)" }}
+                      style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
                     >
                       Stage All
                     </button>
@@ -334,7 +330,7 @@ export function ChangesPage({
             {/* ── 왼쪽: 파일 목록 + 커밋 입력 ── */}
             <div
               className="flex flex-col shrink-0 overflow-hidden"
-              style={{ width: 280, borderRight: `1px solid ${BORDER}`, background: "#fafafa" }}
+              style={{ width: 280, borderRight: `1px solid ${BORDER}`, background: "#F7F8F5" }}
             >
               <div className="flex-1 overflow-y-auto">
 
@@ -344,7 +340,7 @@ export function ChangesPage({
                     onClick={() => { if (!isLoading) setStagedOpen(o => !o); }}
                     disabled={isLoading}
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all disabled:opacity-50"
-                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.9)" }}
+                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "#ECEEE9" }}
                   >
                     {stagedOpen
                       ? <ChevronDown  className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
@@ -352,7 +348,7 @@ export function ChangesPage({
                     }
                     <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: TEXT_LABEL }}>Staged</span>
                     {!isLoading && (
-                      <span className="ml-auto text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
+                      <span className="ml-auto text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: ACCENT_BG, color: ACCENT }}>
                         {stagedFiles.length}
                       </span>
                     )}
@@ -390,7 +386,7 @@ export function ChangesPage({
                     onClick={() => { if (!isLoading) setUnstagedOpen(o => !o); }}
                     disabled={isLoading}
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all disabled:opacity-50"
-                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.9)", borderTop: `1px solid ${BORDER_SUBTLE}` }}
+                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "#ECEEE9", borderTop: `1px solid ${BORDER_SUBTLE}` }}
                   >
                     {unstagedOpen
                       ? <ChevronDown  className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
@@ -459,7 +455,7 @@ export function ChangesPage({
                     <div className="flex items-center gap-2">
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                        style={{ background: "linear-gradient(135deg, #e0e7ff, #fce7f3)" }}
+                        style={{ background: "linear-gradient(135deg, #DDE2D3, #F0F1EE)" }}
                       >
                         <span className="text-[8px] font-bold" style={{ color: ACCENT }}>병</span>
                       </div>
@@ -484,8 +480,8 @@ export function ChangesPage({
                       rows={3}
                       className="w-full px-3 py-2 text-[11px] rounded-xl outline-none resize-none transition-all"
                       style={{
-                        background: "rgba(255,255,255,0.9)",
-                        border: `1px solid ${message.trim() ? "rgba(99,91,255,0.3)" : BORDER}`,
+                        background: "#FFFFFF",
+                        border: `1px solid ${message.trim() ? ACCENT_BORDER : BORDER}`,
                         color: TEXT_PRIMARY,
                         lineHeight: "1.5",
                       }}
@@ -504,12 +500,12 @@ export function ChangesPage({
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold transition-all"
                       style={{
                         background: stagedCount > 0 && message.trim()
-                          ? "linear-gradient(135deg, #635bff 0%, #8b5cf6 50%, #a855f7 100%)"
+                          ? "linear-gradient(135deg, #41431B 0%, #62683A 100%)"
                           : "rgba(0,0,0,0.07)",
                         color: stagedCount > 0 && message.trim()
                           ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
                         boxShadow: stagedCount > 0 && message.trim()
-                          ? "0 4px 16px rgba(99,91,255,0.28)" : "none",
+                          ? "0 4px 16px rgba(65,67,27,0.24)" : "none",
                         cursor: stagedCount > 0 && message.trim() ? "pointer" : "not-allowed",
                       }}
                     >
