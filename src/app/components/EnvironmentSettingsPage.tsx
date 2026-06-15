@@ -13,11 +13,11 @@ import {
   ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
 } from "../colors";
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+// ── 🚨 [수정] 재사용 가능한 스켈레톤 뼈대 컴포넌트 (하얀색 적용) ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
+      className={`animate-pulse rounded-md bg-white/70 ${className || ""}`}
       style={style}
     />
   );
