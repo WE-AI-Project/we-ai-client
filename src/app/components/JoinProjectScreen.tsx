@@ -50,8 +50,10 @@ import {
   ProjectCreatePayload,
   ProjectDepartment,
   ProjectLaunchTarget,
+  ProjectStackDetection,
   ProjectTechStackInput,
   createProject,
+  detectProjectStack,
   fetchMyProjects,
   formatApiError,
   joinProject,
@@ -86,90 +88,18 @@ const DEPARTMENT_LABELS: Record<ProjectDepartment, string> = {
   PM: "PM",
 };
 
-type DetectedInfo = {
-  stack: string[];
-  framework: string;
-  language: string;
-  build: string;
-};
-
-function detectFromPath(path: string): DetectedInfo {
-  const lower = path.toLowerCase();
-  const isJava = lower.includes("java") || lower.includes("spring") || lower.includes("weai");
-  const isNode = lower.includes("node") || lower.includes("react") || lower.includes("frontend");
-  const isPython = lower.includes("python") || lower.includes("py");
-
-  if (isJava || (!isNode && !isPython)) {
-    return {
-      stack: ["Java 17", "Spring Boot 3.2.5", "Gradle 8.7", "PostgreSQL 16", "React 18", "TypeScript 5.4"],
-      framework: "Spring Boot",
-      language: "Java / TypeScript",
-      build: "Gradle",
-    };
-  }
-
-  if (isNode) {
-    return {
-      stack: ["Node.js 20", "React 18", "TypeScript 5.4", "Vite 5", "Tailwind CSS 4"],
-      framework: "React",
-      language: "TypeScript",
-      build: "Vite",
-    };
-  }
-
-  return {
-    stack: ["Python 3.12", "FastAPI 0.110", "PostgreSQL 16", "Docker", "Redis"],
-    framework: "FastAPI",
-    language: "Python",
-    build: "pip / Poetry",
-  };
-}
+type DetectedInfo = ProjectStackDetection;
 
 function genCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-function guessCategory(name: string): ProjectTechStackInput["category"] {
-  const lower = name.toLowerCase();
-
-  if (lower.includes("react") || lower.includes("typescript") || lower.includes("vite") || lower.includes("tailwind")) {
-    return "FRONTEND";
-  }
-
-  if (lower.includes("docker")) {
-    return "DEVOPS";
-  }
-
-  if (lower.includes("gradle")) {
-    return "BUILD_TOOL";
-  }
-
-  if (lower.includes("java") || lower.includes("python") || lower.includes("node")) {
-    return "LANGUAGE";
-  }
-
-  if (lower.includes("postgresql") || lower.includes("redis")) {
-    return "DATABASE";
-  }
-
-  return "BACKEND";
-}
-
 function mapDetectedInfoToTechStacks(info: DetectedInfo | null): ProjectTechStackInput[] | undefined {
-  if (!info) {
-    return undefined;
-  }
-
-  return info.stack.map((item) => {
-    const [name, ...rest] = item.split(" ");
-    return {
-      name,
-      version: rest.join(" ") || undefined,
-      category: guessCategory(item),
-      isRequired: true,
-    };
-  });
+  return info?.techStacks.map((stack) => ({
+    ...stack,
+    version: stack.version || undefined,
+  }));
 }
 
 /* 경고창 없이 폴더 선택 확인 버튼이 바로 활성화되는 공통 컴포넌트 */
@@ -189,8 +119,8 @@ function LocalPathInput({
   const handleOpenExplorer = async () => {
     if ("showDirectoryPicker" in window) {
       try {
-        const dirHandle = await (window as any).showDirectoryPicker();
-        onChange(`C:\\Projects\\${dirHandle.name}`);
+        await (window as any).showDirectoryPicker();
+        alert("브라우저 보안 정책상 선택한 폴더의 전체 경로를 가져올 수 없습니다. 탐색기 주소창에서 절대 경로를 복사해 입력해 주세요.");
       } catch (error: any) {
         if (
           error.name === "SecurityError" ||
@@ -220,8 +150,7 @@ function LocalPathInput({
         {required && <span style={{ color: "#B85450" }}> *</span>}
       </label>
       <div
-        onClick={handleOpenExplorer}
-        className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 transition-all hover:bg-black/[0.02]"
+        className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all hover:bg-black/[0.02]"
         style={{
           background: "rgba(65,67,27,0.04)",
           border: `1.5px solid ${focused ? "rgba(65,67,27,0.35)" : BORDER}`,
@@ -229,12 +158,12 @@ function LocalPathInput({
       >
         <Folder className="h-4 w-4 shrink-0" style={{ color: value ? ACCENT : TEXT_TERTIARY }} />
         <input
-          readOnly
           value={value}
+          onChange={(event) => onChange(event.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={PATH_EXAMPLES[0]}
-          className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none cursor-pointer"
+          className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none"
           style={{ color: TEXT_PRIMARY }}
         />
 
@@ -250,6 +179,14 @@ function LocalPathInput({
             <X className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => void handleOpenExplorer()}
+          className="shrink-0 rounded p-1 hover:bg-black/[0.05]"
+          title="폴더 선택 안내"
+        >
+          <FolderOpen className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
+        </button>
       </div>
     </div>
   );
@@ -397,16 +334,21 @@ function CreateProjectModal({
   const canNextStepTwo = localPath.trim().length > 0;
   const deadlineDays = deadline ? Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000) : null;
 
-  const handleDetect = () => {
+  const handleDetect = async () => {
     if (!localPath.trim()) {
       return;
     }
 
     setDetecting(true);
-    window.setTimeout(() => {
-      setDetected(detectFromPath(localPath.trim()));
+    setErrorMessage("");
+    try {
+      setDetected(await detectProjectStack(localPath.trim()));
+    } catch (error) {
+      setDetected(null);
+      setErrorMessage(formatApiError(error));
+    } finally {
       setDetecting(false);
-    }, 1000);
+    }
   };
 
   const handleNextClick = () => {
@@ -642,13 +584,25 @@ function CreateProjectModal({
                 )}
               </button>
 
+              {errorMessage && (
+                <div
+                  className="flex items-start gap-2 rounded-xl px-3 py-2.5"
+                  style={{ background: "rgba(184,84,80,0.06)", border: "1px solid rgba(184,84,80,0.18)" }}
+                >
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: "#B85450" }} />
+                  <p className="text-[10px]" style={{ color: "#B85450" }}>
+                    {errorMessage}
+                  </p>
+                </div>
+              )}
+
               {detected && <DetectResult info={detected} path={localPath} />}
 
               {!detected && !detecting && localPath && (
                 <div className="flex items-start gap-2 px-1">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: TEXT_TERTIARY }} />
                   <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                    위 버튼을 눌러 경로를 분석하면 기술 스택이 자동으로 감지됩니다.
+                    배포 환경에서는 서버가 접근할 수 있는 경로만 분석할 수 있습니다. 내 PC의 경로는 서버에서 직접 읽을 수 없습니다.
                   </p>
                 </div>
               )}
@@ -854,16 +808,20 @@ function StartModal({
     }, 300);
   };
 
-  const handlePathDetect = () => {
+  const handlePathDetect = async () => {
     if (!localPath.trim()) {
       return;
     }
 
     setDetecting(true);
-    window.setTimeout(() => {
-      setDetected(detectFromPath(localPath.trim()));
+    try {
+      setDetected(await detectProjectStack(localPath.trim()));
+    } catch (error) {
+      setDetected(null);
+      alert(formatApiError(error));
+    } finally {
       setDetecting(false);
-    }, 800);
+    }
   };
 
   return (
@@ -1057,6 +1015,7 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
   const [codeStep, setCodeStep] = useState<"input" | "path">("input");
   const [codePath, setCodePath] = useState("");
   const [codeDetect, setCodeDetect] = useState<DetectedInfo | null>(null);
+  const [codeDetecting, setCodeDetecting] = useState(false);
 
   const [joinDepartments, setJoinDepartments] = useState<ProjectDepartment[]>(["BACKEND"]);
 
@@ -1334,13 +1293,22 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                   />
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!codePath.trim()) {
                         return;
                       }
-                      setCodeDetect(detectFromPath(codePath.trim()));
+                      setCodeDetecting(true);
+                      setCodeError("");
+                      try {
+                        setCodeDetect(await detectProjectStack(codePath.trim()));
+                      } catch (error) {
+                        setCodeDetect(null);
+                        setCodeError(formatApiError(error));
+                      } finally {
+                        setCodeDetecting(false);
+                      }
                     }}
-                    disabled={!codePath.trim()}
+                    disabled={!codePath.trim() || codeDetecting}
                     className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-all"
                     style={{
                       background: codePath.trim() ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
@@ -1348,7 +1316,7 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
                       border: `1px solid ${codePath.trim() ? ACCENT_BORDER : "transparent"}`,
                     }}
                   >
-                    <FolderOpen className="h-3.5 w-3.5" />
+                    {codeDetecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
                     경로 분석
                   </button>
                   {codeDetect && <DetectResult info={codeDetect} path={codePath} />}

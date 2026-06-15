@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const rawProxyTarget = env.VITE_DEV_PROXY_TARGET?.trim() ?? "";
   const proxyTarget =
     rawProxyTarget.replace(/\/+$/, "") ||
-    "https://we-ai-server-167535321001.asia-northeast3.run.app";
+    "http://localhost:8080";
 
   return {
     plugins: [

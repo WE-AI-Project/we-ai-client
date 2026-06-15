@@ -12,10 +12,10 @@ export const CREAM         = "#F8F3E1";   // 크림 (서브 배경)
 export const BRIGHT_BEIGE  = "#FEFCF5";   // 아주 밝은 베이지
 
 // ── 텍스트 (콘텐츠 영역 밝은 배경용) ─────────────────────
-export const TEXT_PRIMARY   = "#1A1C06";   // 기본 텍스트 (아주 다크 올리브)
-export const TEXT_SECONDARY = "#41431B";   // 보조 텍스트 (다크 올리브)
-export const TEXT_TERTIARY  = "#6B6D3A";   // 3차 텍스트 (중간 올리브)
-export const TEXT_LABEL     = "#888A62";   // 레이블 텍스트
+export const TEXT_PRIMARY   = "#20231B";   // 기본 텍스트 (중립 다크)
+export const TEXT_SECONDARY = "#4F554A";   // 보조 텍스트
+export const TEXT_TERTIARY  = "#747A70";   // 3차 텍스트
+export const TEXT_LABEL     = "#858B80";   // 레이블 텍스트
 
 // ── 사이드바 텍스트 (어두운 사이드바 배경 전용) ───────────
 export const SIDEBAR_TEXT        = "rgba(255,255,255,0.55)";
@@ -28,17 +28,17 @@ export const SIDEBAR_TEXT_MUTED  = "rgba(255,255,255,0.18)";
 export const OUTER_BG       = "#0C0E02";   // 최외부 래퍼 배경 (극다크 올리브)
 export const SIDEBAR_BG     = "#131507";   // 사이드바 배경
 export const TITLEBAR_BG    = "#131507";   // 타이틀바 배경
-export const CONTENT_BG     = "#FFFFFF";   // 메인 콘텐츠 배경 (화이트)
-export const PANEL_BG       = "#F8F7F5";   // 패널 배경 (매우 연한 그레이)
-export const CARD_BG        = "#FFFFFF";   // 카드 배경 (화이트)
-export const INPUT_BG       = "#F4F3F0";   // 인풋 배경
-export const TABLE_HEADER_BG = "#F2F1EE";  // 테이블 헤더 배경
-export const TABLE_BG       = "#FAFAF8";   // 테이블 배경
+export const CONTENT_BG     = "#F3F4F1";   // 메인 콘텐츠 배경
+export const PANEL_BG       = "#ECEEE9";   // 패널 배경
+export const CARD_BG        = "#FBFCFA";   // 카드 배경
+export const INPUT_BG       = "#F0F1EE";   // 인풋 배경
+export const TABLE_HEADER_BG = "#E9ECE6";  // 테이블 헤더 배경
+export const TABLE_BG       = "#F7F8F5";   // 테이블 배경
 export const LOGIN_BG       = "#F5F4F1";   // 로그인/프로젝트 선택 배경
 
 // ── 보더 ──────────────────────────────────────────────────
-export const BORDER         = "rgba(0,0,0,0.08)";
-export const BORDER_SUBTLE  = "rgba(0,0,0,0.04)";
+export const BORDER         = "rgba(32,35,27,0.12)";
+export const BORDER_SUBTLE  = "rgba(32,35,27,0.07)";
 export const SIDEBAR_BORDER = "rgba(255,255,255,0.08)";
 
 // ── 인터랙션 (사이드바 어두운 배경 기준) ──────────────────
@@ -49,8 +49,8 @@ export const SIDEBAR_ACTIVE  = "rgba(255,255,255,0.10)";
 export const ACCENT         = "#41431B";
 export const ACCENT_SAGE    = "#AEB784";
 export const ACCENT_MID     = "#6B7040";
-export const ACCENT_BG      = "rgba(65,67,27,0.06)";
-export const ACCENT_BORDER  = "rgba(65,67,27,0.18)";
+export const ACCENT_BG      = "rgba(65,67,27,0.09)";
+export const ACCENT_BORDER  = "rgba(65,67,27,0.22)";
 
 // ── UI 상태 색상 (범용 시맨틱 컬러) ──────────────────────
 export const UI_GREEN       = "#10b981";   // 성공/활성/러닝
@@ -136,7 +136,7 @@ export const GRADIENT_RAINBOW_BORDER2 = "linear-gradient(180deg, #635bff 0%, #8b
 export const GRADIENT_RAINBOW_BORDER3 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 50%, #ec4899 100%) 1";
 
 /** 페이지 콘텐츠 배경 — 화이트 */
-export const GRADIENT_PAGE = "#FFFFFF";
+export const GRADIENT_PAGE = "#F3F4F1";
 /** 사이드바 배경 — 초극다크 올리브 단색 */
 export const GRADIENT_SIDEBAR = "#131507";
 /** 외부 래퍼 배경 — 극다크 올리브 단색 */
@@ -152,9 +152,9 @@ export const GRADIENT_ORB_1 = "transparent";
 export const GRADIENT_ORB_2 = "transparent";
 export const GRADIENT_ORB_3 = "transparent";
 /** 카드 배경 — 화이트 단색 */
-export const GRADIENT_CARD = "#FFFFFF";
+export const GRADIENT_CARD = "#FBFCFA";
 /** 헤더 배너 배경 — 연한 크림 단색 */
-export const GRADIENT_BANNER = "#F8F3E1";
+export const GRADIENT_BANNER = "#E9ECE4";
 
 // ── 상태 색상 (올리브 테마) ──────────────────────────────
 export const STATUS_RUNNING = "#5A8A4A";

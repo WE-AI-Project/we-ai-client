@@ -9,36 +9,36 @@
   --font-size: 16px;
 
   /* ── 기본 서피스 ── */
-  --background: #FEFCF5;           /* 아주 밝은 베이지 */
-  --foreground: #41431B;
+  --background: #F3F4F1;           /* 차분한 쿨 그레이 */
+  --foreground: #20231B;
 
   /* ── 카드 / 팝오버 ── */
-  --card: #F0EBD5;
-  --card-foreground: #41431B;
-  --popover: #F5F0E0;
-  --popover-foreground: #41431B;
+  --card: #FBFCFA;
+  --card-foreground: #20231B;
+  --popover: #FFFFFF;
+  --popover-foreground: #20231B;
 
   /* ── 기본 / 보조 ── */
   --primary: #41431B;
-  --primary-foreground: #FEFCF5;
-  --secondary: #E3DBBB;
-  --secondary-foreground: #41431B;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E8EAE4;
+  --secondary-foreground: #303429;
 
   /* ── 뮤트 / 액센트 ── */
-  --muted: #E3DBBB;
-  --muted-foreground: #888A62;
-  --accent: #AEB784;
-  --accent-foreground: #41431B;
+  --muted: #E8EAE4;
+  --muted-foreground: #6C7165;
+  --accent: #DDE2D3;
+  --accent-foreground: #303429;
 
   /* ── 디스트럭티브 ── */
   --destructive: #B85450;
-  --destructive-foreground: #FEFCF5;
+  --destructive-foreground: #FFFFFF;
 
   /* ── 보더 / 인풋 ── */
-  --border: rgba(65, 67, 27, 0.14);
+  --border: rgba(32, 35, 27, 0.12);
   --input: transparent;
-  --input-background: #EDE8D2;
-  --switch-background: #C4BC9A;
+  --input-background: #F0F1EE;
+  --switch-background: #B8BDB2;
 
   /* ── 폰트 웨이트 ── */
   --font-weight-medium: 500;
