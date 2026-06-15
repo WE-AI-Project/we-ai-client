@@ -870,6 +870,19 @@ export async function createProject(payload: ProjectCreatePayload): Promise<Proj
 }
 
 export async function detectProjectStack(localPath: string): Promise<ProjectStackDetection> {
+  if (isDev) {
+    const response = await fetch("/__local/detect-stack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ localPath }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new ApiError(payload?.message || "로컬 프로젝트 경로를 분석할 수 없습니다.", "LOCAL_STACK_DETECTION_FAILED", response.status);
+    }
+    return payload as ProjectStackDetection;
+  }
+
   return request<ProjectStackDetection>("/api/v1/projects/detect-stack", {
     method: "POST",
     body: { localPath },
