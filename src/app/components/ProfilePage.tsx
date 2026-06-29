@@ -162,12 +162,7 @@ function TechBadge({ name, slug, variant }: { name: string; slug: string; varian
 // 메인 ProfilePage
 // ──────────────────────────────────────────
 export function ProfilePage() {
-  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const stats = useSystemStats();
   const [profile, setProfile] = useState<ProfileData>(loadProfile);

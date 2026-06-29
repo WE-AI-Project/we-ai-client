@@ -122,12 +122,7 @@ export function BranchVisualization({ onClose }: { onClose?: () => void }) {
   const [branches] = useState<BranchMeta[]>(BRANCHES);
   const [filterBranch, setFilterBranch] = useState<string | null>(null);
   
-  // 🚨 [스켈레톤 관리]
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const selectedCommit = COMMITS.find(c => c.id === selected);
 

@@ -114,13 +114,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 3초 스켈레톤 UI 유지를 위한 시뮬레이션 타이머
-  const [isSimulating, setIsSimulating] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsSimulating(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isSimulating = false;
 
   const progressLabel = useMemo(() => `${dashboard?.progressRate ?? 0}%`, [dashboard]);
 

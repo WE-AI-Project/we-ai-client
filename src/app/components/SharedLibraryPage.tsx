@@ -57,12 +57,7 @@ const CAT_META: Record<Resource["category"], { color: string; bg: string }> = {
 };
 
 export function SharedLibraryPage() {
-  // 🚨 [추가] 초기 로딩 3초 타이머
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");

@@ -111,14 +111,7 @@ export function AgentControlPage() {
   const [filterStatus, setFilter]     = useState<AgentStatus | "all">("all");
   const logRef = useRef<HTMLDivElement>(null);
 
-  // 로딩 상태 관리 (백엔드 통신 대체 지연 효과)
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // 3초 뒤에 실제 데이터 표시
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   // 에이전트 토글 (running/idle ↔ stopped)
   const toggleAgent = (id: string) => {

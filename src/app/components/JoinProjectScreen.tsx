@@ -117,30 +117,7 @@ function LocalPathInput({
   const [focused, setFocused] = useState(false);
 
   const handleOpenExplorer = async () => {
-    if ("showDirectoryPicker" in window) {
-      try {
-        await (window as any).showDirectoryPicker();
-        alert("브라우저 보안 정책상 선택한 폴더의 전체 경로를 가져올 수 없습니다. 탐색기 주소창에서 절대 경로를 복사해 입력해 주세요.");
-      } catch (error: any) {
-        if (
-          error.name === "SecurityError" ||
-          error.name === "NotAllowedError" ||
-          error.message?.toLowerCase().includes("sensitive") ||
-          error.message?.toLowerCase().includes("system")
-        ) {
-          alert(
-            "⚠️ 브라우저 보안 정책상 '바탕화면 전체'나 '다운로드' 같은 시스템 폴더는 통째로 지정할 수 없습니다.\n\n바탕화면 안에 [새 폴더]를 하나 만드신 후, 생성된 새 폴더를 선택해 주세요"
-          );
-          return;
-        }
-
-        if (error.name !== "AbortError") {
-          alert("선택하신 위치는 접근할 수 없습니다. 일반 작업 폴더를 선택하거나 새 폴더를 만들어 선택해 주세요.");
-        }
-      }
-    } else {
-      alert("현재 브라우저 환경에서는 폴더 선택 기능을 지원하지 않습니다. 크롬(Chrome) 또는 엣지(Edge) 브라우저를 이용해 주세요.");
-    }
+    alert("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
   };
 
   return (
@@ -183,7 +160,7 @@ function LocalPathInput({
           type="button"
           onClick={() => void handleOpenExplorer()}
           className="shrink-0 rounded p-1 hover:bg-black/[0.05]"
-          title="폴더 선택 안내"
+          title="절대경로 입력 안내"
         >
           <FolderOpen className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
         </button>

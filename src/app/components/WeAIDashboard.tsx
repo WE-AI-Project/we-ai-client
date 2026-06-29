@@ -1255,23 +1255,14 @@ export function WeAIDashboard() {
   const [activeProject, setActiveProject] = useState<typeof PROJECTS[number] | null>(null);
   const [activeTab, setActiveTab] = useState("home");
 
-  // 🚨 [추가] 프로젝트 목록(entry) 로딩 시뮬레이션
-  const [isLoadingEntry, setIsLoadingEntry] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoadingEntry(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoadingEntry = false;
 
-  // 🚨 [추가] 워크스페이스 진입 시 스켈레톤 로딩 관리
-  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(false);
+  const isLoadingWorkspace = false;
 
   const handleJoin = (project: typeof PROJECTS[number]) => {
     setActiveProject(project);
     setView("workspace");
     setActiveTab("home");
-    // 워크스페이스 진입 시 3초 동안 스켈레톤을 보여줌
-    setIsLoadingWorkspace(true);
-    setTimeout(() => setIsLoadingWorkspace(false), 3000);
   };
 
   // Screen A — 프로젝트 진입 화면

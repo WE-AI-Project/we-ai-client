@@ -63,12 +63,7 @@ function SectionCard({ icon: Icon, iconColor, iconBg, title, children }: {
 }
 
 export function SettingsPage() {
-  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   // 알림 토글 상태
   const [notifs, setNotifs] = useState({
