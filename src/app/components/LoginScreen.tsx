@@ -26,7 +26,7 @@ import {
   EyeOff,
   User,
   ChevronRight,
-  ChevronDown, // 💡 추가됨: 아래 방향 화살표 아이콘
+  ChevronDown,
   CheckSquare,
   Square,
   X,
@@ -82,7 +82,7 @@ const SOCIAL_LABELS: Record<SocialProvider, string> = {
   google: "Google",
 };
 
-// 💡 약관 상세 내용 데이터
+// 약관 상세 내용 데이터
 const TERMS_CONTENT = {
   privacy: {
     content: `SynAIpse는 원활한 서비스 제공을 위해 아래와 같이 개인정보를 수집 및 이용합니다.
@@ -302,7 +302,6 @@ function Field({
   );
 }
 
-// 💡 [수정됨] 아코디언 방식으로 펼쳐지는 AgreeRow
 function AgreeRow({
   label,
   checked,
@@ -321,7 +320,6 @@ function AgreeRow({
   return (
     <div className="flex w-full flex-col py-0.5">
       <div className="flex w-full items-center justify-between py-1">
-        {/* 체크박스와 라벨 (클릭 시 체크만 토글) */}
         <button type="button" onClick={() => onChange(!checked)} className="flex items-center gap-2.5 text-left flex-1">
           {checked ? (
             <CheckSquare className="h-4 w-4 shrink-0" style={{ color: OLIVE_DARK }} />
@@ -333,7 +331,6 @@ function AgreeRow({
           </span>
         </button>
         
-        {/* 화살표 아이콘 (클릭 시 내용 펼치기 토글) */}
         {content && (
           <button
             type="button"
@@ -349,7 +346,6 @@ function AgreeRow({
         )}
       </div>
 
-      {/* 펼쳐지는 상세 약관 내용 */}
       {isExpanded && content && (
         <div
           className="mt-1 mb-2 ml-6 rounded-lg p-3 text-[10px] leading-relaxed"
@@ -617,7 +613,7 @@ function LoginForm({
               className="h-4 w-4 animate-spin rounded-full border-2"
               style={{ borderColor: "rgba(255,255,255,0.2)", borderTopColor: "white" }}
             />
-            로그인 중...
+              로그인 중...
           </span>
         ) : (
           "로그인"
@@ -1026,7 +1022,7 @@ function SignupForm({
             </p>
           )}
 
-          {/* 💡 [수정됨] 펼쳐지는 아코디언 약관 영역 */}
+          {/* 약관 영역 */}
           <div className="rounded-xl px-4 py-3" style={{ background: INPUT_BG, border: "1px solid rgba(0,0,0,0.04)" }}>
             <div className="mb-1.5 flex items-center gap-2.5 border-b border-black/6 pb-2.5">
               <button type="button" onClick={() => setAll(!agreeAll)}>
@@ -1363,17 +1359,17 @@ export function LoginScreen({ onAuthenticated }: Props) {
 
   return (
     <div
-      className="relative flex size-full items-center justify-center overflow-hidden"
+      className="relative flex size-full items-center justify-center overflow-hidden bg-[#F5F4F1]"
       style={{
-        background: "#F5F4F1",
         opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.42s ease" : "none",
       }}
     >
       <style>{KEYFRAMES}</style>
 
+      {/* 전체를 좌우로 분할하고 중앙 정렬을 복구한 컨테이너 */}
       <div
-        className="absolute inset-0 flex flex-col items-center justify-center px-8"
+        className="absolute inset-0 flex"
         style={{
           opacity: cardOpen ? 0.12 : 1,
           filter: cardOpen ? "blur(4px)" : "none",
@@ -1383,62 +1379,80 @@ export function LoginScreen({ onAuthenticated }: Props) {
           zIndex: 5,
         }}
       >
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
-            <FolderGit2 className="h-5.5 w-5.5" style={{ color: "white" }} />
+        {/* --- 왼쪽 영역: 기존 내부 중앙 정렬 복구 --- */}
+        <div className="flex h-full w-full flex-col items-center justify-center px-8 sm:px-12 lg:w-1/2">
+          
+          {/* Logo & Title */}
+          <div className="mb-8 flex items-center justify-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
+              <FolderGit2 className="h-5.5 w-5.5" style={{ color: "white" }} />
+            </div>
+            <div>
+              <p className="text-xl font-bold" style={{ color: TEXT_PRIMARY }}>
+                SynAIpse
+              </p>
+              <p className="text-[10px]" style={{ color: LOGIN_MUTED }}>
+                Project Office
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xl font-bold" style={{ color: TEXT_PRIMARY }}>
-              SynAIpse
-            </p>
-            <p className="text-[10px]" style={{ color: LOGIN_MUTED }}>
-              Project Office
-            </p>
+
+          <h1 className="mb-4 text-center text-[44px] font-bold leading-tight tracking-tight sm:text-[52px]">
+            <span style={{ color: "#1A1C06" }}>Welcome to</span>
+            <br />
+            <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
+          </h1>
+
+          <p className="mb-8 text-center text-sm sm:text-base" style={{ color: LOGIN_OLIVE_TEXT, maxWidth: 360 }}>
+            Intelligent Multi-Agent Project Office
+            <br />
+            <span style={{ color: LOGIN_MUTED, fontSize: 11 }}>Java/Spring Boot 기반 엔터프라이즈 관리 플랫폼</span>
+          </p>
+
+          <div className="mb-10 flex max-w-[500px] flex-wrap justify-center gap-2">
+            {["멀티에이전트 관리", "AI QA 모니터링", "실시간 빌드", "팀 협업 대시보드"].map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full px-3 py-1.5 text-[11px] font-medium"
+                style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
+              >
+                {tag}
+              </span>
+            ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setCardOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-sm font-semibold"
+            style={{ background: OLIVE_DARK, color: "white" }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.opacity = "0.88";
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.opacity = "1";
+            }}
+          >
+            시작하기 <ArrowRight className="h-4 w-4" />
+          </button>
+
+          <p className="mt-8 text-center text-[10px]" style={{ color: LOGIN_ICON_MUTED }}>
+            SynAIpse Enterprise Platform - v2025.1
+          </p>
         </div>
 
-        <h1 className="mb-3 text-center text-[40px] font-bold leading-tight tracking-tight">
-          <span style={{ color: "#1A1C06" }}>Welcome to</span>
-          <br />
-          <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
-        </h1>
-
-        <p className="mb-8 text-center text-sm" style={{ color: LOGIN_OLIVE_TEXT, maxWidth: 310 }}>
-          Intelligent Multi-Agent Project Office
-          <br />
-          <span style={{ color: LOGIN_MUTED, fontSize: 11 }}>Java/Spring Boot 기반 엔터프라이즈 관리 플랫폼</span>
-        </p>
-
-        <div className="mb-10 flex flex-wrap justify-center gap-2">
-          {["멀티에이전트 관리", "AI QA 모니터링", "실시간 빌드", "팀 협업 대시보드"].map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full px-3 py-1.5 text-[11px] font-medium"
-              style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
-            >
-              {tag}
-            </span>
-          ))}
+        {/* --- 💡 오른쪽 영역: 로그인 팝업 카드와 비슷한 크기의 사진 배치 --- */}
+        <div className="hidden relative flex h-full w-full items-center justify-center lg:flex lg:w-1/2">
+          {/* 로그인 창과 비슷한 크기(약 420px), 라운딩 처리 추가 */}
+          <div className="relative h-[65%] max-h-[580px] w-[420px] max-w-[90%] overflow-hidden rounded-[20px] shadow-2xl">
+            <img
+              src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1000"
+              alt="SynAIpse Technology Background"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            {/* 그라데이션 및 오버레이 제거하여 사진 원본 노출 */}
+          </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setCardOpen(true)}
-          className="flex items-center gap-2 rounded-xl px-8 py-3.5 text-sm font-semibold"
-          style={{ background: OLIVE_DARK, color: "white" }}
-          onMouseEnter={(event) => {
-            event.currentTarget.style.opacity = "0.88";
-          }}
-          onMouseLeave={(event) => {
-            event.currentTarget.style.opacity = "1";
-          }}
-        >
-          시작하기 <ArrowRight className="h-4 w-4" />
-        </button>
-
-        <p className="mt-6 text-[10px]" style={{ color: LOGIN_ICON_MUTED }}>
-          SynAIpse Enterprise Platform - v2025.1
-        </p>
       </div>
 
       {cardOpen && (
@@ -1449,17 +1463,19 @@ export function LoginScreen({ onAuthenticated }: Props) {
         />
       )}
 
+      {/* 💡 로그인 팝업 */}
       <div
+        className="absolute w-[420px] max-w-[90vw]"
         style={{
-          position: "absolute",
-          left: "50%",
-          top: "50%",
-          width: 420,
+          /* 💡 반응형 위치 처리: lg 이상일 때 left: 60% (우측 중앙 부근), 그 이하일 때 left: 50% */
+          /* 💡 아래로 약간 내림: top-[55%] 사용, translate-y 조절로 중앙에서 약간 아래로 */
+          top: "55%", 
+          left: typeof window !== 'undefined' && window.innerWidth >= 1024 ? "75%" : "50%",
+          transform: "translate(-50%, -50%)",
           zIndex: 30,
           animation: cardOpen ? "card-appear 0.40s cubic-bezier(0.22, 1, 0.36, 1) forwards" : "none",
           opacity: cardOpen ? 1 : 0,
           pointerEvents: cardOpen ? "auto" : "none",
-          transform: "translate(-50%, -50%)",
         }}
       >
         <button
