@@ -68,12 +68,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function AnalyticsPage() {
   const [range, setRange] = useState<string>("14 Days");
   
-  // 🚨 [추가] 초기 로딩 스켈레톤 상태 (3초 대기)
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const sliceCount = range === "7 Days" ? 7 : range === "14 Days" ? 14 : 14;
   const chartData = DAILY_ACTIVITY.slice(-sliceCount);

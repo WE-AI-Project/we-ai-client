@@ -557,14 +557,7 @@ export function AIQAPage({
   const [elapsed,      setElapsed]      = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 🚨 [추가] 초기 로딩 스켈레톤 상태
-  const [isLoading, setIsLoading] = useState(true);
-
-  // 🚨 3초 후 초기 로딩 해제 (실전 배포용)
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   // ── 커밋 정보 ──
   const pendingQA  = getPendingQA();

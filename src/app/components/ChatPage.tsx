@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
@@ -14,7 +14,17 @@ import {
   generateDocBriefing, briefingToMeetingDoc, type BriefingData,
 } from "../data/chatStore";
 import { DocBriefingBubble, BriefingLoadingBubble } from "./DocBriefingBubble";
-import { runAiChat, type AiChatResponse } from "../../api/aiApi";
+import {
+  askAiAgent,
+  fetchAiAgents,
+  runAiChat,
+  runCustomAiDebate,
+  type AiAgent,
+  type AiAgentKey,
+  type AiChatResponse,
+  type DebateResponse,
+  type SingleAgentResponse,
+} from "../../api/aiApi";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
@@ -130,7 +140,7 @@ const PART_INITIAL_MESSAGES: Record<PartId, Omit<ChatMessage, "id" | "time">[]> 
 };
 
 // ── AI 응답 생성 ──
-type AIResponseKind = "text" | "team" | "profile" | "status" | "tasks";
+type AIResponseKind = "text" | "rag" | "agent" | "debate";
 interface AIMsg {
   id: string;
   role: "user" | "ai";
@@ -140,78 +150,71 @@ interface AIMsg {
   data?: any;
 }
 
-function getAIResponse(input: string): { content: string; kind: AIResponseKind; data?: any } {
-  const q = input.toLowerCase();
-
-  const profileMatch = PROJECT_TEAM.find(m =>
-    q.includes(m.name.toLowerCase()) && (q.includes("프로필") || q.includes("profile") || q.includes("님") || q.includes("누구"))
-  );
-  if (profileMatch) {
-    return { content: `**${profileMatch.name}** 님의 프로필입니다.`, kind: "profile", data: profileMatch };
-  }
-
-  if (q.includes("프론트") || q.includes("frontend") || q.includes("react") || q.includes("ui")) {
-    const team = PROJECT_TEAM.filter(m => m.partId === "frontend");
-    return { content: `프론트엔드 팀 담당자는 **${team.map(m => m.name).join(", ")}** 님입니다.`, kind: "team", data: { part: "frontend", members: team } };
-  }
-  if (q.includes("백엔드") || q.includes("backend") || q.includes("spring") || q.includes("java") || q.includes("api")) {
-    const team = PROJECT_TEAM.filter(m => m.partId === "backend");
-    return { content: `백엔드 팀 담당자는 **${team.map(m => m.name).join(", ")}** 님입니다.`, kind: "team", data: { part: "backend", members: team } };
-  }
-  if (q.includes("qa") || q.includes("테스트") || q.includes("버그") || q.includes("품질")) {
-    const team = PROJECT_TEAM.filter(m => m.partId === "qa");
-    return { content: `QA 팀 담당자는 **${team.map(m => m.name).join(", ")}** 님입니다.`, kind: "team", data: { part: "qa", members: team } };
-  }
-  if (q.includes("devops") || q.includes("배포") || q.includes("docker") || q.includes("ci") || q.includes("cd") || q.includes("인프라")) {
-    const team = PROJECT_TEAM.filter(m => m.partId === "devops");
-    return { content: `DevOps 팀 담당자는 **${team.map(m => m.name).join(", ")}** 님입니다.`, kind: "team", data: { part: "devops", members: team } };
-  }
-  if (q.includes("팀") || q.includes("team") || q.includes("멤버") || q.includes("member") || q.includes("전체") || q.includes("모두")) {
-    return { content: `WE&AI 프로젝트 전체 팀원은 **${PROJECT_TEAM.length}명** 입니다.`, kind: "team", data: { part: "all", members: PROJECT_TEAM } };
-  }
-  if (q.includes("담당") || q.includes("맡") || q.includes("업무") || q.includes("task") || q.includes("어떤")) {
-    if (q.includes("에이전트") || q.includes("agent") || q.includes("controller")) {
-      const m = PROJECT_TEAM.find(p => p.tasks.some(t => t.toLowerCase().includes("agent") || t.includes("에이전트")));
-      if (m) return { content: `**${m.name}** 님 (${m.role})이 에이전트 관련 업무를 담당하고 있어요.`, kind: "profile", data: m };
-    }
-    return { content: "팀별 담당 업무 현황입니다.", kind: "tasks", data: PROJECT_TEAM };
-  }
-  if (q.includes("현황") || q.includes("상태") || q.includes("진행") || q.includes("status") || q.includes("지금")) {
-    return {
-      content: "현재 WE&AI 프로젝트 현황입니다.", kind: "status",
-      data: { sprint: "Agent Deployment v1.0", deadline: "2026-06-30", progress: 67, agents: { running: 3, total: 6 }, buildStatus: "PASS", openIssues: 5, completedTasks: 12 },
-    };
-  }
-  if (q.includes("에이전트") || q.includes("agent") || q.includes("agt")) {
-    return {
-      content: "현재 에이전트 운영 현황입니다. 6개 중 3개가 활성 상태예요.", kind: "status",
-      data: { sprint: "Agent Deployment v1.0", deadline: "2026-06-30", progress: 67, agents: { running: 3, total: 6 }, buildStatus: "PASS", openIssues: 5, completedTasks: 12 },
-    };
-  }
-
-  const fallbacks = [
-    "프로젝트 데이터를 기반으로 답변드릴 수 있어요! \"백엔드 담당 누구야\", \"지수 님 프로필\", \"전체 팀 보여줘\" 등을 물어보세요.",
-    "알고 싶은 정보를 구체적으로 질문해 주세요. 팀원 정보, 파트별 담당, 프로젝트 현황 등을 알 수 있어요.",
-    "죄송해요, 해당 내용을 찾기 어렵네요. 팀원 이름이나 파트명을 포함해서 다시 질문해 주세요!",
-    "프로젝트 학습 데이터에서 관련 정보를 찾고 있어요. 좀 더 구체적인 키워드로 질문해 주세요.",
-  ];
-  return { content: fallbacks[Math.floor(Math.random() * fallbacks.length)], kind: "text" };
-}
-
 function formatAiChatAnswer(response: AiChatResponse): string {
   const answer = response.answer?.trim();
   const contexts = (response.contexts ?? []).filter(Boolean);
 
   if (!answer && contexts.length === 0) {
-    return "AI 응답이 비어 있습니다.";
+    return "주의: 충분한 프로젝트의 표본이 없습니다.";
   }
 
   if (contexts.length === 0) {
-    return answer || "AI 응답이 비어 있습니다.";
+    return `주의: 충분한 프로젝트의 표본이 없습니다.\n\n${answer || "프로젝트 문서를 추가하면 더 정확한 답변을 받을 수 있습니다."}`;
   }
 
-  return `${answer || "답변"}\n\n참고 컨텍스트\n${contexts.map((context) => `- ${context}`).join("\n")}`;
+  return compactAiAnswer(answer || "답변");
 }
+
+function compactAiAnswer(text: string, maxLength = 900): string {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (normalized.length <= maxLength) return normalized;
+
+  const shortened = normalized.slice(0, maxLength);
+  const lastBoundary = Math.max(
+    shortened.lastIndexOf(". "),
+    shortened.lastIndexOf("다."),
+    shortened.lastIndexOf("\n"),
+  );
+  const safeEnd = lastBoundary >= Math.floor(maxLength * 0.65) ? lastBoundary + 1 : maxLength;
+  return `${shortened.slice(0, safeEnd).trim()}\n\n… 답변이 길어 핵심 내용만 표시했습니다.`;
+}
+
+function buildEditorContext(projectId: number | null | undefined, question: string, ragMaxResults: number) {
+  return {
+    projectId,
+    fileName: "SYNAIPSE Chat AI Console",
+    currentCodeSnippet: "No editor selection was provided. Use the project RAG context and the user question.",
+    cursorLine: 1,
+    userQuery: question,
+    ragMaxResults,
+  };
+}
+
+function formatSingleAgentAnswer(response: SingleAgentResponse) {
+  const warning = (response.ragContexts?.length ?? 0) === 0
+    ? "주의: 충분한 프로젝트의 표본이 없습니다.\n\n"
+    : "";
+  return `${warning}${compactAiAnswer(response.answer)}`;
+}
+
+function formatDebateSummary(response: DebateResponse) {
+  const warning = (response.ragContexts?.length ?? 0) === 0
+    ? "주의: 충분한 프로젝트의 표본이 없습니다. · "
+    : "";
+  return `${warning}선택한 에이전트 토론 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 라운드`;
+}
+
+const DEFAULT_AI_AGENTS: AiAgent[] = [
+  { agent: "ORACLE", name: "Oracle", role: "Chief coordinator", model: "llama3.1" },
+  { agent: "BACKEND", name: "Backend", role: "Server/API specialist", model: "qwen2.5-coder" },
+  { agent: "FRONTEND", name: "Frontend", role: "UI/UX specialist", model: "llama3.1" },
+  { agent: "INSPECTOR", name: "Inspector", role: "QA/Security inspector", model: "qwen2.5-coder" },
+];
 
 // ══════════════════════════════════════════════════════════
 // 아바타
@@ -504,14 +507,41 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
             alignSelf: isUser ? "flex-end" : "flex-start",
           }}
         >
-          <p className="text-[11px] leading-relaxed" style={{ color: isUser ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>
+          <p className="whitespace-pre-wrap text-[11px] leading-relaxed" style={{ color: isUser ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>
             {msg.content.replace(/\*\*/g, "")}
           </p>
         </div>
-        {!isUser && msg.kind === "profile" && msg.data && <ProfileCard member={msg.data} />}
-        {!isUser && msg.kind === "team" && msg.data && <TeamCard part={msg.data.part} members={msg.data.members} />}
-        {!isUser && msg.kind === "status" && msg.data && <StatusCard data={msg.data} />}
-        {!isUser && msg.kind === "tasks" && msg.data && <TasksCard members={msg.data} />}
+        {!isUser && msg.kind === "rag" && msg.data && (msg.data.contexts?.length ?? 0) > 0 && (
+          <p className="mt-1 px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+            프로젝트 문서 {msg.data.contexts.length}개를 참고한 답변
+          </p>
+        )}
+        {!isUser && msg.kind === "agent" && msg.data && (
+          <div className="mt-2 rounded-xl p-3" style={{ background: "rgba(65,67,27,0.04)", border: `1px solid ${BORDER}` }}>
+            <div className="flex flex-wrap gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+              <span>{msg.data.agentName}</span><span>·</span><span>{msg.data.role}</span><span>·</span><span>{msg.data.model}</span>
+            </div>
+            {(msg.data.ragContexts?.length ?? 0) > 0 && (
+              <p className="mt-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 사용</p>
+            )}
+          </div>
+        )}
+        {!isUser && msg.kind === "debate" && msg.data && (
+          <div className="mt-2 space-y-2">
+            {(msg.data.turns ?? []).map((turn: any, index: number) => (
+              <div key={`${turn.round}-${turn.agent}-${index}`} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.92)", border: `1px solid ${BORDER}` }}>
+                <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>
+                  <span>Round {turn.round}</span><span>·</span><span>{turn.agent}</span><span>·</span><span>{turn.role}</span>
+                  <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(65,67,27,0.08)" }}>{turn.model}</span>
+                </div>
+                <p className="whitespace-pre-wrap text-[10px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>{compactAiAnswer(turn.message, 700)}</p>
+              </div>
+            ))}
+            {(msg.data.ragContexts?.length ?? 0) > 0 && (
+              <p className="px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 · 실행 {msg.data.executedRounds}/{msg.data.maxRounds} 라운드</p>
+            )}
+          </div>
+        )}
         <span className="text-[8px] px-1 mt-0.5" style={{ color: TEXT_TERTIARY }}>{formatTime(msg.time)}</span>
       </div>
     </div>
@@ -649,12 +679,7 @@ export function ChatPage({
   projectId?: number | null;
   onDocsUpdate?: (count: number) => void;
 }) {
-  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const [mainTab,      setMainTab]      = useState<"chat" | "ai" | "docs">("chat");
   const [partTab,      setPartTab]      = useState<PartId>("all");
@@ -680,15 +705,13 @@ export function ChatPage({
   const [micOn,        setMicOn]        = useState(false);
   const [typing,       setTyping]       = useState(false);
   const [aiTyping,     setAITyping]     = useState(false);
-  const [aiMessages,   setAIMessages]   = useState<AIMsg[]>([
-    {
-      id: genId(),
-      role: "ai",
-      content: "안녕하세요! WE&AI 프로젝트 AI 어시스턴트입니다.\n\n이 탭은 /api/v1/ai/chat 기반으로 프로젝트 문서와 RAG 컨텍스트를 참고해 답변합니다.\n\n예: \"프로젝트 핵심 API 설명해줘\", \"최근 일정 진행 상황 요약해줘\", \"마일스톤 현황 알려줘\"",
-      time: new Date().toISOString(),
-      kind: "text",
-    },
-  ]);
+  const [aiMessages,   setAIMessages]   = useState<AIMsg[]>([]);
+  const [aiMode, setAiMode] = useState<"rag" | "agent" | "debate">("rag");
+  const [agents, setAgents] = useState<AiAgent[]>([]);
+  const [selectedAgents, setSelectedAgents] = useState<AiAgentKey[]>(["ORACLE", "BACKEND"]);
+  const [singleAgent, setSingleAgent] = useState<AiAgentKey>("ORACLE");
+  const [maxRounds, setMaxRounds] = useState(2);
+  const [ragMaxResults, setRagMaxResults] = useState(4);
 
   // ── 브리핑 상태 ──
   const [briefingLoading, setBriefingLoading] = useState<string | null>(null);
@@ -712,6 +735,13 @@ export function ChatPage({
   }, [isMeeting]);
 
   useEffect(() => { onDocsUpdate?.(docs.length); }, [docs.length]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    void fetchAiAgents()
+      .then((result) => setAgents(result))
+      .catch((error) => toast.error(error instanceof Error ? error.message : "AI 에이전트 목록을 불러오지 못했습니다."));
+  }, [projectId]);
 
   const addPartMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
@@ -752,18 +782,22 @@ export function ChatPage({
     setAITyping(true);
 
     try {
-      const response = await runAiChat({
-        projectId,
-        question: text,
-      });
-      const aiMsg: AIMsg = {
-        id: genId(),
-        role: "ai",
-        content: formatAiChatAnswer(response),
-        time: new Date().toISOString(),
-        kind: "text",
-        data: response,
-      };
+      let aiMsg: AIMsg;
+      if (aiMode === "rag") {
+        const response = await runAiChat({ projectId, question: text });
+        aiMsg = { id: genId(), role: "ai", content: formatAiChatAnswer(response), time: new Date().toISOString(), kind: "rag", data: response };
+      } else if (aiMode === "agent") {
+        const response = await askAiAgent(singleAgent, buildEditorContext(projectId, text, ragMaxResults));
+        aiMsg = { id: genId(), role: "ai", content: formatSingleAgentAnswer(response), time: new Date().toISOString(), kind: "agent", data: response };
+      } else {
+        if (selectedAgents.length === 0) throw new Error("토론에 참여할 에이전트를 한 명 이상 선택해 주세요.");
+        const response = await runCustomAiDebate({
+          context: buildEditorContext(projectId, text, ragMaxResults),
+          agents: selectedAgents,
+          maxRounds,
+        });
+        aiMsg = { id: genId(), role: "ai", content: formatDebateSummary(response), time: new Date().toISOString(), kind: "debate", data: response };
+      }
       setAIMessages(prev => [...prev, aiMsg]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "AI 채팅 요청에 실패했습니다.");
@@ -777,6 +811,29 @@ export function ChatPage({
     if (!text || aiTyping) return;
     setAIInput("");
     void sendAiQuestion(text);
+  };
+
+  const availableAgents = agents.length > 0 ? agents : DEFAULT_AI_AGENTS;
+
+  const updateDebateAgentCount = (count: number) => {
+    const ordered = availableAgents.map(agent => agent.agent);
+    setSelectedAgents(current => {
+      const next = current.filter(agent => ordered.includes(agent)).slice(0, count);
+      for (const agent of ordered) {
+        if (next.length >= count) break;
+        if (!next.includes(agent)) next.push(agent);
+      }
+      return next;
+    });
+  };
+
+  const toggleDebateAgent = (agent: AiAgentKey) => {
+    setSelectedAgents(current => {
+      if (current.includes(agent)) {
+        return current.length === 1 ? current : current.filter(item => item !== agent);
+      }
+      return [...current, agent];
+    });
   };
 
   // ── 파일 공유 (일반) ──
@@ -1110,7 +1167,11 @@ export function ChatPage({
               </div>
               <div>
                 <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>WE&AI Project Assistant</p>
-                <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG Chat · /api/v1/ai/chat 연동</p>
+                <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                  {aiMode === "rag" && "프로젝트 RAG 질의"}
+                  {aiMode === "agent" && "선택 에이전트 단독 분석"}
+                  {aiMode === "debate" && `${selectedAgents.length}명 · 최대 ${maxRounds}라운드 심화 토론`}
+                </p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: UI_GREEN }} />
@@ -1118,30 +1179,125 @@ export function ChatPage({
               </div>
             </div>
 
-            <div
-              className="flex items-center gap-2 px-3 py-2 shrink-0 overflow-x-auto"
-              style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}
-            >
-              {isLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="w-24 h-6 rounded-full shrink-0" />
-                ))
-              ) : (
-                [
-                  "프로젝트 핵심 API 설명해줘", "최근 일정 진행 상황 요약해줘", "마일스톤 현황 알려줘",
-                  "백엔드 진행률 알려줘", "기술 스택 정리해줘", "최근 활동 요약해줘",
-                ].map(q => (
+            <div className="shrink-0 px-3 py-2.5 space-y-2" style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}>
+              <div className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ background: "rgba(65,67,27,0.07)" }}>
+                {([
+                  ["rag", "RAG 질문"],
+                  ["agent", "단일 AI"],
+                  ["debate", "AI 토론"],
+                ] as const).map(([mode, label]) => (
                   <button
-                    key={q}
-                    onClick={() => { if (!aiTyping) void sendAiQuestion(q); }}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-medium whitespace-nowrap shrink-0 transition-all"
-                    style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(65,67,27,0.14)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(65,67,27,0.07)"; }}
+                    key={mode}
+                    onClick={() => setAiMode(mode)}
+                    disabled={aiTyping}
+                    className="rounded-lg px-2 py-1.5 text-[9px] font-semibold transition-all disabled:opacity-50"
+                    style={{
+                      color: aiMode === mode ? "white" : TEXT_SECONDARY,
+                      background: aiMode === mode ? OLIVE_DARK : "transparent",
+                    }}
                   >
-                    {q}
+                    {label}
                   </button>
-                ))
+                ))}
+              </div>
+
+              {aiMode === "agent" && (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {availableAgents.map(agent => (
+                    <button
+                      key={agent.agent}
+                      onClick={() => setSingleAgent(agent.agent)}
+                      disabled={aiTyping}
+                      className="rounded-xl px-2.5 py-2 text-left transition-all disabled:opacity-50"
+                      style={{
+                        border: `1px solid ${singleAgent === agent.agent ? OLIVE_DARK : BORDER}`,
+                        background: singleAgent === agent.agent ? "rgba(65,67,27,0.09)" : "rgba(255,255,255,0.8)",
+                      }}
+                    >
+                      <span className="block text-[9px] font-bold" style={{ color: TEXT_PRIMARY }}>{agent.name}</span>
+                      <span className="block truncate text-[8px]" style={{ color: TEXT_TERTIARY }}>{agent.role} · {agent.model}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {aiMode === "debate" && (
+                <>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <label className="text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
+                      참여 인원
+                      <select
+                        value={selectedAgents.length}
+                        onChange={event => updateDebateAgentCount(Number(event.target.value))}
+                        disabled={aiTyping}
+                        className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
+                        style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                      >
+                        {availableAgents.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1}명</option>)}
+                      </select>
+                    </label>
+                    <label className="text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
+                      심화 토론
+                      <select
+                        value={maxRounds}
+                        onChange={event => setMaxRounds(Number(event.target.value))}
+                        disabled={aiTyping}
+                        className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
+                        style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                      >
+                        {[1, 2, 3, 4, 5].map(round => <option key={round} value={round}>{round}라운드</option>)}
+                      </select>
+                    </label>
+                    <label className="text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
+                      RAG 문서
+                      <select
+                        value={ragMaxResults}
+                        onChange={event => setRagMaxResults(Number(event.target.value))}
+                        disabled={aiTyping}
+                        className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
+                        style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                      >
+                        {[2, 4, 6, 8, 10, 12].map(count => <option key={count} value={count}>{count}개</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {availableAgents.map(agent => {
+                      const selected = selectedAgents.includes(agent.agent);
+                      return (
+                        <button
+                          key={agent.agent}
+                          onClick={() => toggleDebateAgent(agent.agent)}
+                          disabled={aiTyping}
+                          title={`${agent.role} · ${agent.model}`}
+                          className="rounded-lg px-1.5 py-1.5 text-[8px] font-semibold transition-all disabled:opacity-50"
+                          style={{
+                            border: `1px solid ${selected ? OLIVE_DARK : BORDER}`,
+                            color: selected ? OLIVE_DARK : TEXT_TERTIARY,
+                            background: selected ? "rgba(65,67,27,0.10)" : "white",
+                          }}
+                        >
+                          {agent.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {aiMode === "agent" && (
+                <label className="flex items-center justify-between text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
+                  RAG 검색 문서 수
+                  <select
+                    value={ragMaxResults}
+                    onChange={event => setRagMaxResults(Number(event.target.value))}
+                    disabled={aiTyping}
+                    className="rounded-lg px-2 py-1 text-[9px] outline-none"
+                    style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                  >
+                    {[2, 4, 6, 8, 10, 12].map(count => <option key={count} value={count}>{count}개</option>)}
+                  </select>
+                </label>
               )}
             </div>
 
@@ -1153,6 +1309,15 @@ export function ChatPage({
                 </div>
               ) : (
                 <>
+                  {aiMessages.length === 0 && (
+                    <div className="mx-auto mt-8 max-w-xs rounded-2xl px-4 py-5 text-center" style={{ border: `1px dashed ${BORDER}`, background: "rgba(255,255,255,0.65)" }}>
+                      <Bot className="mx-auto mb-2 h-5 w-5" style={{ color: OLIVE_DARK }} />
+                      <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>실제 AI 응답만 표시됩니다</p>
+                      <p className="mt-1 text-[9px] leading-relaxed" style={{ color: TEXT_TERTIARY }}>
+                        모드를 고르고 질문을 입력하세요. 단일 AI와 토론 모드에서는 에이전트별 역할과 모델도 함께 확인할 수 있습니다.
+                      </p>
+                    </div>
+                  )}
                   {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
                   {aiTyping && (
                     <div className="flex gap-2.5 items-start mb-4">
@@ -1186,7 +1351,13 @@ export function ChatPage({
                   onChange={e => setAIInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAISend(); } }}
                   disabled={isLoading}
-                  placeholder="프로젝트 AI에게 질문하세요... (예: 지수님 프로필 보여줘)"
+                  placeholder={
+                    aiMode === "rag"
+                      ? "프로젝트 문서를 기반으로 질문하세요..."
+                      : aiMode === "agent"
+                        ? `${availableAgents.find(agent => agent.agent === singleAgent)?.name ?? "AI"}에게 분석을 요청하세요...`
+                        : `${selectedAgents.length}명의 AI에게 토론시킬 주제를 입력하세요...`
+                  }
                   rows={2}
                   className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
                   style={{ background: "transparent", color: TEXT_PRIMARY }}
@@ -1255,3 +1426,4 @@ export function ChatPage({
     </div>
   );
 }
+

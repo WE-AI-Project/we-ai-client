@@ -35,6 +35,39 @@ export type DebateRequest = {
   userQuery: string;
 };
 
+export type AiAgentKey = "ORACLE" | "BACKEND" | "FRONTEND" | "INSPECTOR";
+
+export type AiAgent = {
+  agent: AiAgentKey;
+  name: string;
+  role: string;
+  model: string;
+};
+
+export type EditorContextRequest = DebateRequest & {
+  ragMaxResults?: number;
+};
+
+export type CustomDebateRequest = {
+  context: EditorContextRequest;
+  agents: AiAgentKey[];
+  maxRounds: number;
+};
+
+export type SingleAgentResponse = {
+  projectId: number;
+  agent: AiAgentKey;
+  agentName: string;
+  role: string;
+  model: string;
+  fileName: string;
+  cursorLine: number;
+  userQuery: string;
+  answer: string;
+  markdown?: string;
+  ragContexts?: string[];
+};
+
 export type AiCommitRequest = {
   projectId?: number | null;
   diff: string;
@@ -171,4 +204,32 @@ async function aiRequest<T>(
     }
     throw error;
   }
+}
+
+export async function fetchAiAgents(): Promise<AiAgent[]> {
+  return aiRequest<AiAgent[]>("/api/v1/ai/agents", { method: "GET" });
+}
+
+export async function askAiAgent(agent: AiAgentKey, request: EditorContextRequest): Promise<SingleAgentResponse> {
+  return aiRequest<SingleAgentResponse>(`/api/v1/ai/agents/${agent}/ask`, {
+    method: "POST",
+    body: {
+      ...request,
+      projectId: resolveProjectId(request.projectId),
+    },
+  });
+}
+
+export async function runCustomAiDebate(request: CustomDebateRequest): Promise<DebateResponse> {
+  return aiRequest<DebateResponse>("/api/v1/ai/debate/custom", {
+    method: "POST",
+    body: {
+      context: {
+        ...request.context,
+        projectId: resolveProjectId(request.context.projectId),
+      },
+      agents: request.agents,
+      maxRounds: request.maxRounds,
+    },
+  });
 }

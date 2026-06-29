@@ -86,12 +86,7 @@ function getTime() {
 }
 
 export function ServerLogsPage() {
-  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const [logs, setLogs] = useState<LogEntry[]>(BOOT_LOGS.map((l, i) => ({ ...l, id: i })));
   const [running, setRunning] = useState(true);

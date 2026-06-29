@@ -82,12 +82,7 @@ function NotifItem({ notif, onRead }: { notif: Notif; onRead: (id: number) => vo
 }
 
 export function NotificationsPage() {
-  // 🚨 [추가] 초기 스켈레톤 로딩 상태 (3초 대기)
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const [todayNotifs, setTodayNotifs] = useState(TODAY_NOTIFS);
   const [yesterdayNotifs, setYesterdayNotifs] = useState(YESTERDAY_NOTIFS);

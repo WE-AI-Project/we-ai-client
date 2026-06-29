@@ -200,12 +200,7 @@ function EnvFileViewer({
 
 // ── 메인 ──
 export function EnvironmentSettingsPage() {
-  // 🚨 [추가] 초기 로딩 3초 타이머
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoading = false;
 
   const [envVars,        setEnvVars]        = useState<EnvVar[]>(() => loadEnvVars());
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
