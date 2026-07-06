@@ -435,6 +435,58 @@ export type ProjectDepartmentStatusList = {  //프로젝트 파트별 현황 조
   departments: DepartmentStatusDetail[];
 };
 
+export interface MyActivitySummary {  //내 활동 요약 조회
+  totalTasks: number;
+  completedTasks: number;
+  recentCommitsCount: number;
+  lastActivityDate?: string | null;
+}
+
+export async function fetchMyActivitySummary(projectId: number | string): Promise<MyActivitySummary> {  //내 활동 요약 조회
+  return request<MyActivitySummary>(`/api/v1/projects/${projectId}/dashboard/my-summary`);
+}
+
+export type MyActivity = {  //내 최근 활동 조회
+  activityId: number;
+  title: string;
+  description?: string | null;
+  activityType: string;
+  memberName: string;
+  createdAt: string;
+};
+
+export type MyActivityList = {  //내 최근 활동 조회
+  projectId: number;
+  activities: MyActivity[];
+};
+
+export async function fetchMyActivities(projectId: number | string): Promise<MyActivityList> {  //내 최근 활동 조회
+  return request<MyActivityList>(`/api/v1/projects/${projectId}/dashboard/my-activities`);
+}
+
+export type TechEntryInput = {  //내 프로필 수정
+  name: string;
+  slug: string;
+  variant: string;
+};
+
+export type ProfileUpdatePayload = {  //내 프로필 수정
+  displayName: string;
+  role: string;
+  email: string;
+  location: string;
+  bio: string;
+  avatarColor: string;
+  techStack: TechEntryInput[];
+};
+
+export async function updateMyProfile(payload: ProfileUpdatePayload): Promise<void> {  //내 프로필 수정
+  return request<void>("/api/v1/users/me/profile", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {  //프로젝트 파트별 현황 조회
   return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
 }

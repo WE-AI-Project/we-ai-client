@@ -16,11 +16,12 @@ import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
 } from "../colors";
+import { updateMyProfile } from "../lib/api"; // 🌟 실서버 연동 API 임포트
 
 type Props = {
-  profile:  ProfileData;
-  onSave:   (p: ProfileData) => void;
-  onClose:  () => void;
+  profile: ProfileData;
+  onSave: (p: ProfileData) => void;
+  onClose: () => void;
 };
 
 // ── 인풋 필드 ──
@@ -48,7 +49,7 @@ function Field({
           color: TEXT_PRIMARY,
         }}
         onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "60")}
-        onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
+        onBlur={e => (e.currentTarget.style.borderColor = BORDER)}
       />
     </div>
   );
@@ -79,7 +80,7 @@ function TextAreaField({
           color: TEXT_PRIMARY,
         }}
         onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "60")}
-        onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
+        onBlur={e => (e.currentTarget.style.borderColor = BORDER)}
       />
     </div>
   );
@@ -105,11 +106,11 @@ function DeviconImg({ slug, variant, size = 20 }: { slug: string; variant: strin
 
 // ── 메인 ProfileEditModal ──
 export function ProfileEditModal({ profile, onSave, onClose }: Props) {
-  const [form,      setForm]      = useState<ProfileData>({ ...profile });
-  const [saving,    setSaving]    = useState(false);
-  const [visible,   setVisible]   = useState(false);
-  const [techTab,   setTechTab]   = useState<string>("All");
-  const [search,    setSearch]    = useState("");
+  const [form, setForm] = useState<ProfileData>({ ...profile });
+  const [saving, setSaving] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [techTab, setTechTab] = useState<string>("All");
+  const [search, setSearch] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // 마운트 시 진입 애니메이션
@@ -150,14 +151,32 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
   const removeTech = (slug: string) =>
     setForm(f => ({ ...f, techStack: f.techStack.filter(t => t.slug !== slug) }));
 
-  const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => {
+  // ── 🌟 실서버 저장을 반영한 handleSave 수정 ──
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+
+      // 1. 실제 백엔드 데이터베이스 서버에 동기화 패치 요청
+      await updateMyProfile({
+        displayName: form.displayName,
+        role: form.role,
+        email: form.email,
+        location: form.location,
+        bio: form.bio,
+        avatarColor: form.avatarColor,
+        techStack: form.techStack,
+      });
+
+      // 2. 서버 통신 성공 시 브라우저 내 로컬 데이터 교체 및 모달 닫기
       saveProfile(form);
       onSave(form);
-      setSaving(false);
       handleClose();
-    }, 500);
+    } catch (err) {
+      console.error("프로필 수정 실서버 동기화 실패:", err);
+      alert("프로필 정보를 서버에 안전하게 저장하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── devicon 필터 ──
@@ -205,7 +224,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
           {/* 아바타 미리보기 */}
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: gradBg }}
+            style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.via}, ${grad.to})` }}
           >
             <User className="w-5 h-5 text-white" style={{ opacity: 0.85 }} />
           </div>
@@ -234,12 +253,12 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
               기본 정보
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="이름"        icon={User}      value={form.displayName} onChange={set("displayName")} placeholder="홍길동" />
-              <Field label="역할 / 직책" icon={Briefcase} value={form.role}        onChange={set("role")}        placeholder="Student Developer" />
+              <Field label="이름" icon={User} value={form.displayName} onChange={set("displayName")} placeholder="홍길동" />
+              <Field label="역할 / 직책" icon={Briefcase} value={form.role} onChange={set("role")} placeholder="Student Developer" />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="이메일"      icon={Mail}      value={form.email}       onChange={set("email")}       placeholder="user@example.com" type="email" />
-              <Field label="위치"        icon={MapPin}    value={form.location}    onChange={set("location")}    placeholder="Seoul, Korea" />
+              <Field label="이메일" icon={Mail} value={form.email} onChange={set("email")} placeholder="user@example.com" type="email" />
+              <Field label="위치" icon={MapPin} value={form.location} onChange={set("location")} placeholder="Seoul, Korea" />
             </div>
             <TextAreaField
               label="자기소개"
@@ -265,12 +284,13 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                 return (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setForm(f => ({ ...f, avatarColor: key }))}
                     className="w-9 h-9 rounded-xl transition-all relative"
                     style={{
                       background: bg,
                       border: active ? `2px solid ${ACCENT}` : "2px solid transparent",
-                      boxShadow: active ? `0 0 0 2px ${ACCENT_BORDER}` : "none",
+                      boxShadow: active ? `0 0 0 2px rgba(0,0,0,0.1)` : "none",
                       transform: active ? "scale(1.12)" : "scale(1)",
                     }}
                     title={key}
@@ -297,9 +317,10 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                 기술 스택
               </p>
               <button
+                type="button"
                 onClick={() => setPickerOpen(p => !p)}
                 className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all"
-                style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
+                style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid rgba(0,0,0,0.05)` }}
               >
                 <Search className="w-3 h-3" />
                 {pickerOpen ? "닫기" : "기술 선택"}
@@ -319,7 +340,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                     className="flex items-center gap-1.5 px-2 py-1 rounded-lg"
                     style={{
                       background: ACCENT_BG,
-                      border: `1px solid ${ACCENT_BORDER}`,
+                      border: `1px solid ${BORDER_SUBTLE}`,
                     }}
                   >
                     {tech.slug ? (
@@ -329,6 +350,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                     )}
                     <span className="text-[10px] font-medium" style={{ color: TEXT_PRIMARY }}>{tech.name}</span>
                     <button
+                      type="button"
                       onClick={() => removeTech(tech.slug || tech.name)}
                       className="ml-0.5 hover:opacity-60 transition-opacity"
                       style={{ color: TEXT_TERTIARY }}
@@ -361,7 +383,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                     autoFocus
                   />
                   {search && (
-                    <button onClick={() => setSearch("")} className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                    <button type="button" onClick={() => setSearch("")} className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
                       <X className="w-3 h-3" />
                     </button>
                   )}
@@ -375,11 +397,12 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                   {DEVICON_CATEGORIES.map(cat => (
                     <button
                       key={cat}
+                      type="button"
                       onClick={() => setTechTab(cat)}
                       className="text-[9px] font-semibold px-2.5 py-1 rounded-full shrink-0 transition-all"
                       style={{
                         background: techTab === cat ? ACCENT : "rgba(0,0,0,0.04)",
-                        color:      techTab === cat ? "white" : TEXT_SECONDARY,
+                        color: techTab === cat ? "white" : TEXT_SECONDARY,
                       }}
                     >
                       {cat}
@@ -400,6 +423,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                         return (
                           <button
                             key={icon.slug}
+                            type="button"
                             onClick={() => toggleTech(icon)}
                             className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all relative"
                             style={{
@@ -407,12 +431,6 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
                               border: `1px solid ${sel ? ACCENT_BORDER : "transparent"}`,
                             }}
                             title={icon.name}
-                            onMouseEnter={e => {
-                              if (!sel) e.currentTarget.style.background = "rgba(0,0,0,0.04)";
-                            }}
-                            onMouseLeave={e => {
-                              if (!sel) e.currentTarget.style.background = "transparent";
-                            }}
                           >
                             {sel && (
                               <div
@@ -462,22 +480,22 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
           style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}
         >
           <button
+            type="button"
             onClick={handleClose}
             className="px-4 py-2 rounded-xl text-xs font-semibold transition-all"
             style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.09)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,0,0,0.05)")}
           >
             취소
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
             style={{
               background: saving ? "rgba(0,0,0,0.07)" : ACCENT,
               color: saving ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
-              boxShadow: saving ? "none" : "0 4px 14px rgba(65,67,27,0.28)",
+              boxShadow: saving ? "none" : "0 4px 14px rgba(0,0,0,0.15)",
             }}
           >
             <Save className="w-3.5 h-3.5" />
