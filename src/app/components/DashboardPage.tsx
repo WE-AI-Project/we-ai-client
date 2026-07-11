@@ -45,6 +45,10 @@ import {
   ProjectMilestone,
   DepartmentStatusDetail,
   formatApiError,
+  fetchMyActivitySummary,
+  MyActivitySummary,
+  fetchMyActivities,
+  MyActivity,
 } from "../lib/api";
 
 // ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -111,6 +115,12 @@ export function DashboardPage({ projectId, projectName }: Props) {
   const [progressStats, setProgressStats] = useState<ProjectProgressStats | null>(null);
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
   const [deptStatus, setDeptStatus] = useState<DepartmentStatusDetail[]>([]); 
+  
+  // 내 활동 요약 상태 관리 추가
+  const [mySummary, setMySummary] = useState<MyActivitySummary | null>(null);
+  // 내 최근 활동
+  const [myActivities, setMyActivities] = useState<MyActivity[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,6 +135,8 @@ export function DashboardPage({ projectId, projectName }: Props) {
       setProgressStats(null);
       setMilestones([]);
       setDeptStatus([]);
+      setMySummary(null);
+      setMyActivities([]);
       setLoading(false);
       return;
     }
@@ -132,6 +144,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
     setLoading(true);
 
     try {
+      // 1. 기존 오리지널 데이터 Fetch (순서 절대 변경 금지)
       const [nextDashboard, activityList, nextProgress, milestoneList, deptStatusList] = await Promise.all([
         fetchProjectDashboard(projectId),
         fetchProjectActivities(projectId),
@@ -146,6 +159,21 @@ export function DashboardPage({ projectId, projectName }: Props) {
       setMilestones(milestoneList.milestones || []);
       setDeptStatus(deptStatusList.departments || []); 
       setError(null);
+
+      try {
+        const mySummaryData = await fetchMyActivitySummary(projectId);
+        setMySummary(mySummaryData);
+      } catch (summaryError) {
+        console.warn("내 활동 요약 정보를 불러오지 못했습니다.", summaryError);
+      }
+
+      try {
+        const myActivitiesData = await fetchMyActivities(projectId);
+        setMyActivities(myActivitiesData.activities || []);
+      } catch (activitiesError) {
+        console.warn("내 최근 활동 내역을 불러오지 못했습니다.", activitiesError);
+      }
+
     } catch (loadError) {
       setError(formatApiError(loadError));
     } finally {
@@ -285,6 +313,60 @@ export function DashboardPage({ projectId, projectName }: Props) {
               <StatCard label="Progress" value={progressLabel} tone={ACCENT} />
             </>
           )}
+        </section>
+
+        {/* ── 🌟 [새로 추가됨] 내 활동 요약 정보 섹션 ── */}
+        <section
+          className="rounded-[28px] border px-5 py-5"
+          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+        >
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="h-4 w-4" style={{ color: ACCENT }} />
+            <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+              나의 활동 요약
+            </h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {showSkeleton ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <Skeleton className="w-20 h-3 mb-4" />
+                  <Skeleton className="w-16 h-7" />
+                </div>
+              ))
+            ) : mySummary ? (
+              <>
+                <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+                    My Total Tasks
+                  </p>
+                  <p className="mt-3 text-2xl font-bold" style={{ color: ACCENT }}>
+                    {mySummary.totalTasks ?? 0} 개
+                  </p>
+                </div>
+                <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+                    My Completed Tasks
+                  </p>
+                  <p className="mt-3 text-2xl font-bold" style={{ color: "#5A8A4A" }}>
+                    {mySummary.completedTasks ?? 0} 개
+                  </p>
+                </div>
+                <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+                    My Recent Commits
+                  </p>
+                  <p className="mt-3 text-2xl font-bold" style={{ color: "#C09840" }}>
+                    {mySummary.recentCommitsCount ?? 0} 회
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm py-2 col-span-full" style={{ color: TEXT_TERTIARY }}>
+                불러온 내 활동 요약 정보가 존재하지 않습니다.
+              </p>
+            )}
+          </div>
         </section>
 
         {/* ── 진행률 통계 트렌드 차트 ── */}
@@ -460,6 +542,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
           </div>
         </section>
 
+        {/* ── 파트별 상세 현황 ── */}
         <section
           className="rounded-[28px] border px-5 py-5"
           style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
@@ -473,7 +556,6 @@ export function DashboardPage({ projectId, projectName }: Props) {
 
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             {showSkeleton ? (
-              /* [스켈레톤] 파트별 카드 홀더 */
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="rounded-2xl border px-4 py-4 space-y-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
                   <div className="flex justify-between">
@@ -621,13 +703,13 @@ export function DashboardPage({ projectId, projectName }: Props) {
           <div className="mb-4 flex items-center gap-2">
             <Activity className="h-4 w-4" style={{ color: ACCENT }} />
             <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-              최근 활동
+              나의 최근 활동
             </h2>
           </div>
 
           <div className="space-y-3">
             {showSkeleton ? (
-              Array.from({ length: 3 }).map((_, i) => (
+              Array.from({ length: 2 }).map((_, i) => (
                 <div key={i} className="rounded-2xl border px-4 py-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-2 flex-1 pt-1">
@@ -638,12 +720,12 @@ export function DashboardPage({ projectId, projectName }: Props) {
                   </div>
                 </div>
               ))
-            ) : activities.length === 0 ? (
-              <p className="text-sm" style={{ color: TEXT_TERTIARY }}>
-                아직 기록된 최근 활동이 없습니다.
+            ) : myActivities.length === 0 ? (
+              <p className="text-sm text-center py-4" style={{ color: TEXT_TERTIARY }}>
+                아직 기록된 나의 최근 활동이 없습니다.
               </p>
             ) : (
-              activities.map((activity) => (
+              myActivities.map((activity) => (
                 <div
                   key={activity.activityId}
                   className="rounded-2xl border px-4 py-3"
@@ -660,15 +742,12 @@ export function DashboardPage({ projectId, projectName }: Props) {
                         </p>
                       )}
                       <p className="mt-1 text-[11px]" style={{ color: TEXT_TERTIARY }}>
-                        작성자: {activity.memberName} · {activity.createdAt}
+                        일시: {activity.createdAt}
                       </p>
                     </div>
                     <span
                       className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                      style={{
-                        color: activity.activityType === "COMMIT" ? "#5A8A4A" : ACCENT,
-                        background: activity.activityType === "COMMIT" ? "rgba(90,138,74,0.12)" : ACCENT_BG,
-                      }}
+                      style={{ color: ACCENT, background: ACCENT_BG }}
                     >
                       {activity.activityType}
                     </span>

@@ -7,8 +7,9 @@ import {
 import { ProfileEditModal } from "./ProfileEditModal";
 import { loadProfile, ProfileData, AVATAR_GRADIENTS } from "../data/profileStore";
 import { deviconUrl } from "../data/devicons";
+import { fetchCurrentUser } from "../lib/api"; // 🌟 실서버 유저 조회 API 동기화 임포트
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+// ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -131,7 +132,6 @@ function useSystemStats() {
   return { fps, renderLoad, cpuCores, heapUsed, heapTotal, deviceMemoryGB, network };
 }
 
-// ── Devicon 아이콘 이미지 ──
 function TechBadge({ name, slug, variant }: { name: string; slug: string; variant: string }) {
   const [err, setErr] = useState(false);
   const url = slug ? deviconUrl(slug, variant) : "";
@@ -158,15 +158,32 @@ function TechBadge({ name, slug, variant }: { name: string; slug: string; varian
   );
 }
 
-// ──────────────────────────────────────────
-// 메인 ProfilePage
-// ──────────────────────────────────────────
+// ── 메인 ProfilePage ──
 export function ProfilePage() {
   const isLoading = false;
 
   const stats = useSystemStats();
   const [profile, setProfile] = useState<ProfileData>(loadProfile);
   const [editOpen, setEditOpen] = useState(false);
+
+  // 🌟 페이지 마운트 시 실서버 세션의 최신 로그인 유저 정보 동기화
+  useEffect(() => {
+    const syncUserSession = async () => {
+      try {
+        const sessionUser = await fetchCurrentUser();
+        if (sessionUser) {
+          setProfile(prev => ({
+            ...prev,
+            displayName: sessionUser.name || prev.displayName,
+            email: sessionUser.email || prev.email,
+          }));
+        }
+      } catch (e) {
+        console.warn("실서버 최신 세션 계정 정보를 동기화하지 못했습니다.", e);
+      }
+    };
+    void syncUserSession();
+  }, []);
 
   const memPct = stats.heapTotal > 0
     ? Math.round((stats.heapUsed / stats.heapTotal) * 100)
@@ -191,7 +208,6 @@ export function ProfilePage() {
           <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}` }}>
             <div className="flex items-start gap-5">
               {isLoading ? (
-                /* [스켈레톤] 아바타 */
                 <Skeleton className="w-20 h-20 rounded-2xl shrink-0" />
               ) : (
                 <div
@@ -204,7 +220,6 @@ export function ProfilePage() {
               
               <div className="flex-1 min-w-0">
                 {isLoading ? (
-                  /* [스켈레톤] 프로필 정보 */
                   <>
                     <div className="flex items-center gap-3 mb-3">
                       <Skeleton className="h-6 w-32" />
@@ -228,7 +243,6 @@ export function ProfilePage() {
                         {profile.role}
                       </span>
                     </div>
-                    {/* 자기소개 */}
                     {profile.bio && (
                       <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: TEXT_SECONDARY }}>
                         {profile.bio}
@@ -264,8 +278,6 @@ export function ProfilePage() {
                     border: `1px solid ${ACCENT_BORDER}`,
                     color: ACCENT,
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(65,67,27,0.12)")}
-                  onMouseLeave={e => (e.currentTarget.style.background = ACCENT_BG)}
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Edit Profile
@@ -277,7 +289,6 @@ export function ProfilePage() {
           {/* ── 통계 카드 ── */}
           <div className="grid grid-cols-4 gap-2.5">
             {isLoading ? (
-              /* [스켈레톤] 통계 카드 4개 */
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                   <Skeleton className="h-6 w-10 mb-2" />
@@ -309,7 +320,6 @@ export function ProfilePage() {
 
             <div className="p-5 grid grid-cols-3 gap-4">
               {isLoading ? (
-                /* [스켈레톤] 모니터 카드 3개 */
                 Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="rounded-xl p-4 bg-black/5 border border-black/5 space-y-4">
                     <div className="flex justify-between items-center">
@@ -317,10 +327,6 @@ export function ProfilePage() {
                       <Skeleton className="w-10 h-4" />
                     </div>
                     <Skeleton className="w-full h-1.5 rounded-full" />
-                    <div className="space-y-2">
-                      <div className="flex justify-between"><Skeleton className="w-16 h-2.5" /><Skeleton className="w-12 h-2.5" /></div>
-                      <div className="flex justify-between"><Skeleton className="w-16 h-2.5" /><Skeleton className="w-12 h-2.5" /></div>
-                    </div>
                   </div>
                 ))
               ) : (
@@ -448,7 +454,6 @@ export function ProfilePage() {
               </div>
               <div className="space-y-2.5">
                 {isLoading ? (
-                  /* [스켈레톤] Dev Env */
                   Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="flex justify-between items-center">
                       <Skeleton className="w-16 h-3" />
@@ -473,7 +478,7 @@ export function ProfilePage() {
               </div>
             </div>
 
-            {/* Tech Stack — devicon 아이콘 표시 */}
+            {/* Tech Stack */}
             <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.80)", border: `1px solid ${BORDER}` }}>
               <div className="flex items-center gap-2 mb-4">
                 <Code2 className="w-3.5 h-3.5" style={{ color: ACCENT }} />
@@ -490,7 +495,6 @@ export function ProfilePage() {
               </div>
               
               {isLoading ? (
-                /* [스켈레톤] Tech Stack 배지 */
                 <div className="flex flex-wrap gap-1.5">
                   {Array.from({ length: 7 }).map((_, i) => (
                     <Skeleton key={i} className="w-20 h-7 rounded-xl" />
@@ -516,14 +520,10 @@ export function ProfilePage() {
             <p className="text-xs font-semibold mb-4" style={{ color: TEXT_PRIMARY }}>Recent Activity</p>
             <div className="space-y-3">
               {isLoading ? (
-                /* [스켈레톤] 최근 활동 리스트 */
                 Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <Skeleton className="w-6 h-6 rounded-lg shrink-0 mt-0.5" />
-                    <div className="flex-1 space-y-1.5 pt-1">
-                      <Skeleton className="h-3 w-3/4" />
-                    </div>
-                    <Skeleton className="w-12 h-2.5 shrink-0 mt-1" />
+                    <Skeleton className="h-3 w-3/4" />
                   </div>
                 ))
               ) : (
