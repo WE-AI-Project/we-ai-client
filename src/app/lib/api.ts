@@ -435,6 +435,26 @@ export type ProjectDepartmentStatusList = {  //프로젝트 파트별 현황 조
   departments: DepartmentStatusDetail[];
 };
 
+export async function fetchProjectScheduleDetail(  //프로젝트 일정 상세 조회
+  projectId: number | string,
+  scheduleId: number | string
+): Promise<ProjectSchedule> {
+  return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
+    method: "GET",
+  });
+}
+
+export async function updateProjectScheduleStatus(  //프로젝트 일정 상태 변경
+  projectId: number | string,
+  scheduleId: number | string,
+  payload: ProjectScheduleStatusUpdatePayload
+): Promise<ProjectSchedule> {
+  return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}/status`, {
+    method: "PATCH",
+    body: payload, 
+  });
+}
+
 export interface MyActivitySummary {  //내 활동 요약 조회
   totalTasks: number;
   completedTasks: number;
@@ -442,8 +462,10 @@ export interface MyActivitySummary {  //내 활동 요약 조회
   lastActivityDate?: string | null;
 }
 
-export async function fetchMyActivitySummary(projectId: number | string): Promise<MyActivitySummary> {  //내 활동 요약 조회
-  return request<MyActivitySummary>(`/api/v1/projects/${projectId}/dashboard/my-summary`);
+export async function fetchMyActivitySummary(): Promise<MyActivitySummary> {  //내 활동 요약 조회
+  return request<MyActivitySummary>('/api/v1/users/me/activity-summary', {
+    method: 'GET'
+  });
 }
 
 export type MyActivity = {  //내 최근 활동 조회
@@ -455,13 +477,10 @@ export type MyActivity = {  //내 최근 활동 조회
   createdAt: string;
 };
 
-export type MyActivityList = {  //내 최근 활동 조회
-  projectId: number;
-  activities: MyActivity[];
-};
+export type MyActivityListResponse = MyActivity[];  //내 최근 활동 조회
 
-export async function fetchMyActivities(projectId: number | string): Promise<MyActivityList> {  //내 최근 활동 조회
-  return request<MyActivityList>(`/api/v1/projects/${projectId}/dashboard/my-activities`);
+export async function fetchMyActivities(): Promise<MyActivity[]> {  //내 최근 활동 조회
+  return request<MyActivity[]>('/api/v1/users/me/recent-activities');
 }
 
 export type TechEntryInput = {  //내 프로필 수정
@@ -1081,17 +1100,6 @@ export async function updateProjectSchedule(
   payload: ProjectScheduleUpdatePayload
 ): Promise<ProjectSchedule> {
   return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
-    method: "PATCH",
-    body: payload,
-  });
-}
-
-export async function updateProjectScheduleStatus(
-  projectId: number,
-  scheduleId: number,
-  payload: ProjectScheduleStatusUpdatePayload
-): Promise<ProjectSchedule> {
-  return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}/status`, {
     method: "PATCH",
     body: payload,
   });

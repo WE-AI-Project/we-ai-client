@@ -51,12 +51,12 @@ function DarkSkeleton({ className, style }: { className?: string; style?: React.
 
 // ── 워크스페이스 탭 정의 ──
 const WORKSPACE_TABS = [
-  { id: "home",     icon: LayoutDashboard, label: "Dashboard"      },
-  { id: "agents",   icon: Bot,             label: "Agents Control" },
-  { id: "terminal", icon: Terminal,        label: "Server Logs"    },
-  { id: "queue",    icon: ListTodo,        label: "Task Queue"     },
-  { id: "overview", icon: BarChart2,       label: "System Overview"},
-  { id: "build",    icon: Hammer,          label: "Build Tools"    },
+  { id: "home", icon: LayoutDashboard, label: "Dashboard" },
+  { id: "agents", icon: Bot, label: "Agents Control" },
+  { id: "terminal", icon: Terminal, label: "Server Logs" },
+  { id: "queue", icon: ListTodo, label: "Task Queue" },
+  { id: "overview", icon: BarChart2, label: "System Overview" },
+  { id: "build", icon: Hammer, label: "Build Tools" },
 ];
 
 // ── 프로젝트 목록 데이터 (Screen A) ──
@@ -87,49 +87,49 @@ const PROJECTS = [
 
 // ── Git 커밋 목록 (Screen B) ──
 const COMMITS = [
-  { hash: "7f2b1a", msg: "Fixed JDK 17 toolchain issue in settings.gradle",    author: "병권",  time: "2 hrs ago",  branch: "main"         },
-  { hash: "9c4d1e", msg: "Refactored Multi-Agent communication logic",          author: "Admin", time: "4 hrs ago",  branch: "feature/agent" },
-  { hash: "a3b8f2", msg: "Initial project setup",                               author: "System",time: "2 days ago", branch: "main"         },
+  { hash: "7f2b1a", msg: "Fixed JDK 17 toolchain issue in settings.gradle", author: "병권", time: "2 hrs ago", branch: "main" },
+  { hash: "9c4d1e", msg: "Refactored Multi-Agent communication logic", author: "Admin", time: "4 hrs ago", branch: "feature/agent" },
+  { hash: "a3b8f2", msg: "Initial project setup", author: "System", time: "2 days ago", branch: "main" },
 ];
 
 // ── 최근 변경 파일 목록 (Screen B) ──
 const RECENT_FILES = [
-  { path: "build.gradle",             fullPath: "D:\\WE_AI\\build.gradle",                               change: "Modified", time: "5 mins ago", ext: "gradle" },
-  { path: "MultiAgentController.java",  fullPath: "D:\\WE_AI\\src\\main\\java\\MultiAgentController.java",      change: "Added",    time: "1 hr ago",   ext: "java"   },
-  { path: "application-dev.yml",        fullPath: "D:\\WE_AI\\src\\main\\resources\\application-dev.yml",       change: "Modified", time: "3 hrs ago",  ext: "yml"    },
+  { path: "build.gradle", fullPath: "D:\\WE_AI\\build.gradle", change: "Modified", time: "5 mins ago", ext: "gradle" },
+  { path: "MultiAgentController.java", fullPath: "D:\\WE_AI\\src\\main\\java\\MultiAgentController.java", change: "Added", time: "1 hr ago", ext: "java" },
+  { path: "application-dev.yml", fullPath: "D:\\WE_AI\\src\\main\\resources\\application-dev.yml", change: "Modified", time: "3 hrs ago", ext: "yml" },
 ];
 
 // ── 에이전트 목록 ──
 const INITIAL_AGENTS = [
-  { id: "AGT-01", name: "DataSync Alpha",  status: "running", cpu: 42, mem: 61, task: "Fetching API endpoints",         uptime: "03:21:44" },
+  { id: "AGT-01", name: "DataSync Alpha", status: "running", cpu: 42, mem: 61, task: "Fetching API endpoints", uptime: "03:21:44" },
   { id: "AGT-02", name: "Classifier Beta", status: "running", cpu: 78, mem: 83, task: "Image classification batch #12", uptime: "01:05:09" },
-  { id: "AGT-03", name: "Logger Gamma",    status: "idle",    cpu: 3,  mem: 22, task: "—",                              uptime: "06:47:02" },
-  { id: "AGT-04", name: "Parser Delta",    status: "error",   cpu: 0,  mem: 0,  task: "JSON parse error – retrying",    uptime: "00:00:00" },
-  { id: "AGT-05", name: "Scheduler Eps",   status: "running", cpu: 19, mem: 38, task: "Queuing next task batch",        uptime: "02:13:55" },
-  { id: "AGT-06", name: "Analyzer Zeta",   status: "idle",    cpu: 5,  mem: 28, task: "—",                              uptime: "04:30:18" },
+  { id: "AGT-03", name: "Logger Gamma", status: "idle", cpu: 3, mem: 22, task: "—", uptime: "06:47:02" },
+  { id: "AGT-04", name: "Parser Delta", status: "error", cpu: 0, mem: 0, task: "JSON parse error – retrying", uptime: "00:00:00" },
+  { id: "AGT-05", name: "Scheduler Eps", status: "running", cpu: 19, mem: 38, task: "Queuing next task batch", uptime: "02:13:55" },
+  { id: "AGT-06", name: "Analyzer Zeta", status: "idle", cpu: 5, mem: 28, task: "—", uptime: "04:30:18" },
 ];
 
 // ── 로그 라인 ──
 const INITIAL_LOGS = [
-  { ts: "09:41:02", level: "INFO",  agent: "AGT-01", msg: "Connected to upstream API. Fetching /v2/data..." },
-  { ts: "09:41:03", level: "INFO",  agent: "AGT-02", msg: "Batch #12 loaded — 4,096 images queued." },
-  { ts: "09:41:05", level: "WARN",  agent: "AGT-04", msg: "Unexpected token '<' at position 0. Retrying in 5s." },
-  { ts: "09:41:07", level: "INFO",  agent: "AGT-05", msg: "Next task window scheduled: 09:45:00." },
+  { ts: "09:41:02", level: "INFO", agent: "AGT-01", msg: "Connected to upstream API. Fetching /v2/data..." },
+  { ts: "09:41:03", level: "INFO", agent: "AGT-02", msg: "Batch #12 loaded — 4,096 images queued." },
+  { ts: "09:41:05", level: "WARN", agent: "AGT-04", msg: "Unexpected token '<' at position 0. Retrying in 5s." },
+  { ts: "09:41:07", level: "INFO", agent: "AGT-05", msg: "Next task window scheduled: 09:45:00." },
   { ts: "09:41:10", level: "ERROR", agent: "AGT-04", msg: "Retry #3 failed. Escalating to supervisor." },
-  { ts: "09:41:12", level: "INFO",  agent: "AGT-01", msg: "Received 1,240 records. Transforming schema." },
-  { ts: "09:41:15", level: "INFO",  agent: "AGT-03", msg: "Log rotation complete. Archive: logs/20260330.gz" },
-  { ts: "09:41:18", level: "INFO",  agent: "AGT-02", msg: "Processed 512/4096 images (12.5%). ETA: 3m 20s." },
+  { ts: "09:41:12", level: "INFO", agent: "AGT-01", msg: "Received 1,240 records. Transforming schema." },
+  { ts: "09:41:15", level: "INFO", agent: "AGT-03", msg: "Log rotation complete. Archive: logs/20260330.gz" },
+  { ts: "09:41:18", level: "INFO", agent: "AGT-02", msg: "Processed 512/4096 images (12.5%). ETA: 3m 20s." },
 ];
 
 // ── 작업 대기열 ──
 const TASKS = [
-  { id: "T-001", name: "Schema Migration v3",      agent: "AGT-01", status: "done",       priority: "high",   created: "09:30", eta: "09:38" },
-  { id: "T-002", name: "Image Classification #12", agent: "AGT-02", status: "running",    priority: "high",   created: "09:35", eta: "09:45" },
-  { id: "T-003", name: "JSON Parse & Validate",    agent: "AGT-04", status: "error",      priority: "normal", created: "09:38", eta: "—"     },
-  { id: "T-004", name: "Batch Scheduler Refresh",  agent: "AGT-05", status: "running",    priority: "normal", created: "09:40", eta: "09:42" },
-  { id: "T-005", name: "Log Compression",          agent: "AGT-03", status: "done",       priority: "low",    created: "09:20", eta: "09:25" },
-  { id: "T-006", name: "Model Fine-tune Prep",     agent: "—",      status: "scheduled",  priority: "high",   created: "—",     eta: "10:00" },
-  { id: "T-007", name: "Report Generation",        agent: "—",      status: "scheduled",  priority: "low",    created: "—",     eta: "10:30" },
+  { id: "T-001", name: "Schema Migration v3", agent: "AGT-01", status: "done", priority: "high", created: "09:30", eta: "09:38" },
+  { id: "T-002", name: "Image Classification #12", agent: "AGT-02", status: "running", priority: "high", created: "09:35", eta: "09:45" },
+  { id: "T-003", name: "JSON Parse & Validate", agent: "AGT-04", status: "error", priority: "normal", created: "09:38", eta: "—" },
+  { id: "T-004", name: "Batch Scheduler Refresh", agent: "AGT-05", status: "running", priority: "normal", created: "09:40", eta: "09:42" },
+  { id: "T-005", name: "Log Compression", agent: "AGT-03", status: "done", priority: "low", created: "09:20", eta: "09:25" },
+  { id: "T-006", name: "Model Fine-tune Prep", agent: "—", status: "scheduled", priority: "high", created: "—", eta: "10:00" },
+  { id: "T-007", name: "Report Generation", agent: "—", status: "scheduled", priority: "low", created: "—", eta: "10:30" },
 ];
 
 // ── 차트 데이터 생성 ──
@@ -172,12 +172,12 @@ const BUILD_BOOT_LOGS = [
 // ════════════════════════════════════════════
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; dot: string; label: string }> = {
-    running:   { bg: UI_GREEN_BG,  color: UI_GREEN_DARK, dot: UI_GREEN, label: "Running"   },
-    idle:      { bg: UI_GRAY_BG,   color: UI_GRAY,       dot: UI_GRAY_LIGHT, label: "Idle"      },
-    error:     { bg: UI_RED_BG,    color: UI_RED_DARK,   dot: UI_RED,   label: "Error"     },
-    done:      { bg: UI_GREEN_BG,  color: UI_GREEN_DARK, dot: UI_GREEN, label: "Done"      },
-    scheduled: { bg: UI_INDIGO_BG, color: UI_INDIGO,     dot: UI_INDIGO, label: "Scheduled" },
-    active:    { bg: UI_GREEN_BG,  color: UI_GREEN_DARK, dot: UI_GREEN, label: "Active"    },
+    running: { bg: UI_GREEN_BG, color: UI_GREEN_DARK, dot: UI_GREEN, label: "Running" },
+    idle: { bg: UI_GRAY_BG, color: UI_GRAY, dot: UI_GRAY_LIGHT, label: "Idle" },
+    error: { bg: UI_RED_BG, color: UI_RED_DARK, dot: UI_RED, label: "Error" },
+    done: { bg: UI_GREEN_BG, color: UI_GREEN_DARK, dot: UI_GREEN, label: "Done" },
+    scheduled: { bg: UI_INDIGO_BG, color: UI_INDIGO, dot: UI_INDIGO, label: "Scheduled" },
+    active: { bg: UI_GREEN_BG, color: UI_GREEN_DARK, dot: UI_GREEN, label: "Active" },
   };
   const s = map[status.toLowerCase()] ?? map.idle;
   return (
@@ -193,9 +193,9 @@ function StatusBadge({ status }: { status: string }) {
 
 function PriorityBadge({ priority }: { priority: string }) {
   const map: Record<string, { bg: string; color: string }> = {
-    high:   { bg: "rgba(239,68,68,0.08)",   color: UI_RED_DARK },
-    normal: { bg: "rgba(251,191,36,0.10)",  color: UI_AMBER_DARK },
-    low:    { bg: UI_GRAY_BG8, color: UI_GRAY },
+    high: { bg: "rgba(239,68,68,0.08)", color: UI_RED_DARK },
+    normal: { bg: "rgba(251,191,36,0.10)", color: UI_AMBER_DARK },
+    low: { bg: UI_GRAY_BG8, color: UI_GRAY },
   };
   const s = map[priority] ?? map.normal;
   return (
@@ -438,10 +438,10 @@ function ProjectEntry({ onJoin, isLoading }: { onJoin: (project: typeof PROJECTS
 // ════════════════════════════════════════════
 function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number], isLoading?: boolean }) {
   const quickStats = [
-    { label: "Commits Today",   value: "3",    color: ACCENT,    bg: "rgba(99,91,255,0.07)"  },
-    { label: "Files Changed",   value: "3",    color: UI_VIOLET, bg: UI_VIOLET_BG7 },
-    { label: "Agents Running",  value: "3/6",  color: UI_GREEN, bg: UI_GREEN_BG7 },
-    { label: "Build Status",    value: "PASS", color: UI_GREEN_DARK, bg: UI_GREEN_BG7 },
+    { label: "Commits Today", value: "3", color: ACCENT, bg: "rgba(99,91,255,0.07)" },
+    { label: "Files Changed", value: "3", color: UI_VIOLET, bg: UI_VIOLET_BG7 },
+    { label: "Agents Running", value: "3/6", color: UI_GREEN, bg: UI_GREEN_BG7 },
+    { label: "Build Status", value: "PASS", color: UI_GREEN_DARK, bg: UI_GREEN_BG7 },
   ];
 
   const fileExtColor: Record<string, string> = {
@@ -466,10 +466,10 @@ function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number
       <div className="grid grid-cols-4 gap-2.5 mb-4">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
-             <div key={i} className="rounded-xl p-3.5 border bg-white/50 space-y-2">
-               <Skeleton className="h-5 w-10" />
-               <Skeleton className="h-3 w-16" />
-             </div>
+            <div key={i} className="rounded-xl p-3.5 border bg-white/50 space-y-2">
+              <Skeleton className="h-5 w-10" />
+              <Skeleton className="h-3 w-16" />
+            </div>
           ))
         ) : (
           quickStats.map(s => (
@@ -491,7 +491,7 @@ function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number
           </div>
           {isLoading ? (
             <div className="space-y-3 pt-1">
-              {Array.from({length: 3}).map((_, i) => (
+              {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex gap-2.5">
                   <Skeleton className="w-12 h-4 rounded mt-0.5" />
                   <div className="space-y-1.5 flex-1">
@@ -539,7 +539,7 @@ function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number
           </div>
           {isLoading ? (
             <div className="space-y-3 pt-1">
-              {Array.from({length: 3}).map((_, i) => (
+              {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex gap-2.5">
                   <Skeleton className="w-10 h-4 rounded mt-0.5" />
                   <div className="space-y-1.5 flex-1">
@@ -590,10 +590,10 @@ function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number
           {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                 <div key={i} className="flex justify-between items-center">
-                   <div className="flex items-center gap-2"><Skeleton className="w-2 h-2 rounded-full"/><Skeleton className="w-24 h-2.5"/></div>
-                   <div className="flex gap-2"><Skeleton className="w-16 h-2.5"/><Skeleton className="w-10 h-3 rounded-full"/></div>
-                 </div>
+                <div key={i} className="flex justify-between items-center">
+                  <div className="flex items-center gap-2"><Skeleton className="w-2 h-2 rounded-full" /><Skeleton className="w-24 h-2.5" /></div>
+                  <div className="flex gap-2"><Skeleton className="w-16 h-2.5" /><Skeleton className="w-10 h-3 rounded-full" /></div>
+                </div>
               ))}
             </div>
           ) : (
@@ -626,20 +626,20 @@ function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number
           {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
-                 <div key={i} className="flex justify-between items-center">
-                   <Skeleton className="w-16 h-2.5" />
-                   <div className="flex items-center gap-1.5"><Skeleton className="w-3 h-3 rounded-full"/><Skeleton className="w-16 h-2.5"/></div>
-                 </div>
+                <div key={i} className="flex justify-between items-center">
+                  <Skeleton className="w-16 h-2.5" />
+                  <div className="flex items-center gap-1.5"><Skeleton className="w-3 h-3 rounded-full" /><Skeleton className="w-16 h-2.5" /></div>
+                </div>
               ))}
             </div>
           ) : (
             <div className="space-y-2">
               {[
-                { label: "Server",         value: "UP",          ok: true  },
-                { label: "Active Profile", value: "'dev'",        ok: true  },
-                { label: "JDK",            value: "17.0.18+8",   ok: true  },
-                { label: "Port",           value: "8080",        ok: true  },
-                { label: "Context Path",   value: "/",            ok: true  },
+                { label: "Server", value: "UP", ok: true },
+                { label: "Active Profile", value: "'dev'", ok: true },
+                { label: "JDK", value: "17.0.18+8", ok: true },
+                { label: "Port", value: "8080", ok: true },
+                { label: "Context Path", value: "/", ok: true },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between">
                   <span className="text-[10px]" style={{ color: TEXT_LABEL }}>{row.label}</span>
@@ -672,8 +672,8 @@ function AgentMonitor({ isLoading }: { isLoading?: boolean }) {
     setAgents(prev =>
       prev.map(a => {
         if (a.id !== id) return a;
-        if (action === "stop")    return { ...a, status: "idle",    cpu: 0, mem: 0 };
-        if (action === "start")   return { ...a, status: "running", cpu: Math.floor(Math.random() * 50 + 10), mem: Math.floor(Math.random() * 40 + 20) };
+        if (action === "stop") return { ...a, status: "idle", cpu: 0, mem: 0 };
+        if (action === "start") return { ...a, status: "running", cpu: Math.floor(Math.random() * 50 + 10), mem: Math.floor(Math.random() * 40 + 20) };
         if (action === "restart") return { ...a, status: "running", cpu: Math.floor(Math.random() * 30 + 10), mem: Math.floor(Math.random() * 30 + 20), uptime: "00:00:01" };
         return a;
       })
@@ -692,8 +692,8 @@ function AgentMonitor({ isLoading }: { isLoading?: boolean }) {
       <div className="flex items-center gap-2 mb-4">
         {isLoading ? (
           <div className="flex gap-2 w-full">
-             <Skeleton className="w-64 h-7 rounded-lg" />
-             {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="w-16 h-7 rounded-lg" />)}
+            <Skeleton className="w-64 h-7 rounded-lg" />
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="w-16 h-7 rounded-lg" />)}
           </div>
         ) : (
           <>
@@ -727,21 +727,21 @@ function AgentMonitor({ isLoading }: { isLoading?: boolean }) {
 
       <div className="grid grid-cols-1 gap-2.5">
         {isLoading ? (
-           Array.from({ length: 5 }).map((_, i) => (
-             <div key={i} className="rounded-xl p-3.5 border bg-white/75 flex items-start gap-3">
-               <div className="flex gap-2.5 w-full">
-                 <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
-                 <div className="flex-1 space-y-1.5 pt-0.5">
-                    <div className="flex items-center gap-2"><Skeleton className="h-3 w-24" /><Skeleton className="h-2.5 w-12" /></div>
-                    <Skeleton className="h-2.5 w-48" />
-                    <div className="flex items-center gap-4 pt-1"><Skeleton className="h-2.5 w-20" /><Skeleton className="h-2.5 w-20" /><Skeleton className="h-2.5 w-12" /></div>
-                 </div>
-               </div>
-               <div className="flex gap-1 shrink-0">
-                  <Skeleton className="w-6 h-6 rounded-md" /><Skeleton className="w-6 h-6 rounded-md" /><Skeleton className="w-6 h-6 rounded-md" />
-               </div>
-             </div>
-           ))
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-xl p-3.5 border bg-white/75 flex items-start gap-3">
+              <div className="flex gap-2.5 w-full">
+                <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-1.5 pt-0.5">
+                  <div className="flex items-center gap-2"><Skeleton className="h-3 w-24" /><Skeleton className="h-2.5 w-12" /></div>
+                  <Skeleton className="h-2.5 w-48" />
+                  <div className="flex items-center gap-4 pt-1"><Skeleton className="h-2.5 w-20" /><Skeleton className="h-2.5 w-20" /><Skeleton className="h-2.5 w-12" /></div>
+                </div>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Skeleton className="w-6 h-6 rounded-md" /><Skeleton className="w-6 h-6 rounded-md" /><Skeleton className="w-6 h-6 rounded-md" />
+              </div>
+            </div>
+          ))
         ) : (
           filtered.map(agent => (
             <div key={agent.id} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}`, backdropFilter: "blur(8px)" }}>
@@ -805,10 +805,10 @@ function TerminalLogs({ isLoading }: { isLoading?: boolean }) {
   useEffect(() => {
     if (isLoading) return;
     const msgs = [
-      { level: "INFO",  agent: "AGT-02", msg: "Processed 1024/4096 images (25%)." },
-      { level: "INFO",  agent: "AGT-01", msg: "Schema transform complete. Writing to DB." },
-      { level: "WARN",  agent: "AGT-05", msg: "Task queue backlog > 20. Scaling up." },
-      { level: "INFO",  agent: "AGT-06", msg: "Analyzer idle. Waiting for assignment." },
+      { level: "INFO", agent: "AGT-02", msg: "Processed 1024/4096 images (25%)." },
+      { level: "INFO", agent: "AGT-01", msg: "Schema transform complete. Writing to DB." },
+      { level: "WARN", agent: "AGT-05", msg: "Task queue backlog > 20. Scaling up." },
+      { level: "INFO", agent: "AGT-06", msg: "Analyzer idle. Waiting for assignment." },
     ];
     let idx = 0;
     const id = setInterval(() => {
@@ -840,12 +840,12 @@ function TerminalLogs({ isLoading }: { isLoading?: boolean }) {
         {isLoading ? (
           /* [스켈레톤] 터미널 내부 로그 뷰 */
           Array.from({ length: 15 }).map((_, i) => (
-             <div key={i} className="flex gap-3 px-1 py-0.5">
-               <DarkSkeleton className="w-16 h-2.5" />
-               <DarkSkeleton className="w-10 h-2.5" />
-               <DarkSkeleton className="w-20 h-2.5" />
-               <DarkSkeleton className="flex-1 h-2.5" />
-             </div>
+            <div key={i} className="flex gap-3 px-1 py-0.5">
+              <DarkSkeleton className="w-16 h-2.5" />
+              <DarkSkeleton className="w-10 h-2.5" />
+              <DarkSkeleton className="w-20 h-2.5" />
+              <DarkSkeleton className="flex-1 h-2.5" />
+            </div>
           ))
         ) : (
           logs.map((log, i) => (
@@ -861,11 +861,11 @@ function TerminalLogs({ isLoading }: { isLoading?: boolean }) {
         )}
         <div ref={bottomRef} />
       </div>
-      
+
       {isLoading ? (
-         <div className="mt-2 rounded-xl px-4 py-3 bg-[#0f1117]">
-           <DarkSkeleton className="w-full h-3" />
-         </div>
+        <div className="mt-2 rounded-xl px-4 py-3 bg-[#0f1117]">
+          <DarkSkeleton className="w-full h-3" />
+        </div>
       ) : (
         <div className="mt-2 flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.06)" }}>
           <span className="text-xs font-mono" style={{ color: "#635bff" }}>$</span>
@@ -914,18 +914,18 @@ function TaskQueue({ isLoading }: { isLoading?: boolean }) {
       <SectionHeader title="Task Queue" sub="예약 · 진행 · 완료 작업 현황" />
       <div className="grid grid-cols-4 gap-2 mb-5">
         {isLoading ? (
-           Array.from({ length: 4 }).map((_, i) => (
-             <div key={i} className="p-3 rounded-xl border bg-white/50 space-y-2">
-                <Skeleton className="w-10 h-6 mb-1 mx-auto" />
-                <Skeleton className="w-16 h-2.5 mx-auto" />
-             </div>
-           ))
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-xl border bg-white/50 space-y-2">
+              <Skeleton className="w-10 h-6 mb-1 mx-auto" />
+              <Skeleton className="w-16 h-2.5 mx-auto" />
+            </div>
+          ))
         ) : (
           [
-            { label: "Running",   count: counts.running,   color: "#10b981", bg: "rgba(16,185,129,0.08)"  },
-            { label: "Scheduled", count: counts.scheduled, color: ACCENT,    bg: "rgba(99,91,255,0.08)"   },
-            { label: "Done",      count: counts.done,      color: "#6b7280", bg: "rgba(107,114,128,0.08)" },
-            { label: "Error",     count: counts.error,     color: "#ef4444", bg: "rgba(239,68,68,0.08)"   },
+            { label: "Running", count: counts.running, color: "#10b981", bg: "rgba(16,185,129,0.08)" },
+            { label: "Scheduled", count: counts.scheduled, color: ACCENT, bg: "rgba(99,91,255,0.08)" },
+            { label: "Done", count: counts.done, color: "#6b7280", bg: "rgba(107,114,128,0.08)" },
+            { label: "Error", count: counts.error, color: "#ef4444", bg: "rgba(239,68,68,0.08)" },
           ].map(c => (
             <div key={c.label} className="rounded-xl p-3 text-center" style={{ background: c.bg, border: `1px solid ${BORDER}` }}>
               <p className="text-xl font-bold" style={{ color: c.color }}>{c.count}</p>
@@ -949,20 +949,20 @@ function TaskQueue({ isLoading }: { isLoading?: boolean }) {
           <span>Created</span>
           <span>ETA</span>
         </div>
-        
+
         {isLoading ? (
-           /* [스켈레톤] 태스크 큐 목록 */
-           Array.from({ length: 6 }).map((_, i) => (
-             <div key={i} className="grid px-4 py-3 border-b border-black/5 items-center" style={{ gridTemplateColumns: "80px 1fr 90px 80px 70px 70px 70px" }}>
-                <Skeleton className="w-10 h-3" />
-                <div className="pr-4"><Skeleton className="w-full h-3" /></div>
-                <Skeleton className="w-16 h-3" />
-                <Skeleton className="w-14 h-4 rounded-full" />
-                <Skeleton className="w-12 h-4 rounded-full" />
-                <Skeleton className="w-10 h-3" />
-                <Skeleton className="w-10 h-3" />
-             </div>
-           ))
+          /* [스켈레톤] 태스크 큐 목록 */
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="grid px-4 py-3 border-b border-black/5 items-center" style={{ gridTemplateColumns: "80px 1fr 90px 80px 70px 70px 70px" }}>
+              <Skeleton className="w-10 h-3" />
+              <div className="pr-4"><Skeleton className="w-full h-3" /></div>
+              <Skeleton className="w-16 h-3" />
+              <Skeleton className="w-14 h-4 rounded-full" />
+              <Skeleton className="w-12 h-4 rounded-full" />
+              <Skeleton className="w-10 h-3" />
+              <Skeleton className="w-10 h-3" />
+            </div>
+          ))
         ) : (
           sorted.map((task, i) => (
             <div key={task.id} className="grid px-4 py-2.5 items-center text-xs transition-colors hover:bg-black/[0.02]" style={{ gridTemplateColumns: "80px 1fr 90px 80px 70px 70px 70px", borderBottom: i < sorted.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
@@ -989,10 +989,10 @@ function SystemOverview({ isLoading }: { isLoading?: boolean }) {
   const [efficiencyData] = useState(generateEfficiencyData);
 
   const statCards = [
-    { label: "Total Uptime",   value: "18d 06h 22m", color: ACCENT,    bg: "rgba(99,91,255,0.07)"  },
-    { label: "Active Agents",  value: "4 / 6",       color: "#10b981", bg: "rgba(16,185,129,0.07)" },
-    { label: "Avg Efficiency", value: "73.4%",        color: "#8b5cf6", bg: "rgba(139,92,246,0.07)" },
-    { label: "Req/s (peak)",   value: "487 rps",      color: "#f59e0b", bg: "rgba(245,158,11,0.07)" },
+    { label: "Total Uptime", value: "18d 06h 22m", color: ACCENT, bg: "rgba(99,91,255,0.07)" },
+    { label: "Active Agents", value: "4 / 6", color: "#10b981", bg: "rgba(16,185,129,0.07)" },
+    { label: "Avg Efficiency", value: "73.4%", color: "#8b5cf6", bg: "rgba(139,92,246,0.07)" },
+    { label: "Req/s (peak)", value: "487 rps", color: "#f59e0b", bg: "rgba(245,158,11,0.07)" },
   ];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -1010,15 +1010,15 @@ function SystemOverview({ isLoading }: { isLoading?: boolean }) {
   return (
     <div className="space-y-5">
       <SectionHeader title="System Overview" sub="서버 트래픽 · 에이전트 효율 · 시스템 가동 현황" />
-      
+
       <div className="grid grid-cols-4 gap-2.5">
         {isLoading ? (
-           Array.from({ length: 4 }).map((_, i) => (
-             <div key={i} className="rounded-xl p-3.5 border bg-white/50 space-y-2">
-               <Skeleton className="h-4 w-20" />
-               <Skeleton className="h-2.5 w-16" />
-             </div>
-           ))
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl p-3.5 border bg-white/50 space-y-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-2.5 w-16" />
+            </div>
+          ))
         ) : (
           statCards.map(c => (
             <div key={c.label} className="rounded-xl p-3.5" style={{ background: c.bg, border: `1px solid ${BORDER}` }}>
@@ -1032,7 +1032,7 @@ function SystemOverview({ isLoading }: { isLoading?: boolean }) {
       <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}` }}>
         <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Server Traffic (RPS & Latency)</p>
         {isLoading ? (
-           <Skeleton className="w-full h-[180px] rounded-lg" />
+          <Skeleton className="w-full h-[180px] rounded-lg" />
         ) : (
           <ResponsiveContainer width="100%" height={180}>
             <LineChart id="weai-traffic-line" data={trafficData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
@@ -1050,7 +1050,7 @@ function SystemOverview({ isLoading }: { isLoading?: boolean }) {
       <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}` }}>
         <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Agent Efficiency (%)</p>
         {isLoading ? (
-           <Skeleton className="w-full h-[150px] rounded-lg" />
+          <Skeleton className="w-full h-[150px] rounded-lg" />
         ) : (
           <ResponsiveContainer width="100%" height={150}>
             <BarChart id="weai-efficiency-bar" data={efficiencyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
@@ -1091,10 +1091,10 @@ function BuildTools({ isLoading }: { isLoading?: boolean }) {
       cmd === "bootRun"
         ? "> Executing gradlew.bat bootRun with profile 'dev'..."
         : cmd === "build"
-        ? "> Compiling 24 source files..."
-        : cmd === "test"
-        ? "> Running 38 unit tests..."
-        : "> Cleaning build directory...",
+          ? "> Compiling 24 source files..."
+          : cmd === "test"
+            ? "> Running 38 unit tests..."
+            : "> Cleaning build directory...",
       "BUILD SUCCESSFUL in 3s",
     ];
     let i = 0;
@@ -1112,11 +1112,11 @@ function BuildTools({ isLoading }: { isLoading?: boolean }) {
   };
 
   const gradleCommands = [
-    { cmd: "bootRun", label: "bootRun",  icon: Play,       color: "#10b981", bg: "rgba(16,185,129,0.10)",  desc: "Start Spring Boot server" },
-    { cmd: "build",   label: "build",    icon: Package,    color: ACCENT,    bg: "rgba(99,91,255,0.10)",   desc: "Compile & package" },
-    { cmd: "test",    label: "test",     icon: CheckCircle2,color:"#8b5cf6", bg: "rgba(139,92,246,0.10)",  desc: "Run unit tests" },
-    { cmd: "clean",   label: "clean",    icon: RefreshCw,  color: "#f59e0b", bg: "rgba(245,158,11,0.10)",  desc: "Clean build output" },
-    { cmd: "stop",    label: "stop",     icon: Square,     color: "#ef4444", bg: "rgba(239,68,68,0.10)",   desc: "Stop server" },
+    { cmd: "bootRun", label: "bootRun", icon: Play, color: "#10b981", bg: "rgba(16,185,129,0.10)", desc: "Start Spring Boot server" },
+    { cmd: "build", label: "build", icon: Package, color: ACCENT, bg: "rgba(99,91,255,0.10)", desc: "Compile & package" },
+    { cmd: "test", label: "test", icon: CheckCircle2, color: "#8b5cf6", bg: "rgba(139,92,246,0.10)", desc: "Run unit tests" },
+    { cmd: "clean", label: "clean", icon: RefreshCw, color: "#f59e0b", bg: "rgba(245,158,11,0.10)", desc: "Clean build output" },
+    { cmd: "stop", label: "stop", icon: Square, color: "#ef4444", bg: "rgba(239,68,68,0.10)", desc: "Stop server" },
   ];
 
   return (
@@ -1136,13 +1136,13 @@ function BuildTools({ isLoading }: { isLoading?: boolean }) {
           </div>
           <div className="space-y-1.5">
             {isLoading ? (
-               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)
+              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)
             ) : (
               [
-                { k: "Process",    v: serverUp ? "gradlew.bat bootRun" : "—"     },
-                { k: "Profile",    v: "$env:SPRING_PROFILES_ACTIVE = 'dev'"       },
-                { k: "Port",       v: "http://localhost:8080"                     },
-                { k: "Uptime",     v: serverUp ? "18d 06h 22m" : "—"             },
+                { k: "Process", v: serverUp ? "gradlew.bat bootRun" : "—" },
+                { k: "Profile", v: "$env:SPRING_PROFILES_ACTIVE = 'dev'" },
+                { k: "Port", v: "http://localhost:8080" },
+                { k: "Uptime", v: serverUp ? "18d 06h 22m" : "—" },
               ].map(r => (
                 <div key={r.k} className="flex items-center gap-2">
                   <span className="text-[10px] w-16 shrink-0" style={{ color: TEXT_LABEL }}>{r.k}</span>
@@ -1161,14 +1161,14 @@ function BuildTools({ isLoading }: { isLoading?: boolean }) {
           </div>
           <div className="space-y-1.5">
             {isLoading ? (
-               Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)
+              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)
             ) : (
               [
-                { k: "OS",      v: "Windows 11 Pro"          },
-                { k: "JDK",     v: "17.0.18+8 (LTS)"         },
-                { k: "Gradle",  v: "8.7"                     },
-                { k: "Profile", v: "dev"                     },
-                { k: "Spring",  v: "Boot 3.2.4 / Java 17"   },
+                { k: "OS", v: "Windows 11 Pro" },
+                { k: "JDK", v: "17.0.18+8 (LTS)" },
+                { k: "Gradle", v: "8.7" },
+                { k: "Profile", v: "dev" },
+                { k: "Spring", v: "Boot 3.2.4 / Java 17" },
               ].map(r => (
                 <div key={r.k} className="flex items-center gap-2">
                   <span className="text-[10px] w-14 shrink-0" style={{ color: TEXT_LABEL }}>{r.k}</span>
@@ -1184,9 +1184,9 @@ function BuildTools({ isLoading }: { isLoading?: boolean }) {
       <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}` }}>
         <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Gradle Commands</p>
         {isLoading ? (
-           <div className="flex gap-2">
-             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="w-24 h-9 rounded-lg" />)}
-           </div>
+          <div className="flex gap-2">
+            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="w-24 h-9 rounded-lg" />)}
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {gradleCommands.map(({ cmd, label, icon: Icon, color, bg, desc }) => (
@@ -1227,12 +1227,12 @@ function BuildTools({ isLoading }: { isLoading?: boolean }) {
           style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.06)", height: 220 }}
         >
           {isLoading ? (
-             <div className="space-y-2.5">
-                <DarkSkeleton className="w-1/2 h-3" />
-                <DarkSkeleton className="w-3/4 h-3" />
-                <DarkSkeleton className="w-1/3 h-3" />
-                <DarkSkeleton className="w-full h-3" />
-             </div>
+            <div className="space-y-2.5">
+              <DarkSkeleton className="w-1/2 h-3" />
+              <DarkSkeleton className="w-3/4 h-3" />
+              <DarkSkeleton className="w-1/3 h-3" />
+              <DarkSkeleton className="w-full h-3" />
+            </div>
           ) : (
             consoleLogs.map((line, i) => (
               <div key={i} className="leading-4" style={{ color: line.includes("BUILD SUCCESSFUL") ? "#10b981" : line.includes("ERROR") ? "#ef4444" : line.startsWith(" .") || line.startsWith(" /") || line.startsWith("(") || line.startsWith("=") || line.startsWith("'") ? "#635bff" : "#9ca3af" }}>
@@ -1256,7 +1256,6 @@ export function WeAIDashboard() {
   const [activeTab, setActiveTab] = useState("home");
 
   const isLoadingEntry = false;
-
   const isLoadingWorkspace = false;
 
   const handleJoin = (project: typeof PROJECTS[number]) => {
@@ -1272,14 +1271,16 @@ export function WeAIDashboard() {
 
   // Screen B — 프로젝트 워크스페이스
   const renderTab = () => {
+    if (!activeProject) return null;
+
     switch (activeTab) {
-      case "home":     return <WorkspaceHome project={activeProject!} isLoading={isLoadingWorkspace} />;
-      case "agents":   return <AgentMonitor isLoading={isLoadingWorkspace} />;
+      case "home": return <WorkspaceHome project={activeProject!} isLoading={isLoadingWorkspace} />;
+      case "agents": return <AgentMonitor isLoading={isLoadingWorkspace} />;
       case "terminal": return <TerminalLogs isLoading={isLoadingWorkspace} />;
-      case "queue":    return <TaskQueue isLoading={isLoadingWorkspace} />;
+      case "queue": return <TaskQueue isLoading={isLoadingWorkspace} />;
       case "overview": return <SystemOverview isLoading={isLoadingWorkspace} />;
-      case "build":    return <BuildTools isLoading={isLoadingWorkspace} />;
-      default:         return null;
+      case "build": return <BuildTools isLoading={isLoadingWorkspace} />;
+      default: return null;
     }
   };
 
@@ -1303,7 +1304,6 @@ export function WeAIDashboard() {
         <button
           onClick={() => {
             setView("entry");
-            setIsLoadingEntry(false); // 다시 나갈 때는 로딩 생략
           }}
           className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs transition-all mr-2 shrink-0"
           style={{ color: TEXT_SECONDARY, background: "rgba(0,0,0,0.04)" }}
