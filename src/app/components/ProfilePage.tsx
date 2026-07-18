@@ -5,9 +5,20 @@ import {
   Activity, Pencil, Plus,
 } from "lucide-react";
 import { ProfileEditModal } from "./ProfileEditModal";
-import { loadProfile, ProfileData, AVATAR_GRADIENTS } from "../data/profileStore";
+// 기존 localStorage 기반 loadProfile 대신 초기값 뼈대만 사용 (ProfileData 타입은 유지)
+import { ProfileData, AVATAR_GRADIENTS } from "../data/profileStore";
 import { deviconUrl } from "../data/devicons";
-import { fetchCurrentUser } from "../lib/api"; // 🌟 실서버 유저 조회 API 동기화 임포트
+
+// 🌟 API 통신 함수들 가져오기
+import { 
+  fetchCurrentUser, 
+  fetchMyActivitySummary, 
+  fetchMyActivities,
+  updateMyProfile,
+  MyActivitySummary,
+  MyActivity,
+  ProfileUpdatePayload
+} from "../lib/api"; 
 
 // ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -62,22 +73,6 @@ function GaugeBar({ value, color, bg }: { value: number; color: string; bg?: str
     </div>
   );
 }
-
-// ── 통계 카드 ──
-const STATS = [
-  { label: "Active Projects", value: "2",  color: ACCENT,       bg: ACCENT_BG                         },
-  { label: "Commits (30d)",   value: "28", color: "#5A8A4A",    bg: "rgba(90,138,74,0.07)"             },
-  { label: "Agents Managed",  value: "6",  color: ACCENT_SAGE,  bg: "rgba(174,183,132,0.10)"           },
-  { label: "Tasks Done",      value: "41", color: "#C09840",    bg: "rgba(192,152,64,0.07)"            },
-];
-
-const RECENT_ACTIVITIES = [
-  { icon: GitCommit,  color: ACCENT,       msg: "Fixed JDK 17 toolchain issue in settings.gradle",  time: "2 hrs ago"  },
-  { icon: Bot,        color: "#5A8A4A",    msg: "Restarted AGT-04 after JSON parse error resolved",  time: "4 hrs ago"  },
-  { icon: GitCommit,  color: ACCENT,       msg: "Refactored Multi-Agent communication logic",         time: "4 hrs ago"  },
-  { icon: FolderGit2, color: ACCENT_SAGE,  msg: "Joined WE&AI Backend Server project",               time: "1 day ago"  },
-  { icon: GitCommit,  color: ACCENT,       msg: "Initial project setup committed",                   time: "2 days ago" },
-];
 
 // ── 시스템 스탯 훅 ──
 function useSystemStats() {
@@ -159,31 +154,93 @@ function TechBadge({ name, slug, variant }: { name: string; slug: string; varian
 }
 
 // ── 메인 ProfilePage ──
-export function ProfilePage() {
-  const isLoading = false;
+// props로 현재 진입한 프로젝트 ID를 받도록 확장 (기본값 설정)
+export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) {
+  // 로딩 상태 관리를 위해 true로 시작
+  const [isLoading, setIsLoading] = useState(true);
 
   const stats = useSystemStats();
-  const [profile, setProfile] = useState<ProfileData>(loadProfile);
   const [editOpen, setEditOpen] = useState(false);
 
-  // 🌟 페이지 마운트 시 실서버 세션의 최신 로그인 유저 정보 동기화
+  // 🌟 API로 받아올 상태값들
+  const [profile, setProfile] = useState<ProfileData>({
+    displayName: "",
+    role: "",
+    email: "",
+    location: "",
+    bio: "",
+    avatarColor: "olive",
+    techStack: [],
+  });
+  
+  const [activitySummary, setActivitySummary] = useState<MyActivitySummary | null>(null);
+  const [recentActivities, setRecentActivities] = useState<MyActivity[]>([]);
+
+  // 🌟 페이지 마운트 시 실서버 통신
   useEffect(() => {
-    const syncUserSession = async () => {
+    const fetchAllData = async () => {
       try {
-        const sessionUser = await fetchCurrentUser();
-        if (sessionUser) {
-          setProfile(prev => ({
-            ...prev,
-            displayName: sessionUser.name || prev.displayName,
-            email: sessionUser.email || prev.email,
-          }));
-        }
+        setIsLoading(true);
+        // 병렬로 API 3개 동시 호출 (내 정보, 활동 요약, 최근 활동)
+        const [sessionUser, summary, activitiesRes] = await Promise.all([
+          fetchCurrentUser(),
+          fetchMyActivitySummary(projectId),
+          fetchMyActivities(projectId)
+        ]);
+
+        // 받아온 정보로 프로필 상태 업데이트
+        setProfile({
+          displayName: sessionUser.name || "Unknown User",
+          role: sessionUser.role || "Member",
+          email: sessionUser.email || "",
+          location: "Seoul, Korea", // API에 location 필드가 없다면 기본값 또는 빈 문자열
+          bio: "SynAIpse 개발자",   // API에 bio 필드가 없다면 기본값 또는 빈 문자열
+          avatarColor: "olive",     // 사용자 선호 색상 연동 시 변경 가능
+          techStack: [],            // 프로필 확장 시 연동
+        });
+
+        setActivitySummary(summary);
+        setRecentActivities(activitiesRes.activities);
       } catch (e) {
-        console.warn("실서버 최신 세션 계정 정보를 동기화하지 못했습니다.", e);
+        console.error("프로필 데이터를 불러오는 중 오류가 발생했습니다.", e);
+      } finally {
+        setIsLoading(false);
       }
     };
-    void syncUserSession();
-  }, []);
+    
+    void fetchAllData();
+  }, [projectId]);
+
+  // 🌟 프로필 편집 모달에서 "저장" 버튼을 눌렀을 때 호출될 핸들러
+  const handleProfileSave = async (updatedProfile: ProfileData) => {
+    try {
+      // 1. API에 맞는 Payload 형태 구성
+      const payload: ProfileUpdatePayload = {
+        displayName: updatedProfile.displayName,
+        role: updatedProfile.role,
+        email: updatedProfile.email,
+        location: updatedProfile.location,
+        bio: updatedProfile.bio,
+        avatarColor: updatedProfile.avatarColor,
+        techStack: updatedProfile.techStack.map(t => ({
+          name: t.name,
+          slug: t.slug,
+          variant: t.variant
+        }))
+      };
+
+      // 2. 서버로 저장 요청
+      await updateMyProfile(payload);
+      
+      // 3. 로컬 상태 업데이트 및 모달 닫기
+      setProfile(updatedProfile);
+      setEditOpen(false);
+      
+    } catch (error) {
+      console.error("프로필 업데이트 실패:", error);
+      alert("프로필 저장에 실패했습니다. 다시 시도해 주세요.");
+    }
+  };
 
   const memPct = stats.heapTotal > 0
     ? Math.round((stats.heapUsed / stats.heapTotal) * 100)
@@ -191,6 +248,13 @@ export function ProfilePage() {
 
   const grad = AVATAR_GRADIENTS[profile.avatarColor] ?? AVATAR_GRADIENTS["olive"];
   const gradBg = `linear-gradient(135deg, ${grad.from}, ${grad.via}, ${grad.to})`;
+
+  // ── 동적 통계 카드 구성 ──
+  const dynamicStats = [
+    { label: "Total Tasks",      value: String(activitySummary?.totalTasks ?? 0),      color: ACCENT,      bg: ACCENT_BG },
+    { label: "Completed Tasks",  value: String(activitySummary?.completedTasks ?? 0),  color: "#5A8A4A",   bg: "rgba(90,138,74,0.07)" },
+    { label: "Recent Commits",   value: String(activitySummary?.recentCommitsCount ?? 0), color: "#C09840", bg: "rgba(192,152,64,0.07)" },
+  ];
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -287,16 +351,16 @@ export function ProfilePage() {
           </div>
 
           {/* ── 통계 카드 ── */}
-          <div className="grid grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5">
             {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
+              Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                   <Skeleton className="h-6 w-10 mb-2" />
                   <Skeleton className="h-3 w-16" />
                 </div>
               ))
             ) : (
-              STATS.map(s => (
+              dynamicStats.map(s => (
                 <div key={s.label} className="rounded-xl p-3.5" style={{ background: s.bg, border: `1px solid ${BORDER}` }}>
                   <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
                   <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
@@ -305,7 +369,7 @@ export function ProfilePage() {
             )}
           </div>
 
-          {/* ── 시스템 모니터 ── */}
+          {/* ── 시스템 모니터 (변경 없음) ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}` }}>
             <div className="flex items-center gap-2 px-5 py-3.5" style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(247,247,245,0.85)" }}>
               <Activity className="w-3.5 h-3.5" style={{ color: ACCENT }} />
@@ -527,20 +591,35 @@ export function ProfilePage() {
                   </div>
                 ))
               ) : (
-                RECENT_ACTIVITIES.map((a, i) => {
-                  const Icon = a.icon;
-                  return (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: `${a.color}15` }}>
-                        <Icon className="w-3 h-3" style={{ color: a.color }} />
+                recentActivities.length === 0 ? (
+                  <div className="text-center py-4 text-xs" style={{ color: TEXT_TERTIARY }}>
+                    최근 활동 내역이 없습니다.
+                  </div>
+                ) : (
+                  recentActivities.map((a) => {
+                    // API에서 주는 activityType에 따라 아이콘과 색상을 매핑합니다.
+                    const isCommit = a.activityType === "COMMIT";
+                    const isBot = a.activityType === "AI_ACTION";
+                    const Icon = isCommit ? GitCommit : isBot ? Bot : Activity;
+                    const iconColor = isCommit ? ACCENT : isBot ? "#5A8A4A" : TEXT_TERTIARY;
+
+                    return (
+                      <div key={a.activityId} className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: `${iconColor}15` }}>
+                          <Icon className="w-3 h-3" style={{ color: iconColor }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px]" style={{ color: TEXT_PRIMARY }}>
+                            {a.title} {a.description && <span style={{ color: TEXT_SECONDARY }}>- {a.description}</span>}
+                          </p>
+                        </div>
+                        <span className="text-[10px] shrink-0" style={{ color: TEXT_TERTIARY }}>
+                          {new Date(a.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px]" style={{ color: TEXT_PRIMARY }}>{a.msg}</p>
-                      </div>
-                      <span className="text-[10px] shrink-0" style={{ color: TEXT_TERTIARY }}>{a.time}</span>
-                    </div>
-                  );
-                })
+                    );
+                  })
+                )
               )}
             </div>
           </div>
@@ -552,7 +631,7 @@ export function ProfilePage() {
       {editOpen && !isLoading && (
         <ProfileEditModal
           profile={profile}
-          onSave={p => setProfile(p)}
+          onSave={handleProfileSave}
           onClose={() => setEditOpen(false)}
         />
       )}

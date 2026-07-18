@@ -46,6 +46,7 @@ import {
   loginWithEmailCode,
   sendEmailLoginCode,
   signUp,
+  naverLogin,
 } from "../lib/api";
 
 const KEYFRAMES = `
@@ -475,12 +476,22 @@ function LoginForm({
     }
   };
 
-  const handleSocialClick = (provider: SocialProvider) => {
-    setSocialLoading(provider);
-    window.setTimeout(() => {
+  const handleSocialClick = async (provider: SocialProvider) => {
+    try {
+      setSocialLoading(provider);
+      // 1. 백엔드에서 선택한 소셜(구글 등)의 로그인 URL을 받아옵니다.
+      const response = await fetchSocialLoginUrl(provider);
+      
+      // 2. 응답받은 URL로 브라우저를 이동시킵니다.
+      if (response.authorizationUrl) {
+        window.location.href = response.authorizationUrl;
+      }
+    } catch (err) {
+      console.error(`${provider} 로그인 연동 실패:`, err);
+      alert("소셜 로그인 서버와 연결할 수 없습니다.");
+    } finally {
       setSocialLoading(null);
-      onSocialLogin(provider);
-    }, 300);
+    }
   };
 
   return (
@@ -520,7 +531,7 @@ function LoginForm({
           ))}
         </div>
         <p className="text-center text-[9px]" style={{ color: LOGIN_ICON_MUTED }}>
-          소셜 버튼은 임시 mock 가입 흐름으로 다시 열어두었습니다.
+          원하는 소셜 계정을 선택해 로그인하세요.
         </p>
       </div>
 
