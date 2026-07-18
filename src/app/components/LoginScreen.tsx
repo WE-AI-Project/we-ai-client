@@ -46,11 +46,7 @@ import {
   loginWithEmailCode,
   sendEmailLoginCode,
   signUp,
-<<<<<<< Updated upstream
-  naverLogin,
-=======
   fetchSocialLoginUrl,
->>>>>>> Stashed changes
 } from "../lib/api";
 
 const KEYFRAMES = `

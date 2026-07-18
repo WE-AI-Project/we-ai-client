@@ -2,21 +2,33 @@ import { useState, useEffect } from "react";
 import {
   GitCommit, GitBranch, Upload, CheckCircle2, X,
   ShieldCheck, Plus, RotateCcw,
-  ChevronDown, ChevronRight, FileCode2, GitMerge,
+  ChevronDown, ChevronRight, FileCode2, GitMerge, Loader2
 } from "lucide-react";
-import { CHANGE_FILES } from "./commitData";
-import type { CommitFile } from "./commitData";
+// 기존 Mock 데이터(CHANGE_FILES) 임포트 제거
+// import { CHANGE_FILES } from "./commitData";
+// import type { CommitFile } from "./commitData";
 import { FileDiffViewer } from "./FileDiffViewer";
 import { BranchVisualization } from "./BranchVisualization";
 import { setPendingQA } from "../data/qaStore";
 import { AICommitGenerator } from "./AICommitGenerator";
+
+// 🌟 API 연동을 위한 함수 및 타입 임포트
+import { 
+  fetchProjectCommits, 
+  fetchProjectCommitFiles, 
+  fetchProjectCommitFileDiff,
+  ProjectCommitSummary,
+  ProjectCommitChangedFile,
+  ProjectRepositoryType
+} from "../lib/api";
+
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
 } from "../colors";
 import { ConventionGuardModal } from "./ConventionGuardModal";
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+// ── 🚨 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -38,9 +50,14 @@ const EXT_COLOR: Record<string, { bg: string; color: string }> = {
 };
 
 const STATUS_META: Record<string, { color: string; label: string; bg: string }> = {
-  modified: { color: "#C09840", label: "M", bg: "rgba(192,152,64,0.10)"  },
-  added:    { color: "#5A8A4A", label: "A", bg: "rgba(90,138,74,0.10)"   },
-  deleted:  { color: "#B85450", label: "D", bg: "rgba(184,84,80,0.10)"   },
+  MODIFIED: { color: "#C09840", label: "M", bg: "rgba(192,152,64,0.10)"  },
+  ADDED:    { color: "#5A8A4A", label: "A", bg: "rgba(90,138,74,0.10)"   },
+  DELETED:  { color: "#B85450", label: "D", bg: "rgba(184,84,80,0.10)"   },
+};
+
+// API의 ProjectCommitChangedFile 타입을 UI에 맞게 래핑하기 위한 내부 타입
+type UICommitFile = ProjectCommitChangedFile & {
+  id: string; // UI 키용 임시 ID (경로를 암호화하거나 그대로 사용)
 };
 
 // ── QA 확인 모달 ──
@@ -99,14 +116,14 @@ function CommittedModal({ show, msg, onClose }: { show: boolean; msg: string; on
 function FileRow({
   file, staged, selected, onToggle, onSelect,
 }: {
-  file: CommitFile;
+  file: UICommitFile;
   staged: boolean;
   selected: boolean;
   onToggle: (e: React.MouseEvent) => void;
   onSelect: () => void;
 }) {
-  const ec = EXT_COLOR[file.ext] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY };
-  const sm = STATUS_META[file.status];
+  const ec = EXT_COLOR[file.extension] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY };
+  const sm = STATUS_META[file.status] ?? { color: "#C09840", label: "M", bg: "rgba(192,152,64,0.10)" }; // 기본값 방어
 
   return (
     <div
@@ -135,10 +152,12 @@ function FileRow({
       </div>
 
       {/* 확장자 뱃지 */}
-      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={ec}>.{file.ext}</span>
+      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={ec}>.{file.extension}</span>
 
       {/* 파일명 */}
-      <span className="flex-1 text-[11px] truncate" style={{ color: staged ? TEXT_PRIMARY : TEXT_TERTIARY }}>{file.name}</span>
+      <span className="flex-1 text-[11px] truncate" style={{ color: staged ? TEXT_PRIMARY : TEXT_TERTIARY }} title={file.path}>
+        {file.fileName}
+      </span>
 
       {/* +/- */}
       <div className="flex items-center gap-1 shrink-0 text-[9px]">
@@ -158,16 +177,22 @@ function FileRow({
 }
 
 export function ChangesPage({
-  projectId = 0,
+  projectId = 0, // 기본값 처리 (실제로는 props로 받아야 함)
   onNavigateQA,
 }: {
   projectId?: number | null;
   onNavigateQA?: () => void;
 }) {
-  const isLoading = false;
+  const [isLoading, setIsLoading] = useState(true);
+  const [repoType, setRepoType] = useState<ProjectRepositoryType>("BACKEND");
+  
+  // 🌟 API로 받아온 데이터 상태
+  const [latestCommitHash, setLatestCommitHash] = useState<string | null>(null);
+  const [changedFiles, setChangedFiles] = useState<UICommitFile[]>([]);
+  const [fileDiffs, setFileDiffs] = useState<Record<string, any>>({}); // 받아온 diff 캐싱
 
-  const [staged,       setStaged]     = useState<Set<string>>(new Set(["1", "2", "3", "4"]));
-  const [selectedFile, setSelectedFile] = useState<CommitFile | null>(CHANGE_FILES[0]);
+  const [staged,       setStaged]     = useState<Set<string>>(new Set());
+  const [selectedFile, setSelectedFile] = useState<UICommitFile | null>(null);
   const [message,      setMessage]    = useState("");
   const [showQA,       setShowQA]     = useState(false);
   const [showDone,     setShowDone]   = useState(false);
@@ -175,14 +200,72 @@ export function ChangesPage({
   const [history,      setHistory]    = useState<string[]>([]);
   const [stagedOpen,   setStagedOpen] = useState(true);
   const [unstagedOpen, setUnstagedOpen] = useState(true);
+  
   // 브랜치 시각화 모드
   const [showBranch,   setShowBranch] = useState(false);
-
-  // ── 컨벤션 가드 ──
+  // 컨벤션 가드
   const [showConvention, setShowConvention] = useState(false);
 
-  const stagedFiles   = CHANGE_FILES.filter(f => staged.has(f.id));
-  const unstagedFiles = CHANGE_FILES.filter(f => !staged.has(f.id));
+  // 🌟 API 데이터 호출 로직
+  useEffect(() => {
+    async function loadCommitData() {
+      if (!projectId) return;
+      try {
+        setIsLoading(true);
+        // 1. 가장 최근 커밋 목록 가져오기 (가장 최신 1개)
+        const commitData = await fetchProjectCommits(projectId, repoType, 1);
+        
+        if (commitData.commits.length > 0) {
+          const hash = commitData.commits[0].commitHash;
+          setLatestCommitHash(hash);
+
+          // 2. 해당 커밋의 변경된 파일 목록 가져오기
+          const filesData = await fetchProjectCommitFiles(projectId, repoType, hash);
+          
+          // UI용 ID를 부여하여 매핑
+          const mappedFiles = filesData.files.map(f => ({
+            ...f,
+            id: f.path // path를 고유 ID로 사용
+          }));
+          
+          setChangedFiles(mappedFiles);
+          
+          // 처음 불러올 때 모든 파일을 Staged 처리하고 첫 번째 파일을 선택
+          setStaged(new Set(mappedFiles.map(f => f.id)));
+          if (mappedFiles.length > 0) {
+            handleFileSelect(mappedFiles[0], hash);
+          }
+        } else {
+          setChangedFiles([]);
+          setSelectedFile(null);
+        }
+      } catch (error) {
+        console.error("커밋 데이터를 불러오는데 실패했습니다.", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadCommitData();
+  }, [projectId, repoType]);
+
+  // 🌟 파일 선택 시 Diff 데이터 불러오기
+  const handleFileSelect = async (file: UICommitFile, hash: string | null = latestCommitHash) => {
+    setSelectedFile(file);
+    if (!projectId || !hash || fileDiffs[file.id]) return; // 이미 캐싱된 경우 패스
+
+    try {
+      const diffData = await fetchProjectCommitFileDiff(projectId, repoType, hash, file.path);
+      // 기존 fileDiffs 캐시에 추가
+      setFileDiffs(prev => ({ ...prev, [file.id]: diffData }));
+    } catch (error) {
+      console.error("파일 Diff를 불러오는데 실패했습니다.", error);
+    }
+  };
+
+
+  const stagedFiles   = changedFiles.filter(f => staged.has(f.id));
+  const unstagedFiles = changedFiles.filter(f => !staged.has(f.id));
   const stagedCount   = staged.size;
 
   const toggleStage = (e: React.MouseEvent, id: string) => {
@@ -194,7 +277,7 @@ export function ChangesPage({
     });
   };
 
-  const stageAll   = () => setStaged(new Set(CHANGE_FILES.map(f => f.id)));
+  const stageAll   = () => setStaged(new Set(changedFiles.map(f => f.id)));
   const unstageAll = () => setStaged(new Set());
 
   const handleCommitClick = () => {
@@ -219,9 +302,9 @@ export function ChangesPage({
     // 커밋 정보를 qaStore에 저장
     setPendingQA({
       message: message.trim(),
-      author:  "병권",
+      author:  "병권", // 차후 fetchCurrentUser 연동 가능
       branch:  "main",
-      files:   stagedFiles.map(f => f.name),
+      files:   stagedFiles.map(f => f.fileName),
       hash:    Math.random().toString(36).slice(2, 9).toUpperCase(),
       time:    new Date().toISOString(),
     });
@@ -239,8 +322,11 @@ export function ChangesPage({
     setShowDone(true);
   };
 
-  const totalAdd = CHANGE_FILES.reduce((s, f) => s + f.additions, 0);
-  const totalDel = CHANGE_FILES.reduce((s, f) => s + f.deletions, 0);
+  const totalAdd = changedFiles.reduce((s, f) => s + f.additions, 0);
+  const totalDel = changedFiles.reduce((s, f) => s + f.deletions, 0);
+
+  // 현재 선택된 파일의 Diff 데이터를 찾아서 조합 (임시 렌더링용)
+  const currentDiffData = selectedFile ? fileDiffs[selectedFile.id] : null;
 
   return (
     <>
@@ -256,6 +342,24 @@ export function ChangesPage({
         >
           <GitCommit className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
           <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Changes</p>
+
+          {/* 레포지토리 선택 (새로 추가됨) */}
+          <div className="ml-2 flex items-center bg-black/5 rounded-lg p-0.5 border border-black/5">
+            <button 
+              onClick={() => setRepoType("FRONTEND")}
+              disabled={isLoading}
+              className={`px-3 py-1 rounded-md text-[10px] font-semibold transition-colors disabled:opacity-50 ${repoType === "FRONTEND" ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+            >
+              Frontend
+            </button>
+            <button 
+              onClick={() => setRepoType("BACKEND")}
+              disabled={isLoading}
+              className={`px-3 py-1 rounded-md text-[10px] font-semibold transition-colors disabled:opacity-50 ${repoType === "BACKEND" ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+            >
+              Backend
+            </button>
+          </div>
 
           {/* 브랜치 버튼 — 클릭하면 시각화 토글 */}
           <button
@@ -288,7 +392,7 @@ export function ChangesPage({
               <Skeleton className="h-3 w-40" />
             ) : (
               <>
-                <span style={{ color: TEXT_TERTIARY }}>{CHANGE_FILES.length} files changed</span>
+                <span style={{ color: TEXT_TERTIARY }}>{changedFiles.length} files changed</span>
                 <span style={{ color: "#10b981" }}>+{totalAdd}</span>
                 <span style={{ color: "#ef4444" }}>−{totalDel}</span>
 
@@ -365,7 +469,7 @@ export function ChangesPage({
                         staged
                         selected={selectedFile?.id === file.id}
                         onToggle={e => toggleStage(e, file.id)}
-                        onSelect={() => setSelectedFile(file)}
+                        onSelect={() => handleFileSelect(file)}
                       />
                     ))
                   ) : stagedOpen && stagedFiles.length === 0 ? (
@@ -411,7 +515,7 @@ export function ChangesPage({
                         staged={false}
                         selected={selectedFile?.id === file.id}
                         onToggle={e => toggleStage(e, file.id)}
-                        onSelect={() => setSelectedFile(file)}
+                        onSelect={() => handleFileSelect(file)}
                       />
                     ))
                   ) : unstagedOpen && unstagedFiles.length === 0 ? (
@@ -462,9 +566,11 @@ export function ChangesPage({
                     </div>
 
                     {/* ── AI 커밋 메시지 생성기 ── */}
+                    {/* ※ 주의: AICommitGenerator의 props 타입이 기존 CommitFile을 기대한다면 
+                        임시로 매핑을 해주거나 해당 컴포넌트도 UICommitFile 타입으로 맞춰주어야 합니다. */}
                     <AICommitGenerator
                       projectId={projectId ?? 0}
-                      stagedFiles={stagedFiles}
+                      stagedFiles={stagedFiles as any} 
                       onApply={msg => setMessage(msg)}
                     />
 
@@ -533,7 +639,7 @@ export function ChangesPage({
                       className="flex items-center gap-3 px-4 py-2 shrink-0"
                       style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
                     >
-                      <span className="text-[10px] font-semibold" style={{ color: "#c9d1d9" }}>{selectedFile.name}</span>
+                      <span className="text-[10px] font-semibold" style={{ color: "#c9d1d9" }}>{selectedFile.fileName}</span>
                       <span className="text-[9px] font-mono truncate" style={{ color: "#8b949e" }}>{selectedFile.path}</span>
                       <div className="ml-auto flex items-center gap-2 text-[9px]">
                         <span style={{ color: "#3fb950" }}>+{selectedFile.additions}</span>
@@ -541,8 +647,8 @@ export function ChangesPage({
                         <span
                           className="px-1.5 py-0.5 rounded text-[8px] font-semibold"
                           style={{
-                            background: STATUS_META[selectedFile.status].bg,
-                            color:      STATUS_META[selectedFile.status].color,
+                            background: STATUS_META[selectedFile.status]?.bg ?? "#333",
+                            color:      STATUS_META[selectedFile.status]?.color ?? "#fff",
                           }}
                         >
                           {selectedFile.status.toUpperCase()}
@@ -552,7 +658,16 @@ export function ChangesPage({
                   )}
 
                   {selectedFile ? (
-                    <FileDiffViewer file={selectedFile} />
+                    // 기존 FileDiffViewer 컴포넌트가 새로운 currentDiffData 형태를 처리할 수 있도록 
+                    // FileDiffViewer.tsx 내부도 props 구조 수정이 필요할 수 있습니다.
+                    // 현재는 기존처럼 file(또는 diff 포함 객체)를 넘겨줍니다.
+                    currentDiffData ? (
+                       <FileDiffViewer file={{ ...selectedFile, diff: currentDiffData.diff } as any} />
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-white/20" />
+                      </div>
+                    )
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center gap-4">
                       <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.04)" }}>
@@ -574,7 +689,7 @@ export function ChangesPage({
       {/* ── 컨벤션 가드 모달 ── */}
       {showConvention && (
         <ConventionGuardModal
-          stagedFiles={stagedFiles.map(f => f.name)}
+          stagedFiles={stagedFiles.map(f => f.fileName)}
           userName="병권"
           onIgnore={handleConventionIgnore}
           onFix={handleConventionFix}

@@ -1,6 +1,7 @@
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 const isDev = import.meta.env.DEV;
+const isPreview = import.meta.env.VITE_IS_PREVIEW === "true";
 
 const AUTH_SESSION_KEY = "weai_auth_session_v1";
 
@@ -790,6 +791,25 @@ export async function signUp(payload: SignUpPayload): Promise<void> {
 }
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
+  if (isPreview) {
+    console.log("🛠️ [Preview Mode] 가짜 이메일/비밀번호 로그인 성공");
+    await new Promise((resolve) => setTimeout(resolve, 500)); // 0.5초 로딩 딜레이
+    
+    const dummySession: AuthSession = {
+      tokenType: "Bearer",
+      accessToken: "preview_access_token_123",
+      accessTokenExpiresInSeconds: 3600,
+      refreshToken: "preview_refresh_token_456",
+      refreshTokenExpiresInSeconds: 86400,
+      username: payload.email.split("@")[0] || "preview_user",
+      email: payload.email,
+      role: "ADMIN",
+    };
+    
+    saveSession(dummySession);
+    return dummySession;
+  }
+  
   const session = await request<AuthSession>(
     "/api/v1/auth/login",
     {
@@ -806,6 +826,19 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
 export async function sendEmailLoginCode(
   payload: EmailCodeSendPayload
 ): Promise<VerificationCodeDispatchResponse> {
+  if (isPreview) {
+    console.log("🛠️ [Preview Mode] 가짜 인증 코드(123456)가 발송되었습니다.");
+    await new Promise((resolve) => setTimeout(resolve, 500)); // 로딩 딜레이
+    return {
+      purpose: "EMAIL_LOGIN",
+      deliveryChannel: payload.deliveryChannel,
+      deliveryTarget: payload.email,
+      deliveryMode: "MOCK",
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+      debugCode: "123456", // 아무 번호나 입력해도 통과하게 하거나, 이 번호로 확인
+    };
+  }
+
   return request<VerificationCodeDispatchResponse>(
     "/api/v1/auth/email-login/code",
     {
@@ -817,6 +850,23 @@ export async function sendEmailLoginCode(
 }
 
 export async function loginWithEmailCode(payload: EmailCodeLoginPayload): Promise<AuthSession> {
+  if (isPreview) {
+    console.log("🛠️ [Preview Mode] 가짜 이메일 코드 로그인 성공");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const dummySession: AuthSession = {
+      tokenType: "Bearer",
+      accessToken: "preview_access_token_123",
+      accessTokenExpiresInSeconds: 3600,
+      refreshToken: "preview_refresh_token_456",
+      refreshTokenExpiresInSeconds: 86400,
+      username: payload.email.split("@")[0] || "preview_user",
+      email: payload.email,
+      role: "ADMIN", // 교수님이 볼 때 모든 권한이 있도록 ADMIN 부여
+    };
+    saveSession(dummySession);
+    return dummySession;
+  }
+
   const session = await request<AuthSession>(
     "/api/v1/auth/email-login",
     {
@@ -907,6 +957,17 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
+  if (isPreview) {
+    const session = loadSession(); // 위에서 저장한 dummySession을 불러옴
+    return {
+      id: 9999, // 가짜 유저 ID
+      username: session?.username || "evaluator",
+      name: "SynAIpse 평가자", // 화면 우측 상단 등에 표시될 이름
+      email: session?.email || "preview@synaipse.com",
+      role: "ADMIN",
+    };
+  }
+
   return request<CurrentUser>("/api/v1/users/me");
 }
 

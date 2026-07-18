@@ -1,11 +1,16 @@
 {
-  "name": "@figma/my-make-file",
+  "name": "synaipse-client",
   "private": true,
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "description": "SynAIpse - AI-driven Project Management Platform",
+  "author": "SynAIpse Team",
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "build:preview": "tsc && vite build --mode preview",
+    "dev": "vite",
+    "dev:local": "vite --mode local-backend",
+    "dev:preview": "vite --mode preview"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -86,5 +91,16 @@
     "overrides": {
       "vite": "6.3.5"
     }
+  },
+  "build": {
+    "appId": "com.synaipse.app",
+    "productName": "SynAIpse",
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": "nsis"
+    }
   }
 }
+
