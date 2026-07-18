@@ -46,7 +46,7 @@ import {
   loginWithEmailCode,
   sendEmailLoginCode,
   signUp,
-  fetchSocialLoginUrl,
+  naverLogin,
 } from "../lib/api";
 
 const KEYFRAMES = `

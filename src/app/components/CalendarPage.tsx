@@ -38,6 +38,8 @@ import {
   fetchProjectMembers,
   formatApiError,
   updateProjectSchedule,
+  fetchProjectScheduleDetail,
+  updateProjectScheduleStatus,
 } from "../lib/api";
 
 const SCHEDULE_DEPARTMENTS: ProjectDepartment[] = [
@@ -590,6 +592,34 @@ export function CalendarPage({ projectId }: Props) {
   const handleRefresh = async () => {
     await Promise.all([loadMembers(), loadSchedules()]);
     toast.success("캘린더 데이터를 새로고침했습니다.");
+  };
+
+  const handleOpenEditModal = async (scheduleId: number) => {  //프로젝트 일정 상세 조회
+    if (!projectId) return;
+
+    try {
+      const scheduleDetail = await fetchProjectScheduleDetail(projectId, scheduleId);
+      setModalState({ mode: "edit", schedule: scheduleDetail });
+    } catch (error) {
+      toast.error(formatApiError(error));
+    }
+  };
+
+  const handleStatusUpdate = async (scheduleId: number | string, newStatus: ProjectScheduleStatus) => {  //프로젝트 일정 상태 변경
+    try {
+      const currentProjectId = 1;
+
+      await updateProjectScheduleStatus(currentProjectId, scheduleId, {
+        status: newStatus 
+      });
+
+      // 성공 시 화면 데이터를 새로고침
+      if (typeof handleRefresh === 'function') {
+        handleRefresh();
+      }
+    } catch (error) {
+      console.error("일정 상태 변경 실패:", error);
+    }
   };
 
   const handleSaveSchedule = async (form: ScheduleFormState) => {

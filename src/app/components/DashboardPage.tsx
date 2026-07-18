@@ -114,13 +114,13 @@ export function DashboardPage({ projectId, projectName }: Props) {
   const [activities, setActivities] = useState<ProjectActivity[]>([]);
   const [progressStats, setProgressStats] = useState<ProjectProgressStats | null>(null);
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
-  const [deptStatus, setDeptStatus] = useState<DepartmentStatusDetail[]>([]); 
-  
+  const [deptStatus, setDeptStatus] = useState<DepartmentStatusDetail[]>([]);
+
   // 내 활동 요약 상태 관리 추가
   const [mySummary, setMySummary] = useState<MyActivitySummary | null>(null);
   // 내 최근 활동
   const [myActivities, setMyActivities] = useState<MyActivity[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,7 +144,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
     setLoading(true);
 
     try {
-      // 1. 기존 오리지널 데이터 Fetch (순서 절대 변경 금지)
+      // 1. 기존 오리지널 데이터 Fetch
       const [nextDashboard, activityList, nextProgress, milestoneList, deptStatusList] = await Promise.all([
         fetchProjectDashboard(projectId),
         fetchProjectActivities(projectId),
@@ -152,24 +152,36 @@ export function DashboardPage({ projectId, projectName }: Props) {
         fetchProjectMilestones(projectId),
         fetchProjectDepartmentStatus(projectId),
       ]);
-      
+
       setDashboard(nextDashboard);
       setActivities(activityList.activities || []);
       setProgressStats(nextProgress);
       setMilestones(milestoneList.milestones || []);
-      setDeptStatus(deptStatusList.departments || []); 
+      setDeptStatus(deptStatusList.departments || []);
       setError(null);
 
       try {
-        const mySummaryData = await fetchMyActivitySummary(projectId);
+        const mySummaryData = await fetchMyActivitySummary();
         setMySummary(mySummaryData);
       } catch (summaryError) {
         console.warn("내 활동 요약 정보를 불러오지 못했습니다.", summaryError);
       }
 
       try {
-        const myActivitiesData = await fetchMyActivities(projectId);
-        setMyActivities(myActivitiesData.activities || []);
+        const myActivitiesData = await fetchMyActivities();
+
+        let checkedActivities: any[] = [];
+        if (myActivitiesData) {
+          if (Array.isArray(myActivitiesData)) {
+            // 백엔드가 배열로 주는 경우
+            checkedActivities = myActivitiesData;
+          } else if ((myActivitiesData as any).activities && Array.isArray((myActivitiesData as any).activities)) {
+            // 백엔드가 객체 내부 { activities: [...] } 로 주는 경우
+            checkedActivities = (myActivitiesData as any).activities;
+          }
+        }
+
+        setMyActivities(checkedActivities);
       } catch (activitiesError) {
         console.warn("내 최근 활동 내역을 불러오지 못했습니다.", activitiesError);
       }
@@ -236,7 +248,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
   return (
     <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
       <div className="mx-auto max-w-6xl space-y-5">
-        
+
         {/* ── 상단 대시보드 헤더 ── */}
         <section
           className="rounded-[28px] border px-6 py-6"
@@ -419,7 +431,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
 
         {/* ── 2단 컬럼 (부서별 진행률 & 최근 일정) ── */}
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          
+
           {/* 1. 부서별 진행률 */}
           <div
             className="rounded-[28px] border px-5 py-5"
