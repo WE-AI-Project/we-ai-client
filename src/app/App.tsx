@@ -29,6 +29,7 @@ import { SynAIpseGalaxyPage } from "./components/SynAIpseGalaxyPage";
 import { JoinProjectScreen } from "./components/JoinProjectScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { DashboardPage } from "./components/DashboardPage";
+import { WeAIDashboard } from "./components/WeAIDashboard";
 import { EnvironmentSettingsPage } from "./components/EnvironmentSettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { CommitDiffPage } from "./components/CommitDiffPage";
@@ -51,11 +52,13 @@ import {
   CurrentUser,
   ProjectDetail,
   ProjectLaunchTarget,
+  PUBLISHING_USER,
   clearSession,
   fetchCurrentUser,
   fetchProjectDetail,
   loadSession,
   logout,
+  isPublishingSession,
   refreshSession,
 } from "./lib/api";
 
@@ -308,6 +311,20 @@ export default function App() {
         return;
       }
 
+      if (isPublishingSession(existingSession)) {
+        if (active) {
+          setAuthSession(existingSession);
+          setCurrentUser(PUBLISHING_USER);
+          setProjectId(111);
+          setProject("퍼블리싱 테스트 프로젝트");
+          setProjectCode("PUBLISH-111");
+          setLocalPath("");
+          setScreen("workspace");
+          setAuthBootstrapping(false);
+        }
+        return;
+      }
+
       try {
         const refreshedSession = await refreshSession(existingSession.refreshToken);
         const user = await fetchCurrentUser();
@@ -353,7 +370,7 @@ export default function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || isPublishingSession(authSession)) {
       return;
     }
 
@@ -381,7 +398,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [authSession, projectId]);
 
   const handleNavClick = (id: NavId) => {
     setDiffFile(null);
@@ -545,10 +562,10 @@ export default function App() {
   const handleAuthenticated = (session: AuthSession, user: CurrentUser) => {
     setAuthSession(session);
     setCurrentUser(user);
-    setScreen("join");
-    setProjectId(null);
-    setProject("");
-    setProjectCode("");
+    setScreen(isPublishingSession(session) ? "workspace" : "join");
+    setProjectId(isPublishingSession(session) ? 111 : null);
+    setProject(isPublishingSession(session) ? "퍼블리싱 테스트 프로젝트" : "");
+    setProjectCode(isPublishingSession(session) ? "PUBLISH-111" : "");
     setLocalPath("");
   };
 
@@ -631,7 +648,9 @@ export default function App() {
 
   const renderPage = (nav: NavId) => {
     switch (nav) {
-      case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
+      case "Dashboard": return isPublishingSession(authSession)
+        ? <WeAIDashboard />
+        : <DashboardPage projectId={projectId} projectName={projectName} />;
       case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage projectId={projectId} />;
       case "ServerBuild": return <ServerBuildPage />;
@@ -642,7 +661,9 @@ export default function App() {
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} />;
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
-      default: return <DashboardPage projectId={projectId} projectName={projectName} />;
+      default: return isPublishingSession(authSession)
+        ? <WeAIDashboard />
+        : <DashboardPage projectId={projectId} projectName={projectName} />;
     }
   };
 

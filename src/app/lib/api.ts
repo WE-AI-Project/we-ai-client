@@ -4,6 +4,9 @@ const isDev = import.meta.env.DEV;
 const isPreview = import.meta.env.VITE_IS_PREVIEW === "true";
 
 const AUTH_SESSION_KEY = "weai_auth_session_v1";
+const PUBLISHING_ACCESS_TOKEN = "weai-publishing-preview";
+const publishingLoginEnabled =
+  import.meta.env.VITE_ENABLE_PUBLISHING_LOGIN?.trim().toLowerCase() !== "false";
 
 export const AUTH_SESSION_EVENT = "weai:auth-session-changed";
 
@@ -59,6 +62,14 @@ export type AuthSession = {
   username: string;
   email: string;
   role: UserRole;
+};
+
+export const PUBLISHING_USER: CurrentUser = {
+  id: 111,
+  username: "111",
+  name: "퍼블리싱 테스트",
+  email: "111",
+  role: "USER",
 };
 
 export type VerificationCodeDispatchResponse = {
@@ -724,7 +735,8 @@ export async function request<T>(
   if (
     response.status === 401 &&
     options.retryOnAuthFailure !== false &&
-    normalizedPath !== "/api/v1/auth/refresh"
+    normalizedPath !== "/api/v1/auth/refresh" &&
+    !isPublishingSession(session)
   ) {
     const refreshToken = loadSession()?.refreshToken;
 
@@ -771,6 +783,33 @@ export function saveSession(session: AuthSession) {
 
   window.localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
   emitSessionEvent();
+}
+
+export function createPublishingSession(
+  id: string,
+  password: string
+): { session: AuthSession; user: CurrentUser } | null {
+  if (!publishingLoginEnabled || id.trim() !== "111" || password !== "111") {
+    return null;
+  }
+
+  const session: AuthSession = {
+    tokenType: "PublishingPreview",
+    accessToken: PUBLISHING_ACCESS_TOKEN,
+    accessTokenExpiresInSeconds: 0,
+    refreshToken: PUBLISHING_ACCESS_TOKEN,
+    refreshTokenExpiresInSeconds: 0,
+    username: PUBLISHING_USER.username,
+    email: PUBLISHING_USER.email,
+    role: PUBLISHING_USER.role,
+  };
+
+  saveSession(session);
+  return { session, user: PUBLISHING_USER };
+}
+
+export function isPublishingSession(session: AuthSession | null | undefined): boolean {
+  return session?.accessToken === PUBLISHING_ACCESS_TOKEN;
 }
 
 export function clearSession() {
@@ -956,11 +995,12 @@ export async function refreshSession(refreshToken = loadSession()?.refreshToken)
 }
 
 export async function logout(): Promise<void> {
-  const refreshToken = loadSession()?.refreshToken;
+  const session = loadSession();
+  const refreshToken = session?.refreshToken;
   clearSession();
 
   try {
-    if (refreshToken) {
+    if (refreshToken && !isPublishingSession(session)) {
       await request<void>(
         "/api/v1/auth/logout",
         {

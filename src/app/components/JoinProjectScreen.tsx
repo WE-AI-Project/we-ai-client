@@ -58,6 +58,7 @@ import {
   formatApiError,
   joinProject,
 } from "../lib/api";
+import { ProjectPickerSkeleton } from "./SkeletonLoader";
 
 const PATH_EXAMPLES = [
   "D:\\WE_AI\\enterprise",
@@ -849,12 +850,7 @@ function StartModal({
           )}
 
           {loading ? (
-            <div className="flex items-center gap-2 px-2 py-4">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: ACCENT }} />
-              <p className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
-                프로젝트 목록을 불러오는 중...
-              </p>
-            </div>
+            <ProjectPickerSkeleton />
           ) : projects.length === 0 ? (
             <div className="rounded-xl border px-4 py-6 text-center" style={{ background: "rgba(0,0,0,0.02)", borderColor: BORDER }}>
               <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>

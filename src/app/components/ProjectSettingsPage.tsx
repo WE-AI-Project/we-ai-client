@@ -50,6 +50,7 @@ import {
   updateProjectTechStack,
 } from "../lib/api";
 import { loadSettings, saveSettings } from "../data/projectSettingsStore";
+import { ProjectSettingsSkeleton } from "./SkeletonLoader";
 
 const MEMBER_DEPARTMENTS: ProjectDepartment[] = [
   "BACKEND",
@@ -515,18 +516,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
-        <div
-          className="rounded-3xl border px-6 py-6 text-center"
-          style={{ background: "rgba(255,255,255,0.94)", borderColor: BORDER }}
-        >
-          <p className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-            프로젝트 설정을 불러오는 중입니다...
-          </p>
-        </div>
-      </div>
-    );
+    return <ProjectSettingsSkeleton />;
   }
 
   if (!detail || error) {

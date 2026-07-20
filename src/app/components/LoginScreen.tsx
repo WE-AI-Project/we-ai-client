@@ -40,6 +40,7 @@ import {
   CurrentUser,
   SocialProvider,
   VerificationCodeDispatchResponse,
+  createPublishingSession,
   fetchCurrentUser,
   formatApiError,
   login,
@@ -250,6 +251,7 @@ function Field({
   right,
   error,
   disabled,
+  onEnter,
 }: {
   label: string;
   icon: React.ElementType;
@@ -260,6 +262,7 @@ function Field({
   right?: React.ReactNode;
   error?: string;
   disabled?: boolean;
+  onEnter?: () => void;
 }) {
   const [focused, setFocused] = useState(false);
 
@@ -286,6 +289,12 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && onEnter) {
+              event.preventDefault();
+              onEnter();
+            }
+          }}
           type={type}
           placeholder={placeholder}
           disabled={disabled}
@@ -463,6 +472,12 @@ function LoginForm({
     setError("");
     setLoading(true);
     try {
+      const publishingLogin = createPublishingSession(email, password);
+      if (publishingLogin) {
+        onAuthenticated(publishingLogin.session, publishingLogin.user);
+        return;
+      }
+
       const session = await login({
         email: email.trim(),
         password,
@@ -594,6 +609,7 @@ function LoginForm({
           setError("");
         }}
         placeholder="••••••••"
+        onEnter={() => void handleLogin()}
         right={
           <button
             type="button"
@@ -630,6 +646,10 @@ function LoginForm({
           "로그인"
         )}
       </button>
+
+      <p className="text-center text-[10px]" style={{ color: LOGIN_ICON_MUTED }}>
+        퍼블리싱 테스트 계정: <strong style={{ color: OLIVE_DARK }}>publishing.backup.20260720@weai.local / 11!11111</strong>
+      </p>
 
       <button
         type="button"
