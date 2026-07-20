@@ -60,6 +60,7 @@ import {
   logout,
   isPublishingSession,
   refreshSession,
+  fetchMyProjects, // 🚀 API 추가됨
 } from "./lib/api";
 
 // ── 디자인 토큰 ──
@@ -235,6 +236,7 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
 // 메인 App
 export default function App() {
   const [screen, setScreen] = useState<"login" | "join" | "workspace">("login");
+  const [joinView, setJoinView] = useState<"entry" | "create">("entry"); // 🚀 추가됨: 진입 화면 모드
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => loadSession());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authBootstrapping, setAuthBootstrapping] = useState(true);
@@ -345,26 +347,32 @@ export default function App() {
         const refreshedSession = await refreshSession(existingSession.refreshToken);
         const user = await fetchCurrentUser();
 
-        if (!active) {
-          return;
+        // 🚀 자동 로그인 시에도 프로젝트 개수 확인
+        let defaultView: "entry" | "create" = "entry";
+        try {
+          const myProjects = await fetchMyProjects();
+          if (!myProjects || myProjects.length === 0) {
+            defaultView = "create";
+          }
+        } catch (e) {
+          console.error(e);
         }
 
+        if (!active) return;
+
+        setJoinView(defaultView);
         setAuthSession(refreshedSession);
         setCurrentUser(user);
         setScreen("join");
       } catch {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
 
         clearSession();
         setAuthSession(null);
         setCurrentUser(null);
         setScreen("login");
       } finally {
-        if (active) {
-          setAuthBootstrapping(false);
-        }
+        if (active) setAuthBootstrapping(false);
       }
     };
 
@@ -376,9 +384,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
+    if (!currentUser) return;
 
     const nextProfile = buildSidebarProfile(currentUser);
     setSidebarProfile(nextProfile);
@@ -395,10 +401,7 @@ export default function App() {
     const syncProjectContext = async () => {
       try {
         const detail = await fetchProjectDetail(projectId);
-
-        if (!active) {
-          return;
-        }
+        if (!active) return;
 
         setProject(detail.projectName);
         setProjectCode(detail.projectCode);
@@ -501,7 +504,6 @@ export default function App() {
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragStartW = useRef(SIDEBAR_EXPANDED);
-
   const isSplitDragging = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
@@ -558,12 +560,8 @@ export default function App() {
         isDragging.current = false;
         setSidebarWidth(w => w < COLLAPSE_THRESHOLD ? SIDEBAR_COLLAPSED : w);
       }
-      if (isHeaderDragging.current) {
-        isHeaderDragging.current = false;
-      }
-      if (isSplitDragging.current) {
-        isSplitDragging.current = false;
-      }
+      if (isHeaderDragging.current) isHeaderDragging.current = false;
+      if (isSplitDragging.current) isSplitDragging.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
@@ -575,13 +573,36 @@ export default function App() {
 
   const toggleSidebar = () => setSidebarWidth(w => w <= COLLAPSE_THRESHOLD ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED);
 
-  const handleAuthenticated = (session: AuthSession, user: CurrentUser) => {
+  // 🚀 로그인 성공 시 실행되는 함수 (async로 변경됨)
+  const handleAuthenticated = async (session: AuthSession, user: CurrentUser) => {
     setAuthSession(session);
     setCurrentUser(user);
-    setScreen(isPublishingSession(session) ? "workspace" : "join");
-    setProjectId(isPublishingSession(session) ? 111 : null);
-    setProject(isPublishingSession(session) ? "퍼블리싱 테스트 프로젝트" : "");
-    setProjectCode(isPublishingSession(session) ? "PUBLISH-111" : "");
+
+    if (isPublishingSession(session)) {
+      setScreen("workspace");
+      setProjectId(111);
+      setProject("퍼블리싱 테스트 프로젝트");
+      setProjectCode("PUBLISH-111");
+      setLocalPath("");
+      return;
+    }
+
+    try {
+      const myProjects = await fetchMyProjects();
+      if (!myProjects || myProjects.length === 0) {
+        setJoinView("create");
+      } else {
+        setJoinView("entry");
+      }
+    } catch (e) {
+      console.error("프로젝트 조회 실패:", e);
+      setJoinView("entry");
+    }
+
+    setScreen("join");
+    setProjectId(null);
+    setProject("");
+    setProjectCode("");
     setLocalPath("");
   };
 
@@ -683,7 +704,6 @@ export default function App() {
     }
   };
 
-  // 공통 패널 컴포넌트 렌더러 (탭 닫기 로직 수정)
   const renderPanel = (
     panelType: "left" | "right",
     tabs: NavId[],
@@ -712,9 +732,7 @@ export default function App() {
               draggable
               onDragStart={(e) => {
                 setDraggedTab({ id: tId, from: panelType });
-                setTimeout(() => {
-                  setIsDraggingTab(true);
-                }, 0);
+                setTimeout(() => setIsDraggingTab(true), 0);
               }}
               onDragEnd={() => {
                 setIsDraggingTab(false);
@@ -740,10 +758,8 @@ export default function App() {
                   e.stopPropagation();
                   const nextTabs = tabs.filter(t => t !== tId);
                   
-                  // ✨ 화면 자동 병합(Un-split) 처리 로직
                   if (panelType === "left") {
                     if (nextTabs.length === 0 && isSplit) {
-                      // 왼쪽 화면이 다 꺼졌을 때 오른쪽 탭들을 왼쪽으로 당겨오고 분할 해제
                       setLeftTabs([...rightTabs]);
                       setActiveLeftTab(activeRightTab);
                       setRightTabs([]);
@@ -757,7 +773,6 @@ export default function App() {
                     }
                   } else {
                     if (nextTabs.length === 0) {
-                      // 오른쪽 화면이 다 꺼졌을 때 분할 해제
                       setRightTabs([]);
                       setIsSplit(false);
                       setActivePanel("left");
@@ -917,6 +932,7 @@ export default function App() {
         >
           <JoinProjectScreen
             currentUser={currentUser}
+            initialView={joinView} // 🚀 App에서 결정된 상태를 넘겨줍니다
             onOpenProject={handleJoin}
             onLogout={() => void handleLogout()}
           />

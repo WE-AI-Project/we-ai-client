@@ -975,12 +975,20 @@ function StartModal({
 
 type Props = {
   currentUser: CurrentUser | null;
+  initialView?: "entry" | "create";
   onOpenProject: (project: ProjectLaunchTarget) => void;
   onLogout: () => void;
 };
 
-export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Props) {
-  const [modal, setModal] = useState<"none" | "start" | "create">("none");
+export function JoinProjectScreen({
+  currentUser,
+  initialView = "entry",
+  onOpenProject,
+  onLogout,
+}: Props) {
+  const [modal, setModal] = useState<"none" | "start" | "create">(() =>
+    initialView === "create" ? "create" : "none"
+  );
   const [projects, setProjects] = useState<MyProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projectError, setProjectError] = useState("");
@@ -1005,14 +1013,16 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
     [projects]
   );
 
-  const refreshProjects = async () => {
+  const refreshProjects = async (): Promise<MyProject[] | null> => {
     setLoadingProjects(true);
     try {
       const nextProjects = await fetchMyProjects();
       setProjects(nextProjects);
       setProjectError("");
+      return nextProjects;
     } catch (error) {
       setProjectError(formatApiError(error));
+      return null;
     } finally {
       setLoadingProjects(false);
     }
@@ -1021,6 +1031,12 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
   useEffect(() => {
     void refreshProjects();
   }, []);
+
+  useEffect(() => {
+    if (initialView === "create") {
+      setModal("create");
+    }
+  }, [initialView]);
 
   const handleCreate = (project: ProjectLaunchTarget) => {
     setModal("none");
@@ -1031,6 +1047,17 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
   const handleSelectProject = (project: ProjectLaunchTarget) => {
     setModal("none");
     onOpenProject(project);
+  };
+
+  const handleStart = async () => {
+    const nextProjects = await refreshProjects();
+
+    if (nextProjects?.length === 0) {
+      setModal("create");
+      return;
+    }
+
+    setModal("start");
   };
 
   const handleCodeJoin = async () => {
@@ -1132,7 +1159,7 @@ export function JoinProjectScreen({ currentUser, onOpenProject, onLogout }: Prop
           <div className="w-full space-y-3">
             <button
               type="button"
-              onClick={() => setModal("start")}
+              onClick={() => void handleStart()}
               className="group flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left"
               style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
               onMouseEnter={(event) => {
