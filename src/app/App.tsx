@@ -157,6 +157,22 @@ type NavId =
   | "Chat" | "Calendar" | "EnvSettings" | "AIQA"
   | "ProjectSettings" | "Profile" | "Galaxy";
 
+const TAB_LABELS: Record<NavId, string> = {
+  Dashboard: "Dashboard",
+  Changes: "Changes",
+  Commits: "Commits",
+  ServerBuild: "Server & Build",
+  Chat: "Chat",
+  Calendar: "Calendar",
+  EnvSettings: "Environment",
+  AIQA: "QA & Agents",
+  ProjectSettings: "Project Settings",
+  Profile: "Profile",
+  Galaxy: "SynAIpse Galaxy",
+};
+
+const HEADER_TAB_WIDTH = `${Math.max(...Object.values(TAB_LABELS).map(label => label.length)) + 8}ch`;
+
 // ── Tooltip ──
 function Tooltip({ label }: { label: string }) {
   return (
@@ -664,7 +680,10 @@ export default function App() {
         onDrop={() => handleTabDrop(panelType)}
       >
         <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
-          {tabs.map(tId => (
+          {tabs.map(tId => {
+            const tabLabel = TAB_LABELS[tId];
+
+            return (
             <div
               key={tId}
               draggable
@@ -681,13 +700,17 @@ export default function App() {
               onClick={() => setActiveTab(tId)}
               className="flex items-center gap-2 px-4 py-2 text-[11px] font-medium cursor-pointer transition-all border-r select-none"
               style={{
+                width: HEADER_TAB_WIDTH,
+                minWidth: HEADER_TAB_WIDTH,
+                maxWidth: HEADER_TAB_WIDTH,
                 color: activeTab === tId ? "#c9d1d9" : "#8b949e",
                 background: activeTab === tId ? "#0d1117" : "transparent",
                 borderRight: "1px solid rgba(255,255,255,0.08)",
                 borderTop: activeTab === tId ? "2px solid #AEB784" : "2px solid transparent"
               }}
+              title={tabLabel}
             >
-              <span>{tId}</span>
+              <span className="min-w-0 flex-1 truncate">{tabLabel}</span>
               <X
                 className="w-3 h-3 hover:text-red-400 transition-colors rounded-sm"
                 onClick={(e) => {
@@ -725,7 +748,8 @@ export default function App() {
                 }}
               />
             </div>
-          ))}
+            );
+          })}
           <div className="ml-auto px-3 flex items-center gap-2" />
         </div>
 
