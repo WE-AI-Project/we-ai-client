@@ -670,6 +670,7 @@ export default function App() {
     setActiveTab: (id: NavId) => void
   ) => {
     const isFocused = activePanel === panelType;
+    const shouldShowTabs = isSplit || tabs.length > 1;
 
     return (
       <div
@@ -679,7 +680,8 @@ export default function App() {
         onDragOver={(e) => e.preventDefault()}
         onDrop={() => handleTabDrop(panelType)}
       >
-        <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
+        {shouldShowTabs && (
+          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
           {tabs.map(tId => {
             const tabLabel = TAB_LABELS[tId];
 
@@ -751,7 +753,8 @@ export default function App() {
             );
           })}
           <div className="ml-auto px-3 flex items-center gap-2" />
-        </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto scrollbar-hide relative">
           {tabs.length > 0 ? (
