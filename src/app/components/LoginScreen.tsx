@@ -38,6 +38,8 @@ import {
 import {
   AuthSession,
   CurrentUser,
+  findPassword,
+  PasswordFindResponse,
   SocialProvider,
   VerificationCodeDispatchResponse,
   createPublishingSession,
@@ -68,7 +70,7 @@ const THICK_SHADOW = [
   "0 32px 64px rgba(0,0,0,0.14)",
 ].join(", ");
 
-type CardMode = "login" | "signup" | "email-code";
+type CardMode = "login" | "signup" | "email-code" | "password-find";
 type FeedbackTone = "success" | "error" | "info";
 type Feedback = {
   tone: FeedbackTone;
@@ -444,6 +446,7 @@ function LoginForm({
   onAuthenticated,
   onSwitchToSignup,
   onSwitchToEmailCode,
+  onSwitchToPasswordFind,
   onSocialLogin,
 }: {
   initialEmail?: string;
@@ -451,6 +454,7 @@ function LoginForm({
   onAuthenticated: (session: AuthSession, user: CurrentUser) => void;
   onSwitchToSignup: (email?: string) => void;
   onSwitchToEmailCode: (email?: string) => void;
+  onSwitchToPasswordFind: (email?: string) => void;
   onSocialLogin: (provider: SocialProvider) => void;
 }) {
   const [email, setEmail] = useState(initialEmail);
@@ -459,6 +463,7 @@ function LoginForm({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<SocialProvider | null>(null);
+  const [hasFailedPasswordLogin, setHasFailedPasswordLogin] = useState(false);
 
   useEffect(() => {
     setEmail(initialEmail);
@@ -485,6 +490,7 @@ function LoginForm({
       const user = await resolveAuthenticatedUser(session);
       onAuthenticated(session, user);
     } catch (loginError) {
+      setHasFailedPasswordLogin(true);
       setError(formatApiError(loginError));
     } finally {
       setLoading(false);
@@ -620,6 +626,19 @@ function LoginForm({
           </button>
         }
       />
+
+      {hasFailedPasswordLogin && (
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={() => onSwitchToPasswordFind(email.trim() || undefined)}
+            className="text-[11px] font-medium transition-colors hover:underline"
+            style={{ color: LOGIN_MUTED }}
+          >
+            비밀번호를 잊으셨나요?
+          </button>
+        </div>
+      )}
 
       {error && (
         <p className="flex items-center gap-1.5 text-[10px]" style={{ color: STATUS_ERROR }}>
@@ -1319,6 +1338,127 @@ function EmailCodeLoginForm({
   );
 }
 
+function PasswordFindForm({
+  initialEmail = "",
+  onSwitchToLogin,
+}: {
+  initialEmail?: string;
+  onSwitchToLogin: (prefillEmail?: string) => void;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [result, setResult] = useState<PasswordFindResponse | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setEmail(initialEmail);
+  }, [initialEmail]);
+
+  const handleFindPassword = async () => {
+    if (!email.trim()) {
+      setError("이메일을 입력해주세요.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const response = await findPassword({ email: email.trim() });
+      setResult(response);
+    } catch (findError) {
+      setError(formatApiError(findError));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5 p-8">
+      <div className="flex items-center gap-3 border-b border-black/5 pb-5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
+          <KeyRound className="h-5 w-5" style={{ color: "white" }} />
+        </div>
+        <div>
+          <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
+            비밀번호 찾기
+          </h2>
+          <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
+            가입한 이메일로 임시 비밀번호를 발급합니다.
+          </p>
+        </div>
+      </div>
+
+      <Field
+        label="이메일"
+        icon={Mail}
+        type="email"
+        value={email}
+        onChange={(value) => {
+          setEmail(value);
+          setError("");
+          setResult(null);
+        }}
+        placeholder="your@email.com"
+        onEnter={() => void handleFindPassword()}
+      />
+
+      {error && (
+        <p className="flex items-center gap-1.5 text-[10px]" style={{ color: STATUS_ERROR }}>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: STATUS_ERROR }} />
+          {error}
+        </p>
+      )}
+
+      {result && (
+        <div
+          className="rounded-xl px-3.5 py-3"
+          style={{ background: "rgba(90,138,74,0.08)", border: "1px solid rgba(90,138,74,0.18)" }}
+        >
+          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+            임시 비밀번호를 발급했습니다.
+          </p>
+          <p className="mt-1 text-[10px]" style={{ color: LOGIN_MUTED }}>
+            메일함에서 임시 비밀번호를 확인한 뒤 로그인하세요.
+          </p>
+          {result.expiresAt && (
+            <p className="mt-1 text-[9px]" style={{ color: LOGIN_MUTED }}>
+              만료 시각: {result.expiresAt}
+            </p>
+          )}
+          {import.meta.env.DEV && result.debugTemporaryPassword && (
+            <p className="mt-2 text-[10px]" style={{ color: OLIVE_DARK }}>
+              개발용 임시 비밀번호: <strong>{result.debugTemporaryPassword}</strong>
+            </p>
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => void handleFindPassword()}
+        disabled={loading}
+        className="w-full rounded-xl py-3.5 text-sm font-semibold"
+        style={{ background: OLIVE_DARK, color: "white", opacity: loading ? 0.75 : 1 }}
+      >
+        {loading ? "임시 비밀번호 발급 중..." : "임시 비밀번호 발급"}
+      </button>
+
+      <p className="text-center text-[11px]" style={{ color: LOGIN_MUTED }}>
+        비밀번호가 기억나셨나요?{" "}
+        <button
+          type="button"
+          onClick={() => onSwitchToLogin(email.trim() || undefined)}
+          className="font-semibold"
+          style={{ color: OLIVE_DARK }}
+        >
+          로그인
+        </button>
+      </p>
+    </div>
+  );
+}
+
 export function LoginScreen({ onAuthenticated }: Props) {
   const [cardOpen, setCardOpen] = useState(false);
   const [mode, setMode] = useState<CardMode>("login");
@@ -1547,6 +1687,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
                   onAuthenticated={handleAuthenticatedInternal}
                   onSwitchToSignup={(email) => switchMode("signup", { email, notice: null })}
                   onSwitchToEmailCode={(email) => switchMode("email-code", { email, notice: null })}
+                  onSwitchToPasswordFind={(email) => switchMode("password-find", { email, notice: null })}
                   onSocialLogin={(provider) => {
                     switchMode("signup", {
                       email: buildMockSocialEmail(provider),
@@ -1569,6 +1710,13 @@ export function LoginScreen({ onAuthenticated }: Props) {
                 <EmailCodeLoginForm
                   initialEmail={prefillEmail}
                   onAuthenticated={handleAuthenticatedInternal}
+                  onSwitchToLogin={(email) => switchMode("login", { email, notice: null })}
+                />
+              )}
+
+              {mode === "password-find" && (
+                <PasswordFindForm
+                  initialEmail={prefillEmail}
                   onSwitchToLogin={(email) => switchMode("login", { email, notice: null })}
                 />
               )}

@@ -581,6 +581,17 @@ export type LoginPayload = {
   password: string;
 };
 
+export type PasswordFindPayload = {
+  email: string;
+};
+
+export type PasswordFindResponse = {
+  email: string;
+  deliveryMode: string;
+  expiresAt?: string | null;
+  debugTemporaryPassword?: string | null;
+};
+
 export type SignUpPayload = {
   username?: string;
   name: string;
@@ -879,6 +890,29 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
 
   saveSession(session);
   return session;
+}
+
+export async function findPassword(
+  payload: PasswordFindPayload
+): Promise<PasswordFindResponse> {
+  if (isPreview) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return {
+      email: payload.email,
+      deliveryMode: "SIMULATED",
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      debugTemporaryPassword: "Ab3!x9MzQp7",
+    };
+  }
+
+  return request<PasswordFindResponse>(
+    "/api/v1/auth/password/find",
+    {
+      method: "POST",
+      body: payload,
+    },
+    { auth: false, retryOnAuthFailure: false }
+  );
 }
 
 export async function sendEmailLoginCode(
