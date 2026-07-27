@@ -6,81 +6,47 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  SIDEBAR_BORDER,
 } from "../colors";
+import { fetchMyNotifications, NotificationItem } from "../lib/api";
 
-// ── 알림 타입 ──
-type NotifLevel = "info" | "success" | "warning" | "error";
-
-type Notification = {
-  id:      number;
-  level:   NotifLevel;
-  icon:    typeof GitCommit;
-  title:   string;
-  desc:    string;
-  time:    string;
-  read:    boolean;
-};
-
-const LEVEL_COLORS: Record<NotifLevel, { color: string; bg: string }> = {
+// ── 알림 레벨별 색상 설정 ──
+const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
   info:    { color: "#6B7A50",    bg: "rgba(107,122,80,0.10)"  },
   success: { color: "#5A8A4A",    bg: "rgba(90,138,74,0.10)"   },
   warning: { color: "#C09840",    bg: "rgba(192,152,64,0.10)"  },
   error:   { color: "#B85450",    bg: "rgba(184,84,80,0.10)"   },
 };
 
-const INITIAL_NOTIFS: Notification[] = [
-  {
-    id: 1, level: "error", icon: AlertCircle, read: false,
-    title: "AGT-04 연결 끊김",
-    desc:  "에이전트 04번이 응답하지 않습니다. 재시작이 필요합니다.",
-    time:  "방금 전",
-  },
-  {
-    id: 2, level: "success", icon: CheckCircle2, read: false,
-    title: "빌드 성공",
-    desc:  "WE&AI Backend Server — v0.9.3 빌드가 완료됐습니다.",
-    time:  "12분 전",
-  },
-  {
-    id: 3, level: "info", icon: GitCommit, read: false,
-    title: "새 커밋 3건",
-    desc:  "main 브랜치에 새로운 커밋이 푸시됐습니다.",
-    time:  "34분 전",
-  },
-  {
-    id: 4, level: "warning", icon: Bot, read: false,
-    title: "AGT-02 CPU 과부하",
-    desc:  "멀티에이전트 오케스트레이터 CPU 사용률이 87%입니다.",
-    time:  "1시간 전",
-  },
-  {
-    id: 5, level: "info", icon: FolderGit2, read: true,
-    title: "프로젝트 설정 변경됨",
-    desc:  "Active Profile이 dev → staging으로 변경됐습니다.",
-    time:  "2시간 전",
-  },
-  {
-    id: 6, level: "success", icon: Info, read: true,
-    title: "문서 동기화 완료",
-    desc:  "RAG 문서 7건이 성공적으로 인덱싱됐습니다.",
-    time:  "3시간 전",
-  },
-];
+// ── 서버의 type 문자열을 프론트엔드 아이콘과 색상으로 매칭하는 헬퍼 함수 ──
+const getNotificationStyle = (type: string) => {
+  switch (type) {
+    case "error":
+      return { icon: AlertCircle, ...LEVEL_COLORS.error };
+    case "success":
+      return { icon: CheckCircle2, ...LEVEL_COLORS.success };
+    case "warning":
+      return { icon: Bot, ...LEVEL_COLORS.warning };
+    case "commit":
+      return { icon: GitCommit, ...LEVEL_COLORS.info };
+    case "info":
+    default:
+      return { icon: Info, ...LEVEL_COLORS.info };
+  }
+};
 
 // ── 메인 컴포넌트 ──
 export function NotificationPanel() {
   const [open,   setOpen]   = useState(false);
-  const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFS);
+  const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [anim,   setAnim]   = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const unread = notifs.filter(n => !n.read).length;
+  const unread = notifs.filter(n => !n.isRead).length;
 
   // 패널 열릴 때 애니메이션
   useEffect(() => {
     if (open) requestAnimationFrame(() => setAnim(true));
-    else       setAnim(false);
+    else      setAnim(false);
   }, [open]);
 
   // 외부 클릭 닫기
@@ -95,6 +61,19 @@ export function NotificationPanel() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  // 컴포넌트 마운트 시 알림 목록 조회 (API 연동)
+  useEffect(() => { 
+    async function loadNotifications() {
+      try {
+        const data = await fetchMyNotifications();
+        setNotifs(data);
+      } catch (error) {
+        console.error("알림 목록을 불러오지 못했습니다:", error);
+      }
+    }
+    loadNotifications();
+  }, []);
+
   // ESC 닫기
   useEffect(() => {
     if (!open) return;
@@ -103,8 +82,9 @@ export function NotificationPanel() {
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
 
-  const markRead   = (id: number) => setNotifs(ns => ns.map(n => n.id === id ? { ...n, read: true } : n));
-  const markAll    = ()           => setNotifs(ns => ns.map(n => ({ ...n, read: true })));
+  // 🚀 기존 read -> isRead 로 모두 변경
+  const markRead   = (id: number) => setNotifs(ns => ns.map(n => n.id === id ? { ...n, isRead: true } : n));
+  const markAll    = ()           => setNotifs(ns => ns.map(n => ({ ...n, isRead: true })));
   const dismiss    = (id: number) => setNotifs(ns => ns.filter(n => n.id !== id));
   const clearAll   = ()           => setNotifs([]);
 
@@ -197,22 +177,23 @@ export function NotificationPanel() {
             ) : (
               <div>
                 {notifs.map((n, idx) => {
-                  const Icon  = n.icon;
-                  const style = LEVEL_COLORS[n.level];
+                  // 🚀 API의 n.type을 기반으로 아이콘과 색상을 매칭
+                  const { icon: Icon, color, bg } = getNotificationStyle(n.type);
+                  
                   return (
                     <div
                       key={n.id}
                       className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-all group relative"
                       style={{
                         borderBottom: idx < notifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
-                        background:   n.read ? "transparent" : "rgba(174,183,132,0.06)",
+                        background:   n.isRead ? "transparent" : "rgba(174,183,132,0.06)", // read -> isRead
                       }}
                       onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.025)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = n.read ? "transparent" : "rgba(174,183,132,0.06)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = n.isRead ? "transparent" : "rgba(174,183,132,0.06)")}
                       onClick={() => markRead(n.id)}
                     >
                       {/* 미읽음 도트 */}
-                      {!n.read && (
+                      {!n.isRead && (
                         <div
                           className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
                           style={{ background: ACCENT }}
@@ -222,24 +203,24 @@ export function NotificationPanel() {
                       {/* 아이콘 */}
                       <div
                         className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                        style={{ background: style.bg }}
+                        style={{ background: bg }}
                       >
-                        <Icon className="w-3.5 h-3.5" style={{ color: style.color }} />
+                        <Icon className="w-3.5 h-3.5" style={{ color: color }} />
                       </div>
 
                       {/* 텍스트 */}
                       <div className="flex-1 min-w-0">
                         <p
                           className="text-[11px] font-semibold leading-tight"
-                          style={{ color: n.read ? TEXT_SECONDARY : TEXT_PRIMARY }}
+                          style={{ color: n.isRead ? TEXT_SECONDARY : TEXT_PRIMARY }}
                         >
                           {n.title}
                         </p>
                         <p className="text-[10px] mt-0.5 leading-snug" style={{ color: TEXT_TERTIARY }}>
-                          {n.desc}
+                          {n.body} {/* 🚀 desc -> body */}
                         </p>
                         <p className="text-[9px] mt-1" style={{ color: TEXT_LABEL }}>
-                          {n.time}
+                          {n.createdAt} {/* 🚀 time -> createdAt */}
                         </p>
                       </div>
 

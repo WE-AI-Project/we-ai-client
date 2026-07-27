@@ -723,72 +723,72 @@ export default function App() {
       >
         {shouldShowTabs && (
           <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
-          {tabs.map(tId => {
-            const tabLabel = TAB_LABELS[tId];
+            {tabs.map(tId => {
+              const tabLabel = TAB_LABELS[tId];
 
-            return (
-            <div
-              key={tId}
-              draggable
-              onDragStart={(e) => {
-                setDraggedTab({ id: tId, from: panelType });
-                setTimeout(() => setIsDraggingTab(true), 0);
-              }}
-              onDragEnd={() => {
-                setIsDraggingTab(false);
-                setDraggedTab(null);
-              }}
-              onClick={() => setActiveTab(tId)}
-              className="flex items-center gap-2 px-4 py-2 text-[11px] font-medium cursor-pointer transition-all border-r select-none"
-              style={{
-                width: HEADER_TAB_WIDTH,
-                minWidth: HEADER_TAB_WIDTH,
-                maxWidth: HEADER_TAB_WIDTH,
-                color: activeTab === tId ? "#c9d1d9" : "#8b949e",
-                background: activeTab === tId ? "#0d1117" : "transparent",
-                borderRight: "1px solid rgba(255,255,255,0.08)",
-                borderTop: activeTab === tId ? "2px solid #AEB784" : "2px solid transparent"
-              }}
-              title={tabLabel}
-            >
-              <span className="min-w-0 flex-1 truncate">{tabLabel}</span>
-              <X
-                className="w-3 h-3 hover:text-red-400 transition-colors rounded-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const nextTabs = tabs.filter(t => t !== tId);
-                  
-                  if (panelType === "left") {
-                    if (nextTabs.length === 0 && isSplit) {
-                      setLeftTabs([...rightTabs]);
-                      setActiveLeftTab(activeRightTab);
-                      setRightTabs([]);
-                      setIsSplit(false);
-                      setActivePanel("left");
-                    } else {
-                      setLeftTabs(nextTabs);
-                      if (nextTabs.length > 0 && activeTab === tId) {
-                        setActiveLeftTab(nextTabs[nextTabs.length - 1]);
+              return (
+                <div
+                  key={tId}
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggedTab({ id: tId, from: panelType });
+                    setTimeout(() => setIsDraggingTab(true), 0);
+                  }}
+                  onDragEnd={() => {
+                    setIsDraggingTab(false);
+                    setDraggedTab(null);
+                  }}
+                  onClick={() => setActiveTab(tId)}
+                  className="flex items-center gap-2 px-4 py-2 text-[11px] font-medium cursor-pointer transition-all border-r select-none"
+                  style={{
+                    width: HEADER_TAB_WIDTH,
+                    minWidth: HEADER_TAB_WIDTH,
+                    maxWidth: HEADER_TAB_WIDTH,
+                    color: activeTab === tId ? "#c9d1d9" : "#8b949e",
+                    background: activeTab === tId ? "#0d1117" : "transparent",
+                    borderRight: "1px solid rgba(255,255,255,0.08)",
+                    borderTop: activeTab === tId ? "2px solid #AEB784" : "2px solid transparent"
+                  }}
+                  title={tabLabel}
+                >
+                  <span className="min-w-0 flex-1 truncate">{tabLabel}</span>
+                  <X
+                    className="w-3 h-3 hover:text-red-400 transition-colors rounded-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const nextTabs = tabs.filter(t => t !== tId);
+
+                      if (panelType === "left") {
+                        if (nextTabs.length === 0 && isSplit) {
+                          setLeftTabs([...rightTabs]);
+                          setActiveLeftTab(activeRightTab);
+                          setRightTabs([]);
+                          setIsSplit(false);
+                          setActivePanel("left");
+                        } else {
+                          setLeftTabs(nextTabs);
+                          if (nextTabs.length > 0 && activeTab === tId) {
+                            setActiveLeftTab(nextTabs[nextTabs.length - 1]);
+                          }
+                        }
+                      } else {
+                        if (nextTabs.length === 0) {
+                          setRightTabs([]);
+                          setIsSplit(false);
+                          setActivePanel("left");
+                        } else {
+                          setRightTabs(nextTabs);
+                          if (activeTab === tId) {
+                            setActiveRightTab(nextTabs[nextTabs.length - 1]);
+                          }
+                        }
                       }
-                    }
-                  } else {
-                    if (nextTabs.length === 0) {
-                      setRightTabs([]);
-                      setIsSplit(false);
-                      setActivePanel("left");
-                    } else {
-                      setRightTabs(nextTabs);
-                      if (activeTab === tId) {
-                        setActiveRightTab(nextTabs[nextTabs.length - 1]);
-                      }
-                    }
-                  }
-                }}
-              />
-            </div>
-            );
-          })}
-          <div className="ml-auto px-3 flex items-center gap-2" />
+                    }}
+                  />
+                </div>
+              );
+            })}
+            <div className="ml-auto px-3 flex items-center gap-2" />
           </div>
         )}
 
@@ -947,8 +947,9 @@ export default function App() {
     <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
       {showStandup && (
         <DailyStandupModal
-          userName="병권"
-          userPart="Frontend"
+          userName={sidebarProfile.displayName}
+          userPart={sidebarProfile.role}
+          projectId={projectId ?? 0}
           onClose={() => setShowStandup(false)}
           onNavigate={handleStandupNavigate}
         />

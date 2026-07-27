@@ -381,6 +381,39 @@ export type ProjectCommitFileDiff = {
   diff: string;
 };
 
+export type NotificationItem = {  //알림 목록 조회
+  id: number;
+  type: string;
+  title: string;
+  body: string;
+  createdAt: string; 
+  isRead: boolean;
+};
+
+export async function fetchMyNotifications(): Promise<NotificationItem[]> {
+  return request<NotificationItem[]>('/api/v1/notifications', { // /users/me 가 없을 수도 있음
+    method: 'GET',
+  });
+}
+
+export async function fetchDailyStandup(projectId: number | string) { //데일리 스탠드업 브리핑
+  return request<any>(`/api/v1/projects/${projectId}/daily-standup`, {
+    method: "GET",
+  });
+}
+
+export const updateProjectAccessTime = async (projectId: string | number) => {  // 접속 시간 갱신
+  return request(`/api/v1/projects/${projectId}/access`, {
+    method: "PATCH",
+  });
+};
+
+export async function hideDailyStandupToday(projectId: number): Promise<void> {  //오늘 다시 보지 않기
+  return request(`/api/v1/projects/${projectId}/daily-standup/hide`, {
+    method: "POST", 
+  });
+}
+
 export type ProjectActivity = {  //프로젝트 최근 활동
   activityId: number;
   title: string;
