@@ -381,7 +381,7 @@ export type ProjectCommitFileDiff = {
   diff: string;
 };
 
-export type NotificationItem = {  //알림 목록 조회
+export type NotificationItem = {  // 알림 목록 조회
   id: number;
   type: string;
   title: string;
@@ -390,9 +390,21 @@ export type NotificationItem = {  //알림 목록 조회
   isRead: boolean;
 };
 
-export async function fetchMyNotifications(): Promise<NotificationItem[]> {
-  return request<NotificationItem[]>('/api/v1/notifications', { // /users/me 가 없을 수도 있음
-    method: 'GET',
+export async function fetchProjectNotifications(projectId: string | number): Promise<NotificationItem[]> {  //알림 목록 조회
+  return request<NotificationItem[]>(`/api/v1/projects/${projectId}/notifications`, {
+    method: "GET",
+  });
+}
+
+export async function deleteNotification(projectId: string | number, notificationId: string | number) {  //알림 목록 단일 삭제
+  return request(`/api/v1/projects/${projectId}/notifications/${notificationId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function markAllNotificationsAsRead(projectId: string | number) {  //알림 전체 읽음
+  return request(`/api/v1/projects/${projectId}/notifications/read-all`, {
+    method: "PATCH", 
   });
 }
 
