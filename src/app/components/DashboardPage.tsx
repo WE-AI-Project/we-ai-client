@@ -46,6 +46,7 @@ import {
   ProjectMilestone,
   DepartmentStatusDetail,
   formatApiError,
+  isApiError,
   fetchMyActivitySummary,
   MyActivitySummary,
   fetchMyActivities,
@@ -117,18 +118,15 @@ export function DashboardPage({ projectId, projectName }: Props) {
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
   const [deptStatus, setDeptStatus] = useState<DepartmentStatusDetail[]>([]);
 
-  //통신 상태 관리 - 직접 입력하여 상태 확인 중, 수정 예정
-  const [status, setStatus] = useState<ApiStatus>('empty');
-
-  // 내 활동 요약 상태 관리 추가
-  const [mySummary, setMySummary] = useState<MyActivitySummary | null>(null);
-  // 내 최근 활동
-  const [myActivities, setMyActivities] = useState<MyActivity[]>([]);
-
+  // StateViewWrapper 제어용 상태
+  const [status, setStatus] = useState<ApiStatus>('success'); // 스켈레톤을 렌더링하기 위해 기본값을 success로 둠
+  
+  // 스켈레톤 및 데이터 페칭 제어용 상태
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isSimulating = false;
+  const [mySummary, setMySummary] = useState<MyActivitySummary | null>(null);
+  const [myActivities, setMyActivities] = useState<MyActivity[]>([]);
 
   const progressLabel = useMemo(() => `${dashboard?.progressRate ?? 0}%`, [dashboard]);
 
@@ -141,14 +139,16 @@ export function DashboardPage({ projectId, projectName }: Props) {
       setDeptStatus([]);
       setMySummary(null);
       setMyActivities([]);
+      setStatus('empty');
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    setStatus('success'); // StateViewWrapper를 열어두어 내부 스켈레톤이 보이도록 설정
+    setError(null);
 
     try {
-      // 1. 기존 오리지널 데이터 Fetch
       const [nextDashboard, activityList, nextProgress, milestoneList, deptStatusList] = await Promise.all([
         fetchProjectDashboard(projectId),
         fetchProjectActivities(projectId),
@@ -157,12 +157,17 @@ export function DashboardPage({ projectId, projectName }: Props) {
         fetchProjectDepartmentStatus(projectId),
       ]);
 
+      if (!nextDashboard || !nextProgress) {
+        setStatus('empty');
+        setLoading(false);
+        return;
+      }
+
       setDashboard(nextDashboard);
       setActivities(activityList.activities || []);
       setProgressStats(nextProgress);
       setMilestones(milestoneList.milestones || []);
       setDeptStatus(deptStatusList.departments || []);
-      setError(null);
 
       try {
         const mySummaryData = await fetchMyActivitySummary();
@@ -173,25 +178,29 @@ export function DashboardPage({ projectId, projectName }: Props) {
 
       try {
         const myActivitiesData = await fetchMyActivities();
-
         let checkedActivities: any[] = [];
         if (myActivitiesData) {
           if (Array.isArray(myActivitiesData)) {
-            // 백엔드가 배열로 주는 경우
             checkedActivities = myActivitiesData;
           } else if ((myActivitiesData as any).activities && Array.isArray((myActivitiesData as any).activities)) {
-            // 백엔드가 객체 내부 { activities: [...] } 로 주는 경우
             checkedActivities = (myActivitiesData as any).activities;
           }
         }
-
         setMyActivities(checkedActivities);
       } catch (activitiesError) {
         console.warn("내 최근 활동 내역을 불러오지 못했습니다.", activitiesError);
       }
 
+      setStatus('success');
+
     } catch (loadError) {
       setError(formatApiError(loadError));
+      
+      if (isApiError(loadError) && loadError.status === 401) {
+        setStatus('unauthorized');
+      } else {
+        setStatus('error');
+      }
     } finally {
       setLoading(false);
     }
@@ -201,63 +210,17 @@ export function DashboardPage({ projectId, projectName }: Props) {
     void loadDashboard();
   }, [projectId]);
 
-  // 에러 발생 시 처리
-  if (!projectId) {
-    return (
-      <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
-        <div
-          className="rounded-3xl border px-6 py-6 text-center"
-          style={{ background: "rgba(255,255,255,0.94)", borderColor: BORDER }}
-        >
-          <p className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-            아직 선택된 프로젝트가 없습니다.
-          </p>
-          <p className="mt-2 text-sm" style={{ color: TEXT_SECONDARY }}>
-            프로젝트 목록에서 하나를 열면 실시간 대시보드가 여기 표시됩니다.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !loading && !isSimulating) {
-    return (
-      <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
-        <div
-          className="max-w-lg rounded-3xl border px-6 py-6 text-center"
-          style={{ background: "rgba(255,255,255,0.94)", borderColor: BORDER }}
-        >
-          <p className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-            대시보드를 불러오지 못했습니다.
-          </p>
-          <p className="mt-2 text-sm" style={{ color: error ? STATUS_ERROR : TEXT_SECONDARY }}>
-            {error ?? "응답 데이터가 비어 있습니다."}
-          </p>
-          <button
-            onClick={() => void loadDashboard()}
-            type="button"
-            className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white"
-            style={{ background: ACCENT }}
-          >
-            <RefreshCw className="h-4 w-4" />
-            다시 시도
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const showSkeleton = loading || isSimulating || !dashboard || !progressStats;
+  // 실제 데이터 로딩 상태에 따라 스켈레톤을 렌더링하도록 조건 설정
+  const showSkeleton = loading;
 
   return (
     <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
       <StateViewWrapper
         status={status}
         emptyMessage="진행 중인 프로젝트나 대시보드 데이터가 없습니다."
-        errorMessage="대시보드 정보를 불러오는 중 오류가 발생했습니다."
+        errorMessage={error || "대시보드 정보를 불러오는 중 오류가 발생했습니다."}
         onRetry={loadDashboard}
       >
-        {/* 실제 대시보드 콘텐츠 알맹이만 Wrapper로 감싸줍니다 */}
         <div className="mx-auto max-w-6xl space-y-5">
           {/* ── 상단 대시보드 헤더 ── */}
           <section

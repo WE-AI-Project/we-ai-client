@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Sun, X, Sparkles, CheckCircle2, Clock, AlertTriangle,
   ArrowRight, ChevronRight, FileCode2, GitPullRequest,
-  Zap, Bell, ExternalLink, Bot, RefreshCw,
+  Zap, Bell, ExternalLink, Bot, RefreshCw, Loader2,
 } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE,
@@ -11,134 +11,33 @@ import {
   UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG,
   GRADIENT_LOGO, OLIVE_DARK,
 } from "../colors";
+import { fetchDailyStandup, updateProjectAccessTime, hideDailyStandupToday } from "../lib/api"; // 실제 API 함수 임포트
 
 // ─────────────────────────────────────────────────────────────
 // 데이터 타입
 // ─────────────────────────────────────────────────────────────
 type WorkItem = {
-  text:    string;
-  files?:  string[];
-  badge?:  string;  // "PR #42" 등
+  text: string;
+  files?: string[];
+  badge?: string;  // "PR #42" 등
 };
 
 type StandupMember = {
-  name:       string;
-  avatar:     string;
-  role:       string;
-  part:       "Backend" | "Frontend" | "QA" | "DevOps";
-  partKo:     string;
-  color:      string;
-  bg:         string;
-  completed:  WorkItem[];
+  name: string;
+  avatar: string;
+  role: string;
+  part: "Backend" | "Frontend" | "QA" | "DevOps";
+  partKo: string;
+  color: string;
+  bg: string;
+  completed: WorkItem[];
   inProgress: WorkItem[];
-  blockers:   string[];
-  // 현재 사용자(프론트 병권)에게 관련 여부
-  relevantToMe:   boolean;
+  blockers: string[];
+  relevantToMe: boolean;
   relevantReason: string;
-  relevantAction: string;     // "리뷰 필요" | "API 변경 확인" | "배포 확인" ...
-  navigatePage:   string;     // "Changes" | "ServerBuild" | "AIQA" | "Chat"
+  relevantAction: string;
+  navigatePage: string;
 };
-
-// ─────────────────────────────────────────────────────────────
-// 팀별 스탠드업 데이터 (어제 작업 기준 — commit + 파일 분석)
-// ─────────────────────────────────────────────────────────────
-const STANDUP_MEMBERS: StandupMember[] = [
-  {
-    name: "Admin", avatar: "A",
-    role: "DevOps Engineer", part: "DevOps", partKo: "DevOps",
-    color: "#C09840", bg: "rgba(192,152,64,0.10)",
-    completed: [
-      { text: "Jenkins 파이프라인 빌드 시간 23분 → 14분 단축", files: ["Jenkinsfile"] },
-      { text: "K8s 클러스터 v1.28 → v1.30 업그레이드 완료", files: ["k8s-deploy.yml"] },
-      { text: "Redis 커넥션 풀 설정 수정 후 재배포", files: ["redis.conf", "application-prod.yml"] },
-    ],
-    inProgress: [
-      { text: "Heap dump 분석 — 메모리 누수 근본 원인 파악 중" },
-      { text: "프론트엔드 정적 빌드 CDN 캐시 최적화 작업" },
-    ],
-    blockers: [],
-    relevantToMe:   true,
-    relevantReason: "프론트엔드 빌드 파이프라인 변경 — CDN 배포 확인 필요합니다.",
-    relevantAction: "배포 현황 확인",
-    navigatePage:   "ServerBuild",
-  },
-  {
-    name: "병권", avatar: "병",
-    role: "Backend Dev · Team Lead", part: "Backend", partKo: "백엔드",
-    color: "#41431B", bg: "rgba(65,67,27,0.10)",
-    completed: [
-      { text: "MultiAgentController — ConcurrentHashMap 리팩터링 완료", files: ["MultiAgentController.java"] },
-      { text: "DataSyncAgent.java 신규 구현 (RestTemplate 폴링)", files: ["DataSyncAgent.java"] },
-      { text: "Gradle 빌드 JDK 17 툴체인 마이그레이션", files: ["build.gradle", "settings.gradle"] },
-    ],
-    inProgress: [
-      { text: "Spring Security JWT 토큰 갱신 로직 리뷰 중" },
-      { text: "AGT-07 DataParserAgent 구현 예정 (이번 주)" },
-    ],
-    blockers: [],
-    relevantToMe:   true,
-    relevantReason: "GET /api/agents/status 응답 정렬 방식 변경 — useAgents 훅 타입 수정 필요.",
-    relevantAction: "API 변경 확인",
-    navigatePage:   "Changes",
-  },
-  {
-    name: "지수", avatar: "지",
-    role: "Frontend Developer", part: "Frontend", partKo: "프론트엔드",
-    color: "#5A8A4A", bg: "rgba(90,138,74,0.10)",
-    completed: [
-      { text: "AgentCard.tsx — Motion 레이아웃 애니메이션 추가 완료", files: ["AgentCard.tsx"], badge: "완료" },
-      { text: "대시보드 컴포넌트 PR #42 오픈 — 리뷰 요청", badge: "PR #42" },
-      { text: "Recharts Bar 차트 렌더링 이슈 수정", files: ["AnalyticsPage.tsx"] },
-    ],
-    inProgress: [
-      { text: "칸반 보드 드래그 앤 드롭 구현 중 (react-dnd)" },
-      { text: "Storybook 스토리 추가 작업" },
-    ],
-    blockers: [],
-    relevantToMe:   true,
-    relevantReason: "PR #42 코드 리뷰 요청 — 대시보드 컴포넌트 변경사항, 확인해 보세요!",
-    relevantAction: "PR 리뷰 하기",
-    navigatePage:   "Changes",
-  },
-  {
-    name: "민준", avatar: "민",
-    role: "Frontend Developer", part: "Frontend", partKo: "프론트엔드",
-    color: "#7A8B5A", bg: "rgba(122,139,90,0.10)",
-    completed: [
-      { text: "채팅 UI WebSocket 연결 테스트 완료", files: ["ChatPage.tsx"] },
-      { text: "캘린더 페이지 모바일 반응형 완성", files: ["CalendarPage.tsx"] },
-      { text: "Storybook 캘린더 스토리 추가", badge: "문서" },
-    ],
-    inProgress: [
-      { text: "알림 시스템 실시간 연동 구현 중", files: ["NotificationPanel.tsx"] },
-      { text: "Socket.io 클라이언트 초기 설정" },
-    ],
-    blockers: ["Socket.io 서버 엔드포인트 확정 대기 (백엔드 팀 확인 중)"],
-    relevantToMe:   false,
-    relevantReason: "",
-    relevantAction: "",
-    navigatePage:   "Chat",
-  },
-  {
-    name: "서연", avatar: "서",
-    role: "QA Engineer", part: "QA", partKo: "QA",
-    color: "#B85450", bg: "rgba(184,84,80,0.10)",
-    completed: [
-      { text: "v1.3 릴리즈 QA: 42개 중 39개 통과 (92.8%)", badge: "리포트" },
-      { text: "이슈 #124 레이스 컨디션 재현 케이스 작성", files: ["MultiAgent.spec.ts"] },
-      { text: "Playwright E2E 로그인 플로우 테스트 추가", files: ["LoginFlow.spec.ts"] },
-    ],
-    inProgress: [
-      { text: "이슈 #125 — AgentCard 모바일 터치 이슈 조사 중" },
-      { text: "CI 자동화 테스트 파이프라인 점검" },
-    ],
-    blockers: [],
-    relevantToMe:   true,
-    relevantReason: "이슈 #125 AgentCard 모바일 터치 이슈 — 프론트 담당 컴포넌트, 확인해 보세요.",
-    relevantAction: "QA 이슈 확인",
-    navigatePage:   "AIQA",
-  },
-];
 
 const DISMISS_KEY = "weai_standup_dismissed";
 function getTodayKey() { return new Date().toISOString().slice(0, 10); }
@@ -151,7 +50,7 @@ function dismissToday() { localStorage.setItem(DISMISS_KEY, getTodayKey()); }
 // 타이핑 애니메이션 텍스트
 // ─────────────────────────────────────────────────────────────
 function TypedGreeting({ text, delay = 0 }: { text: string; delay?: number }) {
-  const [shown, setShown]     = useState("");
+  const [shown, setShown] = useState("");
   const [started, setStarted] = useState(false);
   const idxRef = useRef(0);
 
@@ -194,15 +93,14 @@ function RelevantHighlight({
     <div
       className="flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all"
       style={{
-        background:  show ? "rgba(255,255,255,0.92)" : "transparent",
-        border:      `1px solid ${show ? member.color + "30" : "transparent"}`,
-        opacity:     show ? 1 : 0,
-        transform:   show ? "translateX(0)" : "translateX(-12px)",
-        transition:  "all 0.28s cubic-bezier(0.34,1.3,0.64,1)",
-        boxShadow:   show ? `0 1px 8px ${member.color}10` : "none",
+        background: show ? "rgba(255,255,255,0.92)" : "transparent",
+        border: `1px solid ${show ? member.color + "30" : "transparent"}`,
+        opacity: show ? 1 : 0,
+        transform: show ? "translateX(0)" : "translateX(-12px)",
+        transition: "all 0.28s cubic-bezier(0.34,1.3,0.64,1)",
+        boxShadow: show ? `0 1px 8px ${member.color}10` : "none",
       }}
     >
-      {/* 아바타 */}
       <div
         className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
         style={{ background: member.bg }}
@@ -228,8 +126,8 @@ function RelevantHighlight({
         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold shrink-0 transition-all"
         style={{
           background: member.bg,
-          color:      member.color,
-          border:     `1px solid ${member.color}25`,
+          color: member.color,
+          border: `1px solid ${member.color}25`,
         }}
         onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.05)"}
         onMouseLeave={e => e.currentTarget.style.filter = ""}
@@ -249,7 +147,7 @@ function MemberCard({
 }: {
   member: StandupMember; idx: number; visible: boolean; onNavigate: (page: string) => void;
 }) {
-  const [show, setShow]         = useState(false);
+  const [show, setShow] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -262,15 +160,14 @@ function MemberCard({
     <div
       className="rounded-2xl overflow-hidden transition-all"
       style={{
-        border:     `1px solid ${member.relevantToMe ? member.color + "25" : BORDER}`,
+        border: `1px solid ${member.relevantToMe ? member.color + "25" : BORDER}`,
         background: "rgba(255,255,255,0.95)",
-        opacity:    show ? 1 : 0,
-        transform:  show ? "translateY(0) scale(1)" : "translateY(12px) scale(0.98)",
+        opacity: show ? 1 : 0,
+        transform: show ? "translateY(0) scale(1)" : "translateY(12px) scale(0.98)",
         transition: "all 0.30s cubic-bezier(0.34,1.2,0.64,1)",
-        boxShadow:  show && member.relevantToMe ? `0 2px 12px ${member.color}12` : "0 1px 4px rgba(0,0,0,0.05)",
+        boxShadow: show && member.relevantToMe ? `0 2px 12px ${member.color}12` : "0 1px 4px rgba(0,0,0,0.05)",
       }}
     >
-      {/* 카드 헤더 */}
       <button
         className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all"
         style={{ background: member.bg, borderBottom: `1px solid ${member.color}20` }}
@@ -303,7 +200,6 @@ function MemberCard({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* 완료 / 진행 카운트 */}
           <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: UI_GREEN_BG, color: UI_GREEN }}>
             ✓ {member.completed.length}
           </span>
@@ -324,7 +220,6 @@ function MemberCard({
         </div>
       </button>
 
-      {/* 항상 보이는 완료 항목 (최대 2개) */}
       <div className="px-4 py-2.5 space-y-1.5">
         {member.completed.slice(0, expanded ? member.completed.length : 2).map((item, i) => (
           <div key={i} className="flex items-start gap-2">
@@ -359,7 +254,6 @@ function MemberCard({
           </button>
         )}
 
-        {/* 진행 중 */}
         {expanded && member.inProgress.length > 0 && (
           <div className="pt-1.5 border-t" style={{ borderColor: BORDER_SUBTLE }}>
             {member.inProgress.map((item, i) => (
@@ -371,7 +265,6 @@ function MemberCard({
           </div>
         )}
 
-        {/* 블로커 */}
         {expanded && member.blockers.length > 0 && (
           <div className="pt-1.5 border-t" style={{ borderColor: BORDER_SUBTLE }}>
             {member.blockers.map((b, i) => (
@@ -384,7 +277,6 @@ function MemberCard({
         )}
       </div>
 
-      {/* 관련 액션 버튼 (나에게 관련 있을 때만) */}
       {member.relevantToMe && (
         <div
           className="px-4 py-2.5 flex items-center gap-2"
@@ -412,65 +304,176 @@ function MemberCard({
 // 메인 모달 컴포넌트
 // ─────────────────────────────────────────────────────────────
 export function DailyStandupModal({
-  userName = "병권",
+  userName = "팀원",
   userPart = "Frontend",
+  projectId,
   onClose,
   onNavigate,
 }: {
-  userName?:  string;
-  userPart?:  string;
-  onClose:    () => void;
+  userName?: string;
+  userPart?: string;
+  projectId: number | string;
+  onClose: () => void;
   onNavigate: (page: string) => void;
 }) {
-  const [visible,       setVisible]       = useState(false);
+  const activeProjectId = Number(
+    projectId || 
+    localStorage.getItem("currentProjectId") || 
+    localStorage.getItem("projectId") || 
+    1
+  );
+  
+  const [visible, setVisible] = useState(false);
   const [highlightShow, setHighlightShow] = useState(false);
-  const [cardsShow,     setCardsShow]     = useState(false);
-  const [activeTab,     setActiveTab]     = useState<"all" | "relevant">("relevant");
-  const [skipToday,     setSkipToday]     = useState(false);
+  const [cardsShow, setCardsShow] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "relevant">("relevant");
+  const [skipToday, setSkipToday] = useState(false);
+
+  // API 연동 상태
+  const [members, setMembers] = useState<StandupMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const todayStr = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
-  const lastLoginStr = "어제 오전 11:42"; // mock
+  const lastLoginStr = "어제 오전 11:42";
+
+  // 데이터 로드 함수
+  const loadStandupData = async () => {
+    try {
+      setLoading(true);
+      setError(false);
+      const res = await fetchDailyStandup(projectId);
+      console.log("스탠드업 API 응답 데이터 확인:", res);
+
+      const rawData = res?.data || res;
+      // 백엔드 응답에서 lastAccessedAt 저장
+      if (rawData?.lastAccessedAt) {
+        setLastAccessedTime(rawData.lastAccessedAt);
+      }
+
+      const dataList = rawData?.members || (Array.isArray(rawData) ? rawData : []);
+
+      setMembers(dataList);
+    } catch (err) {
+      console.error("Failed to load standup data:", err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const closeWithPatch = async (callback: () => void) => {
+    try {
+      // 닫기 전에 PATCH 호출하여 이번 접속 시간 갱신
+      await updateProjectAccessTime(projectId);
+      console.log("프로젝트 접속 시간 갱신 완료");
+    } catch (err) {
+      console.error("프로젝트 접속 시간 갱신 실패", err);
+    } finally {
+      callback();
+    }
+  };
+
+  const [lastAccessedTime, setLastAccessedTime] = useState<string | null>(null);  //접속 시간 저장
+
+  // ✅ 1. 모든 종료/이동 액션 시 공통으로 실행될 통신 로직
+  const executeCloseActions = async (callback: () => void) => {
+    // 💡 F12 콘솔에서 projectId가 제대로 된 숫자로 뜨는지 확인해 보세요!
+    console.log("🛠 현재 전달된 projectId:", projectId);
+
+    // 안전 장치: projectId가 없거나 유효하지 않으면 API 호출을 건너뛰고 모달만 닫음
+    if (!projectId || projectId === "undefined" || projectId === 0 || projectId === "0") {
+      console.warn("⚠️ 유효하지 않은 projectId입니다. API를 호출하지 않고 모달을 닫습니다.");
+      callback();
+      return;
+    }
+
+    try {
+      // 오늘 다시 보지 않기 체크 시 로컬스토리지 저장 및 API 호출
+      if (skipToday) {
+        dismissToday();
+        await hideDailyStandupToday(Number(projectId));
+        console.log("✅ 오늘 다시 보지 않기 설정 완료");
+      }
+      
+      // 프로젝트 접속 시간 갱신 API 호출
+      await updateProjectAccessTime(projectId);
+      console.log("✅ 프로젝트 접속 시간 갱신 완료");
+    } catch (err) {
+      console.error("❌ 종료 액션 처리 중 서버 에러 발생:", err);
+    } finally {
+      callback();
+    }
+  };
+
+  const formatLastLoginTime = (timeStr?: string | null) => {  //날짜 포멧팅 함수(이전 답변 코드 활용)
+    if (!timeStr) return "최근 접속 기록 없음"; 
+    const date = new Date(timeStr);
+    const now = new Date();
+    
+    const isToday = date.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+
+    const timeFormatted = date.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: 'numeric', hour12: true });
+
+    if (isToday) return `오늘 ${timeFormatted}`;
+    if (isYesterday) return `어제 ${timeFormatted}`;
+    return `${date.getMonth() + 1}월 ${date.getDate()}일 ${timeFormatted}`;
+  };
+
+  useEffect(() => {
+    if (!projectId || projectId === 0 || projectId === "0") {
+      setLoading(false);
+      return;
+    }
+
+    loadStandupData();
+  }, [projectId]);
 
   // 관련 멤버 필터
-  const relevantMembers = STANDUP_MEMBERS.filter(m => m.relevantToMe && m.name !== userName);
-  const allMembers      = STANDUP_MEMBERS.filter(m => m.name !== userName);
-  const displayMembers  = activeTab === "relevant" ? relevantMembers : allMembers;
+  const relevantMembers = members.filter(m => m.relevantToMe && m.name !== userName);
+  const allMembers = members.filter(m => m.name !== userName);
+  const displayMembers = activeTab === "relevant" ? relevantMembers : allMembers;
 
   // 총계
-  const totalCompleted  = STANDUP_MEMBERS.reduce((s, m) => s + m.completed.length, 0);
-  const totalInProgress = STANDUP_MEMBERS.reduce((s, m) => s + m.inProgress.length, 0);
-  const totalBlockers   = STANDUP_MEMBERS.reduce((s, m) => s + m.blockers.length, 0);
+  const totalCompleted = members.reduce((s, m) => s + (m.completed?.length || 0), 0);
+  const totalInProgress = members.reduce((s, m) => s + (m.inProgress?.length || 0), 0);
+  const totalBlockers = members.reduce((s, m) => s + (m.blockers?.length || 0), 0);
 
   // 스태거 등장
   useEffect(() => {
-    const t1 = setTimeout(() => setVisible(true),       60);
+    if (loading || error) return;
+    const t1 = setTimeout(() => setVisible(true), 60);
     const t2 = setTimeout(() => setHighlightShow(true), 900);
-    const t3 = setTimeout(() => setCardsShow(true),     1300);
+    const t3 = setTimeout(() => setCardsShow(true), 1300);
     return () => [t1, t2, t3].forEach(clearTimeout);
-  }, []);
+  }, [loading, error]);
 
   const handleClose = () => {
-    if (skipToday) dismissToday();
-    setVisible(false);
-    setTimeout(onClose, 280);
+    executeCloseActions(() => {
+      setVisible(false);
+      setTimeout(onClose, 280);
+    });
   };
 
   const handleNavigate = (page: string) => {
-    if (skipToday) dismissToday();
-    onNavigate(page);
-    onClose();
+    executeCloseActions(() => {
+      onNavigate(page);
+      onClose();
+    });
   };
 
-  // 부드러운 greeting 메시지
   const greetingText = `안녕하세요, ${userName} 님! 마지막 접속(${lastLoginStr}) 이후 팀 변경 사항을 분석했어요.`;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{
-        background:     "rgba(12,14,2,0.72)",
+        background: "rgba(12,14,2,0.72)",
         backdropFilter: "blur(10px)",
-        opacity:    visible ? 1 : 0,
+        opacity: 1,
         transition: "opacity 0.28s ease",
       }}
     >
@@ -490,9 +493,9 @@ export function DailyStandupModal({
           maxWidth: 680,
           maxHeight: "90vh",
           background: "#FAFAF7",
-          border:    `1px solid ${BORDER}`,
+          border: `1px solid ${BORDER}`,
           boxShadow: "0 32px 80px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0.12)",
-          transform: visible ? "translateY(0) scale(1)" : "translateY(20px) scale(0.97)",
+          transform: "translateY(0) scale(1)",
           transition: "transform 0.32s cubic-bezier(0.34,1.2,0.64,1)",
         }}
       >
@@ -502,7 +505,6 @@ export function DailyStandupModal({
           style={{ background: OLIVE_DARK, borderBottom: `1px solid rgba(255,255,255,0.08)` }}
         >
           <div className="flex items-start gap-3">
-            {/* 아이콘 */}
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
               style={{ background: "rgba(174,183,132,0.20)" }}
@@ -523,13 +525,11 @@ export function DailyStandupModal({
               <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
                 {todayStr}
               </p>
-              {/* 타이핑 그리팅 */}
               <p className="text-[11px] mt-2 leading-relaxed" style={{ color: "rgba(255,255,255,0.80)" }}>
                 <TypedGreeting text={greetingText} delay={400} />
               </p>
             </div>
 
-            {/* 닫기 */}
             <button
               onClick={handleClose}
               className="p-1.5 rounded-lg shrink-0 transition-all hover:bg-white/[0.10]"
@@ -538,12 +538,11 @@ export function DailyStandupModal({
             </button>
           </div>
 
-          {/* 통계 칩 */}
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             {[
-              { label: "완료 항목", value: totalCompleted,  color: "#7ee787", bg: "rgba(126,231,135,0.12)" },
-              { label: "진행 중",   value: totalInProgress, color: "#D4CC9E", bg: "rgba(212,204,158,0.12)" },
-              { label: "블로커",    value: totalBlockers,   color: "#ff7b72", bg: "rgba(255,123,114,0.12)" },
+              { label: "완료 항목", value: totalCompleted, color: "#7ee787", bg: "rgba(126,231,135,0.12)" },
+              { label: "진행 중", value: totalInProgress, color: "#D4CC9E", bg: "rgba(212,204,158,0.12)" },
+              { label: "블로커", value: totalBlockers, color: "#ff7b72", bg: "rgba(255,123,114,0.12)" },
               { label: "관련 항목", value: relevantMembers.length, color: "#AEB784", bg: "rgba(174,183,132,0.15)" },
             ].map(s => (
               <div key={s.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: s.bg }}>
@@ -560,107 +559,122 @@ export function DailyStandupModal({
           </div>
         </div>
 
-        {/* ══ 스크롤 영역 ══ */}
+        {/* ══ 스크롤 영역 (내부 로딩/에러 처리) ══ */}
         <div className="flex-1 overflow-y-auto">
-
-          {/* 나에게 관련 하이라이트 섹션 */}
-          <div className="px-5 pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="w-5 h-5 rounded-lg flex items-center justify-center"
-                style={{ background: ACCENT_BG }}
-              >
-                <Bell className="w-3 h-3" style={{ color: ACCENT }} />
-              </div>
-              <p className="text-[11px] font-bold" style={{ color: TEXT_PRIMARY }}>
-                👀 나에게 관련된 항목
-              </p>
-              <span
-                className="text-[8px] px-1.5 py-0.5 rounded-full font-semibold"
-                style={{ background: ACCENT_BG, color: ACCENT }}
-              >
-                {relevantMembers.length}건
-              </span>
-              <span className="ml-auto text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                {userPart} 파트 기준
-              </span>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 className="w-7 h-7 animate-spin" style={{ color: ACCENT }} />
+              <p className="text-[11px]" style={{ color: TEXT_SECONDARY }}>데일리 스탠드업 데이터를 불러오는 중입니다...</p>
             </div>
-
-            <div
-              className="rounded-2xl p-3 space-y-1.5"
-              style={{ background: "rgba(255,255,255,0.70)", border: `1px solid ${ACCENT_BORDER}` }}
-            >
-              {relevantMembers.map((m, i) => (
-                <RelevantHighlight
-                  key={m.name}
-                  member={m}
-                  idx={i}
-                  visible={highlightShow}
-                  onNavigate={handleNavigate}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* 구분선 */}
-          <div className="mx-5 mb-3" style={{ height: 1, background: BORDER_SUBTLE }} />
-
-          {/* 팀 전체 현황 */}
-          <div className="px-5 pb-4">
-            {/* 탭 + 레이블 */}
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-5 h-5 rounded-lg flex items-center justify-center"
-                style={{ background: "rgba(65,67,27,0.08)" }}
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <AlertTriangle className="w-7 h-7" style={{ color: "#B85450" }} />
+              <p className="text-[11px]" style={{ color: TEXT_SECONDARY }}>브리핑 데이터를 불러오지 못했습니다.</p>
+              <button
+                onClick={loadStandupData}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all mt-1"
+                style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
               >
-                <Bot className="w-3 h-3" style={{ color: ACCENT }} />
-              </div>
-              <p className="text-[11px] font-bold" style={{ color: TEXT_PRIMARY }}>팀 전체 현황</p>
-
-              <div className="flex items-center gap-1 ml-auto">
-                {(["relevant", "all"] as const).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className="px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all"
-                    style={{
-                      background: activeTab === tab ? ACCENT_BG : "transparent",
-                      color:      activeTab === tab ? ACCENT : TEXT_TERTIARY,
-                      border:     `1px solid ${activeTab === tab ? ACCENT_BORDER : "transparent"}`,
-                    }}
+                <RefreshCw className="w-3 h-3" />
+                다시 시도
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* 나에게 관련 하이라이트 섹션 */}
+              <div className="px-5 pt-4 pb-3">
+                <div className="flex items-center gap-2 mb-3">
+                  <div
+                    className="w-5 h-5 rounded-lg flex items-center justify-center"
+                    style={{ background: ACCENT_BG }}
                   >
-                    {tab === "relevant" ? "관련된 팀원" : "전체 팀원"}
-                  </button>
-                ))}
-              </div>
-            </div>
+                    <Bell className="w-3 h-3" style={{ color: ACCENT }} />
+                  </div>
+                  <p className="text-[11px] font-bold" style={{ color: TEXT_PRIMARY }}>
+                    나에게 관련된 항목
+                  </p>
+                  <span
+                    className="text-[8px] px-1.5 py-0.5 rounded-full font-semibold"
+                    style={{ background: ACCENT_BG, color: ACCENT }}
+                  >
+                    {relevantMembers.length}건
+                  </span>
+                  <span className="ml-auto text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                    {userPart} 파트 기준
+                  </span>
+                </div>
 
-            <div className="space-y-2.5">
-              {displayMembers.map((m, i) => (
-                <MemberCard
-                  key={m.name}
-                  member={m}
-                  idx={i}
-                  visible={cardsShow}
-                  onNavigate={handleNavigate}
-                />
-              ))}
-            </div>
-
-            {displayMembers.length === 0 && (
-              <div className="flex flex-col items-center py-8 gap-2">
-                <Sparkles className="w-6 h-6" style={{ color: TEXT_TERTIARY }} />
-                <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>나와 관련된 항목이 없습니다</p>
-                <button
-                  onClick={() => setActiveTab("all")}
-                  className="text-[9px] font-semibold px-3 py-1.5 rounded-lg"
-                  style={{ background: ACCENT_BG, color: ACCENT }}
+                <div
+                  className="rounded-2xl p-3 space-y-1.5"
+                  style={{ background: "rgba(255,255,255,0.70)", border: `1px solid ${ACCENT_BORDER}` }}
                 >
-                  전체 팀원 보기
-                </button>
+                  {relevantMembers.map((m, i) => (
+                    <RelevantHighlight
+                      key={m.name}
+                      member={m}
+                      idx={i}
+                      visible={highlightShow}
+                      onNavigate={handleNavigate}
+                    />
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
+
+              <div className="mx-5 mb-3" style={{ height: 1, background: BORDER_SUBTLE }} />
+
+              {/* 팀 전체 현황 */}
+              <div className="px-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className="w-5 h-5 rounded-lg flex items-center justify-center"
+                    style={{ background: "rgba(65,67,27,0.08)" }}
+                  >
+                    <Bot className="w-3 h-3" style={{ color: ACCENT }} />
+                  </div>
+                  <p className="text-[11px] font-bold" style={{ color: TEXT_PRIMARY }}>팀 전체 현황</p>
+
+                  <div className="flex items-center gap-1 ml-auto">
+                    {(["relevant", "all"] as const).map(tab => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className="px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all"
+                        style={{
+                          background: activeTab === tab ? ACCENT_BG : "transparent",
+                          color: activeTab === tab ? ACCENT : TEXT_TERTIARY,
+                          border: `1px solid ${activeTab === tab ? ACCENT_BORDER : "transparent"}`,
+                        }}
+                      >
+                        {tab === "relevant" ? "관련된 팀원" : "전체 팀원"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {displayMembers.map((m, i) => (
+                    <MemberCard
+                      key={m.name}
+                      member={m}
+                      idx={i}
+                      visible={cardsShow}
+                      onNavigate={handleNavigate}
+                    />
+                  ))}
+                </div>
+
+                {displayMembers.length === 0 && (
+                  <div className="flex flex-col items-center py-8 gap-2">
+                    <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>
+                      {activeTab === "relevant"
+                        ? "나와 관련된 팀원의 항목이 없습니다."
+                        : "전체 팀원의 항목이 없습니다."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ══ 푸터 ══ */}
@@ -668,7 +682,6 @@ export function DailyStandupModal({
           className="shrink-0 px-5 py-3.5 flex items-center gap-3"
           style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.98)" }}
         >
-          {/* 오늘 다시 보지 않기 */}
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
             <div
               onClick={() => setSkipToday(s => !s)}
@@ -684,14 +697,13 @@ export function DailyStandupModal({
           </label>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* 빠른 이동 */}
             <button
               onClick={() => handleNavigate("Changes")}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all"
               style={{
                 background: ACCENT_BG,
-                color:      ACCENT,
-                border:     `1px solid ${ACCENT_BORDER}`,
+                color: ACCENT,
+                border: `1px solid ${ACCENT_BORDER}`,
               }}
               onMouseEnter={e => e.currentTarget.style.background = "rgba(65,67,27,0.12)"}
               onMouseLeave={e => e.currentTarget.style.background = ACCENT_BG}
@@ -701,11 +713,11 @@ export function DailyStandupModal({
             </button>
 
             <button
-              onClick={handleClose}
+              onClick={handleClose} 
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold transition-all"
               style={{
                 background: OLIVE_DARK,
-                color:      "rgba(255,255,255,0.92)",
+                color: "rgba(255,255,255,0.92)",
               }}
               onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.12)"}
               onMouseLeave={e => e.currentTarget.style.filter = ""}
@@ -720,7 +732,4 @@ export function DailyStandupModal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// 외부에서 사용: 오늘 dismissed 여부 체크
-// ─────────────────────────────────────────────────────────────
 export { isDismissedToday };
