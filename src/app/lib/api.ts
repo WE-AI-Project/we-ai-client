@@ -421,7 +421,7 @@ export const updateProjectAccessTime = async (projectId: string | number) => {  
 };
 
 export async function hideDailyStandupToday(projectId: number): Promise<void> {  //오늘 다시 보지 않기
-  return request(`/api/v1/projects/${projectId}/daily-standup/hide`, {
+  return request(`/api/v1/projects/${projectId}/daily-standup/dismiss`, {
     method: "POST", 
   });
 }
