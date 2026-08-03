@@ -60,7 +60,6 @@ import {
   logout,
   isPublishingSession,
   refreshSession,
-  fetchMyProjects, // 🚀 API 추가됨
 } from "./lib/api";
 
 // ── 디자인 토큰 ──
@@ -236,7 +235,6 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
 // 메인 App
 export default function App() {
   const [screen, setScreen] = useState<"login" | "join" | "workspace">("login");
-  const [joinView, setJoinView] = useState<"entry" | "create">("entry"); // 🚀 추가됨: 진입 화면 모드
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => loadSession());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authBootstrapping, setAuthBootstrapping] = useState(true);
@@ -347,20 +345,8 @@ export default function App() {
         const refreshedSession = await refreshSession(existingSession.refreshToken);
         const user = await fetchCurrentUser();
 
-        // 🚀 자동 로그인 시에도 프로젝트 개수 확인
-        let defaultView: "entry" | "create" = "entry";
-        try {
-          const myProjects = await fetchMyProjects();
-          if (!myProjects || myProjects.length === 0) {
-            defaultView = "create";
-          }
-        } catch (e) {
-          console.error(e);
-        }
-
         if (!active) return;
 
-        setJoinView(defaultView);
         setAuthSession(refreshedSession);
         setCurrentUser(user);
         setScreen("join");
@@ -585,18 +571,6 @@ export default function App() {
       setProjectCode("PUBLISH-111");
       setLocalPath("");
       return;
-    }
-
-    try {
-      const myProjects = await fetchMyProjects();
-      if (!myProjects || myProjects.length === 0) {
-        setJoinView("create");
-      } else {
-        setJoinView("entry");
-      }
-    } catch (e) {
-      console.error("프로젝트 조회 실패:", e);
-      setJoinView("entry");
     }
 
     setScreen("join");
@@ -932,7 +906,6 @@ export default function App() {
         >
           <JoinProjectScreen
             currentUser={currentUser}
-            initialView={joinView} // 🚀 App에서 결정된 상태를 넘겨줍니다
             onOpenProject={handleJoin}
             onLogout={() => void handleLogout()}
           />
