@@ -669,7 +669,7 @@ export default function App() {
       case "Calendar": return <CalendarPage projectId={projectId} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
-      case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} />;
+      case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
       default: return isPublishingSession(authSession)

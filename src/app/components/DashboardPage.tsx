@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Hash,
   ListTodo,
-  RefreshCw,
   Users,
   TrendingUp,
   Milestone,
@@ -266,18 +265,6 @@ export function DashboardPage({ projectId, projectName }: Props) {
                 )}
               </div>
 
-              <button
-                onClick={() => {
-                  if (!showSkeleton) void loadDashboard();
-                }}
-                disabled={showSkeleton}
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 text-white"
-                style={{ background: ACCENT }}
-              >
-                <RefreshCw className={`h-4 w-4 ${showSkeleton ? "animate-spin" : ""}`} />
-                새로고침
-              </button>
             </div>
           </section>
 

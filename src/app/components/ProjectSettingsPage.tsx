@@ -40,6 +40,7 @@ import {
   ProjectTechStackCategory,
   ProjectTechStackInput,
   createProjectTechStack,
+  deleteProjectMember,
   deleteProjectTechStack,
   fetchProjectDetail,
   fetchProjectMemberDetail,
@@ -90,7 +91,7 @@ const DEPARTMENT_LABELS: Record<ProjectDepartment, string> = {
 };
 
 const ROLE_LABELS: Record<ProjectMemberRole, string> = {
-  LEADER: "Leader",
+  LEADER: "Admin",
   MEMBER: "Member",
   GUEST: "Guest",
 };
@@ -113,6 +114,7 @@ type TabId = "overview" | "team" | "tech" | "schedules";
 
 type Props = {
   projectId: number | null;
+  currentUserId: number | null;
 };
 
 type ProjectFormState = {
@@ -277,7 +279,7 @@ function buildTechForm(stack?: ProjectTechStack): TechFormState {
   };
 }
 
-export function ProjectSettingsPage({ projectId }: Props) {
+export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -302,6 +304,17 @@ export function ProjectSettingsPage({ projectId }: Props) {
       pending: schedules.filter((item) => item.status === "TODO").length,
     }),
     [schedules]
+  );
+
+  const isAdmin = useMemo(
+    () =>
+      members.some(
+        (member) =>
+          member.userId === currentUserId &&
+          member.role === "LEADER" &&
+          member.status === "ACTIVE"
+      ),
+    [currentUserId, members]
   );
 
   const loadProjectSettings = async () => {
@@ -374,6 +387,11 @@ export function ProjectSettingsPage({ projectId }: Props) {
   };
 
   const handleProjectSave = async () => {
+    if (!isAdmin) {
+      toast.error("관리자만 프로젝트 정보를 수정할 수 있습니다.");
+      return;
+    }
+
     if (!projectId || !detail) {
       return;
     }
@@ -411,6 +429,11 @@ export function ProjectSettingsPage({ projectId }: Props) {
   };
 
   const handleMemberRoleSave = async (member: ProjectMember) => {
+    if (!isAdmin) {
+      toast.error("관리자만 프로젝트 멤버를 관리할 수 있습니다.");
+      return;
+    }
+
     if (!projectId) {
       return;
     }
@@ -447,6 +470,11 @@ export function ProjectSettingsPage({ projectId }: Props) {
   };
 
   const handleMemberDepartmentSave = async (member: ProjectMember) => {
+    if (!isAdmin) {
+      toast.error("관리자만 프로젝트 멤버를 관리할 수 있습니다.");
+      return;
+    }
+
     if (!projectId) {
       return;
     }
@@ -484,7 +512,60 @@ export function ProjectSettingsPage({ projectId }: Props) {
     }
   };
 
+  const handleMemberKick = async (member: ProjectMember) => {
+    if (!isAdmin) {
+      toast.error("관리자만 프로젝트 멤버를 추방할 수 있습니다.");
+      return;
+    }
+
+    if (!projectId) {
+      return;
+    }
+
+    if (member.status !== "ACTIVE") {
+      toast("활성 상태인 멤버만 추방할 수 있습니다.");
+      return;
+    }
+
+    if (member.role === "LEADER") {
+      toast.error("관리자는 추방할 수 없습니다.");
+      return;
+    }
+
+    const shouldKick = window.confirm(`"${member.name}" 멤버를 프로젝트에서 추방할까요?`);
+    if (!shouldKick) {
+      return;
+    }
+
+    setSavingMemberId(member.projectMemberId);
+
+    try {
+      await deleteProjectMember(projectId, member.projectMemberId);
+
+      setMembers((current) => current.filter((item) => item.projectMemberId !== member.projectMemberId));
+      setMemberDrafts((current) => {
+        const nextDrafts = { ...current };
+        delete nextDrafts[member.projectMemberId];
+        return nextDrafts;
+      });
+      setSelectedMemberDetail((current) =>
+        current?.projectMemberId === member.projectMemberId ? null : current
+      );
+
+      toast.success("멤버를 프로젝트에서 추방했습니다.");
+    } catch (memberError) {
+      toast.error(formatApiError(memberError));
+    } finally {
+      setSavingMemberId(null);
+    }
+  };
+
   const handleTechSubmit = async () => {
+    if (!isAdmin) {
+      toast.error("관리자만 기술 스택을 관리할 수 있습니다.");
+      return;
+    }
+
     if (!projectId) {
       return;
     }
@@ -526,11 +607,21 @@ export function ProjectSettingsPage({ projectId }: Props) {
   };
 
   const handleTechEdit = (stack: ProjectTechStack) => {
+    if (!isAdmin) {
+      toast.error("관리자만 기술 스택을 관리할 수 있습니다.");
+      return;
+    }
+
     setEditingTechStackId(stack.techStackId);
     setTechForm(buildTechForm(stack));
   };
 
   const handleTechDelete = async (stack: ProjectTechStack) => {
+    if (!isAdmin) {
+      toast.error("관리자만 기술 스택을 관리할 수 있습니다.");
+      return;
+    }
+
     if (!projectId) {
       return;
     }
@@ -648,12 +739,12 @@ export function ProjectSettingsPage({ projectId }: Props) {
             <button
               type="button"
               onClick={() => void handleProjectSave()}
-              disabled={savingProject}
-              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+              disabled={!isAdmin || savingProject}
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed"
               style={{
                 background: "rgba(255,255,255,0.92)",
                 color: ACCENT,
-                opacity: savingProject ? 0.72 : 1,
+                opacity: !isAdmin || savingProject ? 0.55 : 1,
                 boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
               }}
             >
@@ -731,11 +822,19 @@ export function ProjectSettingsPage({ projectId }: Props) {
                 </h2>
               </div>
 
+              {!isAdmin && (
+                <p className="mb-4 flex items-center gap-1.5 text-xs" style={{ color: TEXT_TERTIARY }}>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  관리자만 프로젝트 정보를 수정할 수 있습니다.
+                </p>
+              )}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <InputLabel>Project Name</InputLabel>
                   <input
                     value={projectForm.projectName}
+                    disabled={!isAdmin}
                     onChange={(event) => setProjectForm((current) => ({ ...current, projectName: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
@@ -746,6 +845,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   <InputLabel>Status</InputLabel>
                   <select
                     value={projectForm.status}
+                    disabled={!isAdmin}
                     onChange={(event) =>
                       setProjectForm((current) => ({ ...current, status: event.target.value as ProjectStatus }))
                     }
@@ -764,6 +864,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   <InputLabel>Description</InputLabel>
                   <textarea
                     value={projectForm.description}
+                    disabled={!isAdmin}
                     onChange={(event) => setProjectForm((current) => ({ ...current, description: event.target.value }))}
                     rows={4}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
@@ -775,6 +876,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   <InputLabel>Repository URL</InputLabel>
                   <input
                     value={projectForm.repositoryUrl}
+                    disabled={!isAdmin}
                     onChange={(event) =>
                       setProjectForm((current) => ({ ...current, repositoryUrl: event.target.value }))
                     }
@@ -787,6 +889,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   <InputLabel>Local Path</InputLabel>
                   <input
                     value={projectForm.localPath}
+                    disabled={!isAdmin}
                     onChange={(event) => setProjectForm((current) => ({ ...current, localPath: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
@@ -798,6 +901,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   <input
                     type="date"
                     value={projectForm.startDate}
+                    disabled={!isAdmin}
                     onChange={(event) => setProjectForm((current) => ({ ...current, startDate: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
@@ -809,6 +913,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   <input
                     type="date"
                     value={projectForm.targetDate}
+                    disabled={!isAdmin}
                     onChange={(event) => setProjectForm((current) => ({ ...current, targetDate: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
@@ -845,7 +950,14 @@ export function ProjectSettingsPage({ projectId }: Props) {
                 </h2>
               </div>
 
-              <div className="space-y-3">
+              {!isAdmin && (
+                <p className="mb-4 flex items-center gap-1.5 text-xs" style={{ color: TEXT_TERTIARY }}>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  관리자만 프로젝트 멤버를 관리할 수 있습니다.
+                </p>
+              )}
+
+              <div className="grid gap-3 md:grid-cols-2">
                 {members.length === 0 ? (
                   <p className="text-sm" style={{ color: TEXT_TERTIARY }}>
                     표시할 멤버가 없습니다.
@@ -877,17 +989,33 @@ export function ProjectSettingsPage({ projectId }: Props) {
                             </p>
                           </button>
 
-                          <span
-                            className="rounded-full px-2.5 py-1 text-[11px]"
-                            style={{ background: "rgba(136,138,98,0.12)", color: TEXT_SECONDARY }}
-                          >
-                            {member.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="rounded-full px-2.5 py-1 text-[11px]"
+                              style={{ background: "rgba(136,138,98,0.12)", color: TEXT_SECONDARY }}
+                            >
+                              {member.status}
+                            </span>
+
+                            {member.role !== "LEADER" && (
+                              <button
+                                type="button"
+                                disabled={!isAdmin || member.status !== "ACTIVE" || savingMemberId === member.projectMemberId}
+                                onClick={() => void handleMemberKick(member)}
+                                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                                style={{ borderColor: "rgba(203,86,66,0.28)", color: STATUS_ERROR }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                추방
+                              </button>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="mt-4 grid gap-3 md:grid-cols-[1fr,auto,1fr,auto]">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr,auto]">
                           <select
                             value={draft.role}
+                            disabled={!isAdmin}
                             onChange={(event) =>
                               setMemberDrafts((current) => ({
                                 ...current,
@@ -909,9 +1037,9 @@ export function ProjectSettingsPage({ projectId }: Props) {
 
                           <button
                             type="button"
-                            disabled={savingMemberId === member.projectMemberId}
+                            disabled={!isAdmin || savingMemberId === member.projectMemberId}
                             onClick={() => void handleMemberRoleSave(member)}
-                            className="rounded-full border px-3 py-2 text-[11px] font-semibold"
+                            className="rounded-full border px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                             style={{ borderColor: ACCENT_BORDER, color: TEXT_SECONDARY }}
                           >
                             역할 저장
@@ -919,6 +1047,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
 
                           <select
                             value={draft.department}
+                            disabled={!isAdmin}
                             onChange={(event) =>
                               setMemberDrafts((current) => ({
                                 ...current,
@@ -940,9 +1069,9 @@ export function ProjectSettingsPage({ projectId }: Props) {
 
                           <button
                             type="button"
-                            disabled={savingMemberId === member.projectMemberId}
+                            disabled={!isAdmin || savingMemberId === member.projectMemberId}
                             onClick={() => void handleMemberDepartmentSave(member)}
-                            className="rounded-full border px-3 py-2 text-[11px] font-semibold"
+                            className="rounded-full border px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                             style={{ borderColor: ACCENT_BORDER, color: TEXT_SECONDARY }}
                           >
                             부서 저장
@@ -1010,7 +1139,8 @@ export function ProjectSettingsPage({ projectId }: Props) {
         )}
 
         {activeTab === "tech" && (
-          <section className="grid gap-5 xl:grid-cols-[0.95fr,1.05fr]">
+          <section className={isAdmin ? "grid gap-5 xl:grid-cols-[0.95fr,1.05fr]" : ""}>
+            {isAdmin && (
             <div
               className="rounded-[28px] border px-5 py-5"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
@@ -1102,6 +1232,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                 </button>
               </div>
             </div>
+            )}
 
             <div
               className="rounded-[28px] border px-5 py-5"
@@ -1113,6 +1244,13 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   기술 스택 목록
                 </h2>
               </div>
+
+              {!isAdmin && (
+                <p className="mb-4 flex items-center gap-1.5 text-xs" style={{ color: TEXT_TERTIARY }}>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  관리자만 기술 스택을 추가하거나 수정할 수 있습니다.
+                </p>
+              )}
 
               <div className="space-y-3">
                 {techStacks.length === 0 ? (
@@ -1148,8 +1286,9 @@ export function ProjectSettingsPage({ projectId }: Props) {
 
                         <button
                           type="button"
+                          disabled={!isAdmin}
                           onClick={() => handleTechEdit(stack)}
-                          className="rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                          className="rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                           style={{ borderColor: ACCENT_BORDER, color: TEXT_SECONDARY }}
                         >
                           수정
@@ -1157,8 +1296,9 @@ export function ProjectSettingsPage({ projectId }: Props) {
 
                         <button
                           type="button"
+                          disabled={!isAdmin}
                           onClick={() => void handleTechDelete(stack)}
-                          className="rounded-full border p-2"
+                          className="rounded-full border p-2 disabled:cursor-not-allowed disabled:opacity-50"
                           style={{ borderColor: BORDER_SUBTLE, color: STATUS_ERROR }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
