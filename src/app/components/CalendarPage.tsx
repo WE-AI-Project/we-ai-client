@@ -7,7 +7,6 @@ import {
   ListTodo,
   Pencil,
   Plus,
-  RefreshCw,
   Trash2,
   X,
 } from "lucide-react";
@@ -591,7 +590,6 @@ export function CalendarPage({ projectId }: Props) {
 
   const handleRefresh = async () => {
     await Promise.all([loadMembers(), loadSchedules()]);
-    toast.success("캘린더 데이터를 새로고침했습니다.");
   };
 
   const handleOpenEditModal = async (scheduleId: number) => {  //프로젝트 일정 상세 조회
@@ -728,15 +726,6 @@ export function CalendarPage({ projectId }: Props) {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleRefresh()}
-                  className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold"
-                  style={{ borderColor: ACCENT_BORDER, color: TEXT_SECONDARY }}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  새로고침
-                </button>
                 <button
                   type="button"
                   onClick={() => setModalState({ mode: "create" })}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Sun, X, Sparkles, CheckCircle2, Clock, AlertTriangle,
+  Sun, Sparkles, CheckCircle2, Clock, AlertTriangle,
   ArrowRight, ChevronRight, FileCode2, GitPullRequest,
   Zap, Bell, ExternalLink, Bot, RefreshCw, Loader2,
 } from "lucide-react";
@@ -530,12 +530,6 @@ export function DailyStandupModal({
               </p>
             </div>
 
-            <button
-              onClick={handleClose}
-              className="p-1.5 rounded-lg shrink-0 transition-all hover:bg-white/[0.10]"
-            >
-              <X className="w-4 h-4" style={{ color: "rgba(255,255,255,0.55)" }} />
-            </button>
           </div>
 
           <div className="flex items-center gap-2 mt-3 flex-wrap">

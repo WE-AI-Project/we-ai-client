@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import {
   CalendarDays,
   Folder,
+  Hash,
   Layers,
   ListTodo,
+  LogOut,
   RefreshCw,
   Save,
   Settings,
@@ -100,6 +103,12 @@ const SCHEDULE_STATUS_COLORS: Record<ProjectScheduleStatus, { color: string; bg:
   HOLD: { color: "#888A62", bg: "rgba(136,138,98,0.12)" },
 };
 
+const CARD_SURFACE = "rgba(255,255,255,0.92)";
+const ROW_SURFACE = "rgba(255,255,255,0.72)";
+const FIELD_SURFACE = "rgba(255,255,255,0.86)";
+const MUTED_SURFACE = "rgba(65,67,27,0.055)";
+const PANEL_SHADOW = "0 8px 24px rgba(32,35,27,0.045)";
+
 type TabId = "overview" | "team" | "tech" | "schedules";
 
 type Props = {
@@ -144,7 +153,10 @@ const EMPTY_TECH_FORM: TechFormState = {
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
+    <div
+      className="rounded-2xl border px-4 py-4"
+      style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: "0 1px 8px rgba(32,35,27,0.035)" }}
+    >
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
         {label}
       </p>
@@ -170,12 +182,54 @@ function TabButton({
       type="button"
       className="rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all"
       style={{
-        background: active ? ACCENT : "transparent",
+        background: active ? ACCENT : FIELD_SURFACE,
         color: active ? "white" : TEXT_SECONDARY,
-        border: `1px solid ${active ? ACCENT : ACCENT_BORDER}`,
+        border: `1px solid ${active ? ACCENT : BORDER}`,
       }}
     >
       {label}
+    </button>
+  );
+}
+
+function SettingsNavButton({
+  active,
+  icon: Icon,
+  label,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>;
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all"
+      style={{
+        background: active ? ACCENT : FIELD_SURFACE,
+        borderColor: active ? ACCENT : BORDER,
+        boxShadow: active ? "0 8px 18px rgba(65,67,27,0.16)" : "none",
+      }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        style={{ background: active ? "rgba(255,255,255,0.14)" : MUTED_SURFACE }}
+      >
+        <Icon className="h-4 w-4" style={{ color: active ? "white" : ACCENT }} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[12px] font-bold" style={{ color: active ? "white" : TEXT_PRIMARY }}>
+          {label}
+        </span>
+        <span className="mt-0.5 block truncate text-[10px]" style={{ color: active ? "rgba(255,255,255,0.58)" : TEXT_TERTIARY }}>
+          {description}
+        </span>
+      </span>
     </button>
   );
 }
@@ -350,6 +404,10 @@ export function ProjectSettingsPage({ projectId }: Props) {
     } finally {
       setSavingProject(false);
     }
+  };
+
+  const handleLeaveProject = () => {
+    toast.info("프로젝트 나가기 API 연결이 필요합니다.");
   };
 
   const handleMemberRoleSave = async (member: ProjectMember) => {
@@ -550,56 +608,121 @@ export function ProjectSettingsPage({ projectId }: Props) {
     <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
       <div className="mx-auto max-w-7xl space-y-5">
         <section
-          className="rounded-[28px] border px-6 py-6"
-          style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+          className="relative overflow-hidden rounded-[28px] border px-6 py-6"
+          style={{
+            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #41431B 100%)",
+            borderColor: "rgba(255,255,255,0.10)",
+            boxShadow: "0 18px 42px rgba(12,14,2,0.20)",
+          }}
         >
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 w-1/2"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(174,183,132,0.16))" }}
+          />
+          <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4" style={{ color: ACCENT }} />
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: TEXT_LABEL }}>
+                <Settings className="h-4 w-4" style={{ color: "#AEB784" }} />
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.50)" }}>
                   Project Settings
                 </p>
               </div>
-              <h1 className="mt-2 text-3xl font-bold" style={{ color: TEXT_PRIMARY }}>
+              <h1 className="mt-2 text-3xl font-bold" style={{ color: "rgba(255,255,255,0.96)" }}>
                 {detail.projectName}
               </h1>
-              <p className="mt-2 text-sm" style={{ color: TEXT_SECONDARY }}>
+              <p className="mt-2 max-w-2xl text-sm" style={{ color: "rgba(255,255,255,0.64)" }}>
                 프로젝트 정보 수정, 멤버 관리, 기술 스택 관리, 일정 현황을 한 화면에서 확인할 수 있습니다.
               </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-[12px]" style={{ color: "rgba(255,255,255,0.72)" }}>
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.10)" }}>
+                  <Hash className="h-3.5 w-3.5" />
+                  {detail.projectCode}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(174,183,132,0.18)", color: "#E3DBBB" }}>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {detail.status}
+                </span>
+              </div>
             </div>
 
             <button
-              onClick={() => void loadProjectSettings()}
               type="button"
-              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white"
-              style={{ background: ACCENT }}
+              onClick={() => void handleProjectSave()}
+              disabled={savingProject}
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+              style={{
+                background: "rgba(255,255,255,0.92)",
+                color: ACCENT,
+                opacity: savingProject ? 0.72 : 1,
+                boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
+              }}
             >
-              <RefreshCw className="h-4 w-4" />
-              새로고침
+              <Save className="h-4 w-4" />
+              {savingProject ? "저장 중..." : "프로젝트 정보 저장"}
             </button>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <TabButton active={activeTab === "overview"} label="개요" onClick={() => setActiveTab("overview")} />
-            <TabButton active={activeTab === "team"} label="멤버" onClick={() => setActiveTab("team")} />
-            <TabButton active={activeTab === "tech"} label="기술 스택" onClick={() => setActiveTab("tech")} />
-            <TabButton active={activeTab === "schedules"} label="일정" onClick={() => setActiveTab("schedules")} />
           </div>
         </section>
 
-        {activeTab === "overview" && (
-          <div className="space-y-4">
-            <section className="grid gap-4 md:grid-cols-4">
-              <StatTile label="Status" value={detail.status} />
-              <StatTile label="Members" value={`${members.length}`} />
-              <StatTile label="Tech Stack" value={`${techStacks.length}`} />
-              <StatTile label="Schedules" value={`${scheduleSummary.total}`} />
+        <div className="grid gap-5 xl:grid-cols-[280px,minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <section
+              className="rounded-[28px] border p-3"
+              style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
+            >
+              <div className="space-y-2">
+                <SettingsNavButton
+                  active={activeTab === "overview"}
+                  icon={Folder}
+                  label="Overview"
+                  description="Name, status, path"
+                  onClick={() => setActiveTab("overview")}
+                />
+                <SettingsNavButton
+                  active={activeTab === "team"}
+                  icon={Users}
+                  label="Team"
+                  description={`${members.length} members`}
+                  onClick={() => setActiveTab("team")}
+                />
+                <SettingsNavButton
+                  active={activeTab === "tech"}
+                  icon={Layers}
+                  label="Tech Stack"
+                  description={`${techStacks.length} registered`}
+                  onClick={() => setActiveTab("tech")}
+                />
+                <SettingsNavButton
+                  active={activeTab === "schedules"}
+                  icon={ListTodo}
+                  label="Schedules"
+                  description={`${scheduleSummary.total} items`}
+                  onClick={() => setActiveTab("schedules")}
+                />
+              </div>
             </section>
 
             <section
+              className="rounded-[28px] border p-4"
+              style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
+                Snapshot
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <StatTile label="Members" value={`${members.length}`} />
+                <StatTile label="Tech" value={`${techStacks.length}`} />
+                <StatTile label="Done" value={`${scheduleSummary.completed}`} />
+                <StatTile label="Todo" value={`${scheduleSummary.pending}`} />
+              </div>
+            </section>
+          </aside>
+
+          <div className="min-w-0 space-y-5">
+        {activeTab === "overview" && (
+          <div className="space-y-4">
+            <section
               className="rounded-[28px] border px-5 py-5"
-              style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+              style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
                 <Folder className="h-4 w-4" style={{ color: ACCENT }} />
@@ -615,7 +738,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     value={projectForm.projectName}
                     onChange={(event) => setProjectForm((current) => ({ ...current, projectName: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
 
@@ -627,7 +750,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                       setProjectForm((current) => ({ ...current, status: event.target.value as ProjectStatus }))
                     }
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   >
                     {PROJECT_STATUSES.map((status) => (
                       <option key={status} value={status}>
@@ -644,7 +767,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     onChange={(event) => setProjectForm((current) => ({ ...current, description: event.target.value }))}
                     rows={4}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
 
@@ -656,7 +779,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                       setProjectForm((current) => ({ ...current, repositoryUrl: event.target.value }))
                     }
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
 
@@ -666,7 +789,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     value={projectForm.localPath}
                     onChange={(event) => setProjectForm((current) => ({ ...current, localPath: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
 
@@ -677,7 +800,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     value={projectForm.startDate}
                     onChange={(event) => setProjectForm((current) => ({ ...current, startDate: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
 
@@ -688,7 +811,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     value={projectForm.targetDate}
                     onChange={(event) => setProjectForm((current) => ({ ...current, targetDate: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
               </div>
@@ -696,15 +819,15 @@ export function ProjectSettingsPage({ projectId }: Props) {
               <div className="mt-5 flex justify-end">
                 <button
                   type="button"
-                  onClick={() => void handleProjectSave()}
-                  disabled={savingProject}
-                  className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white"
-                  style={{ background: ACCENT }}
+                  onClick={handleLeaveProject}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white"
+                  style={{ background: STATUS_ERROR }}
                 >
-                  <Save className="h-4 w-4" />
-                  {savingProject ? "저장 중..." : "프로젝트 정보 저장"}
+                  <LogOut className="h-3.5 w-3.5" />
+                  Leave Project
                 </button>
               </div>
+
             </section>
           </div>
         )}
@@ -713,7 +836,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
           <section className="grid gap-5 xl:grid-cols-[1.3fr,0.9fr]">
             <div
               className="rounded-[28px] border px-5 py-5"
-              style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+              style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
                 <Users className="h-4 w-4" style={{ color: ACCENT }} />
@@ -738,7 +861,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                       <div
                         key={member.projectMemberId}
                         className="rounded-2xl border px-4 py-4"
-                        style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                        style={{ background: ROW_SURFACE, borderColor: BORDER_SUBTLE }}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <button
@@ -775,7 +898,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                               }))
                             }
                             className="rounded-2xl border px-3 py-2 text-sm outline-none"
-                            style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: "white" }}
+                            style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                           >
                             {Object.entries(ROLE_LABELS).map(([role, label]) => (
                               <option key={role} value={role}>
@@ -806,7 +929,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                               }))
                             }
                             className="rounded-2xl border px-3 py-2 text-sm outline-none"
-                            style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: "white" }}
+                            style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                           >
                             {MEMBER_DEPARTMENTS.map((department) => (
                               <option key={department} value={department}>
@@ -834,7 +957,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
 
             <div
               className="rounded-[28px] border px-5 py-5"
-              style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+              style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" style={{ color: ACCENT }} />
@@ -849,7 +972,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  <div className="rounded-2xl border px-4 py-4" style={{ borderColor: BORDER_SUBTLE, background: ACCENT_BG }}>
+                  <div className="rounded-2xl border px-4 py-4" style={{ borderColor: BORDER_SUBTLE, background: MUTED_SURFACE }}>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
                       Name
                     </p>
@@ -858,7 +981,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border px-4 py-4" style={{ borderColor: BORDER_SUBTLE, background: ACCENT_BG }}>
+                  <div className="rounded-2xl border px-4 py-4" style={{ borderColor: BORDER_SUBTLE, background: MUTED_SURFACE }}>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
                       Email
                     </p>
@@ -872,7 +995,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     <StatTile label="Department" value={DEPARTMENT_LABELS[selectedMemberDetail.department]} />
                   </div>
 
-                  <div className="rounded-2xl border px-4 py-4" style={{ borderColor: BORDER_SUBTLE, background: ACCENT_BG }}>
+                  <div className="rounded-2xl border px-4 py-4" style={{ borderColor: BORDER_SUBTLE, background: MUTED_SURFACE }}>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
                       Joined At
                     </p>
@@ -890,7 +1013,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
           <section className="grid gap-5 xl:grid-cols-[0.95fr,1.05fr]">
             <div
               className="rounded-[28px] border px-5 py-5"
-              style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+              style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
                 <Layers className="h-4 w-4" style={{ color: ACCENT }} />
@@ -906,7 +1029,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     value={techForm.name}
                     onChange={(event) => setTechForm((current) => ({ ...current, name: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
 
@@ -916,7 +1039,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     value={techForm.version}
                     onChange={(event) => setTechForm((current) => ({ ...current, version: event.target.value }))}
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   />
                 </div>
 
@@ -931,7 +1054,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                       }))
                     }
                     className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: ACCENT_BG }}
+                    style={{ borderColor: BORDER, color: TEXT_PRIMARY, background: FIELD_SURFACE }}
                   >
                     {TECH_STACK_CATEGORIES.map((category) => (
                       <option key={category} value={category}>
@@ -941,7 +1064,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                   </select>
                 </div>
 
-                <label className="flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: BORDER, background: ACCENT_BG }}>
+                <label className="flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: BORDER, background: FIELD_SURFACE }}>
                   <input
                     type="checkbox"
                     checked={techForm.isRequired}
@@ -982,7 +1105,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
 
             <div
               className="rounded-[28px] border px-5 py-5"
-              style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+              style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
                 <Layers className="h-4 w-4" style={{ color: ACCENT }} />
@@ -1001,7 +1124,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     <div
                       key={stack.techStackId}
                       className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-4"
-                      style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                      style={{ background: ROW_SURFACE, borderColor: BORDER_SUBTLE }}
                     >
                       <div>
                         <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
@@ -1052,7 +1175,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
         {activeTab === "schedules" && (
           <section
             className="rounded-[28px] border px-5 py-5"
-            style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
+            style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
           >
             <div className="mb-4 flex items-center gap-2">
               <ListTodo className="h-4 w-4" style={{ color: ACCENT }} />
@@ -1081,7 +1204,7 @@ export function ProjectSettingsPage({ projectId }: Props) {
                     <div
                       key={schedule.scheduleId}
                       className="rounded-2xl border px-4 py-4"
-                      style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                      style={{ background: ROW_SURFACE, borderColor: BORDER_SUBTLE }}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1127,6 +1250,8 @@ export function ProjectSettingsPage({ projectId }: Props) {
             </div>
           </section>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -89,6 +89,21 @@ const DEPARTMENT_LABELS: Record<ProjectDepartment, string> = {
   PM: "PM",
 };
 
+function useEscapeToClose(onClose: () => void, enabled = true) {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [enabled, onClose]);
+}
+
 type DetectedInfo = ProjectStackDetection;
 
 function genCode(): string {
@@ -306,6 +321,7 @@ function CreateProjectModal({
   const [errorMessage, setErrorMessage] = useState("");
 
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  useEscapeToClose(onClose, !isAlertOpen);
 
   const totalSteps = 3;
   const canNextStepOne = name.trim().length >= 2;
@@ -746,6 +762,7 @@ function StartModal({
   onRefresh,
   onClose,
   onSelect,
+  onCreate,
 }: {
   currentUser: CurrentUser | null;
   projects: MyProject[];
@@ -754,12 +771,14 @@ function StartModal({
   onRefresh: () => void;
   onClose: () => void;
   onSelect: (project: ProjectLaunchTarget) => void;
+  onCreate: () => void;
 }) {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [localPath, setLocalPath] = useState("");
   const [joining, setJoining] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
+  useEscapeToClose(onClose);
 
   const selectedProject = projects.find((project) => project.projectId === selectedProjectId) ?? null;
 
@@ -851,15 +870,6 @@ function StartModal({
 
           {loading ? (
             <ProjectPickerSkeleton />
-          ) : projects.length === 0 ? (
-            <div className="rounded-xl border px-4 py-6 text-center" style={{ background: "rgba(0,0,0,0.02)", borderColor: BORDER }}>
-              <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
-                아직 참여 중인 프로젝트가 없습니다
-              </p>
-              <p className="mt-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                새 프로젝트를 만들거나 초대 코드로 참여해보세요.
-              </p>
-            </div>
           ) : (
             <div className="space-y-2">
               {projects.map((project) => {
@@ -899,6 +909,27 @@ function StartModal({
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={onCreate}
+                className="w-full rounded-xl px-4 py-3 text-left transition-all"
+                style={{
+                  background: "rgba(0,0,0,0.02)",
+                  border: `1.5px dashed ${ACCENT_BORDER}`,
+                  minHeight: 84,
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "rgba(65,67,27,0.08)" }}>
+                    <Plus className="h-4 w-4" style={{ color: ACCENT }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold" style={{ color: ACCENT }}>
+                      새 프로젝트 추가
+                    </p>
+                  </div>
+                </div>
+              </button>
             </div>
           )}
 
@@ -975,20 +1006,16 @@ function StartModal({
 
 type Props = {
   currentUser: CurrentUser | null;
-  initialView?: "entry" | "create";
   onOpenProject: (project: ProjectLaunchTarget) => void;
   onLogout: () => void;
 };
 
 export function JoinProjectScreen({
   currentUser,
-  initialView = "entry",
   onOpenProject,
   onLogout,
 }: Props) {
-  const [modal, setModal] = useState<"none" | "start" | "create">(() =>
-    initialView === "create" ? "create" : "none"
-  );
+  const [modal, setModal] = useState<"none" | "start" | "create">("none");
   const [projects, setProjects] = useState<MyProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projectError, setProjectError] = useState("");
@@ -1032,12 +1059,6 @@ export function JoinProjectScreen({
     void refreshProjects();
   }, []);
 
-  useEffect(() => {
-    if (initialView === "create") {
-      setModal("create");
-    }
-  }, [initialView]);
-
   const handleCreate = (project: ProjectLaunchTarget) => {
     setModal("none");
     void refreshProjects();
@@ -1050,13 +1071,7 @@ export function JoinProjectScreen({
   };
 
   const handleStart = async () => {
-    const nextProjects = await refreshProjects();
-
-    if (nextProjects?.length === 0) {
-      setModal("create");
-      return;
-    }
-
+    await refreshProjects();
     setModal("start");
   };
 
@@ -1108,6 +1123,7 @@ export function JoinProjectScreen({
           onRefresh={() => void refreshProjects()}
           onClose={() => setModal("none")}
           onSelect={handleSelectProject}
+          onCreate={() => setModal("create")}
         />
       )}
 
