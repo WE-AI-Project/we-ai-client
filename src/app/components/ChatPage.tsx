@@ -5,7 +5,7 @@ import {
   FileText, X, CheckCircle2, Download, Mic, MicOff,
   Clock, Hash, Users, Loader2, Sparkles, Bot,
   Code2, Server, ShieldCheck, Wrench, Globe,
-  User, ChevronRight, Search, BookOpen,
+  User, ChevronRight, Search, BookOpen, Plus,
 } from "lucide-react";
 import {
   ChatMessage, MeetingDoc,
@@ -45,7 +45,18 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 // ══════════════════════════════════════════════════════════
 // 프로젝트 지식 데이터 (AI 탭에서 사용)
 // ══════════════════════════════════════════════════════════
-type PartId = "all" | "frontend" | "backend" | "qa" | "devops";
+type BasePartId = "all" | "frontend" | "backend" | "qa" | "devops";
+type PartId = BasePartId | string;
+
+type ChatRoomConfig = {
+  id: PartId;
+  label: string;
+  labelKo: string;
+  icon: any;
+  color: string;
+  bg: string;
+  isCustom?: boolean;
+};
 
 const PROJECT_TEAM = [
   {
@@ -97,7 +108,7 @@ const PROJECT_TEAM = [
 
 type TeamMember = typeof PROJECT_TEAM[number];
 
-const PART_CONFIG: Record<PartId, { label: string; labelKo: string; icon: any; color: string; bg: string }> = {
+const PART_CONFIG: Record<BasePartId, Omit<ChatRoomConfig, "id" | "isCustom">> = {
   all:      { label: "All",       labelKo: "전체",       icon: Globe,       color: "#41431B", bg: "rgba(65,67,27,0.08)"    },
   frontend: { label: "Frontend",  labelKo: "프론트엔드",  icon: Code2,       color: "#5A8A4A", bg: "rgba(90,138,74,0.08)"   },
   backend:  { label: "Backend",   labelKo: "백엔드",      icon: Server,      color: "#41431B", bg: "rgba(65,67,27,0.08)"    },
@@ -106,7 +117,7 @@ const PART_CONFIG: Record<PartId, { label: string; labelKo: string; icon: any; c
 };
 
 // ── 파트별 초기 메시지 ──
-const PART_INITIAL_MESSAGES: Record<PartId, Omit<ChatMessage, "id" | "time">[]> = {
+const PART_INITIAL_MESSAGES: Record<BasePartId, Omit<ChatMessage, "id" | "time">[]> = {
   all: [
     { sender: "Admin",  avatar: "A", role: "other", content: "안녕하세요 팀 여러분! 이번 스프린트 킥오프 미팅 일정 공유합니다. 내일 오전 10시 확인 부탁드려요.", type: "text" },
     { sender: "병권",   avatar: "병", role: "other", content: "확인했습니다! 백엔드 쪽 배포 관련해서도 논의할게 있어요.", type: "text" },
@@ -683,9 +694,10 @@ export function ChatPage({
 
   const [mainTab,      setMainTab]      = useState<"chat" | "ai" | "docs">("chat");
   const [partTab,      setPartTab]      = useState<PartId>("all");
+  const [customChatRooms, setCustomChatRooms] = useState<ChatRoomConfig[]>([]);
   const [partMessages, setPartMessages] = useState<Record<PartId, ChatMessage[]>>(() => {
     const init: Partial<Record<PartId, ChatMessage[]>> = {};
-    (Object.keys(PART_INITIAL_MESSAGES) as PartId[]).forEach(p => {
+    (Object.keys(PART_INITIAL_MESSAGES) as BasePartId[]).forEach(p => {
       init[p] = PART_INITIAL_MESSAGES[p].map(m => ({
         ...m, id: genId(), time: new Date(Date.now() - Math.random() * 3600000).toISOString(),
       }));
@@ -722,6 +734,15 @@ export function ChatPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const chatRooms: ChatRoomConfig[] = [
+    ...(Object.entries(PART_CONFIG) as [BasePartId, Omit<ChatRoomConfig, "id" | "isCustom">][]).map(([id, cfg]) => ({
+      id,
+      ...cfg,
+    })),
+    ...customChatRooms,
+  ];
+  const activeChatRoom = chatRooms.find(room => room.id === partTab) ?? chatRooms[0];
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [partMessages, partTab]);
   useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages]);
 
@@ -742,6 +763,37 @@ export function ChatPage({
       .then((result) => setAgents(result))
       .catch((error) => toast.error(error instanceof Error ? error.message : "AI 에이전트 목록을 불러오지 못했습니다."));
   }, [projectId]);
+
+  const handleAddChatRoom = () => {
+    const roomName = window.prompt("추가할 채팅방 이름을 입력해주세요.");
+    const trimmedName = roomName?.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    const hasSameName = chatRooms.some(room => room.labelKo.toLowerCase() === trimmedName.toLowerCase());
+    if (hasSameName) {
+      toast.error("이미 같은 이름의 채팅방이 있습니다.");
+      return;
+    }
+
+    const roomId = `custom-${genId()}`;
+    const nextRoom: ChatRoomConfig = {
+      id: roomId,
+      label: trimmedName,
+      labelKo: trimmedName,
+      icon: Hash,
+      color: "#41431B",
+      bg: "rgba(65,67,27,0.08)",
+      isCustom: true,
+    };
+
+    setCustomChatRooms(prev => [...prev, nextRoom]);
+    setPartMessages(prev => ({ ...prev, [roomId]: [] }));
+    setPartTab(roomId);
+    toast.success(`"${trimmedName}" 채팅방을 추가했습니다.`);
+  };
 
   const addPartMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
@@ -1017,7 +1069,8 @@ export function ChatPage({
                   <Skeleton key={i} className="w-20 h-6 rounded-lg mx-1" />
                 ))
               ) : (
-                (Object.entries(PART_CONFIG) as [PartId, typeof PART_CONFIG[PartId]][]).map(([id, cfg]) => {
+                chatRooms.map((room) => {
+                  const { id, ...cfg } = room;
                   const Icon = cfg.icon;
                   const isActive = partTab === id;
                   const memberCount = id === "all" ? PROJECT_TEAM.length : PROJECT_TEAM.filter(m => m.partId === id).length;
@@ -1043,6 +1096,22 @@ export function ChatPage({
                     </button>
                   );
                 })
+              )}
+
+              {!isLoading && (
+                <button
+                  type="button"
+                  onClick={handleAddChatRoom}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all"
+                  title="채팅방 추가"
+                  style={{
+                    background: "rgba(65,67,27,0.08)",
+                    color: OLIVE_DARK,
+                    border: "1px solid rgba(65,67,27,0.15)",
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
               )}
 
               <div className="ml-auto flex items-center gap-1 shrink-0">
@@ -1110,7 +1179,7 @@ export function ChatPage({
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   disabled={isLoading}
-                  placeholder={isLoading ? "채팅 불러오는 중..." : `${PART_CONFIG[partTab].labelKo} 채널에 메시지 입력...`}
+                  placeholder={isLoading ? "채팅 불러오는 중..." : `${activeChatRoom.labelKo} 채널에 메시지 입력...`}
                   rows={2}
                   className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
                   style={{ background: "transparent", color: TEXT_PRIMARY }}
