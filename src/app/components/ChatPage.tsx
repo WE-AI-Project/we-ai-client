@@ -5,7 +5,7 @@ import {
   FileText, X, CheckCircle2, Download, Mic, MicOff,
   Clock, Hash, Users, Loader2, Sparkles, Bot,
   Code2, Server, ShieldCheck, Wrench, Globe,
-  User, ChevronRight, Search, BookOpen, Plus,
+  User, ChevronRight, Search, BookOpen, Plus, LogOut,
 } from "lucide-react";
 import {
   ChatMessage, MeetingDoc,
@@ -695,6 +695,7 @@ export function ChatPage({
   const [mainTab,      setMainTab]      = useState<"chat" | "ai" | "docs">("chat");
   const [partTab,      setPartTab]      = useState<PartId>("all");
   const [customChatRooms, setCustomChatRooms] = useState<ChatRoomConfig[]>([]);
+  const [leftChatRoomIds, setLeftChatRoomIds] = useState<Set<PartId>>(() => new Set());
   const [partMessages, setPartMessages] = useState<Record<PartId, ChatMessage[]>>(() => {
     const init: Partial<Record<PartId, ChatMessage[]>> = {};
     (Object.keys(PART_INITIAL_MESSAGES) as BasePartId[]).forEach(p => {
@@ -738,9 +739,9 @@ export function ChatPage({
     ...(Object.entries(PART_CONFIG) as [BasePartId, Omit<ChatRoomConfig, "id" | "isCustom">][]).map(([id, cfg]) => ({
       id,
       ...cfg,
-    })),
+    })).filter(room => !leftChatRoomIds.has(room.id)),
     ...customChatRooms,
-  ];
+  ].filter(room => !leftChatRoomIds.has(room.id));
   const activeChatRoom = chatRooms.find(room => room.id === partTab) ?? chatRooms[0];
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [partMessages, partTab]);
@@ -793,6 +794,37 @@ export function ChatPage({
     setPartMessages(prev => ({ ...prev, [roomId]: [] }));
     setPartTab(roomId);
     toast.success(`"${trimmedName}" 채팅방을 추가했습니다.`);
+  };
+
+  const handleLeaveChatRoom = () => {
+    if (partTab === "all") {
+      toast.error("전체 채팅방은 나갈 수 없습니다.");
+      return;
+    }
+
+    const room = activeChatRoom;
+    const shouldLeave = window.confirm(`"${room.labelKo}" 채팅방을 나갈까요?`);
+    if (!shouldLeave) {
+      return;
+    }
+
+    const leaveMessage: ChatMessage = {
+      id: genId(),
+      sender: "System",
+      avatar: "S",
+      role: "other",
+      content: "병권님이 채팅방을 나갔습니다.",
+      time: new Date().toISOString(),
+      type: "system",
+    };
+
+    setPartMessages(prev => ({
+      ...prev,
+      [partTab]: [...(prev[partTab] || []), leaveMessage],
+    }));
+    setLeftChatRoomIds(prev => new Set(prev).add(partTab));
+    setPartTab("all");
+    toast.success(`"${room.labelKo}" 채팅방을 나갔습니다.`);
   };
 
   const addPartMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
@@ -1111,6 +1143,22 @@ export function ChatPage({
                   }}
                 >
                   <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {!isLoading && partTab !== "all" && (
+                <button
+                  type="button"
+                  onClick={handleLeaveChatRoom}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all"
+                  title="채팅방 나가기"
+                  style={{
+                    background: "rgba(184,84,80,0.08)",
+                    color: "#B85450",
+                    border: "1px solid rgba(184,84,80,0.18)",
+                  }}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
                 </button>
               )}
 
