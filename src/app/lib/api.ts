@@ -567,6 +567,12 @@ export async function fetchProjectDepartmentStatus(projectId: number): Promise<P
   return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
 }
 
+export async function leaveProject(projectId: number | string): Promise<void> {  //프로젝트 나가기=탈퇴하기
+  return request(`/api/v1/projects/${projectId}/leave`, {
+    method: 'POST', 
+  });
+}
+
 export async function fetchProjectCommits(
   projectId: number,
   repositoryType: ProjectRepositoryType,

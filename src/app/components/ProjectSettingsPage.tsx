@@ -52,6 +52,7 @@ import {
   updateProjectMemberDepartment,
   updateProjectMemberRole,
   updateProjectTechStack,
+  leaveProject,
 } from "../lib/api";
 import { loadSettings, saveSettings } from "../data/projectSettingsStore";
 import { ProjectSettingsSkeleton } from "./SkeletonLoader";
@@ -424,8 +425,31 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
     }
   };
 
-  const handleLeaveProject = () => {
-    toast.info("프로젝트 나가기 API 연결이 필요합니다.");
+   const handleLeaveProject = async () => {  //프로젝트 나가기=탈퇴하기
+    if (!projectId) {
+      toast.error("유효하지 않은 프로젝트입니다.");
+      return;
+    }
+
+    const isConfirmed = window.confirm(
+      "정말 이 프로젝트에서 나가시겠습니까?\n나간 후에는 프로젝트 목록에서 사라지며 되돌릴 수 없습니다."
+    );
+
+    if (!isConfirmed) return;
+
+    try {
+      // 2. 정상적인 API 호출
+      await leaveProject(projectId);
+      
+      alert("프로젝트에서 정상적으로 나갔습니다.");
+      
+      // 3. 시작 화면으로 강제 이동 및 새로고침
+      window.location.href = '/'; 
+      
+    } catch (error) {
+      console.error("프로젝트 나가기 실패:", error);
+      alert("프로젝트 나가기에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
   };
 
   const handleMemberRoleSave = async (member: ProjectMember) => {
@@ -1337,7 +1361,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
                   등록된 일정이 없습니다.
                 </p>
               ) : (
-                schedules.map((schedule) => {
+                schedules?.map((schedule) => {
                   const statusTone = SCHEDULE_STATUS_COLORS[schedule.status];
 
                   return (
