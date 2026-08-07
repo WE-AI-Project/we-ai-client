@@ -25,6 +25,13 @@ import {
   type DebateResponse,
   type SingleAgentResponse,
 } from "../../api/aiApi";
+import { 
+  fetchChatRooms, 
+  fetchChatMessages, 
+  sendChatMessage, 
+  type ChatRoom, 
+  type ChatMessageResponse 
+} from "../lib/api";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
