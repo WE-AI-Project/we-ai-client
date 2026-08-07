@@ -408,6 +408,49 @@ export async function markAllNotificationsAsRead(projectId: string | number) {  
   });
 }
 
+export type ChatRoom = {
+  chatRoomId: number;
+  name: string;
+  type?: string; 
+  memberCount?: number;
+};
+
+export type ChatMessageResponse = {
+  messageId: number;
+  chatRoomId: number;
+  senderId: number;
+  senderName: string;
+  content: string;
+  messageType: string;
+  createdAt: string;
+};
+
+export async function fetchChatRooms(projectId: number | string): Promise<ChatRoom[]> {  //채팅방 목록 조회
+  return request<ChatRoom[]>(`/api/v1/projects/${projectId}/chat/rooms`, {
+    method: "GET",
+  });
+}
+
+export async function fetchChatMessages(  //채팅 메시지 목록 조회
+  projectId: number | string, 
+  chatRoomId: number | string
+): Promise<ChatMessageResponse[]> {
+  return request<ChatMessageResponse[]>(`/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/messages`, {
+    method: "GET",
+  });
+}
+
+export async function sendChatMessage(  //채팅 메시지 전송
+  projectId: number | string, 
+  chatRoomId: number | string, 
+  content: string
+): Promise<ChatMessageResponse> {
+  return request<ChatMessageResponse>(`/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/messages`, {
+    method: "POST",
+    body: { content },
+  });
+}
+
 export async function fetchDailyStandup(projectId: number | string) { //데일리 스탠드업 브리핑
   return request<any>(`/api/v1/projects/${projectId}/daily-standup`, {
     method: "GET",

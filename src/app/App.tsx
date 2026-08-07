@@ -619,6 +619,7 @@ export default function App() {
   };
 
   const handleLeaveProject = () => {
+    setShowSystemMenu(false);
     setShowStandup(false);
     setScreen("join");
     setProjectId(null);
@@ -629,6 +630,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    setShowSystemMenu(false);
     resetWorkspaceState({
       setAuthSession,
       setCurrentUser,
@@ -666,7 +668,7 @@ export default function App() {
       case "Commits": return <CommitDiffPage projectId={projectId} />;
       case "ServerBuild": return <ServerBuildPage />;
       case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
-      case "Calendar": return <CalendarPage projectId={projectId} />;
+      case "Calendar": return <CalendarPage projectId={projectId ?? 0} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
