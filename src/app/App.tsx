@@ -259,6 +259,7 @@ export default function App() {
   const [joinExiting, setJoinExiting] = useState(false);
   const [sidebarProfile, setSidebarProfile] = useState(() => loadProfile());
   const [docCount, setDocCount] = useState(() => loadDocs().length);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [showStandup, setShowStandup] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
@@ -407,6 +408,10 @@ export default function App() {
 
   const handleNavClick = (id: NavId) => {
     setDiffFile(null);
+    if (id === "Chat") {
+      setUnreadChatCount(0);
+    }
+
     if (!isSplit || activePanel === "left") {
       if (!leftTabs.includes(id)) setLeftTabs([...leftTabs, id]);
       setActiveLeftTab(id);
@@ -668,7 +673,6 @@ export default function App() {
       case "Commits": return <CommitDiffPage projectId={projectId} />;
       case "ServerBuild": return <ServerBuildPage />;
       case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
-      case "Calendar": return <CalendarPage projectId={projectId ?? 0} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
@@ -1094,11 +1098,15 @@ export default function App() {
                 <SectionLabel collapsed={isCollapsed}>MAIN</SectionLabel>
                 <nav className="space-y-0.5">
                   {NAV_ITEMS.map(item => {
-                    const badge = item.id === "Chat" && docCount > 0 && !isCollapsed ? (
-                      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full ml-auto" style={{ background: "rgba(174,183,132,0.18)", color: SIDEBAR_TEXT_HOVER }}>
-                        {docCount}
+                    const badge = item.id === "Chat" && unreadChatCount > 0 && !isCollapsed ? (
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-auto"
+                        style={{ background: "#e11d48", color: "#ffffff" }} // 안 읽은 알림처럼 붉은색 계열로 변경
+                      >
+                        {unreadChatCount}
                       </span>
                     ) : null;
+
                     return (
                       <div key={item.id} className="relative">
                         <NavBtn
