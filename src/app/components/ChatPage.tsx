@@ -3,17 +3,17 @@ import { toast } from "sonner";
 import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
   FileText, X, CheckCircle2, Download, Mic, MicOff,
-  Clock, Hash, Users, Loader2, Sparkles, Bot,
-  Code2, Server, ShieldCheck, Wrench, Globe,
-  User, ChevronRight, Search, BookOpen, Plus, LogOut,
+  Hash, Globe, Server, ShieldCheck, Wrench, Loader2, Sparkles, Bot,
+  Code2, User, BookOpen, Plus,
 } from "lucide-react";
+
 import {
   ChatMessage, MeetingDoc,
   loadDocs, saveDocs,
   generateMeetingSummary, formatTime, formatDate, genId,
-  generateDocBriefing, briefingToMeetingDoc, type BriefingData,
+  generateDocBriefing, briefingToMeetingDoc,
 } from "../data/chatStore";
-import { DocBriefingBubble, BriefingLoadingBubble } from "./DocBriefingBubble";
+
 import {
   askAiAgent,
   fetchAiAgents,
@@ -25,21 +25,63 @@ import {
   type DebateResponse,
   type SingleAgentResponse,
 } from "../../api/aiApi";
-import { 
-  fetchChatRooms, 
-  fetchChatMessages, 
-  sendChatMessage, 
-  type ChatRoom, 
-  type ChatMessageResponse 
-} from "../lib/api";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  UI_GREEN, UI_AMBER,
+  UI_GREEN,
   OLIVE_DARK,
 } from "../colors";
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+// ✅ 1. api.ts에서 request 함수만 깔끔하게 가져옵니다.
+import { request } from "../lib/api";
+
+// ✅ 2. 회원님이 요청하셨던 채팅 API 타입과 함수를 파일 내부에 직접 선언합니다! (에러 완벽 차단)
+export type ChatRoom = {
+  chatRoomId: number;
+  name: string;
+  type?: string;
+  memberCount?: number;
+};
+
+export type ChatMessageResponse = {
+  messageId: number;
+  chatRoomId: number;
+  senderId: number;
+  senderName: string;
+  content: string;
+  messageType: string;
+  createdAt: string;
+};
+
+export async function fetchChatRooms(projectId: number | string): Promise<ChatRoom[]> {
+  return request<ChatRoom[]>(`/api/v1/projects/${projectId}/chat/rooms`, {
+    method: "GET",
+  });
+}
+
+export async function fetchChatMessages(projectId: number | string, chatRoomId: number | string): Promise<ChatMessageResponse[]> {
+  return request<ChatMessageResponse[]>(`/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/messages`, {
+    method: "GET",
+  });
+}
+
+export async function sendChatMessage(projectId: number | string, chatRoomId: number | string, content: string): Promise<ChatMessageResponse> {
+  return request<ChatMessageResponse>(`/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/messages`, {
+    method: "POST",
+    body: { content } as any,
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// 💡 에러 방지를 위해 파일 내부에 선언한 타입 및 UI 컴포넌트들
+// ══════════════════════════════════════════════════════════
+
+export type BriefingData = {
+  fileName: string;
+  summary: string;
+  points?: string[];
+};
+
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -49,8 +91,77 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
+function DocBriefingBubble({ briefing, savedToDoc, onViewDoc, time }: { briefing: BriefingData; savedToDoc?: boolean; onViewDoc?: () => void; time?: string }) {
+  return (
+    <div className="flex gap-2.5 items-start mb-3">
+      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "rgba(90,138,74,0.12)" }}>
+        <Sparkles className="w-3.5 h-3.5" style={{ color: "#5A8A4A" }} />
+      </div>
+      <div className="flex-1 max-w-[85%] flex flex-col gap-1">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="text-[9px] font-semibold" style={{ color: "#5A8A4A" }}>WE&AI Briefing</span>
+          <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-white border" style={{ borderColor: BORDER, color: TEXT_TERTIARY }}>System</span>
+        </div>
+        <div className="rounded-2xl p-3" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}`, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+          <p className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: TEXT_PRIMARY }}>
+            <FileText className="w-3 h-3" style={{ color: TEXT_SECONDARY }} />
+            {briefing.fileName} 분석 완료
+          </p>
+          <div className="space-y-2">
+            <div>
+              <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1" style={{ color: TEXT_LABEL }}>핵심 요약</span>
+              <p className="text-[10px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>{briefing.summary}</p>
+            </div>
+            {briefing.points && briefing.points.length > 0 && (
+              <div>
+                <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1 mt-2" style={{ color: TEXT_LABEL }}>주요 포인트</span>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {briefing.points.map((pt, i) => (
+                    <li key={i} className="text-[10px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>{pt}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {savedToDoc && (
+            <div className="mt-3 pt-2.5 flex items-center justify-between" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3" style={{ color: "#5A8A4A" }} />
+                <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>Docs에 저장됨</span>
+              </div>
+              {onViewDoc && (
+                <button onClick={onViewDoc} className="text-[9px] font-semibold hover:underline" style={{ color: OLIVE_DARK }}>
+                  문서 보기
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        {time && <span className="text-[8px] px-1" style={{ color: TEXT_TERTIARY }}>{formatTime(time)}</span>}
+      </div>
+    </div>
+  );
+}
+
+function BriefingLoadingBubble({ fileName }: { fileName: string }) {
+  return (
+    <div className="flex gap-2.5 items-start mb-3">
+      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "rgba(90,138,74,0.12)" }}>
+        <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#5A8A4A" }} />
+      </div>
+      <div className="flex-1 max-w-[70%]">
+        <div className="rounded-2xl p-3 flex items-center gap-2" style={{ background: "rgba(255,255,255,0.90)", border: `1px solid ${BORDER}` }}>
+          <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
+            <strong>{fileName}</strong> 문서를 AI가 읽고 있습니다...
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════
-// 프로젝트 지식 데이터 (AI 탭에서 사용)
+// 💡 기존 프로젝트 지식 데이터 (아바타 표시, AI 등 원본 유지)
 // ══════════════════════════════════════════════════════════
 type BasePartId = "all" | "frontend" | "backend" | "qa" | "devops";
 type PartId = BasePartId | string;
@@ -113,51 +224,15 @@ const PROJECT_TEAM = [
   },
 ];
 
-type TeamMember = typeof PROJECT_TEAM[number];
-
 const PART_CONFIG: Record<BasePartId, Omit<ChatRoomConfig, "id" | "isCustom">> = {
-  all:      { label: "All",       labelKo: "전체",       icon: Globe,       color: "#41431B", bg: "rgba(65,67,27,0.08)"    },
-  frontend: { label: "Frontend",  labelKo: "프론트엔드",  icon: Code2,       color: "#5A8A4A", bg: "rgba(90,138,74,0.08)"   },
-  backend:  { label: "Backend",   labelKo: "백엔드",      icon: Server,      color: "#41431B", bg: "rgba(65,67,27,0.08)"    },
-  qa:       { label: "QA",        labelKo: "QA",          icon: ShieldCheck, color: "#B85450", bg: "rgba(184,84,80,0.08)"   },
-  devops:   { label: "DevOps",    labelKo: "DevOps",      icon: Wrench,      color: "#C09840", bg: "rgba(192,152,64,0.08)"  },
+  all: { label: "All", labelKo: "전체", icon: Globe, color: "#41431B", bg: "rgba(65,67,27,0.08)" },
+  frontend: { label: "Frontend", labelKo: "프론트엔드", icon: Code2, color: "#5A8A4A", bg: "rgba(90,138,74,0.08)" },
+  backend: { label: "Backend", labelKo: "백엔드", icon: Server, color: "#41431B", bg: "rgba(65,67,27,0.08)" },
+  qa: { label: "QA", labelKo: "QA", icon: ShieldCheck, color: "#B85450", bg: "rgba(184,84,80,0.08)" },
+  devops: { label: "DevOps", labelKo: "DevOps", icon: Wrench, color: "#C09840", bg: "rgba(192,152,64,0.08)" },
 };
 
-// ── 파트별 초기 메시지 ──
-const PART_INITIAL_MESSAGES: Record<BasePartId, Omit<ChatMessage, "id" | "time">[]> = {
-  all: [
-    { sender: "Admin",  avatar: "A", role: "other", content: "안녕하세요 팀 여러분! 이번 스프린트 킥오프 미팅 일정 공유합니다. 내일 오전 10시 확인 부탁드려요.", type: "text" },
-    { sender: "병권",   avatar: "병", role: "other", content: "확인했습니다! 백엔드 쪽 배포 관련해서도 논의할게 있어요.", type: "text" },
-    { sender: "지수",   avatar: "지", role: "other", content: "네 저도 UI 쪽 진행 상황 공유할게요 👍", type: "text" },
-    { sender: "서연",   avatar: "서", role: "other", content: "QA 리포트 최신 버전 올려드렸습니다. 검토 부탁드려요!", type: "text" },
-  ],
-  frontend: [
-    { sender: "지수",   avatar: "지", role: "other", content: "대시보드 컴포넌트 PR 올렸어요. 리뷰 부탁드립니다!", type: "text" },
-    { sender: "민준",   avatar: "민", role: "other", content: "채팅 UI WebSocket 연결 테스트 완료했습니다. 내일 머지 예정이에요.", type: "text" },
-    { sender: "지수",   avatar: "지", role: "other", content: "Recharts 최신 버전 업데이트했는데 Bar 차트 렌더링 이슈 있어요. 확인해볼게요.", type: "text" },
-    { sender: "민준",   avatar: "민", role: "other", content: "캘린더 페이지 모바일 반응형 작업 완료! 스토리북도 추가했어요 🎉", type: "text" },
-  ],
-  backend: [
-    { sender: "병권",   avatar: "병", role: "other", content: "Multi-Agent Controller v1.2 배포 완료했습니다. AGT-01~06 모두 정상 작동 확인.", type: "text" },
-    { sender: "병권",   avatar: "병", role: "other", content: "PostgreSQL 인덱스 최적화 작업 진행 중입니다. 쿼리 성능 약 40% 개선 예상.", type: "text" },
-    { sender: "Admin",  avatar: "A", role: "other", content: "DB 마이그레이션 스크립트 준비했어요. 배포 전에 검토 한 번 해주세요 병권님!", type: "text" },
-    { sender: "병권",   avatar: "병", role: "other", content: "확인할게요! Spring Security JWT 토큰 갱신 로직도 같이 리뷰해주세요.", type: "text" },
-  ],
-  qa: [
-    { sender: "서연",   avatar: "서", role: "other", content: "v1.3 릴리즈 QA 결과: 총 42개 테스트 케이스 중 39개 통과. 3개 이슈 발견했습니다.", type: "text" },
-    { sender: "서연",   avatar: "서", role: "other", content: "이슈 #124 — Multi-Agent 동시 실행 시 레이스 컨디션 발생. 백엔드 팀에 전달했어요.", type: "text" },
-    { sender: "Admin",  avatar: "A", role: "other", content: "자동화 테스트 CI에 붙이는 작업 완료했어요! PR 열면 자동으로 테스트 돌아가요 서연님~", type: "text" },
-    { sender: "서연",   avatar: "서", role: "other", content: "감사합니다! Playwright E2E 테스트 케이스도 추가 중이에요. 이번 주 내로 배포 예정 🚀", type: "text" },
-  ],
-  devops: [
-    { sender: "Admin",  avatar: "A", role: "other", content: "쿠버네티스 클러스터 업그레이드 완료했습니다. v1.28 → v1.30 정상 전환 확인.", type: "text" },
-    { sender: "Admin",  avatar: "A", role: "other", content: "Jenkins 파이프라인 빌드 시간 23분 → 14분으로 단축! 캐싱 레이어 추가 덕분이에요.", type: "text" },
-    { sender: "병권",   avatar: "병", role: "other", content: "백엔드 배포 환경에서 메모리 누수 감지됐어요. 같이 확인해볼 수 있을까요?", type: "text" },
-    { sender: "Admin",  avatar: "A", role: "other", content: "확인했어요! Heap dump 분석해보니 Redis 커넥션 풀 설정 문제로 보이네요. 수정 후 재배포할게요.", type: "text" },
-  ],
-};
-
-// ── AI 응답 생성 ──
+// ── AI 응답 생성 유틸리티 ──
 type AIResponseKind = "text" | "rag" | "agent" | "debate";
 interface AIMsg {
   id: string;
@@ -222,7 +297,7 @@ function formatSingleAgentAnswer(response: SingleAgentResponse) {
 
 function formatDebateSummary(response: DebateResponse) {
   const warning = (response.ragContexts?.length ?? 0) === 0
-    ? "주의: 충분한 프로젝트의 표본이 없습니다. · "
+    ? "주의: 충분한 표본이 없습니다. · "
     : "";
   return `${warning}선택한 에이전트 토론 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 라운드`;
 }
@@ -241,164 +316,14 @@ function Avatar({ name, size = 7 }: { name: string; size?: number }) {
   const member = PROJECT_TEAM.find(m => m.name === name);
   const bg = member ? member.bg : "rgba(65,67,27,0.08)";
   const color = member ? member.color : OLIVE_DARK;
+  const initial = name ? name[0] : "?";
+
   return (
     <div
       className={`w-${size} h-${size} rounded-full flex items-center justify-center shrink-0`}
       style={{ background: bg }}
     >
-      <span className="text-[10px] font-bold" style={{ color }}>{name[0]}</span>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════
-// 프로필 카드 (AI 응답용)
-// ══════════════════════════════════════════════════════════
-function ProfileCard({ member }: { member: TeamMember }) {
-  const cfg = PART_CONFIG[member.partId];
-  const Icon = cfg.icon;
-  return (
-    <div className="rounded-2xl overflow-hidden mt-2" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
-      <div className="px-4 py-3 flex items-center gap-3" style={{ background: member.bg, borderBottom: `1px solid ${BORDER}` }}>
-        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)" }}>
-          <span className="font-bold text-base" style={{ color: member.color }}>{member.avatar}</span>
-        </div>
-        <div>
-          <p className="text-sm font-bold" style={{ color: member.color }}>{member.name}</p>
-          <p className="text-[10px]" style={{ color: "rgba(0,0,0,0.45)" }}>{member.role}</p>
-        </div>
-        <div className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full" style={{ background: cfg.bg }}>
-          <Icon className="w-3 h-3" style={{ color: cfg.color }} />
-          <span className="text-[9px] font-semibold" style={{ color: cfg.color }}>{member.partKo}</span>
-        </div>
-      </div>
-      <div className="px-4 py-3 space-y-2">
-        <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: TEXT_LABEL }}>담당 업무</p>
-        <div className="space-y-1">
-          {member.tasks.map(t => (
-            <div key={t} className="flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full shrink-0" style={{ background: member.color }} />
-              <span className="text-[11px]" style={{ color: TEXT_PRIMARY }}>{t}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-1 mt-2">
-          {member.stack.map(s => (
-            <span key={s} className="text-[8px] px-1.5 py-0.5 rounded-md font-medium" style={{ background: member.bg, color: member.color }}>{s}</span>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 pt-1">
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: member.status === "online" ? UI_GREEN : UI_AMBER }} />
-          <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-            {member.status === "online" ? "온라인" : "자리 비움"} · 합류 {member.joinDate}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TeamCard({ part, members }: { part: PartId; members: TeamMember[] }) {
-  const cfg = PART_CONFIG[part];
-  const Icon = cfg.icon;
-  return (
-    <div className="rounded-2xl overflow-hidden mt-2" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
-      <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: cfg.bg, borderBottom: `1px solid ${BORDER}` }}>
-        <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
-        <p className="text-[11px] font-semibold" style={{ color: cfg.color }}>{cfg.labelKo} 팀 · {members.length}명</p>
-      </div>
-      <div className="divide-y" style={{ borderColor: BORDER }}>
-        {members.map(m => (
-          <div key={m.name} className="px-4 py-2.5 flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: m.bg }}>
-              <span className="text-[10px] font-bold" style={{ color: m.color }}>{m.avatar}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>{m.name}</p>
-              <p className="text-[9px] truncate" style={{ color: TEXT_TERTIARY }}>{m.role}</p>
-            </div>
-            <div className="flex flex-col items-end gap-0.5">
-              {m.tasks.slice(0, 2).map(t => (
-                <span key={t} className="text-[8px] px-1.5 py-0.5 rounded-md" style={{ background: m.bg, color: m.color }}>{t}</span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StatusCard({ data }: { data: any }) {
-  const progress = data.progress as number;
-  return (
-    <div className="rounded-2xl overflow-hidden mt-2" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
-      <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: "rgba(65,67,27,0.06)", borderBottom: `1px solid ${BORDER}` }}>
-        <Sparkles className="w-3.5 h-3.5" style={{ color: OLIVE_DARK }} />
-        <p className="text-[11px] font-semibold" style={{ color: OLIVE_DARK }}>프로젝트 현황 — {data.sprint}</p>
-      </div>
-      <div className="px-4 py-3 space-y-3">
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px]" style={{ color: TEXT_LABEL }}>전체 진행률</span>
-            <span className="text-[11px] font-bold" style={{ color: OLIVE_DARK }}>{progress}%</span>
-          </div>
-          <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.07)" }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: OLIVE_DARK }} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-[10px]">
-          {[
-            { label: "에이전트", value: `${data.agents.running}/${data.agents.total} 활성`, color: UI_GREEN },
-            { label: "빌드 상태", value: data.buildStatus, color: data.buildStatus === "PASS" ? "#5A8A4A" : "#B85450" },
-            { label: "완료 태스크", value: `${data.completedTasks}개`, color: OLIVE_DARK },
-            { label: "오픈 이슈", value: `${data.openIssues}개`, color: "#C09840" },
-          ].map(s => (
-            <div key={s.label} className="px-3 py-2 rounded-xl" style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}` }}>
-              <p className="text-[9px] mb-0.5" style={{ color: TEXT_TERTIARY }}>{s.label}</p>
-              <p className="font-bold" style={{ color: s.color }}>{s.value}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Clock className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-          <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>마감일: {data.deadline}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TasksCard({ members }: { members: TeamMember[] }) {
-  return (
-    <div className="rounded-2xl overflow-hidden mt-2" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
-      <div className="px-4 py-2.5" style={{ background: "rgba(65,67,27,0.06)", borderBottom: `1px solid ${BORDER}` }}>
-        <p className="text-[11px] font-semibold" style={{ color: OLIVE_DARK }}>파트별 담당 업무</p>
-      </div>
-      <div className="divide-y" style={{ borderColor: BORDER }}>
-        {members.map(m => {
-          const cfg = PART_CONFIG[m.partId];
-          return (
-            <div key={m.name} className="px-4 py-2.5">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: m.bg }}>
-                  <span className="text-[8px] font-bold" style={{ color: m.color }}>{m.avatar}</span>
-                </div>
-                <span className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>{m.name}</span>
-                <span className="text-[8px] px-1.5 py-0.5 rounded-full ml-auto" style={{ background: cfg.bg, color: cfg.color }}>{m.partKo}</span>
-              </div>
-              <div className="pl-7 space-y-0.5">
-                {m.tasks.map(t => (
-                  <div key={t} className="flex items-center gap-1.5">
-                    <div className="w-1 h-1 rounded-full shrink-0" style={{ background: m.color }} />
-                    <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>{t}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <span className="text-[10px] font-bold" style={{ color }}>{initial}</span>
     </div>
   );
 }
@@ -407,23 +332,22 @@ function TasksCard({ members }: { members: TeamMember[] }) {
 // 채팅 메시지 버블
 // ══════════════════════════════════════════════════════════
 const FILE_COLOR: Record<string, { bg: string; color: string }> = {
-  java:   { bg: "rgba(245,158,11,0.10)",  color: "#f59e0b" },
-  ts:     { bg: "rgba(59,130,246,0.10)",  color: "#3b82f6" },
-  tsx:    { bg: "rgba(6,182,212,0.10)",   color: "#06b6d4" },
-  gradle: { bg: "rgba(99,91,255,0.10)",   color: ACCENT    },
-  yml:    { bg: "rgba(16,185,129,0.10)",  color: "#10b981" },
-  pdf:    { bg: "rgba(239,68,68,0.10)",   color: "#ef4444" },
-  md:     { bg: "rgba(139,92,246,0.10)",  color: "#8b5cf6" },
+  java: { bg: "rgba(245,158,11,0.10)", color: "#f59e0b" },
+  ts: { bg: "rgba(59,130,246,0.10)", color: "#3b82f6" },
+  tsx: { bg: "rgba(6,182,212,0.10)", color: "#06b6d4" },
+  gradle: { bg: "rgba(99,91,255,0.10)", color: ACCENT },
+  yml: { bg: "rgba(16,185,129,0.10)", color: "#10b981" },
+  pdf: { bg: "rgba(239,68,68,0.10)", color: "#ef4444" },
+  md: { bg: "rgba(139,92,246,0.10)", color: "#8b5cf6" },
 };
 
 function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () => void }) {
   const isMe = msg.role === "me";
 
-  // ── 브리핑 타입 ──
-  if (msg.type === "briefing" && msg.briefing) {
+  if (msg.type === "briefing" && (msg as any).briefing) {
     return (
       <DocBriefingBubble
-        briefing={msg.briefing}
+        briefing={(msg as any).briefing}
         savedToDoc={true}
         onViewDoc={onViewDoc}
         time={msg.time}
@@ -484,7 +408,7 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
             boxShadow: isMe ? "0 2px 8px rgba(65,67,27,0.20)" : "0 1px 4px rgba(0,0,0,0.06)",
           }}
         >
-          <p className="text-[11px] leading-relaxed" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>
+          <p className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>
             {msg.content}
           </p>
         </div>
@@ -587,7 +511,7 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
         >
           {isAI
             ? <Sparkles className="w-3 h-3" style={{ color: OLIVE_DARK }} />
-            : <FileText  className="w-3 h-3" style={{ color: OLIVE_DARK }} />
+            : <FileText className="w-3 h-3" style={{ color: OLIVE_DARK }} />
           }
         </div>
         <div className="flex-1 min-w-0">
@@ -688,70 +612,89 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
 // ══════════════════════════════════════════════════════════
 // 메인 ChatPage
 // ══════════════════════════════════════════════════════════
-const MEETING_MEMBERS = ["병권", "Admin", "QA Bot"];
-
 export function ChatPage({
   projectId = 0,
+  currentUserId,
   onDocsUpdate,
 }: {
   projectId?: number | null;
+  currentUserId?: number;
   onDocsUpdate?: (count: number) => void;
 }) {
-  const isLoading = false;
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
+  const [serverMessages, setServerMessages] = useState<ChatMessageResponse[]>([]);
 
-  const [mainTab,      setMainTab]      = useState<"chat" | "ai" | "docs">("chat");
-  const [partTab,      setPartTab]      = useState<PartId>("all");
-  const [customChatRooms, setCustomChatRooms] = useState<ChatRoomConfig[]>([]);
-  const [leftChatRoomIds, setLeftChatRoomIds] = useState<Set<PartId>>(() => new Set());
-  const [partMessages, setPartMessages] = useState<Record<PartId, ChatMessage[]>>(() => {
-    const init: Partial<Record<PartId, ChatMessage[]>> = {};
-    (Object.keys(PART_INITIAL_MESSAGES) as BasePartId[]).forEach(p => {
-      init[p] = PART_INITIAL_MESSAGES[p].map(m => ({
-        ...m, id: genId(), time: new Date(Date.now() - Math.random() * 3600000).toISOString(),
-      }));
-    });
-    return init as Record<PartId, ChatMessage[]>;
-  });
-  const [docs,         setDocs]         = useState<MeetingDoc[]>(() => loadDocs());
-  const [input,        setInput]        = useState("");
-  const [aiInput,      setAIInput]      = useState("");
-  const [isMeeting,    setIsMeeting]    = useState(false);
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+
+  const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
+  const [docs, setDocs] = useState<MeetingDoc[]>(() => loadDocs());
+  const [input, setInput] = useState("");
+  const [aiInput, setAIInput] = useState("");
+
+  const [isMeeting, setIsMeeting] = useState(false);
   const [meetingStart, setMeetingStart] = useState<Date | null>(null);
-  const [meetingMsgs,  setMeetingMsgs]  = useState<ChatMessage[]>([]);
-  const [elapsed,      setElapsed]      = useState(0);
-  const [savingDoc,    setSavingDoc]    = useState(false);
-  const [docSaved,     setDocSaved]     = useState(false);
-  const [openDoc,      setOpenDoc]      = useState<MeetingDoc | null>(null);
-  const [micOn,        setMicOn]        = useState(false);
-  const [typing,       setTyping]       = useState(false);
-  const [aiTyping,     setAITyping]     = useState(false);
-  const [aiMessages,   setAIMessages]   = useState<AIMsg[]>([]);
+  const [meetingMsgs, setMeetingMsgs] = useState<ChatMessage[]>([]);
+  const [elapsed, setElapsed] = useState(0);
+  const [savingDoc, setSavingDoc] = useState(false);
+  const [docSaved, setDocSaved] = useState(false);
+  const [openDoc, setOpenDoc] = useState<MeetingDoc | null>(null);
+  const [micOn, setMicOn] = useState(false);
+
+  const [typing, setTyping] = useState(false);
+  const [aiTyping, setAITyping] = useState(false);
+  const [aiMessages, setAIMessages] = useState<AIMsg[]>([]);
   const [aiMode, setAiMode] = useState<"rag" | "agent" | "debate">("rag");
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [selectedAgents, setSelectedAgents] = useState<AiAgentKey[]>(["ORACLE", "BACKEND"]);
   const [singleAgent, setSingleAgent] = useState<AiAgentKey>("ORACLE");
   const [maxRounds, setMaxRounds] = useState(2);
   const [ragMaxResults, setRagMaxResults] = useState(4);
-
-  // ── 브리핑 상태 ──
   const [briefingLoading, setBriefingLoading] = useState<string | null>(null);
+
   const briefFileRef = useRef<HTMLInputElement>(null);
-
-  const bottomRef    = useRef<HTMLDivElement>(null);
-  const aiBottomRef  = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const aiBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const chatRooms: ChatRoomConfig[] = [
-    ...(Object.entries(PART_CONFIG) as [BasePartId, Omit<ChatRoomConfig, "id" | "isCustom">][]).map(([id, cfg]) => ({
-      id,
-      ...cfg,
-    })).filter(room => !leftChatRoomIds.has(room.id)),
-    ...customChatRooms,
-  ].filter(room => !leftChatRoomIds.has(room.id));
-  const activeChatRoom = chatRooms.find(room => room.id === partTab) ?? chatRooms[0];
+  // 1. 방 목록 불러오기 API 연동
+  useEffect(() => {
+    if (!projectId) return;
+    setIsLoadingRooms(true);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [partMessages, partTab]);
+    fetchChatRooms(projectId)
+      .then((res: any) => {
+        // 응답 데이터가 배열이 아니라면 내부에 들어있는 배열 속성(.data나 .rooms 등)을 찾아 추출, 그것도 아니면 빈 배열([]) 처리
+        const roomsArray = Array.isArray(res)
+          ? res
+          : (Array.isArray(res?.data) ? res.data : (Array.isArray(res?.rooms) ? res.rooms : []));
+
+        setChatRooms(roomsArray);
+
+        if (roomsArray.length > 0 && activeRoomId === null) {
+          setActiveRoomId(roomsArray[0].chatRoomId);
+        }
+      })
+      .catch(() => toast.error("채팅방 데이터를 불러오지 못했습니다."))
+      .finally(() => setIsLoadingRooms(false));
+  }, [projectId]);
+
+  // 2. 방 선택 시 메시지 불러오기 API 연동
+  useEffect(() => {
+    if (!projectId || !activeRoomId) return;
+    setIsLoadingMessages(true);
+    setLocalMessages([]);
+
+    fetchChatMessages(projectId, activeRoomId)
+      .then(setServerMessages)
+      .catch(() => toast.error("채팅 메시지를 불러오지 못했습니다."))
+      .finally(() => setIsLoadingMessages(false));
+  }, [projectId, activeRoomId]);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [serverMessages, localMessages, activeRoomId]);
   useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages]);
 
   useEffect(() => {
@@ -772,101 +715,68 @@ export function ChatPage({
       .catch((error) => toast.error(error instanceof Error ? error.message : "AI 에이전트 목록을 불러오지 못했습니다."));
   }, [projectId]);
 
-  const handleAddChatRoom = () => {
-    const roomName = window.prompt("추가할 채팅방 이름을 입력해주세요.");
-    const trimmedName = roomName?.trim();
-
-    if (!trimmedName) {
-      return;
-    }
-
-    const hasSameName = chatRooms.some(room => room.labelKo.toLowerCase() === trimmedName.toLowerCase());
-    if (hasSameName) {
-      toast.error("이미 같은 이름의 채팅방이 있습니다.");
-      return;
-    }
-
-    const roomId = `custom-${genId()}`;
-    const nextRoom: ChatRoomConfig = {
-      id: roomId,
-      label: trimmedName,
-      labelKo: trimmedName,
-      icon: Hash,
-      color: "#41431B",
-      bg: "rgba(65,67,27,0.08)",
-      isCustom: true,
-    };
-
-    setCustomChatRooms(prev => [...prev, nextRoom]);
-    setPartMessages(prev => ({ ...prev, [roomId]: [] }));
-    setPartTab(roomId);
-    toast.success(`"${trimmedName}" 채팅방을 추가했습니다.`);
+  const getRoomStyle = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes("프론트") || lowerName.includes("frontend")) return { icon: Code2, color: "#5A8A4A", bg: "rgba(90,138,74,0.08)" };
+    if (lowerName.includes("백엔드") || lowerName.includes("backend")) return { icon: Server, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
+    if (lowerName.includes("qa")) return { icon: ShieldCheck, color: "#B85450", bg: "rgba(184,84,80,0.08)" };
+    if (lowerName.includes("devops")) return { icon: Wrench, color: "#C09840", bg: "rgba(192,152,64,0.08)" };
+    if (lowerName.includes("전체") || lowerName.includes("all")) return { icon: Globe, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
+    return { icon: Hash, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
   };
 
-  const handleLeaveChatRoom = () => {
-    if (partTab === "all") {
-      toast.error("전체 채팅방은 나갈 수 없습니다.");
-      return;
-    }
+  const activeRoom = Array.isArray(chatRooms)
+    ? chatRooms.find(r => r.chatRoomId === activeRoomId)
+    : undefined;
 
-    const room = activeChatRoom;
-    const shouldLeave = window.confirm(`"${room.labelKo}" 채팅방을 나갈까요?`);
-    if (!shouldLeave) {
-      return;
-    }
-
-    const leaveMessage: ChatMessage = {
-      id: genId(),
-      sender: "System",
-      avatar: "S",
-      role: "other",
-      content: "병권님이 채팅방을 나갔습니다.",
-      time: new Date().toISOString(),
-      type: "system",
-    };
-
-    setPartMessages(prev => ({
-      ...prev,
-      [partTab]: [...(prev[partTab] || []), leaveMessage],
-    }));
-    setLeftChatRoomIds(prev => new Set(prev).add(partTab));
-    setPartTab("all");
-    toast.success(`"${room.labelKo}" 채팅방을 나갔습니다.`);
-  };
-
-  const addPartMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
+  const addLocalMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
-    setPartMessages(prev => ({ ...prev, [partTab]: [...(prev[partTab] || []), full] }));
+    setLocalMessages(prev => [...prev, full]);
     if (isMeeting) setMeetingMsgs(prev => [...prev, full]);
     return full;
-  }, [partTab, isMeeting]);
+  }, [isMeeting]);
 
-  // ── 전체/파트 채팅 전송 ──
-  const handleSend = () => {
+  // ── 실제 API 채팅 전송 로직 ──
+  const handleSend = async () => {
     const text = input.trim();
     if (!text) return;
-    if (mainTab === "chat") {
-      addPartMessage({ sender: "병권", avatar: "병", role: "me", content: text, type: "text" });
-      setInput("");
-      setTyping(true);
-      const other = partTab === "all"
-        ? PROJECT_TEAM[Math.floor(Math.random() * PROJECT_TEAM.length)]
-        : PROJECT_TEAM.find(m => m.partId === partTab) ?? PROJECT_TEAM[0];
-      const replies = [
-        "네, 확인했습니다! 진행해볼게요.",
-        "좋아요! 같이 검토해봐요.",
-        "알겠습니다. 조금 더 확인해보겠습니다.",
-        "수고했어요! 👍",
-        "동의합니다. PR 올려주세요.",
-      ];
-      setTimeout(() => {
-        setTyping(false);
-        addPartMessage({ sender: other.name, avatar: other.avatar, role: "other", content: replies[Math.floor(Math.random() * replies.length)], type: "text" });
-      }, 1000 + Math.random() * 800);
+    
+    if (!projectId || !activeRoomId) {
+      toast.error("선택된 채팅방 정보가 없습니다.");
+      return;
+    }
+
+    setInput("");
+    setTyping(true);
+
+    try {
+      // 서버 전송
+      const newMsg = await sendChatMessage(projectId, activeRoomId, text);
+      
+      // 서버 응답이 정상적으로 오면 메시지 목록에 추가
+      if (newMsg) {
+        setServerMessages(prev => [...prev, newMsg]);
+        
+        if (isMeeting) {
+          setMeetingMsgs(prev => [...prev, {
+            id: (newMsg.messageId ?? genId()).toString(),
+            sender: newMsg.senderName || "나",
+            avatar: (newMsg.senderName?.[0]) || "나",
+            role: (newMsg.senderId === currentUserId ? "me" : "other") as "me" | "other",
+            content: newMsg.content,
+            time: newMsg.createdAt || new Date().toISOString(),
+            type: "text",
+          }]);
+        }
+      }
+    } catch (error: any) {
+      console.error("메시지 전송 실패 상세:", error);
+      toast.error(error?.message || "메시지 전송에 실패했습니다.");
+    } finally {
+      setTyping(false);
     }
   };
 
-  // ── AI 채팅 전송 ──
   const sendAiQuestion = async (text: string) => {
     const userMsg: AIMsg = { id: genId(), role: "user", content: text, time: new Date().toISOString() };
     setAIMessages(prev => [...prev, userMsg]);
@@ -927,24 +837,22 @@ export function ChatPage({
     });
   };
 
-  // ── 파일 공유 (일반) ──
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.split(".").pop() ?? "file";
-    addPartMessage({ sender: "병권", avatar: "병", role: "me", content: "", type: "file", fileName: file.name, fileType: ext });
+    addLocalMessage({ sender: "나", avatar: "나", role: "me", content: "", type: "file", fileName: file.name, fileType: ext });
     e.target.value = "";
   };
 
-  // ── AI 문서 브리핑 업로드 ──
   const handleBriefingFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "file";
     e.target.value = "";
 
-    addPartMessage({
-      sender: "병권", avatar: "병", role: "me",
+    addLocalMessage({
+      sender: "나", avatar: "나", role: "me",
       content: "", type: "file",
       fileName: file.name, fileType: ext,
     });
@@ -954,11 +862,11 @@ export function ChatPage({
 
     const delay = 2200 + Math.random() * 800;
     setTimeout(() => {
-      const briefing   = generateDocBriefing(file.name, ext);
+      const briefing = generateDocBriefing(file.name, ext);
       const meetingDoc = briefingToMeetingDoc(briefing);
 
       setBriefingLoading(null);
-      addPartMessage({
+      addLocalMessage({
         sender: "WE&AI", avatar: "AI", role: "other",
         content: `📋 **${file.name}** 한글 브리핑이 완료됐습니다.`,
         type: "briefing",
@@ -975,14 +883,14 @@ export function ChatPage({
     }, delay);
   };
 
-  // ── 회의 ──
   const startMeeting = () => {
     setIsMeeting(true); setMeetingStart(new Date()); setMeetingMsgs([]); setElapsed(0); setDocSaved(false);
-    addPartMessage({ sender: "System", avatar: "S", role: "other", content: "🎙️ 회의 모드가 시작되었습니다.", type: "system" });
+    addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "🎙️ 회의 모드가 시작되었습니다.", type: "system" });
   };
+
   const endMeeting = () => {
     setIsMeeting(false); setMicOn(false);
-    addPartMessage({ sender: "System", avatar: "S", role: "other", content: "⏹️ 회의 모드 종료. 문서로 저장 중...", type: "system" });
+    addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "⏹️ 회의 모드 종료. 문서로 저장 중...", type: "system" });
     setSavingDoc(true);
     setTimeout(() => {
       const now = new Date();
@@ -1001,24 +909,33 @@ export function ChatPage({
   const formatElapsed = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
-  const currentMessages = partMessages[partTab] ?? [];
+  const displayMessages: ChatMessage[] = [
+    ...serverMessages.map(m => ({
+      id: m.messageId.toString(),
+      sender: m.senderName,
+      avatar: m.senderName?.[0] || "?",
+      role: (m.senderId === currentUserId ? "me" : "other") as "me" | "other",
+      content: m.content,
+      time: m.createdAt,
+      type: "text" as const,
+    })),
+    ...localMessages,
+  ].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {openDoc && <DocDetailModal doc={openDoc} onClose={() => setOpenDoc(null)} />}
 
-      {/* 배경 */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(160deg, #f5f4ef 0%, #f0efe8 40%, #ede9df 100%)" }} />
 
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
-
         {/* ══ 메인 탭 바 ══ */}
         <div
           className="flex items-center gap-0 px-3 h-11 shrink-0"
           style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}
         >
           <div className="flex items-center gap-0.5 mr-3">
-            {isLoading ? (
+            {isLoadingRooms ? (
               <div className="flex items-center gap-2">
                 <Skeleton className="w-16 h-7 rounded-lg" />
                 <Skeleton className="w-16 h-7 rounded-lg" />
@@ -1027,8 +944,8 @@ export function ChatPage({
             ) : (
               [
                 { id: "chat", icon: MessageCircle, label: "Chat" },
-                { id: "ai",   icon: Bot,           label: "AI" },
-                { id: "docs", icon: FileText,       label: `Docs${docs.length > 0 ? ` (${docs.length})` : ""}` },
+                { id: "ai", icon: Bot, label: "AI" },
+                { id: "docs", icon: FileText, label: `Docs${docs.length > 0 ? ` (${docs.length})` : ""}` },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -1051,9 +968,8 @@ export function ChatPage({
             )}
           </div>
 
-          {/* 오른쪽: 회의 컨트롤 */}
           <div className="ml-auto flex items-center gap-2">
-            {!isLoading && (
+            {!isLoadingRooms && (
               <>
                 {isMeeting && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.10)" }}>
@@ -1083,8 +999,8 @@ export function ChatPage({
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
                       background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(65,67,27,0.08)",
-                      color:      isMeeting ? "#ef4444" : OLIVE_DARK,
-                      border:     `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(65,67,27,0.15)"}`,
+                      color: isMeeting ? "#ef4444" : OLIVE_DARK,
+                      border: `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(65,67,27,0.15)"}`,
                     }}
                   >
                     {isMeeting ? <><VideoOff className="w-3.5 h-3.5" /> 회의 종료</> : <><Video className="w-3.5 h-3.5" /> 회의 시작</>}
@@ -1098,49 +1014,47 @@ export function ChatPage({
         {/* ══ CHAT 탭 ══ */}
         {mainTab === "chat" && (
           <>
-            {/* 파트 서브탭 */}
             <div
               className="flex items-center gap-1 px-3 h-10 shrink-0 overflow-x-auto"
               style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}
             >
-              {isLoading ? (
+              {isLoadingRooms ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <Skeleton key={i} className="w-20 h-6 rounded-lg mx-1" />
                 ))
               ) : (
-                chatRooms.map((room) => {
-                  const { id, ...cfg } = room;
-                  const Icon = cfg.icon;
-                  const isActive = partTab === id;
-                  const memberCount = id === "all" ? PROJECT_TEAM.length : PROJECT_TEAM.filter(m => m.partId === id).length;
+                Array.isArray(chatRooms) && chatRooms.map((room) => {
+                  const { icon: Icon, color, bg } = getRoomStyle(room.name);
+                  const isActive = activeRoomId === room.chatRoomId;
+
                   return (
                     <button
-                      key={id}
-                      onClick={() => setPartTab(id)}
+                      key={room.chatRoomId}
+                      onClick={() => setActiveRoomId(room.chatRoomId)}
                       className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 transition-all"
                       style={{
-                        background: isActive ? cfg.bg : "transparent",
-                        color:      isActive ? cfg.color : TEXT_TERTIARY,
-                        border:     `1px solid ${isActive ? "rgba(0,0,0,0.08)" : "transparent"}`,
+                        background: isActive ? bg : "transparent",
+                        color: isActive ? color : TEXT_TERTIARY,
+                        border: `1px solid ${isActive ? "rgba(0,0,0,0.08)" : "transparent"}`,
                       }}
                     >
                       <Icon className="w-3 h-3" />
-                      {cfg.labelKo}
+                      {room.name}
                       <span
                         className="text-[8px] px-1 py-0.5 rounded-full ml-0.5"
-                        style={{ background: isActive ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)", color: isActive ? cfg.color : TEXT_TERTIARY }}
+                        style={{ background: isActive ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)", color: isActive ? color : TEXT_TERTIARY }}
                       >
-                        {memberCount}
+                        {room.memberCount ?? 0}
                       </span>
                     </button>
                   );
                 })
               )}
 
-              {!isLoading && (
+              {!isLoadingRooms && (
                 <button
                   type="button"
-                  onClick={handleAddChatRoom}
+                  onClick={() => toast.info("API 준비 중입니다.")}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all"
                   title="채팅방 추가"
                   style={{
@@ -1153,24 +1067,8 @@ export function ChatPage({
                 </button>
               )}
 
-              {!isLoading && partTab !== "all" && (
-                <button
-                  type="button"
-                  onClick={handleLeaveChatRoom}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all"
-                  title="채팅방 나가기"
-                  style={{
-                    background: "rgba(184,84,80,0.08)",
-                    color: "#B85450",
-                    border: "1px solid rgba(184,84,80,0.18)",
-                  }}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </button>
-              )}
-
               <div className="ml-auto flex items-center gap-1 shrink-0">
-                {!isLoading && (partTab === "all" ? PROJECT_TEAM : PROJECT_TEAM.filter(m => m.partId === partTab)).slice(0, 4).map(m => (
+                {!isLoadingRooms && PROJECT_TEAM.slice(0, 4).map(m => (
                   <div
                     key={m.name}
                     title={`${m.name} — ${m.role}`}
@@ -1183,10 +1081,8 @@ export function ChatPage({
               </div>
             </div>
 
-            {/* 메시지 목록 */}
             <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {isLoading ? (
-                /* [스켈레톤] 채팅 버블들 */
+              {isLoadingMessages ? (
                 <div className="space-y-4">
                   {Array.from({ length: 4 }).map((_, i) => {
                     const isMe = i % 2 !== 0;
@@ -1200,7 +1096,7 @@ export function ChatPage({
                 </div>
               ) : (
                 <>
-                  {currentMessages.map(msg => (
+                  {displayMessages.map(msg => (
                     <MessageBubble
                       key={msg.id}
                       msg={msg}
@@ -1209,13 +1105,12 @@ export function ChatPage({
                   ))}
                   {briefingLoading && <BriefingLoadingBubble fileName={briefingLoading} />}
                   {typing && (
-                    <div className="flex gap-2 items-end mb-3">
-                      <Avatar name="Admin" />
-                      <div className="rounded-2xl px-4 py-3" style={{ background: "rgba(255,255,255,0.90)", border: `1px solid ${BORDER}` }}>
+                    <div className="flex gap-2 items-end mb-3 flex-row-reverse">
+                      <div className="rounded-2xl px-4 py-3" style={{ background: OLIVE_DARK, border: `1px solid ${BORDER}` }}>
                         <div className="flex gap-1">
                           {[0, 1, 2].map(i => (
                             <div key={i} className="w-1.5 h-1.5 rounded-full"
-                              style={{ background: TEXT_TERTIARY, animation: `bounce 1s ${i * 0.15}s infinite` }} />
+                              style={{ background: "white", animation: `bounce 1s ${i * 0.15}s infinite` }} />
                           ))}
                         </div>
                       </div>
@@ -1226,15 +1121,14 @@ export function ChatPage({
               )}
             </div>
 
-            {/* 입력창 */}
             <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}>
               <div className="flex items-end gap-2 rounded-2xl px-3 py-2" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}` }}>
                 <textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  disabled={isLoading}
-                  placeholder={isLoading ? "채팅 불러오는 중..." : `${activeChatRoom.labelKo} 채널에 메시지 입력...`}
+                  disabled={isLoadingMessages || isLoadingRooms}
+                  placeholder={isLoadingMessages ? "채팅 불러오는 중..." : `${activeRoom?.name || ""} 채널에 메시지 입력...`}
                   rows={2}
                   className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
                   style={{ background: "transparent", color: TEXT_PRIMARY }}
@@ -1242,7 +1136,7 @@ export function ChatPage({
                 <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoading}
+                    disabled={isLoadingMessages}
                     className="p-1.5 rounded-lg hover:bg-black/[0.05] disabled:opacity-50"
                   >
                     <Paperclip className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
@@ -1251,13 +1145,13 @@ export function ChatPage({
 
                   <button
                     onClick={() => briefFileRef.current?.click()}
-                    disabled={!!briefingLoading || isLoading}
+                    disabled={!!briefingLoading || isLoadingMessages}
                     className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-semibold transition-all disabled:opacity-50"
                     style={{
                       background: briefingLoading ? "rgba(0,0,0,0.04)" : "rgba(65,67,27,0.08)",
-                      color:      briefingLoading ? TEXT_TERTIARY : OLIVE_DARK,
-                      border:     `1px solid ${briefingLoading ? BORDER : "rgba(65,67,27,0.18)"}`,
-                      cursor:     briefingLoading || isLoading ? "not-allowed" : "pointer",
+                      color: briefingLoading ? TEXT_TERTIARY : OLIVE_DARK,
+                      border: `1px solid ${briefingLoading ? BORDER : "rgba(65,67,27,0.18)"}`,
+                      cursor: briefingLoading || isLoadingMessages ? "not-allowed" : "pointer",
                     }}
                   >
                     {briefingLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BookOpen className="w-3 h-3" />}
@@ -1267,7 +1161,7 @@ export function ChatPage({
 
                   <button
                     onClick={handleSend}
-                    disabled={!input.trim() || isLoading}
+                    disabled={!input.trim() || isLoadingMessages || typing}
                     className="w-7 h-7 rounded-xl flex items-center justify-center transition-all disabled:opacity-50"
                     style={{ background: input.trim() ? OLIVE_DARK : "rgba(0,0,0,0.06)" }}
                   >
@@ -1426,7 +1320,7 @@ export function ChatPage({
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {isLoading ? (
+              {isLoadingRooms ? (
                 <div className="flex gap-2.5 items-start mb-4">
                   <Skeleton className="w-7 h-7 rounded-full shrink-0" />
                   <Skeleton className="h-16 w-3/4 rounded-2xl" />
@@ -1474,7 +1368,7 @@ export function ChatPage({
                   value={aiInput}
                   onChange={e => setAIInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAISend(); } }}
-                  disabled={isLoading}
+                  disabled={isLoadingRooms}
                   placeholder={
                     aiMode === "rag"
                       ? "프로젝트 문서를 기반으로 질문하세요..."
@@ -1488,7 +1382,7 @@ export function ChatPage({
                 />
                 <button
                   onClick={handleAISend}
-                  disabled={!aiInput.trim() || aiTyping || isLoading}
+                  disabled={!aiInput.trim() || aiTyping || isLoadingRooms}
                   className="w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0 mb-0.5 disabled:opacity-50"
                   style={{ background: aiInput.trim() && !aiTyping ? OLIVE_DARK : "rgba(0,0,0,0.06)" }}
                 >
@@ -1508,7 +1402,7 @@ export function ChatPage({
             >
               <FileText className="w-4 h-4 shrink-0" style={{ color: OLIVE_DARK }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Meeting Docs</p>
-              {!isLoading && (
+              {!isLoadingRooms && (
                 <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(65,67,27,0.08)", color: OLIVE_DARK }}>
                   {docs.length}개 문서
                 </span>
@@ -1519,7 +1413,7 @@ export function ChatPage({
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {isLoading ? (
+              {isLoadingRooms ? (
                 /* [스켈레톤] 문서 카드들 */
                 Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="rounded-xl p-3 border bg-white/50 border-black/5 space-y-2">
@@ -1550,4 +1444,3 @@ export function ChatPage({
     </div>
   );
 }
-
