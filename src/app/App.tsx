@@ -673,10 +673,11 @@ export default function App() {
       case "Commits": return <CommitDiffPage projectId={projectId} />;
       case "ServerBuild": return <ServerBuildPage />;
       case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
+      case "Calendar": return <CalendarPage projectId={projectId ?? 1} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
-      case "Profile": return <ProfilePage />;
+      case "Profile": return <ProfilePage projectId={projectId ?? 1} />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
       default: return isPublishingSession(authSession)
         ? <WeAIDashboard />
@@ -943,7 +944,7 @@ export default function App() {
       >
         {(!showTitleBar || titleBarHeight === 0) && (
           <div className="absolute top-3 right-4 z-40 transition-all">
-            <NotificationPanel />
+            <NotificationPanel projectId={projectId ?? undefined} />
           </div>
         )}
 
@@ -997,7 +998,7 @@ export default function App() {
                   스탠드업
                 </button>
 
-                <NotificationPanel />
+                <NotificationPanel projectId={projectId ?? undefined} />
               </div>
             </div>
           )}
