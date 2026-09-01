@@ -5,11 +5,14 @@ import { BuildManagementPage } from "./BuildManagementPage";
 import {
   BORDER_SUBTLE,
   GRADIENT_SIDEBAR,
-  SIDEBAR_BORDER,
 } from "../colors";
 
+interface ServerBuildPageProps {
+  projectId?: number | null;
+}
+
 // ── Server & Build 탭 통합 페이지 ──
-export function ServerBuildPage() {
+export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
   const [tab, setTab] = useState<"logs" | "build">("logs");
 
   return (
@@ -27,7 +30,7 @@ export function ServerBuildPage() {
           onClick={() => setTab("logs")}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all"
           style={{
-            color:      tab === "logs" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
+            color: tab === "logs" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
             background: tab === "logs" ? "rgba(174,183,132,0.18)" : "transparent",
             borderBottom: tab === "logs" ? "2px solid #AEB784" : "2px solid transparent",
             borderRadius: 0,
@@ -40,7 +43,7 @@ export function ServerBuildPage() {
           onClick={() => setTab("build")}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all"
           style={{
-            color:      tab === "build" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
+            color: tab === "build" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
             background: tab === "build" ? "rgba(174,183,132,0.18)" : "transparent",
             borderBottom: tab === "build" ? "2px solid #AEB784" : "2px solid transparent",
             borderRadius: 0,
@@ -53,8 +56,8 @@ export function ServerBuildPage() {
 
       {/* 탭 콘텐츠 */}
       <div className="flex-1 flex overflow-hidden">
-        {tab === "logs"  ? <ServerLogsPage />      : null}
-        {tab === "build" ? <BuildManagementPage /> : null}
+        {tab === "logs" ? <ServerLogsPage projectId={projectId} /> : null}
+        {tab === "build" ? <BuildManagementPage projectId={projectId} /> : null}
       </div>
     </div>
   );

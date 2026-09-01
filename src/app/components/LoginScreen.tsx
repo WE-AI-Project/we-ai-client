@@ -784,7 +784,6 @@ function SignupForm({
     setOtpError("");
 
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
       const result = createLocalVerificationDispatch(email.trim());
       setDispatchResult(result);
       setOtpSent(true);
@@ -795,20 +794,16 @@ function SignupForm({
 
   const handleOtpComplete = (code: string) => {
     setOtpError("");
-    setOtpVerifying(true);
+    setOtpVerifying(false);
 
-    window.setTimeout(() => {
-      setOtpVerifying(false);
+    if (code.length === 6) {
+      setVerified(true);
+      setOtpError("");
+      return;
+    }
 
-      if (code.length === 6) {
-        setVerified(true);
-        setOtpError("");
-        return;
-      }
-
-      setVerified(false);
-      setOtpError("6자리 인증번호를 입력해주세요.");
-    }, 700);
+    setVerified(false);
+    setOtpError("6자리 인증번호를 입력해주세요.");
   };
 
   const handleSignup = async () => {
@@ -1485,10 +1480,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
   }, []);
 
   const handleAuthenticatedInternal = (session: AuthSession, user: CurrentUser) => {
-    setExiting(true);
-    window.setTimeout(() => {
-      onAuthenticated(session, user);
-    }, 450);
+    onAuthenticated(session, user);
   };
 
   const switchMode = (

@@ -793,16 +793,12 @@ function StartModal({
       return;
     }
 
-    setJoining(true);
-    window.setTimeout(() => {
-      onSelect({
-        projectId: selectedProject.projectId,
-        projectName: selectedProject.projectName,
-        projectCode: selectedProject.projectCode,
-        localPath: localPath.trim() || undefined,
-      });
-      setJoining(false);
-    }, 300);
+    onSelect({
+      projectId: selectedProject.projectId,
+      projectName: selectedProject.projectName,
+      projectCode: selectedProject.projectCode,
+      localPath: localPath.trim() || undefined,
+    });
   };
 
   const handlePathDetect = async () => {

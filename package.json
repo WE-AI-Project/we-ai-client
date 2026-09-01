@@ -10,7 +10,8 @@
     "build:preview": "tsc && vite build --mode preview",
     "dev": "vite",
     "dev:local": "vite --mode local-backend",
-    "dev:preview": "vite --mode preview"
+    "dev:preview": "vite --mode preview",
+    "start": "vite"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

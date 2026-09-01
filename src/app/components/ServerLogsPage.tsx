@@ -1,12 +1,16 @@
-import { useState, useEffect, useRef } from "react";
-import { Terminal, Play, Square, Trash2, Download, Filter, Search, Circle } from "lucide-react";
-
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Terminal, Play, Square, Trash2, Search, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1,
 } from "../colors";
+import {
+  LogLevel,
+  ServerLogEntry,
+  fetchRecentServerLogs,
+  getServerLogStreamUrl,
+} from "../lib/api";
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -16,7 +20,6 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
-// ── 🚨 [추가] 어두운 배경(터미널)용 스켈레톤 ──
 function DarkSkeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -26,90 +29,147 @@ function DarkSkeleton({ className, style }: { className?: string; style?: React.
   );
 }
 
-// ── 로그 엔트리 타입 ──
-type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG" | "STARTED";
-type LogEntry = {
-  id: number;
-  time: string;
-  level: LogLevel;
-  thread: string;
-  logger: string;
-  message: string;
+const LOG_COLORS: Record<string, { fg: string; tag: string }> = {
+  INFO:    { fg: "#c9d1d9", tag: "#58a6ff" },
+  WARN:    { fg: "#e3b341", tag: "#e3b341" },
+  ERROR:   { fg: "#f97583", tag: "#f97583" },
+  DEBUG:   { fg: "#8b949e", tag: "#8b949e" },
+  TRACE:   { fg: "#6e7681", tag: "#6e7681" },
+  STARTED: { fg: "#7ee787", tag: "#7ee787" },
 };
 
-// ── 초기 더미 로그 (Spring Boot 부팅 시퀀스 시뮬레이션) ──
-const BOOT_LOGS: Omit<LogEntry, "id">[] = [
-  { time: "09:40:00.001", level: "INFO",    thread: "main",                logger: "o.s.boot.SpringApplication",          message: "Starting WeAiApplication using Java 17.0.18 with PID 12440" },
-  { time: "09:40:00.015", level: "INFO",    thread: "main",                logger: "o.s.boot.SpringApplication",          message: "The following 1 profile is active: \"dev\"" },
-  { time: "09:40:01.123", level: "INFO",    thread: "main",                logger: "o.s.c.a.ConfigurationClassParser",    message: "Cannot enhance @Configuration bean definitions" },
-  { time: "09:40:01.456", level: "DEBUG",   thread: "main",                logger: "o.s.b.w.embedded.tomcat.TomcatWeb",  message: "Tomcat initialized with port 8080 (http)" },
-  { time: "09:40:01.789", level: "INFO",    thread: "main",                logger: "o.a.coyote.http11.Http11NioProtocol", message: "Initializing ProtocolHandler [\"http-nio-8080\"]" },
-  { time: "09:40:02.001", level: "INFO",    thread: "main",                logger: "o.s.b.w.embedded.tomcat.TomcatWeb",  message: "Tomcat started on port 8080 (http) with context path ''" },
-  { time: "09:40:02.123", level: "INFO",    thread: "main",                logger: "c.weai.agent.MultiAgentController",   message: "Registering 6 agents: [DataSync, Classifier, Logger, Parser, Scheduler, Analyzer]" },
-  { time: "09:40:02.234", level: "INFO",    thread: "agent-pool-1",        logger: "c.weai.agent.DataSyncAgent",          message: "DataSync Alpha — AGT-01 started on port 8081" },
-  { time: "09:40:02.345", level: "INFO",    thread: "agent-pool-2",        logger: "c.weai.agent.ClassifierAgent",        message: "Classifier Beta — AGT-02 started on port 8082" },
-  { time: "09:40:02.456", level: "INFO",    thread: "agent-pool-3",        logger: "c.weai.agent.LoggerAgent",            message: "Logger Gamma — AGT-03 started on port 8083" },
-  { time: "09:40:02.567", level: "WARN",    thread: "agent-pool-4",        logger: "c.weai.agent.ParserAgent",            message: "Parser Delta — AGT-04 failed to initialize. Retry in 5s." },
-  { time: "09:40:02.678", level: "INFO",    thread: "agent-pool-5",        logger: "c.weai.agent.SchedulerAgent",         message: "Scheduler Epsilon — AGT-05 started on port 8085" },
-  { time: "09:40:02.789", level: "INFO",    thread: "agent-pool-6",        logger: "c.weai.agent.AnalyzerAgent",          message: "Analyzer Zeta — AGT-06 started on port 8086" },
-  { time: "09:40:03.001", level: "STARTED", thread: "main",                logger: "o.s.boot.SpringApplication",          message: "Started WeAiApplication in 3.001 seconds (process running for 3.512)" },
-  { time: "09:40:07.001", level: "ERROR",   thread: "agent-pool-4",        logger: "c.weai.agent.ParserAgent",            message: "ParserDelta: Unexpected token '<' at position 0. IOException." },
-  { time: "09:41:00.000", level: "INFO",    thread: "scheduler-1",         logger: "c.weai.agent.SchedulerAgent",         message: "Task queue flush: 8 tasks dispatched in 340ms." },
-  { time: "09:50:00.000", level: "DEBUG",   thread: "agent-pool-1",        logger: "c.weai.agent.DataSyncAgent",          message: "DataSync: Auth token refreshed. TTL=3600s." },
-  { time: "09:51:30.000", level: "INFO",    thread: "agent-pool-2",        logger: "c.weai.agent.ClassifierAgent",        message: "Classifier: Batch #47 processing (12/48 records)." },
-  { time: "09:52:00.000", level: "WARN",    thread: "agent-pool-2",        logger: "c.weai.agent.ClassifierAgent",        message: "ClassifierBeta: Memory usage at 83%. Consider increasing heap." },
-  { time: "09:52:01.000", level: "INFO",    thread: "agent-pool-1",        logger: "c.weai.agent.DataSyncAgent",          message: "DataSync: Batch fetch complete. 48 records synced to database." },
-];
+type ConnectionState = "connecting" | "live" | "paused" | "offline";
 
-// 실시간 스트리밍 더미 로그 (주기적으로 추가)
-const STREAMING_LOGS: Omit<LogEntry, "id">[] = [
-  { time: "", level: "INFO",  thread: "scheduler-1",  logger: "c.weai.agent.SchedulerAgent",  message: "Task queue flush: 12 tasks dispatched in 285ms."             },
-  { time: "", level: "DEBUG", thread: "agent-pool-1",  logger: "c.weai.agent.DataSyncAgent",   message: "DataSync: Heartbeat OK. Latency: 12ms."                      },
-  { time: "", level: "INFO",  thread: "agent-pool-5",  logger: "c.weai.agent.SchedulerAgent",  message: "Next scheduled flush in 30s. Queue depth: 5."                },
-  { time: "", level: "INFO",  thread: "agent-pool-2",  logger: "c.weai.agent.ClassifierAgent", message: "Batch #48 started. 48 records loaded."                       },
-  { time: "", level: "WARN",  thread: "agent-pool-4",  logger: "c.weai.agent.ParserAgent",     message: "ParserDelta: Retry #4 scheduled in 10s."                     },
-  { time: "", level: "INFO",  thread: "agent-pool-6",  logger: "c.weai.agent.AnalyzerAgent",   message: "AnalyzerZeta: New dataset received. Processing…"             },
-  { time: "", level: "DEBUG", thread: "http-nio-8080-exec-3", logger: "c.weai.controller.AgentApi", message: "GET /api/agents/status — 200 OK (4ms)"               },
-  { time: "", level: "INFO",  thread: "agent-pool-1",  logger: "c.weai.agent.DataSyncAgent",   message: "DataSync: Delta sync complete. 8 new records."               },
-];
-
-const LOG_COLORS: Record<LogLevel, { fg: string; tag: string }> = {
-  INFO:    { fg: "#c9d1d9",  tag: "#58a6ff" },
-  WARN:    { fg: "#e3b341",  tag: "#e3b341" },
-  ERROR:   { fg: "#f97583",  tag: "#f97583" },
-  DEBUG:   { fg: "#8b949e",  tag: "#8b949e" },
-  STARTED: { fg: "#7ee787",  tag: "#7ee787" },
-};
-
-function getTime() {
-  return new Date().toTimeString().split(" ")[0] + "." + String(Date.now() % 1000).padStart(3, "0");
+interface ServerLogsPageProps {
+  projectId?: number | null;
 }
 
-export function ServerLogsPage() {
-  const isLoading = false;
-
-  const [logs, setLogs] = useState<LogEntry[]>(BOOT_LOGS.map((l, i) => ({ ...l, id: i })));
+export function ServerLogsPage({ projectId }: ServerLogsPageProps) {
+  const [logs, setLogs] = useState<ServerLogEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [running, setRunning] = useState(true);
+  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [filter, setFilter] = useState<LogLevel | "ALL">("ALL");
   const [search, setSearch] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
-  const logRef = useRef<HTMLDivElement>(null);
-  const idRef  = useRef(BOOT_LOGS.length);
-  const streamIdx = useRef(0);
 
-  // 실시간 로그 스트리밍 시뮬레이션
+  const logRef = useRef<HTMLDivElement>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 1. 초기 로그 REST API 로딩 (빠른 초기 화면 렌더링)
+  const loadInitialLogs = useCallback(async () => {
+    try {
+      const recent = await fetchRecentServerLogs(projectId);
+      if (Array.isArray(recent) && recent.length > 0) {
+        setLogs(recent);
+      }
+    } catch {
+      // REST API 실패 시 SSE init 이벤트로 fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
-    if (isLoading || !running) return;
-    const interval = setInterval(() => {
-      const template = STREAMING_LOGS[streamIdx.current % STREAMING_LOGS.length];
-      streamIdx.current++;
-      setLogs(prev => [
-        ...prev,
-        { ...template, id: idRef.current++, time: getTime() },
-      ]);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [running, isLoading]);
+    loadInitialLogs();
+  }, [loadInitialLogs]);
+
+  // 2. 실시간 SSE (Server-Sent Events) 스트림 연결
+  useEffect(() => {
+    if (!running) {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      setConnectionState("paused");
+      return;
+    }
+
+    setConnectionState("connecting");
+
+    const connectSse = () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+
+      const streamUrl = getServerLogStreamUrl(projectId);
+      const es = new EventSource(streamUrl);
+      eventSourceRef.current = es;
+
+      es.onopen = () => {
+        setConnectionState("live");
+        setIsLoading(false);
+      };
+
+      // init 이벤트: 서버 버퍼에 쌓여있던 최근 로그 일괄 수신
+      es.addEventListener("init", (event: MessageEvent) => {
+        try {
+          const initialLogs: ServerLogEntry[] = JSON.parse(event.data);
+          if (Array.isArray(initialLogs)) {
+            setLogs(initialLogs);
+          }
+        } catch (e) {
+          console.error("Failed to parse initial logs", e);
+        } finally {
+          setIsLoading(false);
+        }
+      });
+
+      // log 이벤트: 실시간 신규 발생 로그 수신
+      es.addEventListener("log", (event: MessageEvent) => {
+        try {
+          const newLog: ServerLogEntry = JSON.parse(event.data);
+          setLogs((prev) => {
+            // 중복 방지 (id 기준)
+            if (prev.some((l) => l.id === newLog.id)) {
+              return prev;
+            }
+            return [...prev.slice(-999), newLog];
+          });
+        } catch (e) {
+          console.error("Failed to parse server log event", e);
+        }
+      });
+
+      // fallback 일반 메시지 핸들러
+      es.onmessage = (event: MessageEvent) => {
+        try {
+          const parsed: ServerLogEntry = JSON.parse(event.data);
+          if (parsed && typeof parsed === "object" && "level" in parsed) {
+            setLogs((prev) => [...prev.slice(-999), parsed]);
+          }
+        } catch {
+          // ignore
+        }
+      };
+
+      es.onerror = () => {
+        setConnectionState("offline");
+        es.close();
+        eventSourceRef.current = null;
+
+        // 실행 중인 경우 5초 후 자동 재연결 시도
+        if (running) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectSse();
+          }, 5000);
+        }
+      };
+    };
+
+    connectSse();
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [running, projectId]);
 
   // 자동 스크롤
   useEffect(() => {
@@ -120,27 +180,50 @@ export function ServerLogsPage() {
 
   const clearLogs = () => {
     setLogs([]);
-    idRef.current = 0;
   };
 
-  const filteredLogs = logs.filter(l => {
-    const matchLevel  = filter === "ALL" || l.level === filter;
-    const matchSearch = search === "" ||
-      l.message.toLowerCase().includes(search.toLowerCase()) ||
-      l.logger.toLowerCase().includes(search.toLowerCase());
+  const filteredLogs = logs.filter((l) => {
+    const matchLevel = filter === "ALL" || l.level === filter;
+    const matchSearch =
+      search === "" ||
+      (l.message && l.message.toLowerCase().includes(search.toLowerCase())) ||
+      (l.logger && l.logger.toLowerCase().includes(search.toLowerCase())) ||
+      (l.thread && l.thread.toLowerCase().includes(search.toLowerCase()));
     return matchLevel && matchSearch;
   });
 
-  const errorCount = logs.filter(l => l.level === "ERROR").length;
-  const warnCount  = logs.filter(l => l.level === "WARN").length;
+  const errorCount = logs.filter((l) => l.level === "ERROR").length;
+  const warnCount = logs.filter((l) => l.level === "WARN").length;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* 배경 */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
       <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,152,64,0.14) 0%, transparent 70%)", filter: "blur(50px)" }} />
+        <div
+          style={{
+            position: "absolute",
+            top: "-10%",
+            left: "-5%",
+            width: "45%",
+            height: "45%",
+            borderRadius: "50%",
+            background: GRADIENT_ORB_1,
+            filter: "blur(50px)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: "-10%",
+            right: "-5%",
+            width: "50%",
+            height: "50%",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(192,152,64,0.14) 0%, transparent 70%)",
+            filter: "blur(50px)",
+          }}
+        />
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden p-5 gap-4">
@@ -152,10 +235,29 @@ export function ServerLogsPage() {
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Server Logs</h1>
-                {!isLoading && running && (
-                  <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.10)", color: "#10b981" }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
-                    LIVE
+                
+                {/* 실시간 연결 상태 배지 */}
+                {connectionState === "live" && (
+                  <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                    LIVE STREAM
+                  </span>
+                )}
+                {connectionState === "connecting" && (
+                  <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500">
+                    <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                    CONNECTING
+                  </span>
+                )}
+                {connectionState === "paused" && (
+                  <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-400">
+                    PAUSED
+                  </span>
+                )}
+                {connectionState === "offline" && (
+                  <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">
+                    <WifiOff className="w-2.5 h-2.5" />
+                    OFFLINE
                   </span>
                 )}
               </div>
@@ -163,7 +265,7 @@ export function ServerLogsPage() {
                 <Skeleton className="h-3 w-48 mt-1.5" />
               ) : (
                 <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                  <span style={{ color: "#f97583" }}>{errorCount} errors</span> · <span style={{ color: "#e3b341" }}>{warnCount} warnings</span> · {logs.length} total
+                  <span style={{ color: "#f97583" }}>{errorCount} errors</span> · <span style={{ color: "#e3b341" }}>{warnCount} warnings</span> · {logs.length} total captured
                 </p>
               )}
             </div>
@@ -178,7 +280,7 @@ export function ServerLogsPage() {
               ) : (
                 <>
                   <button
-                    onClick={() => setRunning(r => !r)}
+                    onClick={() => setRunning((r) => !r)}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
                       background: running ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)",
@@ -207,10 +309,11 @@ export function ServerLogsPage() {
             style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
           >
             {isLoading ? (
-              /* [스켈레톤] 필터/검색 바 */
               <div className="flex items-center gap-3 w-full">
                 <div className="flex gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-5 w-10 rounded" />)}
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-5 w-10 rounded" />
+                  ))}
                 </div>
                 <div className="w-px h-4" style={{ background: BORDER }} />
                 <Skeleton className="flex-1 h-6 rounded-lg" />
@@ -220,18 +323,23 @@ export function ServerLogsPage() {
               <>
                 {/* 레벨 필터 */}
                 <div className="flex items-center gap-1">
-                  {(["ALL", "INFO", "WARN", "ERROR", "DEBUG"] as const).map(lvl => (
+                  {(["ALL", "INFO", "WARN", "ERROR", "DEBUG"] as const).map((lvl) => (
                     <button
                       key={lvl}
                       onClick={() => setFilter(lvl)}
                       className="px-2 py-0.5 rounded text-[9px] font-semibold uppercase transition-all"
                       style={{
                         background: filter === lvl ? "#1c1c1e" : "rgba(0,0,0,0.05)",
-                        color: filter === lvl ? "rgba(255,255,255,0.9)"
-                          : lvl === "ERROR" ? "#ef4444"
-                          : lvl === "WARN"  ? "#e3b341"
-                          : lvl === "DEBUG" ? "#8b949e"
-                          : TEXT_SECONDARY,
+                        color:
+                          filter === lvl
+                            ? "rgba(255,255,255,0.9)"
+                            : lvl === "ERROR"
+                            ? "#ef4444"
+                            : lvl === "WARN"
+                            ? "#e3b341"
+                            : lvl === "DEBUG"
+                            ? "#8b949e"
+                            : TEXT_SECONDARY,
                       }}
                     >
                       {lvl}
@@ -242,25 +350,31 @@ export function ServerLogsPage() {
                 <div className="w-px h-4" style={{ background: BORDER }} />
                 {/* 검색 */}
                 <div className="relative flex-1 min-w-40">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                  <Search
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+                    style={{ color: TEXT_TERTIARY }}
+                  />
                   <input
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Filter logs..."
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Filter logs by message, logger, thread..."
                     className="w-full pl-7 pr-3 py-1 text-[10px] rounded-lg outline-none transition-colors"
                     style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
-                    onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
-                    onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = ACCENT + "50")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = BORDER)}
                   />
                 </div>
                 {/* 자동 스크롤 */}
                 <label className="flex items-center gap-1.5 cursor-pointer text-[10px]" style={{ color: TEXT_SECONDARY }}>
                   <div
-                    onClick={() => setAutoScroll(v => !v)}
+                    onClick={() => setAutoScroll((v) => !v)}
                     className="w-7 h-4 rounded-full transition-colors relative cursor-pointer"
                     style={{ background: autoScroll ? "#635bff" : "rgba(0,0,0,0.12)" }}
                   >
-                    <div className="absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all" style={{ left: autoScroll ? "calc(100% - 0.875rem)" : "0.125rem" }} />
+                    <div
+                      className="absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all"
+                      style={{ left: autoScroll ? "calc(100% - 0.875rem)" : "0.125rem" }}
+                    />
                   </div>
                   Auto-scroll
                 </label>
@@ -285,7 +399,7 @@ export function ServerLogsPage() {
                 <DarkSkeleton className="ml-2 h-2.5 w-64" />
               ) : (
                 <span className="ml-2 text-[10px] font-mono" style={{ color: "#8b949e" }}>
-                  ./gradlew.bat bootRun --args='--spring.profiles.active=dev'
+                  Spring Boot Logback Stream (SSE)
                 </span>
               )}
               {!isLoading && (
@@ -298,11 +412,10 @@ export function ServerLogsPage() {
             {/* 로그 본문 */}
             <div
               ref={logRef}
-              className="flex-1 overflow-y-auto p-4 font-mono text-[10px] leading-relaxed"
+              className="flex-1 overflow-y-auto p-4 font-mono text-[10px] leading-relaxed select-text"
               style={{ color: "#c9d1d9" }}
             >
               {isLoading ? (
-                /* [스켈레톤] 어두운 배경용 로그 줄 렌더링 */
                 <div className="space-y-3">
                   {Array.from({ length: 15 }).map((_, i) => (
                     <div key={i} className="flex gap-4">
@@ -314,24 +427,47 @@ export function ServerLogsPage() {
                   ))}
                 </div>
               ) : filteredLogs.length === 0 ? (
-                <p style={{ color: "#8b949e" }}>No log entries match the current filter.</p>
+                <div className="py-8 text-center" style={{ color: "#8b949e" }}>
+                  {connectionState === "offline" ? (
+                    <p>백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.</p>
+                  ) : (
+                    <p>수신된 로그가 없거나 필터 조건에 일치하는 로그가 없습니다.</p>
+                  )}
+                </div>
               ) : (
-                filteredLogs.map(log => {
-                  const col = LOG_COLORS[log.level];
+                filteredLogs.map((log) => {
+                  const col = LOG_COLORS[log.level] || LOG_COLORS.INFO;
                   return (
-                    <div key={log.id} className="flex gap-2 mb-0.5 hover:bg-white/[0.03] px-1 rounded transition-colors">
+                    <div
+                      key={log.id}
+                      className="flex gap-2 mb-0.5 hover:bg-white/[0.03] px-1 rounded transition-colors"
+                    >
                       {/* 시간 */}
-                      <span className="shrink-0 w-28" style={{ color: "#8b949e" }}>{log.time}</span>
+                      <span className="shrink-0 w-28 text-left" style={{ color: "#8b949e" }}>
+                        {log.time}
+                      </span>
                       {/* 레벨 */}
-                      <span className="shrink-0 w-14 font-bold" style={{ color: col.tag }}>{log.level.padEnd(7)}</span>
+                      <span className="shrink-0 w-14 font-bold" style={{ color: col.tag }}>
+                        {(log.level || "INFO").padEnd(7)}
+                      </span>
                       {/* 스레드 */}
-                      <span className="shrink-0 w-24 truncate" style={{ color: "#6e7681" }}>[{log.thread}]</span>
+                      <span className="shrink-0 w-28 truncate" style={{ color: "#6e7681" }}>
+                        [{log.thread || "main"}]
+                      </span>
                       {/* 로거 (축약) */}
-                      <span className="shrink-0 w-32 truncate" style={{ color: "#6e7681" }}>
-                        {log.logger.length > 25 ? "..." + log.logger.slice(-22) : log.logger}
+                      <span
+                        className="shrink-0 w-36 truncate"
+                        style={{ color: "#6e7681" }}
+                        title={log.logger}
+                      >
+                        {log.logger && log.logger.length > 28
+                          ? "..." + log.logger.slice(-25)
+                          : log.logger || "system"}
                       </span>
                       {/* 메시지 */}
-                      <span style={{ color: col.fg }}>{log.message}</span>
+                      <span className="break-all whitespace-pre-wrap" style={{ color: col.fg }}>
+                        {log.message}
+                      </span>
                     </div>
                   );
                 })

@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Bot,
   ChevronRight,
+  Columns2,
+  Database,
   FolderCode,
   GitBranch,
   GitCommit,
+  Layers,
   Monitor,
+  Palette,
   Server,
+  ShieldCheck,
   User,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CommitFile, DiffLine } from "./commitData";
@@ -16,11 +23,13 @@ import {
   fetchProjectCommitDetail,
   fetchProjectCommitFileDiff,
   fetchProjectCommitFiles,
+  fetchProjectDepartmentStatus,
   formatApiError,
   type ProjectCommitChangedFile,
   type ProjectCommitDetail,
   type ProjectCommitFileDiff,
   type ProjectCommitSummary,
+  type ProjectDepartment,
   type ProjectRepositoryType,
 } from "../lib/api";
 import {
@@ -32,9 +41,6 @@ import {
   TEXT_SECONDARY,
   TEXT_TERTIARY,
 } from "../colors";
-
-type RepoMode = "backend" | "split" | "frontend";
-type RepoKey = "backend" | "frontend";
 
 type RepoState = {
   loading: boolean;
@@ -48,29 +54,119 @@ type RepoState = {
   commitFiles: Record<string, CommitFile[]>;
 };
 
-type RepoConfig = {
+export type PartConfig = {
+  key: string;
+  department?: ProjectDepartment;
   repositoryType: ProjectRepositoryType;
   label: string;
+  shortLabel: string;
   accent: string;
+  bgAccent: string;
   icon: typeof Server;
 };
 
 const PANEL_BG = CREAM;
 
-const REPO_CONFIG: Record<RepoKey, RepoConfig> = {
-  backend: {
+const KNOWN_PART_CONFIGS: Record<string, PartConfig> = {
+  BACKEND: {
+    key: "BACKEND",
+    department: "BACKEND",
     repositoryType: "BACKEND",
     label: "Backend (Java/Spring)",
-    accent: ACCENT,
+    shortLabel: "Backend",
+    accent: "#62683A",
+    bgAccent: "rgba(98,104,58,0.12)",
     icon: Server,
   },
-  frontend: {
+  FRONTEND: {
+    key: "FRONTEND",
+    department: "FRONTEND",
     repositoryType: "FRONTEND",
     label: "Frontend (React/TS)",
-    accent: "#06b6d4",
+    shortLabel: "Frontend",
+    accent: "#0284c7",
+    bgAccent: "rgba(2,132,199,0.12)",
     icon: Monitor,
   },
+  AI: {
+    key: "AI",
+    department: "AI",
+    repositoryType: "BACKEND",
+    label: "AI (Python/Agents)",
+    shortLabel: "AI & Agents",
+    accent: "#8b5cf6",
+    bgAccent: "rgba(139,92,246,0.12)",
+    icon: Bot,
+  },
+  DEVOPS: {
+    key: "DEVOPS",
+    department: "DEVOPS",
+    repositoryType: "BACKEND",
+    label: "DevOps & Infra (Docker/CI)",
+    shortLabel: "DevOps",
+    accent: "#f59e0b",
+    bgAccent: "rgba(245,158,11,0.12)",
+    icon: Layers,
+  },
+  DATABASE: {
+    key: "DATABASE",
+    department: "DATABASE",
+    repositoryType: "BACKEND",
+    label: "Database (MySQL/Redis)",
+    shortLabel: "Database",
+    accent: "#10b981",
+    bgAccent: "rgba(16,185,129,0.12)",
+    icon: Database,
+  },
+  QA: {
+    key: "QA",
+    department: "QA",
+    repositoryType: "FRONTEND",
+    label: "QA & Testing",
+    shortLabel: "QA",
+    accent: "#ec4899",
+    bgAccent: "rgba(236,72,153,0.12)",
+    icon: ShieldCheck,
+  },
+  DESIGN: {
+    key: "DESIGN",
+    department: "DESIGN",
+    repositoryType: "FRONTEND",
+    label: "Design (UI/UX)",
+    shortLabel: "Design",
+    accent: "#a855f7",
+    bgAccent: "rgba(168,85,247,0.12)",
+    icon: Palette,
+  },
+  PM: {
+    key: "PM",
+    department: "PM",
+    repositoryType: "BACKEND",
+    label: "PM & Planning",
+    shortLabel: "PM",
+    accent: "#6366f1",
+    bgAccent: "rgba(99,102,241,0.12)",
+    icon: Users,
+  },
 };
+
+function getPartConfig(partKey: string): PartConfig {
+  const upperKey = partKey.toUpperCase();
+  if (KNOWN_PART_CONFIGS[upperKey]) {
+    return KNOWN_PART_CONFIGS[upperKey];
+  }
+
+  const isFront = upperKey.includes("FRONT") || upperKey.includes("DESIGN") || upperKey.includes("QA") || upperKey.includes("CLIENT");
+  return {
+    key: partKey,
+    repositoryType: isFront ? "FRONTEND" : "BACKEND",
+    label: partKey,
+    shortLabel: partKey,
+    accent: "#62683A",
+    bgAccent: "rgba(98,104,58,0.12)",
+    icon: isFront ? Monitor : Server,
+  };
+}
 
 function createInitialRepoState(): RepoState {
   return {
@@ -226,8 +322,8 @@ function formatCommitHeader(detail?: ProjectCommitDetail | null): string {
   return `${detail.shortCommitHash} · ${detail.authorName} · ${formatCommittedAt(detail.committedAt)}`;
 }
 
-function getSelectedFile(state: RepoState): CommitFile | null {
-  if (!state.selectedCommitHash || !state.selectedFilePath) {
+function getSelectedFile(state?: RepoState | null): CommitFile | null {
+  if (!state || !state.selectedCommitHash || !state.selectedFilePath) {
     return null;
   }
 
@@ -337,28 +433,41 @@ function FileRow({
 function RepoColumn({
   accent,
   label,
+  shortLabel,
   icon: Icon,
   state,
   selectedDetail,
   onSelectCommit,
   onSelectFile,
+  isSplit,
 }: {
   accent: string;
   label: string;
+  shortLabel?: string;
   icon: typeof Server;
   state: RepoState;
   selectedDetail: ProjectCommitDetail | null;
   onSelectCommit: (commitHash: string) => void;
   onSelectFile: (filePath: string) => void;
+  isSplit?: boolean;
 }) {
   const files = state.selectedCommitHash ? state.commitFiles[state.selectedCommitHash] ?? [] : [];
 
   return (
-    <div className="flex min-w-0 shrink-0 overflow-hidden" style={{ width: 420, borderRight: `1px solid ${BORDER}` }}>
-      <div className="flex w-[210px] shrink-0 flex-col overflow-hidden" style={{ borderRight: `1px solid ${BORDER}` }}>
+    <div
+      className="flex min-w-0 shrink-0 overflow-hidden"
+      style={{
+        width: isSplit ? "100%" : 420,
+        minWidth: isSplit ? 340 : 420,
+        flex: isSplit ? "1 1 0" : "none",
+        borderRight: `1px solid ${BORDER}`,
+      }}
+    >
+      {/* 1. 커밋 목록 컬럼 */}
+      <div className="flex w-1/2 shrink-0 flex-col overflow-hidden" style={{ borderRight: `1px solid ${BORDER}` }}>
         <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
           <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
-          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }} title={label}>
             {label}
           </p>
           <GitBranch className="ml-auto h-3 w-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
@@ -397,7 +506,8 @@ function RepoColumn({
         </div>
       </div>
 
-      <div className="flex w-[210px] shrink-0 flex-col overflow-hidden">
+      {/* 2. 변경 파일 목록 컬럼 */}
+      <div className="flex w-1/2 shrink-0 flex-col overflow-hidden">
         <div className="px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
           <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
             {selectedDetail?.message ?? "Changed Files"}
@@ -468,7 +578,7 @@ function DiffPanel({
 
   if (!file) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#0d1117] text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#0d1117] text-center p-4">
         <GitCommit className="h-8 w-8" style={{ color: "#30363d" }} />
         <div>
           <p className="text-[12px] font-semibold" style={{ color: "#c9d1d9" }}>
@@ -484,7 +594,7 @@ function DiffPanel({
 
   return (
     <div className="flex h-full flex-col bg-[#0d1117]">
-      <div className="flex h-9 items-center gap-2 border-b border-white/10 px-4">
+      <div className="flex h-9 items-center gap-2 border-b border-white/10 px-4 shrink-0">
         <span className="text-[10px] font-semibold" style={{ color: accent }}>
           {title}
         </span>
@@ -501,21 +611,23 @@ function DiffPanel({
 }
 
 export function CommitDiffPage({ projectId }: { projectId: number | null }) {
-  const [mode, setMode] = useState<RepoMode>("split");
-  const [repoStates, setRepoStates] = useState<Record<RepoKey, RepoState>>({
-    backend: createInitialRepoState(),
-    frontend: createInitialRepoState(),
+  const [isSplit, setIsSplit] = useState<boolean>(false);
+  const [activeParts, setActiveParts] = useState<string[]>(["BACKEND", "FRONTEND"]);
+  const [selectedPart, setSelectedPart] = useState<string>("BACKEND");
+  const [repoStates, setRepoStates] = useState<Record<string, RepoState>>({
+    BACKEND: createInitialRepoState(),
+    FRONTEND: createInitialRepoState(),
   });
 
-  const setRepoState = useCallback((repoKey: RepoKey, updater: (state: RepoState) => RepoState) => {
+  const setRepoState = useCallback((partKey: string, updater: (state: RepoState) => RepoState) => {
     setRepoStates((current) => ({
       ...current,
-      [repoKey]: updater(current[repoKey]),
+      [partKey]: updater(current[partKey] ?? createInitialRepoState()),
     }));
   }, []);
 
   const loadCommitDiff = useCallback(async (
-    repoKey: RepoKey,
+    partKey: string,
     commitHash: string,
     filePath: string
   ) => {
@@ -523,10 +635,11 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
       return;
     }
 
-    const repositoryType = REPO_CONFIG[repoKey].repositoryType;
+    const config = getPartConfig(partKey);
+    const repositoryType = config.repositoryType;
     const loadingDiffKey = `${commitHash}:${filePath}`;
 
-    setRepoState(repoKey, (state) => ({
+    setRepoState(partKey, (state) => ({
       ...state,
       selectedFilePath: filePath,
       loadingDiffKey,
@@ -535,7 +648,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
     try {
       const diffResponse = await fetchProjectCommitFileDiff(projectId, repositoryType, commitHash, filePath);
 
-      setRepoState(repoKey, (state) => {
+      setRepoState(partKey, (state) => {
         const files = state.commitFiles[commitHash] ?? [];
         return {
           ...state,
@@ -550,7 +663,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         };
       });
     } catch (error) {
-      setRepoState(repoKey, (state) => ({
+      setRepoState(partKey, (state) => ({
         ...state,
         loadingDiffKey: null,
       }));
@@ -559,7 +672,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
   }, [projectId, setRepoState]);
 
   const loadCommitSelection = useCallback(async (
-    repoKey: RepoKey,
+    partKey: string,
     commitHash: string,
     preferredFilePath?: string | null
   ) => {
@@ -567,9 +680,10 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
       return;
     }
 
-    const repositoryType = REPO_CONFIG[repoKey].repositoryType;
+    const config = getPartConfig(partKey);
+    const repositoryType = config.repositoryType;
 
-    setRepoState(repoKey, (state) => ({
+    setRepoState(partKey, (state) => ({
       ...state,
       selectedCommitHash: commitHash,
       selectedFilePath: null,
@@ -597,7 +711,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         );
       }
 
-      setRepoState(repoKey, (state) => ({
+      setRepoState(partKey, (state) => ({
         ...state,
         selectedCommitHash: commitHash,
         selectedFilePath,
@@ -613,7 +727,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         },
       }));
     } catch (error) {
-      setRepoState(repoKey, (state) => ({
+      setRepoState(partKey, (state) => ({
         ...state,
         loadingCommitHash: null,
         loadingDiffKey: null,
@@ -623,14 +737,15 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
     }
   }, [projectId, setRepoState]);
 
-  const loadRepository = useCallback(async (repoKey: RepoKey) => {
+  const loadRepository = useCallback(async (partKey: string) => {
     if (!projectId) {
-      setRepoState(repoKey, () => createInitialRepoState());
+      setRepoState(partKey, () => createInitialRepoState());
       return;
     }
 
-    const repositoryType = REPO_CONFIG[repoKey].repositoryType;
-    setRepoState(repoKey, () => ({
+    const config = getPartConfig(partKey);
+    const repositoryType = config.repositoryType;
+    setRepoState(partKey, () => ({
       ...createInitialRepoState(),
       loading: true,
     }));
@@ -639,7 +754,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
       const response = await fetchFilteredProjectCommits(projectId, repositoryType, 15);
       const firstCommitHash = response.commits[0]?.commitHash ?? null;
 
-      setRepoState(repoKey, (state) => ({
+      setRepoState(partKey, (state) => ({
         ...state,
         loading: false,
         error: null,
@@ -649,10 +764,10 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
       }));
 
       if (firstCommitHash) {
-        await loadCommitSelection(repoKey, firstCommitHash);
+        await loadCommitSelection(partKey, firstCommitHash);
       }
     } catch (error) {
-      setRepoState(repoKey, () => ({
+      setRepoState(partKey, () => ({
         ...createInitialRepoState(),
         loading: false,
         error: formatApiError(error),
@@ -660,41 +775,92 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
     }
   }, [loadCommitSelection, projectId, setRepoState]);
 
+  // 프로젝트 부서(파트) 목록 자동 감지 및 로딩
   useEffect(() => {
-    void loadRepository("backend");
-    void loadRepository("frontend");
-  }, [loadRepository]);
+    if (!projectId) {
+      setActiveParts(["BACKEND", "FRONTEND"]);
+      return;
+    }
 
-  const backendState = repoStates.backend;
-  const frontendState = repoStates.frontend;
-  const backendDetail = backendState.selectedCommitHash
-    ? backendState.commitDetails[backendState.selectedCommitHash] ?? null
-    : null;
-  const frontendDetail = frontendState.selectedCommitHash
-    ? frontendState.commitDetails[frontendState.selectedCommitHash] ?? null
-    : null;
-  const backendFile = getSelectedFile(backendState);
-  const frontendFile = getSelectedFile(frontendState);
+    let isSubscribed = true;
 
-  const totalStats = useMemo(() => {
-    const allCommits = [...backendState.commits, ...frontendState.commits];
-    return {
-      commitCount: allCommits.length,
-      additions: allCommits.reduce((sum, commit) => sum + commit.additions, 0),
-      deletions: allCommits.reduce((sum, commit) => sum + commit.deletions, 0),
+    async function detectProjectParts() {
+      try {
+        const deptRes = await fetchProjectDepartmentStatus(projectId!);
+        if (!isSubscribed) return;
+
+        if (deptRes && deptRes.departments && deptRes.departments.length > 0) {
+          const depts = deptRes.departments.map((d) => d.department);
+          const distinctDepts = Array.from(new Set(depts));
+          if (distinctDepts.length > 0) {
+            setActiveParts(distinctDepts);
+            setSelectedPart(distinctDepts[0]);
+            return;
+          }
+        }
+      } catch (err) {
+        // Fallback default parts
+      }
+
+      if (isSubscribed) {
+        setActiveParts(["BACKEND", "FRONTEND"]);
+        setSelectedPart("BACKEND");
+      }
+    }
+
+    void detectProjectParts();
+
+    return () => {
+      isSubscribed = false;
     };
-  }, [backendState.commits, frontendState.commits]);
+  }, [projectId]);
 
-  const singleModeFile = mode === "frontend" ? frontendFile : backendFile;
-  const singleModeLoading = mode === "frontend"
-    ? Boolean(frontendState.loading || frontendState.loadingCommitHash || frontendState.loadingDiffKey)
-    : Boolean(backendState.loading || backendState.loadingCommitHash || backendState.loadingDiffKey);
+  // 활성 파트들의 커밋 데이터 로드
+  useEffect(() => {
+    activeParts.forEach((partKey) => {
+      void loadRepository(partKey);
+    });
+  }, [activeParts, loadRepository]);
+
+  // 전체 커밋 통계 계산
+  const totalStats = useMemo(() => {
+    let commitCount = 0;
+    let additions = 0;
+    let deletions = 0;
+
+    Object.values(repoStates).forEach((state) => {
+      if (state && state.commits) {
+        commitCount += state.commits.length;
+        state.commits.forEach((c) => {
+          additions += c.additions;
+          deletions += c.deletions;
+        });
+      }
+    });
+
+    return { commitCount, additions, deletions };
+  }, [repoStates]);
+
   const canShowContent = Boolean(projectId);
+
+  // 단일 모드일 때 선택된 파트의 상태
+  const currentSingleState = repoStates[selectedPart] ?? createInitialRepoState();
+  const currentSingleConfig = getPartConfig(selectedPart);
+  const currentSingleDetail = currentSingleState.selectedCommitHash
+    ? currentSingleState.commitDetails[currentSingleState.selectedCommitHash] ?? null
+    : null;
+  const currentSingleFile = getSelectedFile(currentSingleState);
+  const currentSingleLoading = Boolean(
+    currentSingleState.loading ||
+    currentSingleState.loadingCommitHash ||
+    currentSingleState.loadingDiffKey
+  );
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" style={{ background: "#ffffff" }} />
 
+      {/* 상단 툴바 */}
       <div
         className="relative z-10 flex h-10 shrink-0 items-center gap-3 px-4"
         style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,250,250,0.98)" }}
@@ -704,28 +870,98 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
           Commit History
         </p>
 
-        <div
-          className="ml-2 flex items-center gap-1 rounded-lg p-0.5"
-          style={{ background: "rgba(0,0,0,0.06)", border: `1px solid ${BORDER}` }}
+        {/* 파트 수 표시 뱃지 */}
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+          style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
         >
-          {(["backend", "split", "frontend"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setMode(value)}
-              className="rounded-md px-2.5 py-1 text-[10px] font-semibold capitalize transition-all"
-              style={{
-                background: mode === value ? "#ffffff" : "transparent",
-                color: mode === value ? TEXT_PRIMARY : TEXT_TERTIARY,
-                boxShadow: mode === value ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              }}
-            >
-              {value === "backend" ? "Backend" : value === "frontend" ? "Frontend" : "Split"}
-            </button>
-          ))}
-        </div>
+          {activeParts.length} Parts
+        </span>
 
-        <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: TEXT_TERTIARY }}>
+        {/* 1. 단일 모드일 때: 파트 선택 탭들 */}
+        {!isSplit && (
+          <div
+            className="ml-2 flex items-center gap-1 rounded-lg p-0.5 overflow-x-auto"
+            style={{ background: "rgba(0,0,0,0.06)", border: `1px solid ${BORDER}` }}
+          >
+            {activeParts.map((partKey) => {
+              const cfg = getPartConfig(partKey);
+              const Icon = cfg.icon;
+              const isSelected = selectedPart === partKey;
+              return (
+                <button
+                  key={partKey}
+                  type="button"
+                  onClick={() => setSelectedPart(partKey)}
+                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold transition-all whitespace-nowrap"
+                  style={{
+                    background: isSelected ? "#ffffff" : "transparent",
+                    color: isSelected ? TEXT_PRIMARY : TEXT_TERTIARY,
+                    boxShadow: isSelected ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  }}
+                >
+                  <Icon className="w-3 h-3" style={{ color: isSelected ? cfg.accent : TEXT_TERTIARY }} />
+                  <span>{cfg.shortLabel}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 2. 스플릿 모드일 때: 활성화된 파트 목록 태그들 */}
+        {isSplit && (
+          <div className="ml-2 flex items-center gap-1.5 overflow-x-auto">
+            <span className="text-[10px] font-semibold" style={{ color: TEXT_TERTIARY }}>
+              전체 분배:
+            </span>
+            {activeParts.map((partKey) => {
+              const cfg = getPartConfig(partKey);
+              const Icon = cfg.icon;
+              return (
+                <span
+                  key={partKey}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap"
+                  style={{
+                    background: cfg.bgAccent,
+                    color: cfg.accent,
+                    border: `1px solid ${cfg.accent}30`,
+                  }}
+                >
+                  <Icon className="w-2.5 h-2.5" />
+                  {cfg.shortLabel}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 스플릿 뷰 켜기/끄기 토글 버튼 */}
+        <button
+          type="button"
+          onClick={() => setIsSplit((prev) => !prev)}
+          className="ml-auto flex items-center gap-2 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
+          style={{
+            background: isSplit ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.04)",
+            border: `1px solid ${isSplit ? ACCENT : BORDER}`,
+            color: isSplit ? ACCENT : TEXT_SECONDARY,
+          }}
+          title={isSplit ? "스플릿 뷰 끄기 (단일 파트 선택 보기)" : "스플릿 뷰 켜기 (프로젝트 파트 수 분배 보기)"}
+        >
+          <Columns2 className="w-3.5 h-3.5" style={{ color: isSplit ? ACCENT : TEXT_SECONDARY }} />
+          <span>Split View</span>
+          <div
+            className="w-6 h-3.5 rounded-full transition-colors relative flex items-center px-0.5"
+            style={{ background: isSplit ? ACCENT : "rgba(0,0,0,0.18)" }}
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-xs"
+              style={{ transform: isSplit ? "translateX(10px)" : "translateX(0px)" }}
+            />
+          </div>
+        </button>
+
+        {/* 커밋 통계 */}
+        <div className="flex items-center gap-2.5 text-[10px] border-l pl-3" style={{ borderColor: BORDER, color: TEXT_TERTIARY }}>
           <span>{totalStats.commitCount} commits</span>
           <span style={{ color: "#10b981" }}>+{totalStats.additions}</span>
           <span style={{ color: "#ef4444" }}>-{totalStats.deletions}</span>
@@ -745,70 +981,104 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         </div>
       ) : (
         <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
-          <div className="flex shrink-0 overflow-hidden" style={{ borderRight: `1px solid ${BORDER}` }}>
-            {(mode === "backend" || mode === "split") && (
-              <RepoColumn
-                accent={REPO_CONFIG.backend.accent}
-                label={REPO_CONFIG.backend.label}
-                icon={REPO_CONFIG.backend.icon}
-                state={backendState}
-                selectedDetail={backendDetail}
-                onSelectCommit={(commitHash) => void loadCommitSelection("backend", commitHash)}
-                onSelectFile={(filePath) => {
-                  if (!backendState.selectedCommitHash) {
-                    return;
-                  }
-                  void loadCommitDiff("backend", backendState.selectedCommitHash, filePath);
-                }}
-              />
-            )}
+          {/* ─────────────────────────────────────────────
+              커밋 & 파일 목록 컬럼 영역 (좌측/중앙)
+              - 단일 뷰: 선택된 1개 파트 컬럼 (420px)
+              - 스플릿 뷰: 프로젝트의 모든 활성 파트들이 균등하게 분배됨 (flex: 1)
+             ───────────────────────────────────────────── */}
+          <div
+            className="flex shrink-0 overflow-x-auto overflow-y-hidden"
+            style={{
+              width: isSplit ? `${Math.min(100, activeParts.length * 420)}px` : "420px",
+              maxWidth: isSplit ? "75%" : "420px",
+              borderRight: `1px solid ${BORDER}`,
+            }}
+          >
+            {isSplit ? (
+              // 스플릿 모드: 모든 활성 파트를 나란히 분배하여 렌더링
+              activeParts.map((partKey) => {
+                const cfg = getPartConfig(partKey);
+                const state = repoStates[partKey] ?? createInitialRepoState();
+                const detail = state.selectedCommitHash
+                  ? state.commitDetails[state.selectedCommitHash] ?? null
+                  : null;
 
-            {(mode === "frontend" || mode === "split") && (
+                return (
+                  <RepoColumn
+                    key={partKey}
+                    accent={cfg.accent}
+                    label={cfg.label}
+                    shortLabel={cfg.shortLabel}
+                    icon={cfg.icon}
+                    state={state}
+                    selectedDetail={detail}
+                    onSelectCommit={(commitHash) => void loadCommitSelection(partKey, commitHash)}
+                    onSelectFile={(filePath) => {
+                      if (!state.selectedCommitHash) return;
+                      void loadCommitDiff(partKey, state.selectedCommitHash, filePath);
+                    }}
+                    isSplit={true}
+                  />
+                );
+              })
+            ) : (
+              // 단일 모드: 현재 선택된 파트 1개만 렌더링
               <RepoColumn
-                accent={REPO_CONFIG.frontend.accent}
-                label={REPO_CONFIG.frontend.label}
-                icon={REPO_CONFIG.frontend.icon}
-                state={frontendState}
-                selectedDetail={frontendDetail}
-                onSelectCommit={(commitHash) => void loadCommitSelection("frontend", commitHash)}
+                accent={currentSingleConfig.accent}
+                label={currentSingleConfig.label}
+                shortLabel={currentSingleConfig.shortLabel}
+                icon={currentSingleConfig.icon}
+                state={currentSingleState}
+                selectedDetail={currentSingleDetail}
+                onSelectCommit={(commitHash) => void loadCommitSelection(selectedPart, commitHash)}
                 onSelectFile={(filePath) => {
-                  if (!frontendState.selectedCommitHash) {
-                    return;
-                  }
-                  void loadCommitDiff("frontend", frontendState.selectedCommitHash, filePath);
+                  if (!currentSingleState.selectedCommitHash) return;
+                  void loadCommitDiff(selectedPart, currentSingleState.selectedCommitHash, filePath);
                 }}
+                isSplit={false}
               />
             )}
           </div>
 
+          {/* ─────────────────────────────────────────────
+              Diff 뷰어 영역 (우측)
+              - 단일 뷰: 선택된 파트의 전체 Diff 패널
+              - 스플릿 뷰: 각 파트별 Diff 패널들이 세로/가로로 분배 분할됨
+             ───────────────────────────────────────────── */}
           <div className="min-w-0 flex-1 overflow-hidden bg-[#0d1117]">
-            {mode === "split" ? (
-              <div className="flex h-full flex-col overflow-hidden">
-                <div className="min-h-0 flex-1 overflow-hidden" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  <DiffPanel
-                    title="Backend Diff"
-                    accent={REPO_CONFIG.backend.accent}
-                    file={backendFile}
-                    loading={Boolean(backendState.loading || backendState.loadingCommitHash || backendState.loadingDiffKey)}
-                    emptyMessage="백엔드 파일을 선택하면 Diff가 표시됩니다."
-                  />
-                </div>
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <DiffPanel
-                    title="Frontend Diff"
-                    accent={REPO_CONFIG.frontend.accent}
-                    file={frontendFile}
-                    loading={Boolean(frontendState.loading || frontendState.loadingCommitHash || frontendState.loadingDiffKey)}
-                    emptyMessage="프론트엔드 파일을 선택하면 Diff가 표시됩니다."
-                  />
-                </div>
+            {isSplit ? (
+              <div className="flex h-full flex-col overflow-y-auto">
+                {activeParts.map((partKey, index) => {
+                  const cfg = getPartConfig(partKey);
+                  const state = repoStates[partKey] ?? createInitialRepoState();
+                  const file = getSelectedFile(state);
+                  const loading = Boolean(state.loading || state.loadingCommitHash || state.loadingDiffKey);
+
+                  return (
+                    <div
+                      key={partKey}
+                      className="min-h-[220px] flex-1 overflow-hidden"
+                      style={{
+                        borderBottom: index < activeParts.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                      }}
+                    >
+                      <DiffPanel
+                        title={`${cfg.shortLabel} Diff`}
+                        accent={cfg.accent}
+                        file={file}
+                        loading={loading}
+                        emptyMessage={`${cfg.shortLabel} 파일을 선택하면 Diff가 표시됩니다.`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <DiffPanel
-                title={mode === "frontend" ? "Frontend Diff" : "Backend Diff"}
-                accent={mode === "frontend" ? REPO_CONFIG.frontend.accent : REPO_CONFIG.backend.accent}
-                file={singleModeFile}
-                loading={singleModeLoading}
+                title={`${currentSingleConfig.shortLabel} Diff`}
+                accent={currentSingleConfig.accent}
+                file={currentSingleFile}
+                loading={currentSingleLoading}
                 emptyMessage="파일을 선택하면 Diff가 표시됩니다."
               />
             )}

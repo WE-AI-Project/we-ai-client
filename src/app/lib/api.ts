@@ -956,7 +956,6 @@ export async function signUp(payload: SignUpPayload): Promise<void> {
 export async function login(payload: LoginPayload): Promise<AuthSession> {
   if (isPreview) {
     console.log("🛠️ [Preview Mode] 가짜 이메일/비밀번호 로그인 성공");
-    await new Promise((resolve) => setTimeout(resolve, 500)); // 0.5초 로딩 딜레이
     
     const dummySession: AuthSession = {
       tokenType: "Bearer",
@@ -990,7 +989,6 @@ export async function findPassword(
   payload: PasswordFindPayload
 ): Promise<PasswordFindResponse> {
   if (isPreview) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
     return {
       email: payload.email,
       deliveryMode: "SIMULATED",
@@ -1014,7 +1012,6 @@ export async function sendEmailLoginCode(
 ): Promise<VerificationCodeDispatchResponse> {
   if (isPreview) {
     console.log("🛠️ [Preview Mode] 가짜 인증 코드(123456)가 발송되었습니다.");
-    await new Promise((resolve) => setTimeout(resolve, 500)); // 로딩 딜레이
     return {
       purpose: "EMAIL_LOGIN",
       deliveryChannel: payload.deliveryChannel,
@@ -1038,7 +1035,6 @@ export async function sendEmailLoginCode(
 export async function loginWithEmailCode(payload: EmailCodeLoginPayload): Promise<AuthSession> {
   if (isPreview) {
     console.log("🛠️ [Preview Mode] 가짜 이메일 코드 로그인 성공");
-    await new Promise((resolve) => setTimeout(resolve, 500));
     const dummySession: AuthSession = {
       tokenType: "Bearer",
       accessToken: "preview_access_token_123",
@@ -1358,3 +1354,85 @@ export async function deleteProjectSchedule(projectId: number, scheduleId: numbe
     method: "DELETE",
   });
 }
+
+export type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG" | "STARTED" | "TRACE";
+
+export type ServerLogEntry = {
+  id: number;
+  time: string;
+  level: LogLevel;
+  thread: string;
+  logger: string;
+  message: string;
+};
+
+export async function fetchRecentServerLogs(projectId?: number | null): Promise<ServerLogEntry[]> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/server/logs`
+    : `/api/v1/server/logs`;
+  return request<ServerLogEntry[]>(path, { method: "GET" });
+}
+
+export function getServerLogStreamUrl(projectId?: number | null): string {
+  const session = loadSession();
+  const token = session?.accessToken;
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/server/logs/stream`
+    : `/api/v1/server/logs/stream`;
+
+  const baseUrl = apiBaseUrl || "";
+  const fullUrl = `${baseUrl}${path}`;
+  if (token) {
+    const separator = fullUrl.includes("?") ? "&" : "?";
+    return `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
+  return fullUrl;
+}
+
+export type BuildTaskItem = {
+  taskName: string;
+  displayName: string;
+  description: string;
+  command: string;
+  category: string;
+  dangerous: boolean;
+  enabled: boolean;
+};
+
+export type BuildTaskListResponse = {
+  projectId: number;
+  buildTool: string;
+  tasks: BuildTaskItem[];
+};
+
+export type BuildTaskExecutionResponse = {
+  taskName: string;
+  command: string;
+  status: "SUCCESS" | "FAILED";
+  exitCode: number;
+  duration: string;
+  logs: string[];
+  executedAt: string;
+};
+
+export async function fetchBuildTasks(projectId?: number | null): Promise<BuildTaskListResponse> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/build/tasks`
+    : `/api/v1/build/tasks`;
+  return request<BuildTaskListResponse>(path, { method: "GET" });
+}
+
+export async function executeBuildTask(
+  taskName: string,
+  projectId?: number | null
+): Promise<BuildTaskExecutionResponse> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/build/execute`
+    : `/api/v1/build/execute`;
+  return request<BuildTaskExecutionResponse>(path, {
+    method: "POST",
+    body: { taskName },
+  });
+}
+
+

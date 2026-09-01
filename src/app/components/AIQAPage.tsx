@@ -642,12 +642,8 @@ export function AIQAPage({
     ];
     const scanTargets = filesForQa.map((file) => file.path);
 
-    scanTargets.forEach((file, index) => {
-      setTimeout(() => {
-        setScanCurrent(file);
-        setScanFiles(prev => prev.includes(file) ? prev : [...prev, file]);
-      }, index * 140);
-    });
+    setScanFiles(scanTargets);
+    setScanCurrent(scanTargets[0] || "");
 
     try {
       const response = await runAiQa({
@@ -662,12 +658,10 @@ export function AIQAPage({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "AI QA 분석에 실패했습니다.");
     } finally {
-      setTimeout(() => {
-        setScanCurrent("");
-        setPhase1Done(true);
-        setPhase("phase2");
-        setTimeout(() => runPhase2(), 600);
-      }, Math.max(scanTargets.length * 140, 500));
+      setScanCurrent("");
+      setPhase1Done(true);
+      setPhase("phase2");
+      runPhase2();
     }
   };
 

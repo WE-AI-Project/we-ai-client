@@ -484,12 +484,6 @@ export function CalendarPage() {
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
   const [view, setView] = useState<"month" | "list">("month");
 
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
 
   type DeptColorType = Record<string, {
     bg: string;

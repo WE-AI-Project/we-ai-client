@@ -586,41 +586,35 @@ export default function App() {
   };
 
   const handleJoin = (project: ProjectLaunchTarget) => {
-    setJoinExiting(true);
-    setTimeout(() => {
-      setProjectId(project.projectId);
-      setProject(project.projectName);
-      setProjectCode(project.projectCode ?? genProjectCode());
-      setLocalPath(project.localPath ?? "");
-      setScreen("workspace");
+    setProjectId(project.projectId);
+    setProject(project.projectName);
+    setProjectCode(project.projectCode ?? genProjectCode());
+    setLocalPath(project.localPath ?? "");
+    setScreen("workspace");
 
-      setLeftTabs(["Dashboard"]);
-      setActiveLeftTab("Dashboard");
-      setRightTabs([]);
-      setIsSplit(false);
-      setActivePanel("left");
+    setLeftTabs(["Dashboard"]);
+    setActiveLeftTab("Dashboard");
+    setRightTabs([]);
+    setIsSplit(false);
+    setActivePanel("left");
 
-      setDiffFile(null);
-      setIsLoading(true);
-      setJoinExiting(false);
+    setDiffFile(null);
+    setIsLoading(false);
+    setJoinExiting(false);
 
-      if (project.localPath || project.projectName) {
-        const cur = loadSettings();
-        saveSettings({
-          ...cur,
-          projectName: project.projectName || cur.projectName,
-          repository: project.localPath || cur.repository,
-          description: cur.description || `${project.projectName} project`,
-        });
-      }
+    if (project.localPath || project.projectName) {
+      const cur = loadSettings();
+      saveSettings({
+        ...cur,
+        projectName: project.projectName || cur.projectName,
+        repository: project.localPath || cur.repository,
+        description: cur.description || `${project.projectName} project`,
+      });
+    }
 
-      setTimeout(() => {
-        setIsLoading(false);
-        if (!isDismissedToday()) {
-          setTimeout(() => setShowStandup(true), 700);
-        }
-      }, 1000);
-    }, 440);
+    if (!isDismissedToday()) {
+      setTimeout(() => setShowStandup(true), 300);
+    }
   };
 
   const handleLeaveProject = () => {
@@ -671,8 +665,9 @@ export default function App() {
         : <DashboardPage projectId={projectId} projectName={projectName} />;
       case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage projectId={projectId} />;
-      case "ServerBuild": return <ServerBuildPage />;
+      case "ServerBuild": return <ServerBuildPage projectId={projectId} />;
       case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
+      case "Calendar": return <CalendarPage />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;

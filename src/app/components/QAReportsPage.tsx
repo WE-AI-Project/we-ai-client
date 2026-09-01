@@ -121,8 +121,7 @@ export function QAReportsPage() {
             ) : (
               <button
                 onClick={() => {
-                  setIsLoading(true);
-                  setTimeout(() => setIsLoading(false), 2000); // 리스캔 시 2초 로딩
+                  setIsLoading(false);
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-black/[0.05] transition-all"
                 style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}

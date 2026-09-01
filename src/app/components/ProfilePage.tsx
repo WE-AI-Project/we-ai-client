@@ -184,8 +184,8 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
         // 병렬로 API 3개 동시 호출 (내 정보, 활동 요약, 최근 활동)
         const [sessionUser, summary, activitiesRes] = await Promise.all([
           fetchCurrentUser(),
-          fetchMyActivitySummary(projectId),
-          fetchMyActivities(projectId)
+          fetchMyActivitySummary(),
+          fetchMyActivities()
         ]);
 
         // 받아온 정보로 프로필 상태 업데이트
@@ -200,7 +200,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
         });
 
         setActivitySummary(summary);
-        setRecentActivities(activitiesRes.activities);
+        setRecentActivities(Array.isArray(activitiesRes) ? activitiesRes : []);
       } catch (e) {
         console.error("프로필 데이터를 불러오는 중 오류가 발생했습니다.", e);
       } finally {
