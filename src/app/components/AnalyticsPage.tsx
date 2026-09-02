@@ -6,6 +6,7 @@ import {
 import { BarChart2, TrendingUp, GitCommit, CheckSquare, Bot } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
+  CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -79,13 +80,7 @@ export function AnalyticsPage() {
   const avgUptime    = (AGENT_PERF.reduce((s, a) => s + parseFloat(a.uptime), 0) / AGENT_PERF.length).toFixed(1);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
@@ -140,7 +135,7 @@ export function AnalyticsPage() {
               ))
             ) : (
               [
-                { label: "Commits",       value: totalCommits, color: ACCENT,    bg: "rgba(99,91,255,0.07)",  icon: GitCommit    },
+                { label: "Commits",       value: totalCommits, color: ACCENT,    bg: "rgba(112,130,56,0.07)",  icon: GitCommit    },
                 { label: "Tasks Done",    value: totalTasks,   color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: CheckSquare  },
                 { label: "Active Agents", value: activeAgents, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Bot          },
                 { label: "Avg Uptime",    value: `${avgUptime}%`, color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: TrendingUp },

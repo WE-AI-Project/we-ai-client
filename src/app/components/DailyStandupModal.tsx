@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import {
   Sun, Sparkles, CheckCircle2, Clock, AlertTriangle,
   ArrowRight, ChevronRight, FileCode2, GitPullRequest,
@@ -507,7 +507,7 @@ export function DailyStandupModal({
           <div className="flex items-start gap-3">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-              style={{ background: "rgba(174,183,132,0.20)" }}
+              style={{ background: "rgba(166,123,91,0.20)" }}
             >
               <Sun className="w-5 h-5" style={{ color: "#D4CC9E" }} />
             </div>
@@ -519,7 +519,7 @@ export function DailyStandupModal({
                 </h2>
                 <span
                   className="text-[8px] px-2 py-0.5 rounded-full font-bold"
-                  style={{ background: "rgba(174,183,132,0.20)", color: "#AEB784" }}
+                  style={{ background: "rgba(166,123,91,0.20)", color: "#A67B5B" }}
                 >AI 자동 생성</span>
               </div>
               <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
@@ -537,7 +537,7 @@ export function DailyStandupModal({
               { label: "완료 항목", value: totalCompleted, color: "#7ee787", bg: "rgba(126,231,135,0.12)" },
               { label: "진행 중", value: totalInProgress, color: "#D4CC9E", bg: "rgba(212,204,158,0.12)" },
               { label: "블로커", value: totalBlockers, color: "#ff7b72", bg: "rgba(255,123,114,0.12)" },
-              { label: "관련 항목", value: relevantMembers.length, color: "#AEB784", bg: "rgba(174,183,132,0.15)" },
+              { label: "관련 항목", value: relevantMembers.length, color: "#A67B5B", bg: "rgba(166,123,91,0.15)" },
             ].map(s => (
               <div key={s.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: s.bg }}>
                 <span className="text-[11px] font-bold" style={{ color: s.color }}>{s.value}</span>
@@ -621,7 +621,7 @@ export function DailyStandupModal({
                 <div className="flex items-center gap-3 mb-3">
                   <div
                     className="w-5 h-5 rounded-lg flex items-center justify-center"
-                    style={{ background: "rgba(65,67,27,0.08)" }}
+                    style={{ background: "rgba(112,130,56,0.08)" }}
                   >
                     <Bot className="w-3 h-3" style={{ color: ACCENT }} />
                   </div>
@@ -699,7 +699,7 @@ export function DailyStandupModal({
                 color: ACCENT,
                 border: `1px solid ${ACCENT_BORDER}`,
               }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(65,67,27,0.12)"}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(112,130,56,0.12)"}
               onMouseLeave={e => e.currentTarget.style.background = ACCENT_BG}
             >
               <GitPullRequest className="w-3.5 h-3.5" />

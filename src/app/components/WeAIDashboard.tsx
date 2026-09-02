@@ -15,7 +15,7 @@ import {
 // ── 디자인 토큰 ──
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_LOGO,
+  ACCENT, ACCENT_BG, GRADIENT_LOGO,
   CTA_BG, UI_GREEN, UI_GREEN_DARK, UI_GREEN_BG, UI_GREEN_BG7,
   UI_RED, UI_RED_DARK, UI_RED_BG,
   UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
@@ -264,13 +264,7 @@ function ProjectEntry({ onJoin, isLoading }: { onJoin: (project: typeof PROJECTS
   const selectedProject = PROJECTS.find(p => p.id === selected);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,152,64,0.14) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 flex items-center justify-center p-6">
         <div
           className="w-full max-w-lg rounded-2xl p-7"
@@ -438,7 +432,7 @@ function ProjectEntry({ onJoin, isLoading }: { onJoin: (project: typeof PROJECTS
 // ════════════════════════════════════════════
 function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number], isLoading?: boolean }) {
   const quickStats = [
-    { label: "Commits Today", value: "3", color: ACCENT, bg: "rgba(99,91,255,0.07)" },
+    { label: "Commits Today", value: "3", color: ACCENT, bg: "rgba(112,130,56,0.07)" },
     { label: "Files Changed", value: "3", color: UI_VIOLET, bg: UI_VIOLET_BG7 },
     { label: "Agents Running", value: "3/6", color: UI_GREEN, bg: UI_GREEN_BG7 },
     { label: "Build Status", value: "PASS", color: UI_GREEN_DARK, bg: UI_GREEN_BG7 },
@@ -507,7 +501,7 @@ function WorkspaceHome({ project, isLoading }: { project: typeof PROJECTS[number
                 <div key={i} className="flex items-start gap-2.5">
                   <span
                     className="text-[9px] font-mono px-1.5 py-0.5 rounded shrink-0 mt-0.5"
-                    style={{ background: "rgba(99,91,255,0.08)", color: ACCENT }}
+                    style={{ background: "rgba(112,130,56,0.08)", color: ACCENT }}
                   >
                     {c.hash}
                   </span>
@@ -747,7 +741,7 @@ function AgentMonitor({ isLoading }: { isLoading?: boolean }) {
             <div key={agent.id} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.75)", border: `1px solid ${BORDER}`, backdropFilter: "blur(8px)" }}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, #e0e7ff, #e8d5f5, #fce7f3)" }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: ACCENT_BG }}>
                     <Bot className="w-4 h-4" style={{ color: ACCENT }} />
                   </div>
                   <div className="min-w-0">
@@ -777,7 +771,7 @@ function AgentMonitor({ isLoading }: { isLoading?: boolean }) {
                   <button onClick={() => handleAction(agent.id, "stop")} title="Stop" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(239,68,68,0.10)", color: "#dc2626" }}>
                     <Square className="w-3 h-3 fill-current" />
                   </button>
-                  <button onClick={() => handleAction(agent.id, "restart")} title="Restart" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}>
+                  <button onClick={() => handleAction(agent.id, "restart")} title="Restart" className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(112,130,56,0.10)", color: ACCENT }}>
                     <RotateCcw className="w-3 h-3" />
                   </button>
                 </div>
@@ -923,7 +917,7 @@ function TaskQueue({ isLoading }: { isLoading?: boolean }) {
         ) : (
           [
             { label: "Running", count: counts.running, color: "#10b981", bg: "rgba(16,185,129,0.08)" },
-            { label: "Scheduled", count: counts.scheduled, color: ACCENT, bg: "rgba(99,91,255,0.08)" },
+            { label: "Scheduled", count: counts.scheduled, color: ACCENT, bg: "rgba(112,130,56,0.08)" },
             { label: "Done", count: counts.done, color: "#6b7280", bg: "rgba(107,114,128,0.08)" },
             { label: "Error", count: counts.error, color: "#ef4444", bg: "rgba(239,68,68,0.08)" },
           ].map(c => (
@@ -989,7 +983,7 @@ function SystemOverview({ isLoading }: { isLoading?: boolean }) {
   const [efficiencyData] = useState(generateEfficiencyData);
 
   const statCards = [
-    { label: "Total Uptime", value: "18d 06h 22m", color: ACCENT, bg: "rgba(99,91,255,0.07)" },
+    { label: "Total Uptime", value: "18d 06h 22m", color: ACCENT, bg: "rgba(112,130,56,0.07)" },
     { label: "Active Agents", value: "4 / 6", color: "#10b981", bg: "rgba(16,185,129,0.07)" },
     { label: "Avg Efficiency", value: "73.4%", color: "#8b5cf6", bg: "rgba(139,92,246,0.07)" },
     { label: "Req/s (peak)", value: "487 rps", color: "#f59e0b", bg: "rgba(245,158,11,0.07)" },
@@ -1113,7 +1107,7 @@ function BuildTools({ isLoading }: { isLoading?: boolean }) {
 
   const gradleCommands = [
     { cmd: "bootRun", label: "bootRun", icon: Play, color: "#10b981", bg: "rgba(16,185,129,0.10)", desc: "Start Spring Boot server" },
-    { cmd: "build", label: "build", icon: Package, color: ACCENT, bg: "rgba(99,91,255,0.10)", desc: "Compile & package" },
+    { cmd: "build", label: "build", icon: Package, color: ACCENT, bg: "rgba(112,130,56,0.10)", desc: "Compile & package" },
     { cmd: "test", label: "test", icon: CheckCircle2, color: "#8b5cf6", bg: "rgba(139,92,246,0.10)", desc: "Run unit tests" },
     { cmd: "clean", label: "clean", icon: RefreshCw, color: "#f59e0b", bg: "rgba(245,158,11,0.10)", desc: "Clean build output" },
     { cmd: "stop", label: "stop", icon: Square, color: "#ef4444", bg: "rgba(239,68,68,0.10)", desc: "Stop server" },
@@ -1285,17 +1279,7 @@ export function WeAIDashboard() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경: 하늘 물드는 그라데이션 */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }}
-      />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       {/* 워크스페이스 탭 헤더 */}
       <div
         className="relative z-10 flex items-center gap-1 px-4 pt-3 pb-2.5 shrink-0 flex-wrap"
@@ -1315,7 +1299,7 @@ export function WeAIDashboard() {
         <div className="flex items-center gap-2 mr-3 shrink-0">
           <div
             className="w-5 h-5 rounded-md flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #e0e7ff, #ddd6fe, #fce7f3)" }}
+            style={{ background: ACCENT_BG }}
           >
             <Bot className="w-3 h-3" style={{ color: ACCENT }} />
           </div>

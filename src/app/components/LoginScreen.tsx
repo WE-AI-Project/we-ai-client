@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   OLIVE_DARK,
   SAGE,
@@ -17,6 +17,7 @@ import {
   INPUT_BG,
   TEXT_LABEL,
   TEXT_SECONDARY,
+  SIDEBAR_DEEP,
 } from "../colors";
 import {
   FolderGit2,
@@ -235,7 +236,7 @@ function OtpInput({
             border: `2px solid ${digit ? OLIVE_DARK : "rgba(0,0,0,0.08)"}`,
             color: TEXT_PRIMARY,
             transition: "all 0.15s",
-            boxShadow: digit ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
+            boxShadow: digit ? "0 2px 8px rgba(112,130,56,0.12)" : "none",
           }}
         />
       ))}
@@ -573,7 +574,7 @@ function LoginForm({
                 ? "rgba(90,138,74,0.08)"
                 : notice.tone === "error"
                   ? "rgba(184,84,80,0.08)"
-                  : "rgba(65,67,27,0.06)",
+                  : "rgba(112,130,56,0.06)",
             color:
               notice.tone === "success"
                 ? STATUS_SUCCESS
@@ -585,7 +586,7 @@ function LoginForm({
                 ? "rgba(90,138,74,0.16)"
                 : notice.tone === "error"
                   ? "rgba(184,84,80,0.16)"
-                  : "rgba(65,67,27,0.12)"
+                  : "rgba(112,130,56,0.12)"
             }`,
           }}
         >
@@ -875,7 +876,7 @@ function SignupForm({
           {socialProvider && (
             <div
               className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
-              style={{ background: "rgba(65,67,27,0.05)", border: "1.5px solid rgba(65,67,27,0.12)" }}
+              style={{ background: "rgba(112,130,56,0.05)", border: "1.5px solid rgba(112,130,56,0.12)" }}
             >
               <div
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
@@ -921,7 +922,7 @@ function SignupForm({
               style={{
                 background: INPUT_BG,
                 border: `1.5px solid ${
-                  verified ? STATUS_SUCCESS : otpSent ? "rgba(65,67,27,0.20)" : "transparent"
+                  verified ? STATUS_SUCCESS : otpSent ? "rgba(112,130,56,0.20)" : "transparent"
                 }`,
                 transition: "border-color 0.15s",
               }}
@@ -989,7 +990,7 @@ function SignupForm({
               <div className="space-y-3 pt-2">
                 <div
                   className="flex items-start gap-2 rounded-xl px-3 py-2.5"
-                  style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
+                  style={{ background: "rgba(112,130,56,0.04)", border: "1px solid rgba(112,130,56,0.10)" }}
                 >
                   <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: OLIVE_DARK }} />
                   <div>
@@ -1258,9 +1259,9 @@ function EmailCodeLoginForm({
         disabled={sending}
         className="w-full rounded-xl py-3 text-sm font-semibold"
         style={{
-          background: "rgba(65,67,27,0.08)",
+          background: "rgba(112,130,56,0.08)",
           color: OLIVE_DARK,
-          border: "1px solid rgba(65,67,27,0.10)",
+          border: "1px solid rgba(112,130,56,0.10)",
           opacity: sending ? 0.75 : 1,
         }}
       >
@@ -1270,7 +1271,7 @@ function EmailCodeLoginForm({
       {dispatchResult && (
         <div
           className="rounded-xl px-3.5 py-3"
-          style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
+          style={{ background: "rgba(112,130,56,0.04)", border: "1px solid rgba(112,130,56,0.10)" }}
         >
           <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
             인증코드를 보냈습니다
@@ -1530,7 +1531,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
 
   return (
     <div
-      className="relative flex size-full items-center justify-center overflow-hidden bg-[#F5F4F1]"
+      className="relative flex size-full items-center justify-center overflow-hidden bg-[#F8F5F2]"
       style={{
         opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.42s ease" : "none",
@@ -1585,7 +1586,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
               <span
                 key={tag}
                 className="rounded-full px-3 py-1.5 text-[11px] font-medium"
-                style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
+                style={{ background: "rgba(112,130,56,0.07)", color: OLIVE_DARK, border: "1px solid rgba(112,130,56,0.12)" }}
               >
                 {tag}
               </span>
@@ -1612,16 +1613,44 @@ export function LoginScreen({ onAuthenticated }: Props) {
           </p>
         </div>
 
-        {/* --- 💡 오른쪽 영역: 로그인 팝업 카드와 비슷한 크기의 사진 배치 --- */}
+        {/* --- 오른쪽 영역: 로그인 팝업 카드와 비슷한 크기의 브랜드 일러스트 --- */}
         <div className="hidden relative flex h-full w-full items-center justify-center lg:flex lg:w-1/2">
           {/* 로그인 창과 비슷한 크기(약 420px), 라운딩 처리 추가 */}
-          <div className="relative h-[65%] max-h-[580px] w-[420px] max-w-[90%] overflow-hidden rounded-[20px] shadow-2xl">
-            <img
-              src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1000"
-              alt="SynAIpse Technology Background"
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            {/* 그라데이션 및 오버레이 제거하여 사진 원본 노출 */}
+          <div
+            className="relative h-[65%] max-h-[580px] w-[420px] max-w-[90%] overflow-hidden rounded-[20px]"
+            style={{ background: SIDEBAR_DEEP }}
+          >
+            <svg
+              className="absolute inset-0 h-full w-full"
+              viewBox="0 0 420 580"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <line x1="90" y1="150" x2="210" y2="230" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="330" y1="120" x2="210" y2="230" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="210" y1="230" x2="150" y2="380" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="210" y1="230" x2="300" y2="400" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="150" y1="380" x2="300" y2="400" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="300" y1="400" x2="260" y2="500" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="90" y1="150" x2="60" y2="280" stroke="#3A3D18" strokeWidth="1.5" />
+
+              <circle cx="210" cy="230" r="10" fill="#708238" />
+              <circle cx="90" cy="150" r="6" fill="#A67B5B" />
+              <circle cx="330" cy="120" r="7" fill="#A67B5B" />
+              <circle cx="150" cy="380" r="7" fill="#C09840" />
+              <circle cx="300" cy="400" r="8" fill="#708238" />
+              <circle cx="260" cy="500" r="5" fill="#A67B5B" />
+              <circle cx="60" cy="280" r="5" fill="#5A6B2E" />
+            </svg>
+
+            <div className="absolute bottom-7 left-7 right-7">
+              <p className="text-[11px] font-semibold tracking-wide" style={{ color: "#A67B5B" }}>
+                MULTI-AGENT NETWORK
+              </p>
+              <p className="mt-1 text-sm" style={{ color: "rgba(248,245,242,0.65)" }}>
+                여러 에이전트가 하나의 프로젝트 오피스에서 함께 움직입니다.
+              </p>
+            </div>
           </div>
         </div>
       </div>

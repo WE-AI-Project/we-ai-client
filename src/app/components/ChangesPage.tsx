@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+﻿import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   GitCommit, GitBranch, Upload, CheckCircle2, X,
   ShieldCheck, Plus, RotateCcw,
@@ -41,10 +41,10 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 // ── 디자인 토큰 ──
 const EXT_COLOR: Record<string, { bg: string; color: string }> = {
   java:   { bg: "rgba(192,152,64,0.10)",  color: "#C09840" },
-  gradle: { bg: "rgba(65,67,27,0.08)",    color: ACCENT    },
+  gradle: { bg: "rgba(112,130,56,0.08)",    color: ACCENT    },
   yml:    { bg: "rgba(90,138,74,0.08)",   color: "#5A8A4A" },
   ts:     { bg: "rgba(107,122,80,0.10)",  color: "#6B7A50" },
-  tsx:    { bg: "rgba(174,183,132,0.12)", color: "#7A8B5A" },
+  tsx:    { bg: "rgba(166,123,91,0.12)", color: "#7A8B5A" },
   css:    { bg: "rgba(184,120,80,0.08)",  color: "#B87850" },
   env:    { bg: "rgba(136,138,98,0.08)",  color: "#888A62" },
 };
@@ -72,7 +72,7 @@ function QAModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)" }}>
       <div className="rounded-2xl overflow-hidden" style={{ width: 360, background: "rgba(255,255,255,0.97)", border: `1px solid ${BORDER}`, boxShadow: "0 12px 48px rgba(0,0,0,0.16)" }}>
         <div className="p-7 text-center">
-          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(224,231,255,0.7), rgba(221,214,254,0.6))" }}>
+          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: ACCENT_BG }}>
             <ShieldCheck className="w-7 h-7" style={{ color: ACCENT }} />
           </div>
           <h3 className="text-sm font-bold mb-1" style={{ color: TEXT_PRIMARY }}>커밋 전 AI QA를 실행할까요?</h3>
@@ -80,7 +80,7 @@ function QAModal({
           <div className="px-3 py-2 rounded-xl text-left font-mono text-[10px] mb-6" style={{ background: "rgba(0,0,0,0.04)", color: TEXT_SECONDARY }}>{commitMsg}</div>
           <div className="flex gap-2.5">
             <button onClick={onQANo}  className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}>아니오, 바로 커밋</button>
-            <button onClick={onQAYes} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "linear-gradient(135deg, #41431B, #62683A)", color: "rgba(255,255,255,0.95)", boxShadow: "0 4px 14px rgba(65,67,27,0.24)" }}>예, AI QA 실행</button>
+            <button onClick={onQAYes} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "linear-gradient(135deg, #708238, #62683A)", color: "rgba(255,255,255,0.95)", boxShadow: "0 4px 14px rgba(112,130,56,0.24)" }}>예, AI QA 실행</button>
           </div>
         </div>
       </div>
@@ -131,10 +131,10 @@ function FileRow({
       className="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all"
       style={{
         borderBottom: `1px solid ${BORDER_SUBTLE}`,
-        background: selected ? "rgba(65,67,27,0.08)" : "transparent",
+        background: selected ? "rgba(112,130,56,0.08)" : "transparent",
         // 선택 시 왼쪽 그라데이션 border
         borderLeft: selected ? "2.5px solid" : "2.5px solid transparent",
-        borderImage: selected ? "linear-gradient(180deg, #41431B, #AEB784) 1" : "none",
+        borderImage: selected ? "linear-gradient(180deg, #708238, #A67B5B) 1" : "none",
       }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "rgba(0,0,0,0.025)"; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
@@ -413,7 +413,7 @@ export function ChangesPage({
             disabled={isLoading}
             className="flex items-center gap-1.5 ml-3 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all disabled:opacity-50"
             style={{
-              background: showBranch ? "rgba(65,67,27,0.10)" : "rgba(32,35,27,0.05)",
+              background: showBranch ? "rgba(112,130,56,0.10)" : "rgba(31,31,31,0.05)",
               color:      showBranch ? ACCENT : TEXT_PRIMARY,
               border:     `1px solid ${showBranch ? ACCENT_BORDER : BORDER}`,
             }}
@@ -471,7 +471,7 @@ export function ChangesPage({
             {/* ── 왼쪽: 파일 목록 + 커밋 입력 ── */}
             <div
               className="flex flex-col shrink-0 overflow-hidden"
-              style={{ width: 280, borderRight: `1px solid ${BORDER}`, background: "#F7F8F5" }}
+              style={{ width: 280, borderRight: `1px solid ${BORDER}`, background: "#F7F2EA" }}
             >
               <div className="flex-1 overflow-y-auto">
 
@@ -481,7 +481,7 @@ export function ChangesPage({
                     onClick={() => { if (!isLoading) setStagedOpen(o => !o); }}
                     disabled={isLoading}
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all disabled:opacity-50"
-                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "#ECEEE9" }}
+                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "#F5EFE6" }}
                   >
                     {stagedOpen
                       ? <ChevronDown  className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
@@ -527,7 +527,7 @@ export function ChangesPage({
                     onClick={() => { if (!isLoading) setUnstagedOpen(o => !o); }}
                     disabled={isLoading}
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/[0.03] transition-all disabled:opacity-50"
-                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "#ECEEE9", borderTop: `1px solid ${BORDER_SUBTLE}` }}
+                    style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "#F5EFE6", borderTop: `1px solid ${BORDER_SUBTLE}` }}
                   >
                     {unstagedOpen
                       ? <ChevronDown  className="w-3 h-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
@@ -596,7 +596,7 @@ export function ChangesPage({
                     <div className="flex items-center gap-2">
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                        style={{ background: "linear-gradient(135deg, #DDE2D3, #F0F1EE)" }}
+                        style={{ background: "linear-gradient(135deg, #EAE1D0, #F5EFE6)" }}
                       >
                         <span className="text-[8px] font-bold" style={{ color: ACCENT }}>
                           {userName.charAt(0) || "U"}
@@ -643,12 +643,12 @@ export function ChangesPage({
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold transition-all"
                       style={{
                         background: stagedCount > 0 && message.trim()
-                          ? "linear-gradient(135deg, #41431B 0%, #62683A 100%)"
+                          ? "linear-gradient(135deg, #708238 0%, #62683A 100%)"
                           : "rgba(0,0,0,0.07)",
                         color: stagedCount > 0 && message.trim()
                           ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
                         boxShadow: stagedCount > 0 && message.trim()
-                          ? "0 4px 16px rgba(65,67,27,0.24)" : "none",
+                          ? "0 4px 16px rgba(112,130,56,0.24)" : "none",
                         cursor: stagedCount > 0 && message.trim() ? "pointer" : "not-allowed",
                       }}
                     >

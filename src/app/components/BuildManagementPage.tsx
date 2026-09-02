@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { Hammer, Play, Square, CheckCircle2, XCircle, Clock, RotateCw, Circle } from "lucide-react";
 
 import {
@@ -80,13 +80,13 @@ const BUILD_LOGS: Record<string, string[]> = {
 
 const STATUS_META: Record<TaskStatus, { color: string; bg: string; icon: any; label: string }> = {
   idle:    { color: "#9A9B72", bg: "rgba(154,155,114,0.10)", icon: Circle,       label: "Idle"    },
-  running: { color: ACCENT,   bg: "rgba(65,67,27,0.10)",    icon: RotateCw,     label: "Running" },
+  running: { color: ACCENT,   bg: "rgba(112,130,56,0.10)",    icon: RotateCw,     label: "Running" },
   success: { color: "#5A8A4A", bg: "rgba(90,138,74,0.10)",  icon: CheckCircle2, label: "Success" },
   failed:  { color: "#B85450", bg: "rgba(184,84,80,0.10)",  icon: XCircle,      label: "Failed"  },
 };
 
 const GROUP_COLOR: Record<string, { color: string; bg: string }> = {
-  application:  { color: ACCENT,    bg: "rgba(65,67,27,0.08)"    },
+  application:  { color: ACCENT,    bg: "rgba(112,130,56,0.08)"    },
   build:        { color: "#5A8A4A", bg: "rgba(90,138,74,0.08)"   },
   verification: { color: "#C09840", bg: "rgba(192,152,64,0.08)"  },
   help:         { color: "#888A62", bg: "rgba(136,138,98,0.08)"  },
@@ -171,12 +171,12 @@ export function BuildManagementPage() {
           {/* ── 진행 바 (태스크 실행 중) ── */}
           {runningTask && (
             <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
-              <div className="w-4 h-4 border-2 rounded-full animate-spin shrink-0" style={{ borderColor: "rgba(65,67,27,0.20)", borderTopColor: ACCENT }} />
+              <div className="w-4 h-4 border-2 rounded-full animate-spin shrink-0" style={{ borderColor: "rgba(112,130,56,0.20)", borderTopColor: ACCENT }} />
               <div className="flex-1">
                 <p className="text-[11px] font-semibold mb-1" style={{ color: ACCENT }}>
                   Running: {tasks.find(t => t.id === runningTask)?.name}
                 </p>
-                <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: "rgba(65,67,27,0.10)" }}>
+                <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: "rgba(112,130,56,0.10)" }}>
                   <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: ACCENT }} />
                 </div>
               </div>
@@ -249,7 +249,7 @@ export function BuildManagementPage() {
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
                       style={{
                         background: runningTask
-                          ? "rgba(65,67,27,0.04)"
+                          ? "rgba(112,130,56,0.04)"
                           : ACCENT_BG,
                         color: runningTask ? TEXT_TERTIARY : ACCENT,
                         cursor: runningTask ? "not-allowed" : "pointer",

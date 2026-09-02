@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import {
   ShieldAlert, X, AlertCircle, AlertTriangle, Info,
   CheckCircle2, ChevronDown, ChevronRight,
@@ -725,7 +725,7 @@ export function ConventionGuardModal({
                     <CheckCircle2 className="w-6 h-6" style={{ color: UI_GREEN }} />
                   </div>
                   <p className="text-[12px] font-semibold" style={{ color: UI_GREEN }}>모든 위반이 수정됐어요!</p>
-                  <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>이제 커밋할 준비가 됐습니다 🎉</p>
+                  <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>이제 커밋할 준비가 됐습니다</p>
                 </div>
               ) : (
                 Object.entries(byFile).map(([file, vs], gi) => (
@@ -829,7 +829,7 @@ export function ConventionGuardModal({
                 onClick={onFix}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all"
                 style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(65,67,27,0.12)"}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(112,130,56,0.12)"}
                 onMouseLeave={e => e.currentTarget.style.background = ACCENT_BG}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -844,7 +844,7 @@ export function ConventionGuardModal({
                   style={{
                     background: OLIVE_DARK,
                     color: "rgba(255,255,255,0.93)",
-                    boxShadow: "0 2px 8px rgba(65,67,27,0.25)",
+                    boxShadow: "0 2px 8px rgba(112,130,56,0.25)",
                   }}
                   onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.12)"}
                   onMouseLeave={e => e.currentTarget.style.filter = ""}

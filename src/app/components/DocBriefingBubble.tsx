@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import {
   Sparkles, Bot, FileText, ChevronDown, ChevronUp,
   CheckCircle2, AlertTriangle, AlertCircle, FolderOpen,
@@ -24,7 +24,7 @@ const EXT_COLORS: Record<string, { bg: string; color: string }> = {
   java:   { bg: "rgba(245,158,11,0.12)",  color: "#C09840" },
   ts:     { bg: "rgba(59,130,246,0.12)",  color: "#3b82f6" },
   tsx:    { bg: "rgba(6,182,212,0.12)",   color: "#06b6d4" },
-  gradle: { bg: "rgba(65,67,27,0.10)",   color: ACCENT    },
+  gradle: { bg: "rgba(112,130,56,0.10)",   color: ACCENT    },
   yml:    { bg: "rgba(90,138,74,0.12)",  color: "#5A8A4A" },
   yaml:   { bg: "rgba(90,138,74,0.12)",  color: "#5A8A4A" },
   pdf:    { bg: "rgba(184,84,80,0.12)",  color: "#B85450" },
@@ -133,7 +133,7 @@ export function DocBriefingBubble({
 
   const risk    = RISK_MAP[briefing.riskLevel];
   const RiskIcon = risk.icon;
-  const extColor = EXT_COLORS[briefing.fileExt] ?? { bg: "rgba(65,67,27,0.08)", color: ACCENT };
+  const extColor = EXT_COLORS[briefing.fileExt] ?? { bg: "rgba(112,130,56,0.08)", color: ACCENT };
 
   return (
     <div className="flex gap-2.5 items-start mb-5">
@@ -153,7 +153,7 @@ export function DocBriefingBubble({
             AI
           </span>
           <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(90,138,74,0.10)", color: "#5A8A4A" }}>
-            🌐 한글화 완료
+            한글화 완료
           </span>
         </div>
 
@@ -275,7 +275,7 @@ export function DocBriefingBubble({
                       key={t}
                       className="text-[9px] px-2 py-0.5 rounded-full font-medium"
                       style={{
-                        background: "rgba(65,67,27,0.07)",
+                        background: "rgba(112,130,56,0.07)",
                         color: ACCENT,
                         border: `1px solid ${ACCENT_BORDER}`,
                       }}

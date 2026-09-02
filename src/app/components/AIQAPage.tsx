@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle,
@@ -15,8 +15,8 @@ import { buildDiffFromCommitFiles, runAiQa, type QaResponse } from "../../api/ai
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
-  GRADIENT_SIDEBAR, SIDEBAR_BORDER,
+  ACCENT, ACCENT_BG, ACCENT_BORDER,
+  GRADIENT_SIDEBAR, SIDEBAR_BORDER, CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -791,8 +791,8 @@ export function AIQAPage({
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
             color:        mainTab === "qa" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background:   mainTab === "qa" ? "rgba(174,183,132,0.18)" : "transparent",
-            borderBottom: mainTab === "qa" ? "2px solid #AEB784"      : "2px solid transparent",
+            background:   mainTab === "qa" ? "rgba(166,123,91,0.18)" : "transparent",
+            borderBottom: mainTab === "qa" ? "2px solid #A67B5B"      : "2px solid transparent",
           }}
         >
           <ShieldCheck className="w-3.5 h-3.5" />
@@ -803,8 +803,8 @@ export function AIQAPage({
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
             color:        mainTab === "agents" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background:   mainTab === "agents" ? "rgba(174,183,132,0.18)" : "transparent",
-            borderBottom: mainTab === "agents" ? "2px solid #AEB784"      : "2px solid transparent",
+            background:   mainTab === "agents" ? "rgba(166,123,91,0.18)" : "transparent",
+            borderBottom: mainTab === "agents" ? "2px solid #A67B5B"      : "2px solid transparent",
           }}
         >
           <Bot className="w-3.5 h-3.5" />
@@ -817,14 +817,7 @@ export function AIQAPage({
 
       {/* ── AI QA 탭 ── */}
       {mainTab === "qa" && (
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position:"absolute", top:"-10%", left:"-5%", width:"45%", height:"45%", borderRadius:"50%", background: GRADIENT_ORB_1, filter:"blur(50px)" }} />
-        <div style={{ position:"absolute", bottom:"-10%", right:"-5%", width:"50%", height:"50%", borderRadius:"50%", background:"radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter:"blur(50px)" }} />
-      </div>
-
+      <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
 
@@ -871,7 +864,7 @@ export function AIQAPage({
               ) : commitInfo ? (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:ACCENT_BG, border:`1px solid ${ACCENT_BORDER}` }}>
-                    <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background:"rgba(65,67,27,0.10)" }}>
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background:"rgba(112,130,56,0.10)" }}>
                       <span className="text-[7px] font-bold" style={{ color:ACCENT }}>{commitInfo.author[0]}</span>
                     </div>
                     <span className="text-[10px] font-semibold" style={{ color:ACCENT }}>{commitInfo.author}</span>
@@ -936,7 +929,7 @@ export function AIQAPage({
                       style={{
                         background: phase !== "idle" && phase !== "done" ? "rgba(0,0,0,0.07)" : ACCENT,
                         color:      phase !== "idle" && phase !== "done" ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
-                        boxShadow:  phase !== "idle" && phase !== "done" ? "none" : "0 4px 14px rgba(65,67,27,0.25)",
+                        boxShadow:  phase !== "idle" && phase !== "done" ? "none" : "0 4px 14px rgba(112,130,56,0.25)",
                         cursor:     phase !== "idle" && phase !== "done" ? "not-allowed" : "pointer",
                       }}
                     >
@@ -980,7 +973,7 @@ export function AIQAPage({
                           background: n.read ? "transparent" : ACCENT_BG,
                         }}
                       >
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background:"rgba(65,67,27,0.10)" }}>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background:"rgba(112,130,56,0.10)" }}>
                           <span className="text-[10px] font-bold" style={{ color:ACCENT }}>{n.to[0]}</span>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1016,9 +1009,9 @@ export function AIQAPage({
                 <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
                   style={{
-                    background: activeTab === tab.id ? "rgba(65,67,27,0.08)" : "transparent",
+                    background: activeTab === tab.id ? "rgba(112,130,56,0.08)" : "transparent",
                     color:      activeTab === tab.id ? ACCENT : TEXT_SECONDARY,
-                    boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
+                    boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(112,130,56,0.12)" : "none",
                   }}
                 >
                   <tab.icon className="w-3.5 h-3.5" />{tab.label}
@@ -1118,7 +1111,7 @@ export function AIQAPage({
                                       <p className="text-[10px]" style={{ color:TEXT_SECONDARY }}>{err.message}</p>
                                       {err.fix && (
                                         <div className="mt-1.5 px-2 py-1 rounded-lg" style={{ background:"rgba(0,0,0,0.05)" }}>
-                                          <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>💡 수정 제안: {err.fix}</p>
+                                          <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>수정 제안: {err.fix}</p>
                                         </div>
                                       )}
                                     </div>
@@ -1133,7 +1126,7 @@ export function AIQAPage({
 
                     {phase === "idle" && (
                       <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <Code2 className="w-8 h-8" style={{ color:"rgba(65,67,27,0.25)" }} />
+                        <Code2 className="w-8 h-8" style={{ color:"rgba(112,130,56,0.25)" }} />
                         <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>QA 시작 시 파일을 읽고 문법 오류, 런타임 오류를 분석합니다</p>
                       </div>
                     )}

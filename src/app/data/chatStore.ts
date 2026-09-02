@@ -255,18 +255,18 @@ export function briefingToMeetingDoc(briefing: BriefingData): MeetingDoc {
   const actions = briefing.actionItems.map(a => `• ${a}`).join("\n");
 
   const summary = [
-    `📋 문서 유형: ${briefing.docType}`,
+    `문서 유형: ${briefing.docType}`,
     ``,
-    `📌 목적`,
+    `목적`,
     briefing.purpose,
     ``,
-    `🔑 핵심 요약`,
+    `핵심 요약`,
     points,
     ``,
-    `🔧 기술 스택`,
+    `기술 스택`,
     briefing.techStack.join(", "),
     ``,
-    `✅ 필요 조치`,
+    `필요 조치`,
     actions,
   ].join("\n");
 

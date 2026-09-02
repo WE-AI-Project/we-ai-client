@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { ComponentType, CSSProperties } from "react";
 import {
   CalendarDays,
@@ -108,8 +108,8 @@ const SCHEDULE_STATUS_COLORS: Record<ProjectScheduleStatus, { color: string; bg:
 const CARD_SURFACE = "rgba(255,255,255,0.92)";
 const ROW_SURFACE = "rgba(255,255,255,0.72)";
 const FIELD_SURFACE = "rgba(255,255,255,0.86)";
-const MUTED_SURFACE = "rgba(65,67,27,0.055)";
-const PANEL_SHADOW = "0 8px 24px rgba(32,35,27,0.045)";
+const MUTED_SURFACE = "rgba(112,130,56,0.055)";
+const PANEL_SHADOW = "0 8px 24px rgba(31,31,31,0.045)";
 
 type TabId = "overview" | "team" | "tech" | "schedules";
 
@@ -158,7 +158,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div
       className="rounded-2xl border px-4 py-4"
-      style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: "0 1px 8px rgba(32,35,27,0.035)" }}
+      style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: "0 1px 8px rgba(31,31,31,0.035)" }}
     >
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
         {label}
@@ -216,7 +216,7 @@ function SettingsNavButton({
       style={{
         background: active ? ACCENT : FIELD_SURFACE,
         borderColor: active ? ACCENT : BORDER,
-        boxShadow: active ? "0 8px 18px rgba(65,67,27,0.16)" : "none",
+        boxShadow: active ? "0 8px 18px rgba(112,130,56,0.16)" : "none",
       }}
     >
       <span
@@ -725,19 +725,19 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
         <section
           className="relative overflow-hidden rounded-[28px] border px-6 py-6"
           style={{
-            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #41431B 100%)",
+            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #708238 100%)",
             borderColor: "rgba(255,255,255,0.10)",
             boxShadow: "0 18px 42px rgba(12,14,2,0.20)",
           }}
         >
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-1/2"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(174,183,132,0.16))" }}
+            style={{ background: "linear-gradient(90deg, transparent, rgba(166,123,91,0.16))" }}
           />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4" style={{ color: "#AEB784" }} />
+                <Settings className="h-4 w-4" style={{ color: "#A67B5B" }} />
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.50)" }}>
                   Project Settings
                 </p>
@@ -753,7 +753,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
                   <Hash className="h-3.5 w-3.5" />
                   {detail.projectCode}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(174,183,132,0.18)", color: "#E3DBBB" }}>
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(166,123,91,0.18)", color: "#F5EFE6" }}>
                   <ShieldCheck className="h-3.5 w-3.5" />
                   {detail.status}
                 </span>

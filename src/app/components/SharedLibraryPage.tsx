@@ -5,6 +5,7 @@ import {
   UI_RED_DARK, UI_RED_BG8, UI_GREEN, UI_GREEN_BG8, UI_GREEN_BG7, UI_AMBER, UI_AMBER_BG8, UI_AMBER_BG7,
   UI_VIOLET, UI_VIOLET_BG8, UI_VIOLET_BG7, UI_INDIGO,
   GRADIENT_HEADER, BTN_DARK,
+  CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -43,14 +44,14 @@ const CATEGORIES = ["All", "Docs", "Guide", "Reference", "Template"] as const;
 
 const FILE_META: Record<Resource["fileType"], { color: string; bg: string; label: string; icon: any }> = {
   pdf:  { color: "#dc2626", bg: "rgba(239,68,68,0.08)",   label: "PDF",  icon: FileText  },
-  md:   { color: ACCENT,   bg: "rgba(99,91,255,0.08)",   label: "MD",   icon: FileText  },
+  md:   { color: ACCENT,   bg: "rgba(112,130,56,0.08)",   label: "MD",   icon: FileText  },
   yml:  { color: "#10b981", bg: "rgba(16,185,129,0.08)",  label: "YML",  icon: File      },
   java: { color: "#f59e0b", bg: "rgba(245,158,11,0.08)",  label: "JAVA", icon: Code2     },
   link: { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)",  label: "LINK", icon: Link      },
 };
 
 const CAT_META: Record<Resource["category"], { color: string; bg: string }> = {
-  Docs:      { color: ACCENT,    bg: "rgba(99,91,255,0.08)"   },
+  Docs:      { color: ACCENT,    bg: "rgba(112,130,56,0.08)"   },
   Guide:     { color: "#10b981", bg: "rgba(16,185,129,0.08)"  },
   Reference: { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)"  },
   Template:  { color: "#f59e0b", bg: "rgba(245,158,11,0.08)"  },
@@ -73,13 +74,7 @@ export function SharedLibraryPage() {
   RESOURCES.forEach(r => { catCounts[r.category] = (catCounts[r.category] ?? 0) + 1; });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
@@ -115,7 +110,7 @@ export function SharedLibraryPage() {
             ) : (
               [
                 { label: "Total Resources", value: RESOURCES.length, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Layers    },
-                { label: "Docs",            value: catCounts.Docs ?? 0,      color: ACCENT,    bg: "rgba(99,91,255,0.07)",  icon: FileText  },
+                { label: "Docs",            value: catCounts.Docs ?? 0,      color: ACCENT,    bg: "rgba(112,130,56,0.07)",  icon: FileText  },
                 { label: "Guides",          value: catCounts.Guide ?? 0,     color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: BookMarked},
                 { label: "Templates",       value: catCounts.Template ?? 0,  color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: File      },
               ].map(s => {

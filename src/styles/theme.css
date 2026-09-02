@@ -2,54 +2,56 @@
 
 /* ============================================================
    WE&AI Project Office — CSS 테마 변수
-   팔레트: 사이드바(#131507) · 올리브(#41431B) · 세이지(#AEB784)
-           베이지(#E3DBBB) · 크림(#F8F3E1) · 밝은베이지(#FEFCF5)
+   팔레트: Sidebar/Wrapper(#131507) · Primary Olive(#708238)
+           Secondary Brown(#A67B5B) · Surface(#F5EFE6)
+           Background Base(#F8F5F2) · Text Base(#1F1F1F)
+   (가이드라인.md 2026-09-02 개정 기준)
    ============================================================ */
 :root {
   --font-size: 16px;
 
   /* ── 기본 서피스 ── */
-  --background: #F3F4F1;           /* 차분한 쿨 그레이 */
-  --foreground: #20231B;
+  --background: #F8F5F2;           /* Background Base — 따뜻한 페이퍼 톤 */
+  --foreground: #1F1F1F;           /* Text Base */
 
   /* ── 카드 / 팝오버 ── */
-  --card: #FBFCFA;
-  --card-foreground: #20231B;
-  --popover: #FFFFFF;
-  --popover-foreground: #20231B;
+  --card: #FAF7F1;
+  --card-foreground: #1F1F1F;
+  --popover: #FDFBF7;
+  --popover-foreground: #1F1F1F;
 
   /* ── 기본 / 보조 ── */
-  --primary: #41431B;
-  --primary-foreground: #FFFFFF;
-  --secondary: #E8EAE4;
-  --secondary-foreground: #303429;
+  --primary: #708238;              /* Primary Accent — Olive */
+  --primary-foreground: #F8F5F2;   /* Inverse Text (Background Base) */
+  --secondary: #EFE6D5;
+  --secondary-foreground: #2A2A2A;
 
   /* ── 뮤트 / 액센트 ── */
-  --muted: #E8EAE4;
-  --muted-foreground: #6C7165;
-  --accent: #DDE2D3;
-  --accent-foreground: #303429;
+  --muted: #EFE6D5;
+  --muted-foreground: #6B6B6B;
+  --accent: #EAE1D0;
+  --accent-foreground: #2A2A2A;
 
   /* ── 디스트럭티브 ── */
   --destructive: #B85450;
   --destructive-foreground: #FFFFFF;
 
   /* ── 보더 / 인풋 ── */
-  --border: rgba(32, 35, 27, 0.12);
+  --border: rgba(31, 31, 31, 0.12);
   --input: transparent;
-  --input-background: #F0F1EE;
-  --switch-background: #B8BDB2;
+  --input-background: #F5EFE6;
+  --switch-background: #C7BDA8;
 
   /* ── 폰트 웨이트 ── */
   --font-weight-medium: 500;
   --font-weight-normal: 400;
 
   /* ── 링 ── */
-  --ring: rgba(65, 67, 27, 0.35);
+  --ring: rgba(112, 130, 56, 0.35);
 
   /* ── 차트 ── */
-  --chart-1: #41431B;
-  --chart-2: #AEB784;
+  --chart-1: #708238;
+  --chart-2: #A67B5B;
   --chart-3: #C09840;
   --chart-4: #5A8A4A;
   --chart-5: #B87850;
@@ -57,54 +59,54 @@
   /* ── 라디우스 ── */
   --radius: 0.625rem;
 
-  /* ── 사이드바 (초극다크 올리브 — #131507 기반) ── */
+  /* ── 사이드바 (Sidebar/Wrapper — #131507, 유일한 다크 앵커) ── */
   --sidebar: #131507;
-  --sidebar-foreground: #D4CC9E;         /* 크림-올리브 (어두운 배경 텍스트) */
-  --sidebar-primary: #AEB784;            /* 세이지 그린 */
+  --sidebar-foreground: #F8F5F2;         /* Inverse Text (Background Base) */
+  --sidebar-primary: #A67B5B;            /* Secondary — Brown */
   --sidebar-primary-foreground: #131507;
-  --sidebar-accent: rgba(174, 183, 132, 0.15);
-  --sidebar-accent-foreground: #D4CC9E;
-  --sidebar-border: rgba(174, 183, 132, 0.08);
-  --sidebar-ring: rgba(174, 183, 132, 0.30);
+  --sidebar-accent: rgba(166, 123, 91, 0.15);
+  --sidebar-accent-foreground: #F8F5F2;
+  --sidebar-border: rgba(166, 123, 91, 0.08);
+  --sidebar-ring: rgba(166, 123, 91, 0.30);
 }
 
 .dark {
-  --background: #1A1C08;
-  --foreground: #E3DBBB;
-  --card: #212308;
-  --card-foreground: #E3DBBB;
-  --popover: #1A1C08;
-  --popover-foreground: #E3DBBB;
-  --primary: #AEB784;
+  --background: #1A1B12;
+  --foreground: #F0E9DC;
+  --card: #232419;
+  --card-foreground: #F0E9DC;
+  --popover: #1A1B12;
+  --popover-foreground: #F0E9DC;
+  --primary: #A67B5B;
   --primary-foreground: #131507;
-  --secondary: #2A2C10;
-  --secondary-foreground: #E3DBBB;
-  --muted: #2A2C10;
+  --secondary: #2C2D1E;
+  --secondary-foreground: #F0E9DC;
+  --muted: #2C2D1E;
   --muted-foreground: #9A9B72;
-  --accent: #2A2C10;
-  --accent-foreground: #E3DBBB;
+  --accent: #2C2D1E;
+  --accent-foreground: #F0E9DC;
   --destructive: #B85450;
-  --destructive-foreground: #E3DBBB;
-  --border: rgba(174, 183, 132, 0.18);
-  --input: rgba(174, 183, 132, 0.12);
-  --ring: rgba(174, 183, 132, 0.35);
+  --destructive-foreground: #F0E9DC;
+  --border: rgba(166, 123, 91, 0.18);
+  --input: rgba(166, 123, 91, 0.12);
+  --ring: rgba(166, 123, 91, 0.35);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: #AEB784;
-  --chart-2: #6B7A50;
+  --chart-1: #A67B5B;
+  --chart-2: #708238;
   --chart-3: #C09840;
   --chart-4: #5A8A4A;
   --chart-5: #B87850;
 
   /* ── 다크모드 사이드바 ── */
   --sidebar: #0C0E02;
-  --sidebar-foreground: #C4BC8A;
-  --sidebar-primary: #AEB784;
+  --sidebar-foreground: #E8DEC8;
+  --sidebar-primary: #A67B5B;
   --sidebar-primary-foreground: #0C0E02;
-  --sidebar-accent: rgba(174, 183, 132, 0.12);
-  --sidebar-accent-foreground: #C4BC8A;
-  --sidebar-border: rgba(174, 183, 132, 0.10);
-  --sidebar-ring: rgba(174, 183, 132, 0.30);
+  --sidebar-accent: rgba(166, 123, 91, 0.12);
+  --sidebar-accent-foreground: #E8DEC8;
+  --sidebar-border: rgba(166, 123, 91, 0.10);
+  --sidebar-ring: rgba(166, 123, 91, 0.30);
 }
 
 @theme inline {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+﻿import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Calendar, Plus, X, ChevronLeft, ChevronRight,
   User, Flag, CheckCircle2, Clock, Circle, Tag,
@@ -473,9 +473,9 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
             disabled={!form.title?.trim()}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold"
             style={{
-              background: form.title?.trim() ? "linear-gradient(135deg, #41431B, #6B7040)" : BEIGE,
+              background: form.title?.trim() ? "linear-gradient(135deg, #708238, #6B7040)" : BEIGE,
               color: form.title?.trim() ? "rgba(254,252,245,0.95)" : TEXT_TERTIARY,
-              boxShadow: form.title?.trim() ? "0 4px 14px rgba(65,67,27,0.22)" : "none",
+              boxShadow: form.title?.trim() ? "0 4px 14px rgba(112,130,56,0.22)" : "none",
             }}
           >
             <Save className="w-3.5 h-3.5" />
@@ -1075,7 +1075,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               onClick={() => setEditSchedule("new")}
               disabled={isLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all ml-2 disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #41431B, #6B7040)", color: "rgba(254,252,245,0.95)", boxShadow: "0 4px 12px rgba(65,67,27,0.22)" }}
+              style={{ background: "linear-gradient(135deg, #708238, #6B7040)", color: "rgba(254,252,245,0.95)", boxShadow: "0 4px 12px rgba(112,130,56,0.22)" }}
             >
               <Plus className="w-3.5 h-3.5" /> 일정 추가
             </button>

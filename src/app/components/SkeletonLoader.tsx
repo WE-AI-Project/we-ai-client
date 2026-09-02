@@ -1,7 +1,7 @@
-import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM } from "../colors";
+﻿import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM } from "../colors";
 
-const SKELETON_BG = "rgba(65,67,27,0.06)";
-const SKELETON_SHIMMER = "rgba(65,67,27,0.11)";
+const SKELETON_BG = "rgba(112,130,56,0.06)";
+const SKELETON_SHIMMER = "rgba(112,130,56,0.11)";
 const PAGE_BG = BRIGHT_BEIGE;
 
 export function SkeletonBox({
@@ -146,14 +146,14 @@ export function ProjectSettingsSkeleton() {
         <section
           className="relative overflow-hidden rounded-[28px] border px-6 py-6"
           style={{
-            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #41431B 100%)",
+            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #708238 100%)",
             borderColor: "rgba(255,255,255,0.10)",
             boxShadow: "0 18px 42px rgba(12,14,2,0.20)",
           }}
         >
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-1/2"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(174,183,132,0.16))" }}
+            style={{ background: "linear-gradient(90deg, transparent, rgba(166,123,91,0.16))" }}
           />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-3">
@@ -203,7 +203,7 @@ export function ProjectSettingsSkeleton() {
             style={{
               background: "rgba(255,255,255,0.92)",
               borderColor: BORDER,
-              boxShadow: "0 8px 24px rgba(32,35,27,0.045)",
+              boxShadow: "0 8px 24px rgba(31,31,31,0.045)",
             }}
           >
             <SkeletonBox style={{ width: "88px", height: "13px", marginBottom: "14px" }} />
@@ -230,7 +230,7 @@ export function ProjectSettingsSkeleton() {
               style={{
                 background: "rgba(255,255,255,0.92)",
                 borderColor: BORDER,
-                boxShadow: "0 8px 24px rgba(32,35,27,0.045)",
+                boxShadow: "0 8px 24px rgba(31,31,31,0.045)",
               }}
             >
               <div className="mb-5 flex items-center gap-2">
@@ -247,7 +247,7 @@ export function ProjectSettingsSkeleton() {
                         width: "100%",
                         height: index === 1 ? "92px" : "46px",
                         borderRadius: "16px",
-                        background: "rgba(65,67,27,0.055)",
+                        background: "rgba(112,130,56,0.055)",
                       }}
                     />
                   </div>
@@ -268,7 +268,7 @@ export function ProjectSettingsSkeleton() {
                   style={{
                     background: "rgba(255,255,255,0.92)",
                     borderColor: BORDER,
-                    boxShadow: "0 8px 24px rgba(32,35,27,0.045)",
+                    boxShadow: "0 8px 24px rgba(31,31,31,0.045)",
                   }}
                 >
                   <SkeletonBox style={{ width: "126px", height: "18px", marginBottom: "16px" }} />
@@ -277,7 +277,7 @@ export function ProjectSettingsSkeleton() {
                       <div
                         key={itemIndex}
                         className="rounded-2xl border px-4 py-3"
-                        style={{ borderColor: "rgba(65,67,27,0.08)", background: ACCENT_BG }}
+                        style={{ borderColor: "rgba(112,130,56,0.08)", background: ACCENT_BG }}
                       >
                         <SkeletonBox style={{ width: "84px", height: "11px", marginBottom: "10px" }} />
                         <SkeletonBox

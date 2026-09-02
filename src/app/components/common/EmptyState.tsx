@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 interface EmptyStateProps {
     message?: string;
@@ -21,7 +21,7 @@ export default function EmptyState({
             </h3>
             <p
                 className="mt-2 text-sm leading-relaxed break-keep max-w-md mx-auto"
-                style={{ color: 'rgba(65, 67, 27, 0.7)' }}
+                style={{ color: 'rgba(112,130,56, 0.7)' }}
             >
                 {description}
             </p>
@@ -30,7 +30,7 @@ export default function EmptyState({
             <button
                 type="button"
                 onClick={onGoBack}
-                className="mt-6 flex items-center justify-center gap-2 rounded-xl px-7 py-3.5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#41431B] focus:ring-offset-2"
+                className="mt-6 flex items-center justify-center gap-2 rounded-xl px-7 py-3.5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#708238] focus:ring-offset-2"
                 style={{
                     background: 'rgb(65, 67, 27)'
                 }}

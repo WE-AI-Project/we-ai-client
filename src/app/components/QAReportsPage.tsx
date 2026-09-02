@@ -6,6 +6,7 @@ import {
   UI_RED, UI_RED_DARK, UI_RED_BG7, UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
   UI_GREEN, UI_VIOLET, UI_VIOLET_BG7, UI_GRAY, UI_GRAY_BG,
   ACCENT,
+  CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -52,7 +53,7 @@ const SEV_META: Record<Issue["severity"], { color: string; bg: string; label: st
   critical: { color: UI_RED_DARK, bg: UI_RED_BG7,   label: "Critical", icon: XCircle      },
   major:    { color: UI_AMBER_DARK, bg: UI_AMBER_BG,  label: "Major",    icon: AlertTriangle },
   minor:    { color: UI_GRAY, bg: UI_GRAY_BG, label: "Minor",    icon: AlertTriangle },
-  info:     { color: ACCENT,   bg: "rgba(99,91,255,0.10)",   label: "Info",     icon: CheckCircle2 },
+  info:     { color: ACCENT,   bg: "rgba(112,130,56,0.10)",   label: "Info",     icon: CheckCircle2 },
 };
 
 const STATUS_META: Record<Issue["status"], { color: string; label: string }> = {
@@ -91,13 +92,7 @@ export function QAReportsPage() {
   const filteredIssues = ISSUES.filter(i => severityFilter === "all" || i.severity === severityFilter);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">

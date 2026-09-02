@@ -1,4 +1,5 @@
-import React from 'react';
+﻿import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 interface ErrorStateProps {
   message?: string;
@@ -16,11 +17,11 @@ export default function ErrorState({
       <div 
         className="flex items-center justify-center w-14 h-14 rounded-full mb-4 border"
         style={{ 
-          backgroundColor: 'rgba(65, 67, 27, 0.06)', 
-          borderColor: 'rgba(65, 67, 27, 0.15)' 
+          backgroundColor: 'rgba(112,130,56, 0.06)', 
+          borderColor: 'rgba(112,130,56, 0.15)' 
         }}
       >
-        <span className="text-2xl leading-none">🚨</span>
+        <AlertTriangle className="w-6 h-6" style={{ color: 'rgb(65, 67, 27)' }} />
       </div>
 
       <h3 
@@ -32,7 +33,7 @@ export default function ErrorState({
 
       <p 
         className="mt-2 text-sm leading-relaxed mb-4 break-keep"
-        style={{ color: 'rgba(65, 67, 27, 0.7)' }}
+        style={{ color: 'rgba(112,130,56, 0.7)' }}
       >
         {description}
       </p>

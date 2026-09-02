@@ -180,7 +180,7 @@ const PROJECT_TEAM = [
   {
     name: "병권", part: "Backend", partKo: "백엔드", partId: "backend" as PartId,
     role: "Backend Dev · Team Lead", avatar: "병",
-    color: "#41431B", bg: "rgba(65,67,27,0.10)",
+    color: "#708238", bg: "rgba(112,130,56,0.10)",
     tasks: ["Multi-Agent Controller", "Spring Boot API 설계", "DB 스키마 관리", "에이전트 오케스트레이션"],
     stack: ["Java 17", "Spring Boot 3.2", "PostgreSQL", "Redis"],
     status: "online",
@@ -225,9 +225,9 @@ const PROJECT_TEAM = [
 ];
 
 const PART_CONFIG: Record<BasePartId, Omit<ChatRoomConfig, "id" | "isCustom">> = {
-  all: { label: "All", labelKo: "전체", icon: Globe, color: "#41431B", bg: "rgba(65,67,27,0.08)" },
+  all: { label: "All", labelKo: "전체", icon: Globe, color: "#708238", bg: "rgba(112,130,56,0.08)" },
   frontend: { label: "Frontend", labelKo: "프론트엔드", icon: Code2, color: "#5A8A4A", bg: "rgba(90,138,74,0.08)" },
-  backend: { label: "Backend", labelKo: "백엔드", icon: Server, color: "#41431B", bg: "rgba(65,67,27,0.08)" },
+  backend: { label: "Backend", labelKo: "백엔드", icon: Server, color: "#708238", bg: "rgba(112,130,56,0.08)" },
   qa: { label: "QA", labelKo: "QA", icon: ShieldCheck, color: "#B85450", bg: "rgba(184,84,80,0.08)" },
   devops: { label: "DevOps", labelKo: "DevOps", icon: Wrench, color: "#C09840", bg: "rgba(192,152,64,0.08)" },
 };
@@ -314,7 +314,7 @@ const DEFAULT_AI_AGENTS: AiAgent[] = [
 // ══════════════════════════════════════════════════════════
 function Avatar({ name, size = 7 }: { name: string; size?: number }) {
   const member = PROJECT_TEAM.find(m => m.name === name);
-  const bg = member ? member.bg : "rgba(65,67,27,0.08)";
+  const bg = member ? member.bg : "rgba(112,130,56,0.08)";
   const color = member ? member.color : OLIVE_DARK;
   const initial = name ? name[0] : "?";
 
@@ -335,7 +335,7 @@ const FILE_COLOR: Record<string, { bg: string; color: string }> = {
   java: { bg: "rgba(245,158,11,0.10)", color: "#f59e0b" },
   ts: { bg: "rgba(59,130,246,0.10)", color: "#3b82f6" },
   tsx: { bg: "rgba(6,182,212,0.10)", color: "#06b6d4" },
-  gradle: { bg: "rgba(99,91,255,0.10)", color: ACCENT },
+  gradle: { bg: "rgba(112,130,56,0.10)", color: ACCENT },
   yml: { bg: "rgba(16,185,129,0.10)", color: "#10b981" },
   pdf: { bg: "rgba(239,68,68,0.10)", color: "#ef4444" },
   md: { bg: "rgba(139,92,246,0.10)", color: "#8b5cf6" },
@@ -377,7 +377,7 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
             style={{
               background: isMe ? OLIVE_DARK : "rgba(255,255,255,0.90)",
               border: isMe ? "none" : `1px solid ${BORDER}`,
-              boxShadow: isMe ? "0 2px 8px rgba(65,67,27,0.20)" : "0 1px 4px rgba(0,0,0,0.06)",
+              boxShadow: isMe ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
             }}
           >
             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: fc.bg }}>
@@ -405,7 +405,7 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
           style={{
             background: isMe ? OLIVE_DARK : "rgba(255,255,255,0.90)",
             border: isMe ? "none" : `1px solid ${BORDER}`,
-            boxShadow: isMe ? "0 2px 8px rgba(65,67,27,0.20)" : "0 1px 4px rgba(0,0,0,0.06)",
+            boxShadow: isMe ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
           }}
         >
           <p className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>
@@ -429,7 +429,7 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
         </div>
       )}
       {isUser && (
-        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "rgba(65,67,27,0.12)" }}>
+        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "rgba(112,130,56,0.12)" }}>
           <User className="w-3.5 h-3.5" style={{ color: OLIVE_DARK }} />
         </div>
       )}
@@ -437,7 +437,7 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
         {!isUser && (
           <div className="flex items-center gap-1.5 mb-0.5">
             <span className="text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>WE&AI Assistant</span>
-            <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(65,67,27,0.08)", color: OLIVE_DARK }}>AI</span>
+            <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}>AI</span>
           </div>
         )}
         <div
@@ -445,7 +445,7 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
           style={{
             background: isUser ? OLIVE_DARK : "rgba(255,255,255,0.95)",
             border: isUser ? "none" : `1px solid ${BORDER}`,
-            boxShadow: isUser ? "0 2px 8px rgba(65,67,27,0.20)" : "0 1px 6px rgba(0,0,0,0.06)",
+            boxShadow: isUser ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 6px rgba(0,0,0,0.06)",
             alignSelf: isUser ? "flex-end" : "flex-start",
           }}
         >
@@ -459,7 +459,7 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
           </p>
         )}
         {!isUser && msg.kind === "agent" && msg.data && (
-          <div className="mt-2 rounded-xl p-3" style={{ background: "rgba(65,67,27,0.04)", border: `1px solid ${BORDER}` }}>
+          <div className="mt-2 rounded-xl p-3" style={{ background: "rgba(112,130,56,0.04)", border: `1px solid ${BORDER}` }}>
             <div className="flex flex-wrap gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
               <span>{msg.data.agentName}</span><span>·</span><span>{msg.data.role}</span><span>·</span><span>{msg.data.model}</span>
             </div>
@@ -474,7 +474,7 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
               <div key={`${turn.round}-${turn.agent}-${index}`} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.92)", border: `1px solid ${BORDER}` }}>
                 <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>
                   <span>Round {turn.round}</span><span>·</span><span>{turn.agent}</span><span>·</span><span>{turn.role}</span>
-                  <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(65,67,27,0.08)" }}>{turn.model}</span>
+                  <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(112,130,56,0.08)" }}>{turn.model}</span>
                 </div>
                 <p className="whitespace-pre-wrap text-[10px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>{compactAiAnswer(turn.message, 700)}</p>
               </div>
@@ -498,7 +498,7 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
       className="rounded-xl p-3 cursor-pointer transition-all"
       style={{
         background: "rgba(255,255,255,0.85)",
-        border: `1px solid ${isAI ? "rgba(65,67,27,0.15)" : BORDER}`,
+        border: `1px solid ${isAI ? "rgba(112,130,56,0.15)" : BORDER}`,
       }}
       onClick={onOpen}
       onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.98)")}
@@ -507,7 +507,7 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
       <div className="flex items-start gap-2 mb-1.5">
         <div
           className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: isAI ? "rgba(65,67,27,0.10)" : "rgba(65,67,27,0.08)" }}
+          style={{ background: isAI ? "rgba(112,130,56,0.10)" : "rgba(112,130,56,0.08)" }}
         >
           {isAI
             ? <Sparkles className="w-3 h-3" style={{ color: OLIVE_DARK }} />
@@ -518,7 +518,7 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
           <p className="text-[11px] font-semibold leading-snug" style={{ color: TEXT_PRIMARY }}>{doc.title}</p>
           {isAI && (
             <span className="text-[8px] px-1.5 py-0.5 rounded-full mt-0.5 inline-block" style={{ background: "rgba(90,138,74,0.10)", color: "#5A8A4A" }}>
-              🌐 AI 한글화
+              AI 한글화
             </span>
           )}
         </div>
@@ -528,7 +528,7 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
       </p>
       <div className="flex items-center gap-1.5 flex-wrap">
         {doc.tags.map(tag => (
-          <span key={tag} className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(65,67,27,0.06)", color: OLIVE_DARK }}>
+          <span key={tag} className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(112,130,56,0.06)", color: OLIVE_DARK }}>
             #{tag}
           </span>
         ))}
@@ -552,9 +552,9 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
       >
         <div
           className="flex items-center gap-3 px-5 py-4 shrink-0"
-          style={{ background: "rgba(65,67,27,0.06)", borderBottom: `1px solid ${BORDER_SUBTLE}` }}
+          style={{ background: "rgba(112,130,56,0.06)", borderBottom: `1px solid ${BORDER_SUBTLE}` }}
         >
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(65,67,27,0.12)" }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(112,130,56,0.12)" }}>
             <FileText className="w-4 h-4" style={{ color: OLIVE_DARK }} />
           </div>
           <div className="flex-1 min-w-0">
@@ -571,13 +571,13 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
               <Sparkles className="w-3.5 h-3.5" style={{ color: OLIVE_DARK }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>AI 요약</p>
             </div>
-            <div className="rounded-xl p-3.5 text-[11px] leading-relaxed whitespace-pre-line" style={{ background: "rgba(65,67,27,0.05)", border: `1px solid rgba(65,67,27,0.10)`, color: TEXT_SECONDARY }}>
+            <div className="rounded-xl p-3.5 text-[11px] leading-relaxed whitespace-pre-line" style={{ background: "rgba(112,130,56,0.05)", border: `1px solid rgba(112,130,56,0.10)`, color: TEXT_SECONDARY }}>
               {doc.summary}
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {doc.tags.map(tag => (
-              <span key={tag} className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(65,67,27,0.06)", color: OLIVE_DARK }}>
+              <span key={tag} className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(112,130,56,0.06)", color: OLIVE_DARK }}>
                 #{tag}
               </span>
             ))}
@@ -595,7 +595,7 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
                         <span className="text-[8px]" style={{ color: TEXT_TERTIARY }}>{formatTime(m.time)}</span>
                       </div>
                       <p className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
-                        {m.type === "file" ? `📎 ${m.fileName}` : m.content}
+                        {m.type === "file" ? m.fileName : m.content}
                       </p>
                     </div>
                   </div>
@@ -718,11 +718,11 @@ export function ChatPage({
   const getRoomStyle = (name: string) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes("프론트") || lowerName.includes("frontend")) return { icon: Code2, color: "#5A8A4A", bg: "rgba(90,138,74,0.08)" };
-    if (lowerName.includes("백엔드") || lowerName.includes("backend")) return { icon: Server, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
+    if (lowerName.includes("백엔드") || lowerName.includes("backend")) return { icon: Server, color: "#708238", bg: "rgba(112,130,56,0.08)" };
     if (lowerName.includes("qa")) return { icon: ShieldCheck, color: "#B85450", bg: "rgba(184,84,80,0.08)" };
     if (lowerName.includes("devops")) return { icon: Wrench, color: "#C09840", bg: "rgba(192,152,64,0.08)" };
-    if (lowerName.includes("전체") || lowerName.includes("all")) return { icon: Globe, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
-    return { icon: Hash, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
+    if (lowerName.includes("전체") || lowerName.includes("all")) return { icon: Globe, color: "#708238", bg: "rgba(112,130,56,0.08)" };
+    return { icon: Hash, color: "#708238", bg: "rgba(112,130,56,0.08)" };
   };
 
   const activeRoom = Array.isArray(chatRooms)
@@ -868,7 +868,7 @@ export function ChatPage({
       setBriefingLoading(null);
       addLocalMessage({
         sender: "WE&AI", avatar: "AI", role: "other",
-        content: `📋 **${file.name}** 한글 브리핑이 완료됐습니다.`,
+        content: `**${file.name}** 한글 브리핑이 완료됐습니다.`,
         type: "briefing",
         briefing,
       });
@@ -885,7 +885,7 @@ export function ChatPage({
 
   const startMeeting = () => {
     setIsMeeting(true); setMeetingStart(new Date()); setMeetingMsgs([]); setElapsed(0); setDocSaved(false);
-    addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "🎙️ 회의 모드가 시작되었습니다.", type: "system" });
+    addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "회의 모드가 시작되었습니다.", type: "system" });
   };
 
   const endMeeting = () => {
@@ -955,13 +955,13 @@ export function ChatPage({
                     height: 44,
                     color: mainTab === tab.id ? OLIVE_DARK : TEXT_TERTIARY,
                     borderBottomColor: mainTab === tab.id ? OLIVE_DARK : "transparent",
-                    background: tab.id === "ai" && mainTab === "ai" ? "rgba(65,67,27,0.05)" : "transparent",
+                    background: tab.id === "ai" && mainTab === "ai" ? "rgba(112,130,56,0.05)" : "transparent",
                   }}
                 >
                   <tab.icon className="w-3.5 h-3.5" />
                   {tab.label}
                   {tab.id === "ai" && (
-                    <span className="ml-0.5 text-[8px] px-1 py-0.5 rounded-full font-bold" style={{ background: "rgba(65,67,27,0.12)", color: OLIVE_DARK }}>AI</span>
+                    <span className="ml-0.5 text-[8px] px-1 py-0.5 rounded-full font-bold" style={{ background: "rgba(112,130,56,0.12)", color: OLIVE_DARK }}>AI</span>
                   )}
                 </button>
               ))
@@ -998,9 +998,9 @@ export function ChatPage({
                     onClick={isMeeting ? endMeeting : startMeeting}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
-                      background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(65,67,27,0.08)",
+                      background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(112,130,56,0.08)",
                       color: isMeeting ? "#ef4444" : OLIVE_DARK,
-                      border: `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(65,67,27,0.15)"}`,
+                      border: `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(112,130,56,0.15)"}`,
                     }}
                   >
                     {isMeeting ? <><VideoOff className="w-3.5 h-3.5" /> 회의 종료</> : <><Video className="w-3.5 h-3.5" /> 회의 시작</>}
@@ -1058,9 +1058,9 @@ export function ChatPage({
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all"
                   title="채팅방 추가"
                   style={{
-                    background: "rgba(65,67,27,0.08)",
+                    background: "rgba(112,130,56,0.08)",
                     color: OLIVE_DARK,
-                    border: "1px solid rgba(65,67,27,0.15)",
+                    border: "1px solid rgba(112,130,56,0.15)",
                   }}
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -1148,9 +1148,9 @@ export function ChatPage({
                     disabled={!!briefingLoading || isLoadingMessages}
                     className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-semibold transition-all disabled:opacity-50"
                     style={{
-                      background: briefingLoading ? "rgba(0,0,0,0.04)" : "rgba(65,67,27,0.08)",
+                      background: briefingLoading ? "rgba(0,0,0,0.04)" : "rgba(112,130,56,0.08)",
                       color: briefingLoading ? TEXT_TERTIARY : OLIVE_DARK,
-                      border: `1px solid ${briefingLoading ? BORDER : "rgba(65,67,27,0.18)"}`,
+                      border: `1px solid ${briefingLoading ? BORDER : "rgba(112,130,56,0.18)"}`,
                       cursor: briefingLoading || isLoadingMessages ? "not-allowed" : "pointer",
                     }}
                   >
@@ -1178,7 +1178,7 @@ export function ChatPage({
           <>
             <div
               className="flex items-center gap-3 px-4 py-3 shrink-0"
-              style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(65,67,27,0.05)" }}
+              style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(112,130,56,0.05)" }}
             >
               <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: OLIVE_DARK }}>
                 <Bot className="w-4 h-4" style={{ color: "white" }} />
@@ -1198,7 +1198,7 @@ export function ChatPage({
             </div>
 
             <div className="shrink-0 px-3 py-2.5 space-y-2" style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}>
-              <div className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ background: "rgba(65,67,27,0.07)" }}>
+              <div className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ background: "rgba(112,130,56,0.07)" }}>
                 {([
                   ["rag", "RAG 질문"],
                   ["agent", "단일 AI"],
@@ -1229,7 +1229,7 @@ export function ChatPage({
                       className="rounded-xl px-2.5 py-2 text-left transition-all disabled:opacity-50"
                       style={{
                         border: `1px solid ${singleAgent === agent.agent ? OLIVE_DARK : BORDER}`,
-                        background: singleAgent === agent.agent ? "rgba(65,67,27,0.09)" : "rgba(255,255,255,0.8)",
+                        background: singleAgent === agent.agent ? "rgba(112,130,56,0.09)" : "rgba(255,255,255,0.8)",
                       }}
                     >
                       <span className="block text-[9px] font-bold" style={{ color: TEXT_PRIMARY }}>{agent.name}</span>
@@ -1292,7 +1292,7 @@ export function ChatPage({
                           style={{
                             border: `1px solid ${selected ? OLIVE_DARK : BORDER}`,
                             color: selected ? OLIVE_DARK : TEXT_TERTIARY,
-                            background: selected ? "rgba(65,67,27,0.10)" : "white",
+                            background: selected ? "rgba(112,130,56,0.10)" : "white",
                           }}
                         >
                           {agent.name}
@@ -1361,7 +1361,7 @@ export function ChatPage({
             <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}>
               <div
                 className="flex items-end gap-2 rounded-2xl px-3 py-2"
-                style={{ background: "rgba(255,255,255,0.95)", border: `1.5px solid rgba(65,67,27,0.15)` }}
+                style={{ background: "rgba(255,255,255,0.95)", border: `1.5px solid rgba(112,130,56,0.15)` }}
               >
                 <Bot className="w-4 h-4 shrink-0 mb-1.5" style={{ color: OLIVE_DARK, opacity: 0.5 }} />
                 <textarea
@@ -1403,7 +1403,7 @@ export function ChatPage({
               <FileText className="w-4 h-4 shrink-0" style={{ color: OLIVE_DARK }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Meeting Docs</p>
               {!isLoadingRooms && (
-                <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(65,67,27,0.08)", color: OLIVE_DARK }}>
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}>
                   {docs.length}개 문서
                 </span>
               )}
@@ -1427,7 +1427,7 @@ export function ChatPage({
                 ))
               ) : docs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
-                  <FileText className="w-10 h-10" style={{ color: "rgba(65,67,27,0.15)" }} />
+                  <FileText className="w-10 h-10" style={{ color: "rgba(112,130,56,0.15)" }} />
                   <p className="text-[12px] font-semibold" style={{ color: TEXT_TERTIARY }}>저장된 문서가 없습니다</p>
                   <p className="text-[10px]" style={{ color: TEXT_LABEL }}>AI 문서 분석 버튼으로 파일을 업로드하거나 회의를 시작하세요</p>
                 </div>

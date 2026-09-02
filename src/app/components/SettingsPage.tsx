@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Settings, User, Bell, Monitor, Palette, Shield, Save, ChevronRight } from "lucide-react";
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
+  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT, ACCENT_SAGE,
   UI_GREEN, UI_GREEN_BG, UI_RED, UI_RED_BG, UI_AMBER, UI_AMBER_BG, UI_VIOLET, UI_VIOLET_BG, UI_INDIGO,
   GRADIENT_HEADER, BTN_DARK,
+  CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -98,13 +99,7 @@ export function SettingsPage() {
     setDevSettings(prev => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-2xl mx-auto space-y-4">
@@ -138,7 +133,7 @@ export function SettingsPage() {
           </div>
 
           {/* ── 프로필 정보 ── */}
-          <SectionCard icon={User} iconColor={ACCENT} iconBg="rgba(99,91,255,0.10)" title="Profile">
+          <SectionCard icon={User} iconColor={ACCENT} iconBg="rgba(112,130,56,0.10)" title="Profile">
             {isLoading ? (
               <div className="py-2">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -182,7 +177,7 @@ export function SettingsPage() {
                   <p className="text-[10px] font-semibold mb-2" style={{ color: TEXT_LABEL }}>Organization</p>
                   <div
                     className="px-3 py-2 rounded-xl text-xs"
-                    style={{ background: "rgba(99,91,255,0.06)", border: "1px solid rgba(99,91,255,0.12)", color: ACCENT }}
+                    style={{ background: "rgba(112,130,56,0.06)", border: "1px solid rgba(112,130,56,0.12)", color: ACCENT }}
                   >
                     SynAIpse Project Office
                   </div>
@@ -280,7 +275,7 @@ export function SettingsPage() {
           </SectionCard>
 
           {/* ── 외관 설정 ── */}
-          <SectionCard icon={Palette} iconColor="#8b5cf6" iconBg="rgba(139,92,246,0.10)" title="Appearance">
+          <SectionCard icon={Palette} iconColor={ACCENT_SAGE} iconBg="rgba(166,123,91,0.10)" title="Appearance">
             {isLoading ? (
               <div className="py-4 space-y-4">
                 <div>
@@ -315,25 +310,23 @@ export function SettingsPage() {
                         onClick={() => setTheme(t)}
                         className="flex-1 py-2.5 rounded-xl text-xs font-semibold capitalize transition-all"
                         style={{
-                          background: theme === t
-                            ? "linear-gradient(135deg, rgba(224,231,255,0.8), rgba(232,213,245,0.6))"
-                            : "rgba(0,0,0,0.04)",
+                          background: theme === t ? "rgba(112,130,56,0.10)" : "rgba(0,0,0,0.04)",
                           color: theme === t ? ACCENT : TEXT_SECONDARY,
-                          border: theme === t ? "1px solid rgba(99,91,255,0.2)" : `1px solid ${BORDER}`,
+                          border: theme === t ? "1px solid rgba(112,130,56,0.25)" : `1px solid ${BORDER}`,
                         }}
                       >
-                        {t === "light" ? "☀️ Light" : t === "dark" ? "🌙 Dark" : "💻 System"}
+                        {t === "light" ? "Light" : t === "dark" ? "Dark" : "System"}
                       </button>
                     ))}
                   </div>
                 </div>
-                <SettingRow label="Color Theme" sub="앱 강조 색상 (현재: Indigo-Lavender)">
+                <SettingRow label="Color Theme" sub="앱 강조 색상 (현재: Olive)">
                   <div className="flex items-center gap-1.5">
-                    {["#635bff", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"].map(c => (
+                    {["#708238", "#A67B5B", "#10b981", "#f59e0b", "#ef4444"].map(c => (
                       <div
                         key={c}
                         className="w-5 h-5 rounded-full cursor-pointer transition-all hover:scale-110"
-                        style={{ background: c, outline: c === "#635bff" ? `2px solid ${c}` : "none", outlineOffset: 1 }}
+                        style={{ background: c, outline: c === "#708238" ? `2px solid ${c}` : "none", outlineOffset: 1 }}
                       />
                     ))}
                   </div>

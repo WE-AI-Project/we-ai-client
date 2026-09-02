@@ -1,4 +1,5 @@
-import React from 'react';
+﻿import React from 'react';
+import { ShieldOff } from 'lucide-react';
 
 interface UnauthorizedStateProps {
   message?: string;
@@ -40,11 +41,11 @@ export default function UnauthorizedState({
       <div 
         className="flex items-center justify-center w-14 h-14 rounded-full mb-4 border"
         style={{
-          backgroundColor: 'rgba(65, 67, 27, 0.06)',
-          borderColor: 'rgba(65, 67, 27, 0.15)'
+          backgroundColor: 'rgba(112,130,56, 0.06)',
+          borderColor: 'rgba(112,130,56, 0.15)'
         }}
       >
-        <span className="text-2xl leading-none">🛡️</span>
+        <ShieldOff className="w-6 h-6" style={{ color: 'rgb(65, 67, 27)' }} />
       </div>
 
       {/* 안내 메시지 제목: 슬레이트 톤을 걷어내고 메인 시그니처 컬러 적용 */}
@@ -58,7 +59,7 @@ export default function UnauthorizedState({
       {/* 하단 가이드 설명: 가독성을 위해 70% 수준의 투명도를 준 서브 카키 톤 */}
       <p 
         className="text-sm max-w-xs mb-6 leading-relaxed break-keep"
-        style={{ color: 'rgba(65, 67, 27, 0.7)' }}
+        style={{ color: 'rgba(112,130,56, 0.7)' }}
       >
         인증 세션이 만료되었거나 권한이 없습니다.<br />
         로그인 후 이용해 주세요.

@@ -3,7 +3,8 @@ import { Terminal, Play, Square, Trash2, Download, Filter, Search, Circle } from
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1,
+  ACCENT, ACCENT_BG,
+  CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -135,14 +136,7 @@ export function ServerLogsPage() {
   const warnCount  = logs.filter(l => l.level === "WARN").length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,152,64,0.14) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden p-5 gap-4">
         <div className="max-w-4xl w-full mx-auto flex flex-col flex-1 gap-3 overflow-hidden">
 

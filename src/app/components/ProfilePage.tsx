@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import {
   User, GitCommit, Bot, FolderGit2, MapPin, Mail, Code2,
   Monitor, Cpu, MemoryStick, Wifi,
@@ -246,8 +246,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
     ? Math.round((stats.heapUsed / stats.heapTotal) * 100)
     : 0;
 
-  const grad = AVATAR_GRADIENTS[profile.avatarColor] ?? AVATAR_GRADIENTS["olive"];
-  const gradBg = `linear-gradient(135deg, ${grad.from}, ${grad.via}, ${grad.to})`;
+  const gradBg = AVATAR_GRADIENTS[profile.avatarColor] ?? AVATAR_GRADIENTS["olive"];
 
   // ── 동적 통계 카드 구성 ──
   const dynamicStats = [
@@ -405,7 +404,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
                     <GaugeBar
                       value={stats.renderLoad}
                       color={stats.renderLoad > 70 ? "#ef4444" : stats.renderLoad > 40 ? "#f59e0b" : ACCENT}
-                      bg="rgba(65,67,27,0.10)"
+                      bg="rgba(112,130,56,0.10)"
                     />
                     <div className="mt-2.5 space-y-1">
                       <div className="flex justify-between text-[9px]">
@@ -566,7 +565,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
                 </div>
               ) : profile.techStack.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 gap-2">
-                  <Code2 className="w-6 h-6" style={{ color: "rgba(65,67,27,0.20)" }} />
+                  <Code2 className="w-6 h-6" style={{ color: "rgba(112,130,56,0.20)" }} />
                   <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>기술 스택을 추가하세요</p>
                 </div>
               ) : (

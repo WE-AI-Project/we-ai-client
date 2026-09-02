@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import {
   GitCommit, CheckSquare, Upload, GitBranch,
   CheckCircle2, X, ShieldCheck,
@@ -9,6 +9,7 @@ import type { CommitFile } from "./commitData";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER, BEIGE,
+  GRADIENT_INDIGO, GRADIENT_RAINBOW_BORDER3,
 } from "../colors";
 
 const STATUS_ICON: Record<string, { color: string; label: string }> = {
@@ -45,7 +46,7 @@ function QAModal({
         <div className="p-6 text-center">
           <div
             className="w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, rgba(224,231,255,0.7), rgba(221,214,254,0.6))" }}
+            style={{ background: ACCENT_BG }}
           >
             <ShieldCheck className="w-6 h-6" style={{ color: ACCENT }} />
           </div>
@@ -73,9 +74,9 @@ function QAModal({
               onClick={onQAYes}
               className="flex-1 py-2.5 rounded-xl text-xs font-semibold"
               style={{
-                background: "linear-gradient(135deg, #635bff, #8b5cf6)",
+                background: GRADIENT_INDIGO,
                 color: "rgba(255,255,255,0.95)",
-                boxShadow: "0 4px 14px rgba(99,91,255,0.3)",
+                boxShadow: "0 4px 14px rgba(112,130,56,0.25)",
               }}
             >
               예, AI QA 실행
@@ -226,7 +227,7 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
         {stagedCount > 0 && (
           <span
             className="ml-2 text-[8px] font-semibold px-1.5 py-0.5 rounded-full"
-            style={{ background: "rgba(99,91,255,0.10)", color: ACCENT }}
+            style={{ background: "rgba(112,130,56,0.10)", color: ACCENT }}
           >
             {stagedCount}
           </span>
@@ -251,15 +252,15 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
               className="flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-all"
               style={{
                 borderBottom: `1px solid ${BORDER_SUBTLE}`,
-                background: isSelected ? "rgba(99,91,255,0.06)" : isStaged ? "rgba(99,91,255,0.02)" : "transparent",
+                background: isSelected ? "rgba(112,130,56,0.06)" : isStaged ? "rgba(112,130,56,0.02)" : "transparent",
                 // 그라데이션 선택 border
                 borderLeft: isSelected ? "2px solid" : "2px solid transparent",
                 borderImage: isSelected
-                  ? "linear-gradient(180deg, #635bff 0%, #8b5cf6 50%, #ec4899 100%) 1"
+                  ? GRADIENT_RAINBOW_BORDER3
                   : "none",
               }}
               onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(0,0,0,0.025)"; }}
-              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isStaged ? "rgba(99,91,255,0.02)" : "transparent"; }}
+              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isStaged ? "rgba(112,130,56,0.02)" : "transparent"; }}
             >
               {/* 체크박스 */}
               <div
@@ -326,7 +327,7 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
         <div className="flex items-center gap-1.5">
           <div
             className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: "linear-gradient(135deg, #E3DBBB, #AEB784)" }}
+            style={{ background: "linear-gradient(135deg, #F5EFE6, #A67B5B)" }}
           >
             <span className="text-[7px] font-bold" style={{ color: ACCENT }}>병</span>
           </div>
@@ -339,10 +340,10 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
           className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-semibold transition-all"
           style={{
             background: stagedCount > 0 && message.trim()
-              ? "linear-gradient(135deg, #41431B, #6B7040, #AEB784)"
-              : "rgba(65,67,27,0.06)",
+              ? "linear-gradient(135deg, #708238, #6B7040, #A67B5B)"
+              : "rgba(112,130,56,0.06)",
             color: stagedCount > 0 && message.trim() ? "rgba(248,243,225,0.95)" : TEXT_TERTIARY,
-            boxShadow: stagedCount > 0 && message.trim() ? "0 4px 14px rgba(65,67,27,0.22)" : "none",
+            boxShadow: stagedCount > 0 && message.trim() ? "0 4px 14px rgba(112,130,56,0.22)" : "none",
             cursor: stagedCount > 0 && message.trim() ? "pointer" : "not-allowed",
           }}
         >

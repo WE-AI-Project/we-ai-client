@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { CheckSquare, Circle, Clock, Search, ChevronDown, Plus, Tag, User, Trash2, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -476,7 +476,7 @@ export function TasksPage({ projectId = 1 }: { projectId?: number | null }) {
               <button
                 onClick={handleCreateTask}
                 className="flex-1 py-2 rounded-xl text-xs font-semibold text-white shadow-md hover:opacity-90"
-                style={{ background: "linear-gradient(135deg, #41431B, #62683A)" }}
+                style={{ background: "linear-gradient(135deg, #708238, #62683A)" }}
               >
                 생성
               </button>

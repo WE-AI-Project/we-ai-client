@@ -186,8 +186,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
     return inCat && inSearch;
   });
 
-  const grad = AVATAR_GRADIENTS[form.avatarColor] ?? AVATAR_GRADIENTS["olive"];
-  const gradBg = `linear-gradient(135deg, ${grad.from}, ${grad.via}, ${grad.to})`;
+  const avatarBg = AVATAR_GRADIENTS[form.avatarColor] ?? AVATAR_GRADIENTS["olive"];
 
   return (
     // ── 오버레이 ──
@@ -224,7 +223,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
           {/* 아바타 미리보기 */}
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.via}, ${grad.to})` }}
+            style={{ background: avatarBg }}
           >
             <User className="w-5 h-5 text-white" style={{ opacity: 0.85 }} />
           </div>
@@ -278,8 +277,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
               아바타 컬러
             </p>
             <div className="flex items-center gap-2">
-              {Object.entries(AVATAR_GRADIENTS).map(([key, g]) => {
-                const bg = `linear-gradient(135deg, ${g.from}, ${g.via}, ${g.to})`;
+              {Object.entries(AVATAR_GRADIENTS).map(([key, bg]) => {
                 const active = form.avatarColor === key;
                 return (
                   <button

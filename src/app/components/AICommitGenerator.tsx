@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, ChevronDown, ChevronUp,
@@ -37,7 +37,7 @@ const TAG_COLORS: Record<string, string> = {
   docs:     "#7A8B5A",
   perf:     "#B87850",
   test:     "#888A62",
-  style:    "#AEB784",
+  style:    "#A67B5B",
 };
 
 function classifyFiles(files: CommitFile[]) {
@@ -426,7 +426,7 @@ export function AICommitGenerator({
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold transition-all"
           style={{
             background: open
-              ? "rgba(65,67,27,0.12)"
+              ? "rgba(112,130,56,0.12)"
               : canGenerate
               ? ACCENT_BG
               : "rgba(0,0,0,0.04)",
@@ -436,7 +436,7 @@ export function AICommitGenerator({
           }}
           onMouseEnter={e => {
             if (canGenerate && !open)
-              e.currentTarget.style.background = "rgba(65,67,27,0.10)";
+              e.currentTarget.style.background = "rgba(112,130,56,0.10)";
           }}
           onMouseLeave={e => {
             if (canGenerate && !open)
@@ -518,8 +518,8 @@ export function AICommitGenerator({
                 <div style={{
                   position: "absolute", inset: 0,
                   borderRadius: "50%",
-                  border: "2px solid rgba(65,67,27,0.08)",
-                  borderTopColor: "#AEB784",
+                  border: "2px solid rgba(112,130,56,0.08)",
+                  borderTopColor: "#A67B5B",
                   animation: "_ai-spin 0.9s linear infinite",
                 }} />
                 <div
@@ -546,7 +546,7 @@ export function AICommitGenerator({
                     key={f.id}
                     className="text-[8px] px-1.5 py-0.5 rounded-md font-mono"
                     style={{
-                      background: "rgba(65,67,27,0.06)",
+                      background: "rgba(112,130,56,0.06)",
                       color: TEXT_TERTIARY,
                       border: `1px solid ${BORDER_SUBTLE}`,
                     }}
@@ -667,17 +667,17 @@ export function AICommitGenerator({
                         style={{
                           background: isApplied
                             ? UI_GREEN_BG
-                            : "rgba(65,67,27,0.08)",
+                            : "rgba(112,130,56,0.08)",
                           color:  isApplied ? UI_GREEN : ACCENT,
                           border: `1px solid ${isApplied ? `${UI_GREEN}30` : ACCENT_BORDER}`,
                         }}
                         onMouseEnter={e => {
                           if (!isApplied)
-                            e.currentTarget.style.background = "rgba(65,67,27,0.13)";
+                            e.currentTarget.style.background = "rgba(112,130,56,0.13)";
                         }}
                         onMouseLeave={e => {
                           if (!isApplied)
-                            e.currentTarget.style.background = "rgba(65,67,27,0.08)";
+                            e.currentTarget.style.background = "rgba(112,130,56,0.08)";
                         }}
                       >
                         {isApplied ? (

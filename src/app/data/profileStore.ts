@@ -1,4 +1,4 @@
-// ── WE&AI 프로필 저장소 ──
+﻿// ── WE&AI 프로필 저장소 ──
 // localStorage 기반 프로필 데이터 관리
 
 export type TechEntry = {
@@ -19,12 +19,13 @@ export type ProfileData = {
 
 const STORAGE_KEY = "weai_profile_v2";
 
-export const AVATAR_GRADIENTS: Record<string, { from: string; via: string; to: string }> = {
-  olive:  { from: "#D4CC9E", via: "#AEB784", to: "#6B7040" },
-  sage:   { from: "#E8EDD4", via: "#C4CC9A", to: "#AEB784" },
-  warm:   { from: "#F8E8C8", via: "#E3DBBB", to: "#C4A860" },
-  forest: { from: "#C8D8A8", via: "#8CAE6A", to: "#5A8A4A" },
-  amber:  { from: "#FCE8C0", via: "#E8C46A", to: "#C09840" },
+// 아바타 배경색 — 그라디언트 대신 플랫 컬러
+export const AVATAR_GRADIENTS: Record<string, string> = {
+  olive:  "#6B7040",
+  sage:   "#8C9A5E",
+  warm:   "#C4A860",
+  forest: "#5A8A4A",
+  amber:  "#C09840",
 };
 
 export const DEFAULT_PROFILE: ProfileData = {

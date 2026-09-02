@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 interface LoadingStateProps {
     message?: string;
@@ -10,7 +10,7 @@ export default function LoadingState({ message = "Synaipse 로딩 중..." }: Loa
             <div className="relative w-12 h-12">
                 <div
                     className="absolute inset-0 border-4 rounded-full"
-                    style={{ borderColor: 'rgba(65, 67, 27, 0.1)' }}
+                    style={{ borderColor: 'rgba(112,130,56, 0.1)' }}
                 ></div>
 
                 <div

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import {
   Bell, GitCommit, Bot, AlertCircle,
   CheckCircle2, Info, Check, ChevronRight
@@ -122,7 +122,7 @@ export function NotificationPanel({ projectId }: NotificationPanelProps) {
       >
         <Bell
           className="w-3.5 h-3.5"
-          style={{ color: unread > 0 ? "#AEB784" : "rgba(255,255,255,0.55)" }}
+          style={{ color: unread > 0 ? "#A67B5B" : "rgba(255,255,255,0.55)" }}
         />
         {unread > 0 && (
           <span
@@ -186,7 +186,7 @@ export function NotificationPanel({ projectId }: NotificationPanelProps) {
           <div className="overflow-y-auto flex-1">
             {notifs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2">
-                <Bell className="w-7 h-7" style={{ color: "rgba(65,67,27,0.15)" }} />
+                <Bell className="w-7 h-7" style={{ color: "rgba(112,130,56,0.15)" }} />
                 <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>새 알림이 없습니다</p>
               </div>
             ) : (
@@ -200,10 +200,10 @@ export function NotificationPanel({ projectId }: NotificationPanelProps) {
                       className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-all relative"
                       style={{
                         borderBottom: idx < notifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
-                        background:   n.isRead ? "transparent" : "rgba(174,183,132,0.06)",
+                        background:   n.isRead ? "transparent" : "rgba(166,123,91,0.06)",
                       }}
                       onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.025)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = n.isRead ? "transparent" : "rgba(174,183,132,0.06)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = n.isRead ? "transparent" : "rgba(166,123,91,0.06)")}
                       onClick={() => markRead(n.id)}
                     >
                       {!n.isRead && (
