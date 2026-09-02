@@ -666,12 +666,12 @@ export default function App() {
 
   const renderPage = (nav: NavId) => {
     switch (nav) {
-      case "Dashboard": return isPublishingSession(authSession)
-        ? <WeAIDashboard />
-        : <DashboardPage projectId={projectId} projectName={projectName} />;
-      case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
-      case "Commits": return <CommitDiffPage projectId={projectId} />;
-      case "ServerBuild": return <ServerBuildPage />;
+      case "Changes": 
+        return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
+      case "Commits": 
+        return <CommitDiffPage projectId={projectId} />;
+      case "ServerBuild": 
+        return <ServerBuildPage />;
       case "Chat":
         return (
           <ChatPage
@@ -681,16 +681,23 @@ export default function App() {
             onUnreadUpdate={setUnreadChatCount}
           />
         );
-      case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
-      case "Calendar": return <CalendarPage projectId={projectId ?? 1} />;
-      case "EnvSettings": return <EnvironmentSettingsPage />;
-      case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
-      case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
-      case "Profile": return <ProfilePage projectId={projectId ?? 1} />;
-      case "Galaxy": return <SynAIpseGalaxyPage />;
-      default: return isPublishingSession(authSession)
-        ? <WeAIDashboard />
-        : <DashboardPage projectId={projectId} projectName={projectName} />;
+      case "Calendar": 
+        return <CalendarPage projectId={projectId ?? 1} />;
+      case "EnvSettings": 
+        return <EnvironmentSettingsPage />;
+      case "AIQA": 
+        return <AIQAPage projectId={projectId ?? 0} autoStart />;
+      case "ProjectSettings": 
+        return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
+      case "Profile": 
+        return <ProfilePage projectId={projectId ?? 1} />;
+      case "Galaxy": 
+        return <SynAIpseGalaxyPage />;
+      case "Dashboard":
+      default: 
+        return isPublishingSession(authSession)
+          ? <WeAIDashboard />
+          : <DashboardPage projectId={projectId} projectName={projectName} />;
     }
   };
 
