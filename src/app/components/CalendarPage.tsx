@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Calendar, Plus, X, ChevronLeft, ChevronRight,
   User, Flag, CheckCircle2, Clock, Circle, Tag,
-  Edit2, Trash2, Save, AlertCircle,
+  Edit2, Trash2, Save, AlertCircle, Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Schedule, Dept, SchedulePriority, ScheduleStatus,
   DEPT_COLOR, STATUS_META, PRIORITY_META,
@@ -11,6 +12,17 @@ import {
   getDaysInMonth, getFirstDayOfMonth, dateStr,
   isInRange, formatDateKR, today as getTodayStr,
 } from "../data/scheduleStore";
+import {
+  fetchProjectSchedules,
+  createProjectSchedule,
+  updateProjectSchedule,
+  deleteProjectSchedule,
+  updateProjectScheduleStatus,
+  type ProjectSchedule,
+  type ProjectDepartment,
+  type ProjectSchedulePriority,
+  type ProjectScheduleStatus,
+} from "../lib/api";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
@@ -18,6 +30,85 @@ import {
   BRIGHT_BEIGE, CREAM, PANEL_BG, CONTENT_BG, BEIGE,
   GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
 } from "../colors";
+
+function mapBackendDepartmentToDept(dept?: string): Dept {
+  switch ((dept || "").toUpperCase()) {
+    case "FRONTEND": return "Frontend";
+    case "BACKEND": return "Backend";
+    case "AI": return "Agent";
+    case "DEVOPS": return "DevOps";
+    case "QA": return "QA";
+    case "DESIGN": return "Design";
+    default: return (dept as Dept) || "Backend";
+  }
+}
+
+function mapDeptToBackendDepartment(dept?: string): ProjectDepartment {
+  switch ((dept || "").toLowerCase()) {
+    case "frontend": return "FRONTEND";
+    case "backend": return "BACKEND";
+    case "agent": return "AI";
+    case "ai": return "AI";
+    case "devops": return "DEVOPS";
+    case "qa": return "QA";
+    case "design": return "DESIGN";
+    default: return "BACKEND";
+  }
+}
+
+function mapBackendPriority(priority?: string): SchedulePriority {
+  switch ((priority || "").toUpperCase()) {
+    case "HIGH": return "high";
+    case "LOW": return "low";
+    default: return "medium";
+  }
+}
+
+function mapPriorityToBackend(priority?: string): ProjectSchedulePriority {
+  switch ((priority || "").toLowerCase()) {
+    case "high": return "HIGH";
+    case "low": return "LOW";
+    default: return "MEDIUM";
+  }
+}
+
+function mapBackendStatus(status?: string): ScheduleStatus {
+  switch ((status || "").toUpperCase()) {
+    case "DONE":
+    case "COMPLETED":
+      return "done";
+    case "IN_PROGRESS":
+      return "in-progress";
+    default:
+      return "todo";
+  }
+}
+
+function mapStatusToBackend(status?: string): ProjectScheduleStatus {
+  switch ((status || "").toLowerCase()) {
+    case "done":
+    case "completed":
+      return "DONE";
+    case "in-progress":
+      return "IN_PROGRESS";
+    default:
+      return "TODO";
+  }
+}
+
+function convertBackendSchedule(item: ProjectSchedule): Schedule {
+  return {
+    id: String(item.scheduleId),
+    title: item.title,
+    assignee: item.assigneeName || "",
+    department: mapBackendDepartmentToDept(item.department),
+    startDate: item.startDate || getTodayStr(),
+    endDate: item.endDate || getTodayStr(),
+    priority: mapBackendPriority(item.priority),
+    status: mapBackendStatus(item.status),
+    desc: item.description || "",
+  };
+}
 
 const DEPTS: Dept[] = ["전체", "Frontend", "Backend", "Agent", "DevOps", "QA", "Design"];
 const PRIORITIES: SchedulePriority[] = ["high", "medium", "low"];
@@ -474,7 +565,7 @@ function ScheduleCard({
 }
 
 // ══ 메인 CalendarPage ══
-export function CalendarPage() {
+export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   const [schedules, setSchedules] = useState<Schedule[]>(() => loadSchedules());
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
@@ -486,10 +577,34 @@ export function CalendarPage() {
 
   const [isLoading, setIsLoading] = useState(true);
 
+  // 🌟 백엔드 API 연동: 프로젝트 일정 목록 조회
+  const loadApiSchedules = useCallback(async () => {
+    if (!projectId) {
+      setIsLoading(false);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const res = await fetchProjectSchedules(projectId);
+      if (res && res.schedules && res.schedules.length > 0) {
+        const converted = res.schedules.map(convertBackendSchedule);
+        setSchedules(converted);
+        saveSchedules(converted);
+      } else {
+        const local = loadSchedules();
+        setSchedules(local);
+      }
+    } catch (err) {
+      console.warn("프로젝트 일정 API 조회 실패, 로컬 캐시 사용:", err);
+      setSchedules(loadSchedules());
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+    loadApiSchedules();
+  }, [loadApiSchedules]);
 
   type DeptColorType = Record<string, {
     bg: string;
@@ -571,7 +686,8 @@ export function CalendarPage() {
 
   const selectedDaySchedules = selectedDay ? (daySchedules[selectedDay] ?? []) : [];
 
-  const handleSave = (s: Schedule) => {
+  const handleSave = async (s: Schedule) => {
+    // 낙관적 UI 업데이트
     setSchedules(prev => {
       const next = prev.some(x => x.id === s.id)
         ? prev.map(x => x.id === s.id ? s : x)
@@ -580,14 +696,57 @@ export function CalendarPage() {
       return next;
     });
     setEditSchedule(null);
+
+    if (projectId) {
+      try {
+        const isNumericId = /^\d+$/.test(s.id);
+        if (isNumericId) {
+          await updateProjectSchedule(projectId, Number(s.id), {
+            title: s.title,
+            description: s.desc,
+            department: mapDeptToBackendDepartment(s.department),
+            startDate: s.startDate,
+            endDate: s.endDate,
+            priority: mapPriorityToBackend(s.priority),
+            status: mapStatusToBackend(s.status),
+          });
+          toast.success("일정이 수정되었습니다.");
+        } else {
+          const created = await createProjectSchedule(projectId, {
+            title: s.title,
+            description: s.desc,
+            department: mapDeptToBackendDepartment(s.department),
+            startDate: s.startDate,
+            endDate: s.endDate,
+            priority: mapPriorityToBackend(s.priority),
+            status: mapStatusToBackend(s.status),
+          });
+          if (created && created.scheduleId) {
+            setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, id: String(created.scheduleId) } : x));
+          }
+          toast.success("새 일정이 등록되었습니다.");
+        }
+      } catch (err) {
+        console.warn("백엔드 일정 동기화 실패 (로컬 유지됨):", err);
+      }
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     setSchedules(prev => {
       const next = prev.filter(s => s.id !== id);
       saveSchedules(next);
       return next;
     });
+
+    if (projectId && /^\d+$/.test(id)) {
+      try {
+        await deleteProjectSchedule(projectId, Number(id));
+        toast.success("일정이 삭제되었습니다.");
+      } catch (err) {
+        console.warn("백엔드 일정 삭제 실패:", err);
+      }
+    }
   };
 
   const prevMonth = () => {
