@@ -451,6 +451,25 @@ export async function sendChatMessage(  //채팅 메시지 전송
   });
 }
 
+export type Department = {
+  departmentId: number;
+  name: string;
+  chatRoomExists: boolean;
+};
+
+export async function fetchDepartments(projectId: number | string): Promise<Department[]> {  //채팅방 부서 목록 조회
+  return request<Department[]>(`/api/v1/projects/${projectId}/departments`, {
+    method: "GET",
+  });
+}
+
+export async function createChatRoom(projectId: number | string, name: string, type: string): Promise<ChatRoom> {  //채팅방 생성
+  return request<ChatRoom>(`/api/v1/projects/${projectId}/chat/rooms`, {
+    method: "POST",
+    body: { name, type } as any,
+  });
+}
+
 export async function fetchDailyStandup(projectId: number | string) { //데일리 스탠드업 브리핑
   return request<any>(`/api/v1/projects/${projectId}/daily-standup`, {
     method: "GET",
