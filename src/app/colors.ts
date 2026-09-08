@@ -122,20 +122,17 @@ export const BTN_DARK       = "#1c1c1e";   // 다크 버튼 배경
 export const CTA_BG         = "#2A2C10";   // CTA 올리브 다크
 export const OLIVE_DARK_BG  = "#212308";   // 올리브 다크 배경
 
-// ── 그라디언트 ─────────────────────────────────────────────
-/** 페이지 헤더 — 파스텔 레인보우 */
-export const GRADIENT_HEADER      = "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)";
-export const GRADIENT_HEADER_SM   = "linear-gradient(135deg, #e0e7ff, #ddd6fe, #e8d5f5, #fce7f3)";
-export const GRADIENT_HEADER_SM2  = "linear-gradient(135deg, #e0e7ff, #e8d5f5, #fce7f3)";
-export const GRADIENT_HEADER_SM3  = "linear-gradient(135deg, #e0e7ff, #ddd6fe, #fce7f3)";
-/** 인디고 그라디언트 (CTA 버튼 등) */
-export const GRADIENT_INDIGO      = "linear-gradient(135deg, #635bff, #8b5cf6)";
-/** 인디고 세로 레인보우 보더 */
-export const GRADIENT_RAINBOW_BORDER = "linear-gradient(180deg, #635bff 0%, #8b5cf6 45%, #ec4899 80%, #fbbf24 100%) 1";
-export const GRADIENT_RAINBOW_BORDER2 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 40%, #ec4899 80%, #fbbf24 100%) 1";
-export const GRADIENT_RAINBOW_BORDER3 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 50%, #ec4899 100%) 1";
+// ── 브랜드 솔리드 / 틴트 서피스 (AI 무지개 그라디언트 전면 제거) ─────────
+export const GRADIENT_HEADER      = "#F0F1EE";
+export const GRADIENT_HEADER_SM   = "#F0F1EE";
+export const GRADIENT_HEADER_SM2  = "#F0F1EE";
+export const GRADIENT_HEADER_SM3  = "#F0F1EE";
+export const GRADIENT_INDIGO      = "#41431B";
+export const GRADIENT_RAINBOW_BORDER = "none";
+export const GRADIENT_RAINBOW_BORDER2 = "none";
+export const GRADIENT_RAINBOW_BORDER3 = "none";
 
-/** 페이지 콘텐츠 배경 — 화이트 */
+/** 페이지 콘텐츠 배경 — 틴트 쿨 베이지/그레이 */
 export const GRADIENT_PAGE = "#F3F4F1";
 /** 사이드바 배경 — 초극다크 올리브 단색 */
 export const GRADIENT_SIDEBAR = "#131507";
@@ -146,12 +143,12 @@ export const GRADIENT_LOGO = "#AEB784";
 /** 활성 항목 배경 (사이드바) — 화이트 틴트 */
 export const GRADIENT_ACTIVE = "rgba(255,255,255,0.10)";
 /** 콘텐츠 영역 활성 항목 배경 */
-export const GRADIENT_ACTIVE_LIGHT = "rgba(174,183,132,0.35)";
-/** 배경 orb — 제거 */
+export const GRADIENT_ACTIVE_LIGHT = "rgba(174,183,132,0.20)";
+/** 배경 orb — 완전 제거 */
 export const GRADIENT_ORB_1 = "transparent";
 export const GRADIENT_ORB_2 = "transparent";
 export const GRADIENT_ORB_3 = "transparent";
-/** 카드 배경 — 화이트 단색 */
+/** 카드 배경 — 틴트 화이트 단색 */
 export const GRADIENT_CARD = "#FBFCFA";
 /** 헤더 배너 배경 — 연한 크림 단색 */
 export const GRADIENT_BANNER = "#E9ECE4";
@@ -241,3 +238,4 @@ export const CHAT_AVATARS = [
   "linear-gradient(135deg,#fce7f3,#fbcfe8)",
   "linear-gradient(135deg,#dbeafe,#bfdbfe)",
 ];
+

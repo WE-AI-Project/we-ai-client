@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Settings, User, Bell, Monitor, Palette, Shield, Save, ChevronRight } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  UI_GREEN, UI_GREEN_BG, UI_RED, UI_RED_BG, UI_AMBER, UI_AMBER_BG, UI_VIOLET, UI_VIOLET_BG, UI_INDIGO,
-  GRADIENT_HEADER, BTN_DARK,
+  CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -98,16 +97,9 @@ export function SettingsPage() {
     setDevSettings(prev => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-2xl mx-auto space-y-4">
+        <div className="w-full max-w-[1400px] mx-auto space-y-4">
 
           {/* ── 헤더 + 저장 버튼 ── */}
           <div className="flex items-center justify-between">
@@ -119,12 +111,14 @@ export function SettingsPage() {
               {isLoading ? (
                 <Skeleton className="h-3 w-32 mt-1.5" />
               ) : (
-                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>앱 환경 · 알림 · 개발 설정</p>
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  SynAIpse 개발 환경 및 알림, 테마 설정을 관리합니다.
+                </p>
               )}
             </div>
             
             {isLoading ? (
-              <Skeleton className="h-8 w-28 rounded-lg" />
+              <Skeleton className="h-8 w-24 rounded-lg" />
             ) : (
               <button
                 onClick={handleSave}
@@ -137,8 +131,9 @@ export function SettingsPage() {
             )}
           </div>
 
-          {/* ── 프로필 정보 ── */}
-          <SectionCard icon={User} iconColor={ACCENT} iconBg="rgba(99,91,255,0.10)" title="Profile">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* ── 프로필 정보 ── */}
+            <SectionCard icon={User} iconColor={ACCENT} iconBg="rgba(99,91,255,0.10)" title="Profile">
             {isLoading ? (
               <div className="py-2">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -380,7 +375,8 @@ export function SettingsPage() {
                 <div className="py-2" />
               </>
             )}
-          </SectionCard>
+            </SectionCard>
+          </div>
 
         </div>
       </div>

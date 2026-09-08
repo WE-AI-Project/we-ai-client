@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   X, User, Mail, MapPin, Code2, Briefcase, FileText,
   Save, Palette, Search, CheckCircle2, ChevronDown,
@@ -224,7 +224,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
           {/* 아바타 미리보기 */}
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.via}, ${grad.to})` }}
+            style={{ background: gradBg }}
           >
             <User className="w-5 h-5 text-white" style={{ opacity: 0.85 }} />
           </div>

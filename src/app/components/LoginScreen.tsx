@@ -436,7 +436,7 @@ function SocialBtn({
   );
 }
 
-async function resolveAuthenticatedUser(session: AuthSession) {
+async function resolveAuthenticatedUser(_session: AuthSession) {
   return fetchCurrentUser();
 }
 
@@ -447,7 +447,6 @@ function LoginForm({
   onSwitchToSignup,
   onSwitchToEmailCode,
   onSwitchToPasswordFind,
-  onSocialLogin,
 }: {
   initialEmail?: string;
   notice: Feedback | null;
@@ -722,8 +721,8 @@ function SignupForm({
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [otpError, setOtpError] = useState("");
-  const [dispatchResult, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
-  
+  const [, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
+
   // 약관 동의 상태
   const [agreeAll, setAgreeAll] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
@@ -1480,7 +1479,8 @@ export function LoginScreen({ onAuthenticated }: Props) {
   }, []);
 
   const handleAuthenticatedInternal = (session: AuthSession, user: CurrentUser) => {
-    onAuthenticated(session, user);
+    setExiting(true);
+    window.setTimeout(() => onAuthenticated(session, user), 420);
   };
 
   const switchMode = (

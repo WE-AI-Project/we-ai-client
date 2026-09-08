@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Bell, AlertCircle, GitCommit, CheckCircle2, Server, Bot, Circle, CheckCheck, Settings } from "lucide-react";
+import { useState } from "react";
+import { GitCommit, CheckCircle2, Server, Bot, CheckCheck } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   UI_RED, UI_RED_BG, UI_GREEN, UI_GREEN_BG, UI_GRAY, UI_GRAY_BG, UI_INDIGO, UI_INDIGO_BG,

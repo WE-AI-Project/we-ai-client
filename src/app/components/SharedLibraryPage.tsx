@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BookOpen, Search, FileText, Link, Download, File, Code2, BookMarked, Layers } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  UI_RED_DARK, UI_RED_BG8, UI_GREEN, UI_GREEN_BG8, UI_GREEN_BG7, UI_AMBER, UI_AMBER_BG8, UI_AMBER_BG7,
-  UI_VIOLET, UI_VIOLET_BG8, UI_VIOLET_BG7, UI_INDIGO,
-  GRADIENT_HEADER, BTN_DARK,
+  CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -73,16 +71,9 @@ export function SharedLibraryPage() {
   RESOURCES.forEach(r => { catCounts[r.category] = (catCounts[r.category] ?? 0) + 1; });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">

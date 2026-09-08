@@ -2,21 +2,27 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle,
-  Loader2, Bot, Server, Monitor, Cpu, Play, RotateCw,
-  FileCode, AlertCircle, GitCommit, Clock, ChevronDown,
-  ChevronUp, Hash, User, Calendar, MousePointer, Video,
-  Bell, Eye, Code2, Zap, Film, X, Volume2,
+  Loader2, Bot, Monitor, Play, RotateCw,
+  FileCode, GitCommit, Clock, ChevronDown,
+  ChevronUp, User, Calendar, MousePointer, Video,
+  Bell, Code2, Film, X, Globe, Home,
+  Settings, GitPullRequest,
 } from "lucide-react";
 import { getPendingQA, clearPendingQA } from "../data/qaStore";
-import { getLeader, getAllLeaders } from "../data/projectSettingsStore";
+import { getLeader } from "../data/projectSettingsStore";
 import { AgentControlPage } from "./AgentControlPage";
-import { BACKEND_COMMITS, FRONTEND_COMMITS } from "./commitData";
-import { buildDiffFromCommitFiles, runAiQa, type QaResponse } from "../../api/aiApi";
+import { BACKEND_COMMITS, FRONTEND_COMMITS, type CommitFile } from "./commitData";
+import {
+  buildDiffFromCommitFiles,
+  runAiQa,
+  generateLocalSemanticQaAnalysis,
+  type QaResponse,
+} from "../../api/aiApi";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
-  GRADIENT_SIDEBAR, SIDEBAR_BORDER,
+  ACCENT, ACCENT_BG, ACCENT_BORDER,
+  GRADIENT_SIDEBAR, SIDEBAR_BORDER, CONTENT_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -31,7 +37,6 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 
 // ── 타입 ──
 type Severity   = "critical" | "warning" | "passed";
-type TestStatus = "waiting" | "running" | "passed" | "failed";
 type QAPhase    = "idle" | "phase1" | "phase2" | "done";
 
 type StaticError = {
@@ -142,25 +147,21 @@ const QA_STATUS_META: Record<CommitQAStatus, { color: string; bg: string; label:
   skipped: { color:"#7d7f5b", bg:"rgba(125,127,91,0.10)",  label:"Skipped", icon:ChevronDown   },
 };
 
-// ── Phase 1 더미 정적 분석 결과 ──
-const STATIC_ERRORS: StaticError[] = [
-  { id:"se1", file:"ParserAgent.java",           line:87,  col:12, type:"NullPointerException",          severity:"critical", message:"response 객체가 null일 수 있습니다. null 체크 추가 필요",              fix:"if (response != null) { ... }" },
-  { id:"se2", file:"MultiAgentController.java",  line:42,  col:5,  type:"ConcurrentModificationException",severity:"warning",  message:"agentRegistry에 동기화 없이 접근 — synchronized 블록 필요",            fix:"synchronized(agentRegistry) { ... }" },
-  { id:"se3", file:"apiClient.ts",               line:13,  col:3,  type:"UnhandledRejection",            severity:"warning",  message:"fetch() 오류가 catch되지 않음 — .catch() 또는 try/catch 블록 필요",  fix:"try { await fetch(...) } catch(e) { ... }" },
-  { id:"se4", file:"DataSyncAgent.java",         line:204, col:8,  type:"PotentialMemoryLeak",            severity:"warning",  message:"ExecutorService가 종료되지 않을 수 있음 — shutdown() 호출 누락",       fix:"executor.shutdown();" },
-  { id:"se5", file:"AgentScheduler.java",        line:118, col:22, type:"DeadlockRisk",                  severity:"critical", message:"중첩 synchronized 블록에서 데드락 위험 감지됨",                         fix:"Lock ordering 패턴 적용 필요" },
-];
-
-// ── Phase 2 UI 액션 시나리오 ──
-function mapQaResponseToErrors(response: QaResponse): StaticError[] {
+// ── Phase 1: AI QA 응답 → 정적 분석 오류 목록으로 변환 ──
+// scanTargets(실제 스캔된 파일 경로 목록)을 함께 넘기면 bugReport 본문에
+// 등장하는 파일명을 찾아 file 필드를 실제 경로로 보강한다.
+function mapQaResponseToErrors(response: QaResponse, scanTargets: string[] = []): StaticError[] {
   const bugReport = response.bugReport ?? response.bug_report ?? "";
   const optimization = response.optimization ?? "";
   const commitMsg = response.commitMsg ?? response.commit_msg ?? "";
 
+  const guessFile = (text: string) =>
+    scanTargets.find((path) => text.includes(path.split("/").pop() ?? path)) ?? "전체 변경 diff";
+
   return [
     bugReport && {
       id: "ai-bug-report",
-      file: "AI 분석 diff",
+      file: guessFile(bugReport),
       line: 1,
       col: 1,
       type: "AI Bug Risk",
@@ -180,6 +181,7 @@ function mapQaResponseToErrors(response: QaResponse): StaticError[] {
   ].filter((item): item is StaticError => Boolean(item));
 }
 
+// ── Phase 2 UI 액션 시나리오 ──
 const UI_ACTIONS: UIAction[] = [
   { id:"a1", step:1,  label:"앱 초기 로딩 확인",          element:"<App />",                   status:"pending" },
   { id:"a2", step:2,  label:"대시보드 렌더링 검사",         element:"<DashboardPage />",         status:"pending" },
@@ -188,12 +190,51 @@ const UI_ACTIONS: UIAction[] = [
   { id:"a5", step:5,  label:"파일 클릭 → Diff 뷰어",       element:"<FileDiffViewer />",        status:"pending" },
   { id:"a6", step:6,  label:"커밋 메시지 입력 필드",        element:"<textarea#commitMsg />",    status:"pending" },
   { id:"a7", step:7,  label:"Agent Control 페이지 이동",    element:"<AgentControlPage />",      status:"pending" },
-  { id:"a8", step:8,  label:"에이전트 토글 버튼 동작",      element:"<AgentToggle />",           status:"pending", error:"Toggle state not updated after click — state mutation issue detected", clip: { id:"clip1", thumbnail:"", duration:"0:03", errorLabel:"에이전트 토글 오작동", ts:"14:22:07" } },
+  { id:"a8", step:8,  label:"에이전트 토글 버튼 동작",      element:"<AgentToggle />",           status:"pending" },
   { id:"a9", step:9,  label:"환경 변수 설정 페이지",        element:"<EnvironmentSettingsPage />",status:"pending" },
   { id:"a10",step:10, label:"Build 관리 페이지 이동",       element:"<BuildManagementPage />",   status:"pending" },
   { id:"a11",step:11, label:"채팅 페이지 메시지 전송",      element:"<ChatPage send />",         status:"pending" },
   { id:"a12",step:12, label:"QA 결과 페이지 로딩 완료",     element:"<AIQAPage />",              status:"pending" },
 ];
+
+// ── Phase 2: Phase 1에서 실제로 감지된 오류를 화면 조작 단계에 매핑 ──
+// 변경된 실제 파일 경로(scanTargets)를 각 화면 영역과 대조해,
+// 어떤 조작 단계에서 실패를 재현할지 결정한다. (스크립트로 고정된 실패가 아님)
+function deriveUiActionOutcomes(
+  scanTargets: string[],
+  errors: StaticError[]
+): Record<string, string> {
+  const critical = errors.find(e => e.severity === "critical") ?? errors[0];
+  if (!critical) return {};
+
+  const lowerTargets = scanTargets.map(t => t.toLowerCase());
+  const touches = (...keywords: string[]) =>
+    lowerTargets.some(t => keywords.some(k => t.includes(k)));
+
+  const outcomes: Record<string, string> = {};
+  const mark = (...ids: string[]) => ids.forEach(id => { outcomes[id] = critical.message; });
+
+  if (touches("agent", "scheduler", "parser", "datasync")) mark("a7", "a8");
+  if (touches("chat")) mark("a11");
+  if (touches("env")) mark("a9");
+  if (touches("build", "gradle")) mark("a10");
+  if (touches("diff", "changes", "commit")) mark("a4", "a5", "a6");
+  if (touches("dashboard")) mark("a2");
+
+  // 어떤 화면 영역과도 겹치지 않으면 최종 QA 요약 단계에서 오류를 노출한다
+  if (Object.keys(outcomes).length === 0) mark("a12");
+
+  return outcomes;
+}
+
+// ── 안전한 Canvas roundRect 헬퍼 (구형/일렉트론 환경 폴백) ──
+function safeRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.rect(x, y, w, h);
+  }
+}
 
 // ── UI 클립 Canvas 썸네일 ──
 function ClipThumbnail({ clip, onClick }: { clip: UIClip; onClick: () => void }) {
@@ -211,13 +252,13 @@ function ClipThumbnail({ clip, onClick }: { clip: UIClip; onClick: () => void })
 
     // UI 요소 모의
     ctx.fillStyle = "#161b22";
-    ctx.roundRect(8, 8, 164, 12, 3); ctx.fill();
+    safeRoundRect(ctx, 8, 8, 164, 12, 3); ctx.fill();
     ctx.fillStyle = "#21262d";
-    ctx.roundRect(8, 26, 80, 60, 4); ctx.fill();
+    safeRoundRect(ctx, 8, 26, 80, 60, 4); ctx.fill();
     ctx.fillStyle = "#21262d";
-    ctx.roundRect(96, 26, 76, 28, 4); ctx.fill();
+    safeRoundRect(ctx, 96, 26, 76, 28, 4); ctx.fill();
     ctx.fillStyle = "#21262d";
-    ctx.roundRect(96, 58, 76, 28, 4); ctx.fill();
+    safeRoundRect(ctx, 96, 58, 76, 28, 4); ctx.fill();
 
     // 빨간 오류 하이라이트
     ctx.strokeStyle = "#ef4444";
@@ -315,11 +356,11 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
 
       // 메인 컨텐츠
       ctx.fillStyle = "#21262d";
-      ctx.roundRect(68, 52, 200, 110, 6); ctx.fill();
+      safeRoundRect(ctx, 68, 52, 200, 110, 6); ctx.fill();
       ctx.fillStyle = "#21262d";
-      ctx.roundRect(68, 172, 200, 90, 6); ctx.fill();
+      safeRoundRect(ctx, 68, 172, 200, 90, 6); ctx.fill();
       ctx.fillStyle = "#21262d";
-      ctx.roundRect(280, 52, 220, 210, 6); ctx.fill();
+      safeRoundRect(ctx, 280, 52, 220, 210, 6); ctx.fill();
 
       // 에이전트 토글 버튼 (오류 요소)
       const toggleX = 288;
@@ -327,7 +368,7 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
       const pulse   = Math.sin(t * Math.PI * 6) * 0.5 + 0.5;
 
       ctx.fillStyle = frame < 30 ? "#10b981" : "#ef4444";
-      ctx.roundRect(toggleX, toggleY, 44, 20, 10); ctx.fill();
+      safeRoundRect(ctx, toggleX, toggleY, 44, 20, 10); ctx.fill();
 
       // 오류 하이라이트
       if (frame >= 28) {
@@ -340,7 +381,7 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
         // 오류 말풍선
         if (frame >= 35) {
           ctx.fillStyle = "rgba(239,68,68,0.90)";
-          ctx.roundRect(toggleX - 40, toggleY - 44, 180, 32, 6); ctx.fill();
+          safeRoundRect(ctx, toggleX - 40, toggleY - 44, 180, 32, 6); ctx.fill();
           ctx.fillStyle = "white";
           ctx.font      = "9px -apple-system, sans-serif";
           ctx.textAlign = "left";
@@ -451,13 +492,236 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
   );
 }
 
+// ── 🖥️ 실시간 가상 화면 조작 에뮬레이터 (Live Screen Manipulation Viewport) ──
+function LiveScreenManipulationPlayer({
+  activeAction,
+  actions,
+  isTesting,
+}: {
+  activeAction: string | null;
+  actions: UIAction[];
+  isTesting: boolean;
+  onSelectAction?: (id: string) => void;
+}) {
+  const currentAction = actions.find(a => a.id === activeAction) || actions[0];
+  const step = currentAction ? currentAction.step : 1;
+
+  // 가상 커서 위치 및 활성 페이지 맵
+  const cursorTargets: Record<number, { x: number; y: number; label: string; page: string }> = {
+    1:  { x: 90,  y: 40,  label: "앱 루트 컴포넌트 마운트",           page: "Dashboard" },
+    2:  { x: 320, y: 110, label: "대시보드 KPI 및 일정 통계 렌더링",    page: "Dashboard" },
+    3:  { x: 28,  y: 85,  label: "사이드바 Changes 탭 전환 클릭",      page: "Changes" },
+    4:  { x: 140, y: 120, label: "변경된 파일 목록 스테이징 체크",       page: "Changes" },
+    5:  { x: 380, y: 140, label: "FileDiffViewer 신구 라인 비교 검증", page: "FileDiffViewer" },
+    6:  { x: 140, y: 230, label: "커밋 메시지 textarea 포커싱 및 입력", page: "Changes" },
+    7:  { x: 28,  y: 125, label: "Agent Control 모니터링 페이지 이동",   page: "AgentControlPage" },
+    8:  { x: 420, y: 110, label: "ParserAgent 활성 토글 스위치 클릭",   page: "AgentControlPage" },
+    9:  { x: 28,  y: 165, label: "로컬 환경 변수(.env) 암호화 저장소",  page: "EnvironmentSettingsPage" },
+    10: { x: 28,  y: 205, label: "Gradle / 빌드 파이프라인 무결성 검증", page: "BuildManagementPage" },
+    11: { x: 28,  y: 245, label: "실시간 웹소켓 채팅 메시지 디스패치",   page: "ChatPage" },
+    12: { x: 320, y: 160, label: "종합 AI QA 리포트 및 자동 통과 확인", page: "AIQAPage" },
+  };
+
+  const target = cursorTargets[step] || { x: 320, y: 130, label: "테스트 대기", page: "Dashboard" };
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden border shadow-xl flex flex-col transition-all mb-4"
+      style={{
+        background: "#0d1117",
+        borderColor: isTesting ? "rgba(245,158,11,0.5)" : "rgba(255,255,255,0.12)",
+      }}
+    >
+      {/* ── 🌐 가상 윈도우 블루 타이틀바 (유저 스크린샷 일치) ── */}
+      <div
+        className="h-8 px-3.5 flex items-center justify-between select-none shrink-0"
+        style={{ background: "#0078D7", color: "#FFFFFF" }}
+      >
+        <div className="flex items-center gap-2">
+          <Globe className="w-3.5 h-3.5 text-white" />
+          <span className="text-[11px] font-bold tracking-tight">SynAIpse Live Screen Emulation</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {isTesting && (
+            <span className="flex items-center gap-1 text-[9px] font-mono bg-red-500/30 text-red-200 px-2 py-0.5 rounded border border-red-400/40 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              LIVE AUTOMATION TESTING
+            </span>
+          )}
+          <span className="text-[9px] font-mono text-white/80">1280x720 Viewport</span>
+        </div>
+      </div>
+
+      {/* ── 가상 화면 UI 뷰포트 ── */}
+      <div className="relative w-full h-64 bg-[#161b22] overflow-hidden select-none">
+        {/* 가상 사이드바 */}
+        <div className="absolute left-0 top-0 bottom-0 w-14 bg-[#0d1117] border-r border-white/5 flex flex-col items-center py-2.5 gap-2.5">
+          <div className="w-6 h-6 rounded-lg bg-blue-600/40 flex items-center justify-center">
+            <span className="text-[8px] font-bold text-blue-300">SY</span>
+          </div>
+          <div className={`w-7 h-6 rounded-lg flex items-center justify-center transition-all ${target.page === "Dashboard" ? "bg-white/15 text-white" : "text-white/40"}`}>
+            <Home className="w-3 h-3" />
+          </div>
+          <div className={`w-7 h-6 rounded-lg flex items-center justify-center transition-all ${target.page === "Changes" || target.page === "FileDiffViewer" ? "bg-white/15 text-white" : "text-white/40"}`}>
+            <GitPullRequest className="w-3 h-3" />
+          </div>
+          <div className={`w-7 h-6 rounded-lg flex items-center justify-center transition-all ${target.page === "AgentControlPage" ? "bg-white/15 text-white" : "text-white/40"}`}>
+            <Bot className="w-3 h-3" />
+          </div>
+          <div className={`w-7 h-6 rounded-lg flex items-center justify-center transition-all ${target.page === "EnvironmentSettingsPage" ? "bg-white/15 text-white" : "text-white/40"}`}>
+            <Settings className="w-3 h-3" />
+          </div>
+          <div className={`w-7 h-6 rounded-lg flex items-center justify-center transition-all ${target.page === "AIQAPage" ? "bg-white/15 text-white" : "text-white/40"}`}>
+            <ShieldCheck className="w-3 h-3" />
+          </div>
+        </div>
+
+        {/* 가상 컨텐츠 화면 */}
+        <div className="absolute left-14 top-0 right-0 bottom-0 p-3.5 flex flex-col overflow-hidden">
+          {/* 가상 화면 네비게이션 헤더 */}
+          <div className="flex items-center justify-between pb-2 border-b border-white/5 mb-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-white/90 font-mono">
+                SynAIpse &gt; {target.page}
+              </span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-white/70 font-mono">
+                Step {step}/12
+              </span>
+            </div>
+            <span className="text-[9px] font-mono text-white/60 truncate max-w-[200px]">
+              {currentAction?.label}
+            </span>
+          </div>
+
+          {/* 가상 페이지 인터랙션 목업 뷰 */}
+          <div className="flex-1 grid grid-cols-3 gap-2.5 min-h-0">
+            {/* 좌측 컴포넌트 트리 */}
+            <div className="bg-[#21262d] rounded-xl p-2.5 border border-white/5 flex flex-col gap-1.5 overflow-hidden">
+              <span className="text-[8.5px] font-semibold text-white/60">UI Component DOM</span>
+              <div className="space-y-1 overflow-y-auto pr-1">
+                <div className="h-4 bg-white/5 rounded px-1.5 text-[7.5px] text-white/70 font-mono flex items-center">
+                  &lt;AppHeader /&gt;
+                </div>
+                <div className={`h-4 rounded px-1.5 text-[7.5px] font-mono flex items-center transition-all ${step === 4 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse" : "bg-white/5 text-white/70"}`}>
+                  &lt;FileRow id="ParserAgent" /&gt;
+                </div>
+                <div className={`h-4 rounded px-1.5 text-[7.5px] font-mono flex items-center transition-all ${step === 5 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse" : "bg-white/5 text-white/70"}`}>
+                  &lt;FileDiffViewer /&gt;
+                </div>
+                <div className={`h-4 rounded px-1.5 text-[7.5px] font-mono flex items-center transition-all ${step === 6 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse" : "bg-white/5 text-white/70"}`}>
+                  &lt;CommitTextarea /&gt;
+                </div>
+                <div className={`h-4 rounded px-1.5 text-[7.5px] font-mono flex items-center transition-all ${step === 8 ? "bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse" : "bg-white/5 text-white/70"}`}>
+                  &lt;AgentToggle /&gt;
+                </div>
+              </div>
+            </div>
+
+            {/* 우측 Assertion 패널 */}
+            <div className="col-span-2 bg-[#21262d] rounded-xl p-2.5 border border-white/5 flex flex-col justify-between overflow-hidden">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold text-white/80">Active Viewport Assertion</span>
+                  <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full ${currentAction?.status === "passed" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : currentAction?.status === "failed" ? "bg-red-500/20 text-red-300 border border-red-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40"}`}>
+                    {currentAction?.status?.toUpperCase() || "PENDING"}
+                  </span>
+                </div>
+                <p className="text-[9.5px] text-white/80 leading-snug font-mono">
+                  {currentAction?.element} &rarr; <span className="text-amber-300">{target.label}</span>
+                </p>
+                {currentAction?.status === "failed" && (
+                  <div className="p-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-[8.5px] text-red-300 leading-tight">
+                    ⚠ {currentAction.error}
+                  </div>
+                )}
+              </div>
+
+              {/* 하단 인터랙션 시뮬레이션 버튼 */}
+              <div className="flex items-center justify-between pt-1.5 border-t border-white/5">
+                <span className="text-[7.5px] text-white/40 font-mono">Target: ({target.x}px, {target.y}px)</span>
+                <div className="flex gap-1.5">
+                  <div className={`px-2 py-0.5 rounded text-[7.5px] font-semibold transition-all ${step === 8 ? "bg-red-500 text-white animate-bounce" : "bg-emerald-600 text-white"}`}>
+                    {step === 8 ? "State Mutation Warning" : "DOM Assertion OK"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 🖱️ 실시간 애니메이션 마우스 커서 ── */}
+          <div
+            className="absolute transition-all duration-500 pointer-events-none z-30"
+            style={{
+              left: `${target.x}px`,
+              top: `${target.y}px`,
+              transform: "translate(-2px, -2px)",
+            }}
+          >
+            <div className="relative">
+              {/* 커서 SVG */}
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="drop-shadow-[0_3px_10px_rgba(0,0,0,0.9)]"
+              >
+                <path
+                  d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.86a.5.5 0 0 0-.85.35Z"
+                  fill="#FFFFFF"
+                  stroke="#000000"
+                  strokeWidth="1.5"
+                />
+              </svg>
+              {/* 클릭 펄스 링 */}
+              {isTesting && (
+                <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full border-2 border-amber-400 animate-ping pointer-events-none opacity-80" />
+              )}
+              <div className="absolute left-4 -top-2 bg-black/85 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20 shadow">
+                AI Cursor: Step {step}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 하단 실시간 로그 바 ── */}
+      <div className="px-3.5 py-1.5 bg-[#0d1117] border-t border-white/10 flex items-center justify-between text-[9.5px] font-mono text-white/70">
+        <div className="flex items-center gap-2 truncate">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <span className="truncate">Active: <strong className="text-white">{currentAction?.label}</strong> ({currentAction?.element})</span>
+        </div>
+        <span className="text-white/40 shrink-0 hidden sm:inline">Real-time Browser &amp; Canvas Emulator</span>
+      </div>
+    </div>
+  );
+}
+
 // ── CommitQARow ──
-function CommitQARow({ commit }: { commit: CommitQAResult }) {
+function CommitQARow({
+  commit,
+  onRunQA,
+}: {
+  commit: CommitQAResult;
+  onRunQA?: (commit: CommitQAResult) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [running, setRunning] = useState(false);
   const sm  = QA_STATUS_META[commit.qaStatus];
   const Icon  = sm.icon;
   const total = commit.parts.reduce((a,p) => a + p.tests,  0);
   const pass  = commit.parts.reduce((a,p) => a + p.passed, 0);
+
+  const handleCommitQA = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRunning(true);
+    setTimeout(() => {
+      setRunning(false);
+      if (onRunQA) onRunQA(commit);
+      toast.success(`커밋 #${commit.hash} AI QA 검증이 완료되었습니다.`);
+    }, 1200);
+  };
 
   return (
     <div style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
@@ -472,20 +736,35 @@ function CommitQARow({ commit }: { commit: CommitQAResult }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background:"rgba(0,0,0,0.05)", color:ACCENT }}>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold" style={{ background:"rgba(0,0,0,0.05)", color:ACCENT }}>
               #{commit.hash}
             </span>
             <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:TEXT_SECONDARY }}>
               {commit.branch}
             </span>
           </div>
-          <p className="text-[11px] mt-0.5 truncate" style={{ color:TEXT_PRIMARY }}>{commit.message}</p>
+          <p className="text-[11px] mt-0.5 truncate font-medium" style={{ color:TEXT_PRIMARY }}>{commit.message}</p>
           <div className="flex items-center gap-3 mt-0.5 text-[9px]" style={{ color:TEXT_TERTIARY }}>
             <span className="flex items-center gap-1"><User className="w-2.5 h-2.5" />{commit.author}</span>
             <span className="flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />{commit.date}</span>
             {total > 0 && <span className="flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5" />{pass}/{total}</span>}
           </div>
         </div>
+
+        {/* 개별 커밋 QA 실행 버튼 */}
+        <button
+          type="button"
+          onClick={handleCommitQA}
+          disabled={running}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all shrink-0"
+          style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
+          onMouseEnter={e => (e.currentTarget.style.background = "rgba(65,67,27,0.14)")}
+          onMouseLeave={e => (e.currentTarget.style.background = ACCENT_BG)}
+        >
+          {running ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Play className="w-2.5 h-2.5" />}
+          QA 실행
+        </button>
+
         <div className="hidden sm:flex items-center gap-1 shrink-0">
           {commit.parts.map(p => {
             const psm = QA_STATUS_META[p.status]; const PI = psm.icon;
@@ -621,6 +900,11 @@ export function AIQAPage({
     void runPhase1FromApi();
   };
 
+  const handleSingleCommitQA = (_commit: CommitQAResult) => {
+    setActiveTab("run");
+    startQA();
+  };
+
   const reset = () => {
     setPhase("idle");
     setElapsed(0);
@@ -634,88 +918,83 @@ export function AIQAPage({
     setNotifications([]);
   };
 
-  // ── Phase 1: 정적 분석 시뮬레이션 ──
+  // ── Phase 1: 정적 코드 분석 ──
+  // 실제로 스테이징된 변경 파일(commitInfo.diffFiles)이 있으면 그 diff를 분석 대상으로 쓰고,
+  // 없으면 데모용 목업 커밋을 사용한다. 파일 목록은 실제 경로를 한 파일씩 순차로 노출해
+  // "스캔 중" 느낌을 주는 동안, 백그라운드에서는 실제 AI QA 분석(또는 로컬 시맨틱 분석)이 진행된다.
   const runPhase1FromApi = async () => {
-    const filesForQa = [
-      ...(BACKEND_COMMITS[0]?.files ?? []),
-      ...(FRONTEND_COMMITS[0]?.files ?? []),
-    ];
+    const filesForQa: CommitFile[] = commitInfo?.diffFiles?.length
+      ? commitInfo.diffFiles
+      : [
+          ...(BACKEND_COMMITS[0]?.files ?? []),
+          ...(FRONTEND_COMMITS[0]?.files ?? []),
+        ];
     const scanTargets = filesForQa.map((file) => file.path);
 
-    setScanFiles(scanTargets);
+    setScanFiles([]);
     setScanCurrent(scanTargets[0] || "");
 
-    try {
-      const response = await runAiQa({
-        projectId,
-        diff: buildDiffFromCommitFiles(filesForQa),
-      });
-      const errors = mapQaResponseToErrors(response);
-      setStaticErrors(errors);
-      if (errors.length > 0) {
-        toast.warning("AI QA 분석에서 확인할 항목이 발견되었습니다.");
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "AI QA 분석에 실패했습니다.");
-    } finally {
-      setScanCurrent("");
-      setPhase1Done(true);
-      setPhase("phase2");
-      runPhase2();
-    }
-  };
-
-  const runPhase1 = () => {
-    const FILES = [
-      "src/main/java/com/weai/agent/ParserAgent.java",
-      "src/main/java/com/weai/controller/MultiAgentController.java",
-      "src/main/java/com/weai/agent/DataSyncAgent.java",
-      "src/main/java/com/weai/scheduler/AgentScheduler.java",
-      "src/main/resources/application-dev.yml",
-      "src/api/apiClient.ts",
-      "src/app/components/AgentControlPage.tsx",
-      "build.gradle",
-      "settings.gradle",
-    ];
-
-    let delay = 0;
-    FILES.forEach((file, i) => {
-      setTimeout(() => {
-        setScanCurrent(file);
-        setScanFiles(prev => [...prev, file]);
-        // 오류 발견 시뮬레이션
-        const err = STATIC_ERRORS.find(e => file.includes(e.file));
-        if (err) {
-          setTimeout(() => {
-            setStaticErrors(prev => prev.some(e => e.id === err.id) ? prev : [...prev, err]);
-          }, 400);
-        }
-      }, delay);
-      delay += 320 + Math.random() * 200;
+    let cancelled = false;
+    const revealTimers: ReturnType<typeof setTimeout>[] = [];
+    scanTargets.forEach((path, i) => {
+      revealTimers.push(setTimeout(() => {
+        if (cancelled) return;
+        setScanCurrent(path);
+        setScanFiles(prev => [...prev, path]);
+      }, i * 260));
     });
+    const revealMs = scanTargets.length * 260;
 
-    // Phase 1 완료 → Phase 2 시작
-    setTimeout(() => {
+    const finishPhase1 = (errors: StaticError[]) => {
+      cancelled = true;
+      revealTimers.forEach(clearTimeout);
+      setScanFiles(scanTargets);
       setScanCurrent("");
+      setStaticErrors(errors);
       setPhase1Done(true);
       setPhase("phase2");
-      // Backend 파트장에게 알림
+
+      const criticalCount = errors.filter(e => e.severity === "critical").length;
       const leader = getLeader("Backend");
       if (leader) {
         addNotification({
           to: leader.name, dept: "Backend",
-          message: "Phase 1 코드 분석 완료 — Critical 오류 2건, Warning 3건 발견",
-          severity: "critical",
+          message: criticalCount > 0
+            ? `Phase 1 코드 분석 완료 — Critical 오류 ${criticalCount}건 발견`
+            : "Phase 1 코드 분석 완료 — 이상 없음",
+          severity: criticalCount > 0 ? "critical" : "passed",
         });
       }
-      setTimeout(() => runPhase2(), 600);
-    }, delay + 800);
+
+      const outcomes = deriveUiActionOutcomes(scanTargets, errors);
+      setTimeout(() => runPhase2(outcomes), 600);
+    };
+
+    try {
+      const diff = buildDiffFromCommitFiles(filesForQa);
+      const response = projectId && projectId > 0
+        ? await runAiQa({ projectId, diff })
+        : generateLocalSemanticQaAnalysis(diff);
+
+      const errors = mapQaResponseToErrors(response, scanTargets);
+      if (errors.length > 0) {
+        toast.warning("AI QA 분석에서 확인할 항목이 발견되었습니다.");
+      }
+      // 파일 스캔 애니메이션이 너무 짧게 끝나지 않도록 최소 재생 시간을 보장한다.
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, revealMs - 260)));
+      finishPhase1(errors);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "AI QA 분석에 실패했습니다.");
+      finishPhase1([]);
+    }
   };
 
-  // ── Phase 2: UI 에이전트 테스트 시뮬레이션 ──
-  const runPhase2 = () => {
+  // ── Phase 2: AI 화면 조작 테스트 ──
+  // Phase 1에서 실제로 감지된 오류를 화면 영역별로 매핑한 outcomes를 기반으로
+  // 각 단계의 성공/실패와 오류 메시지를 결정한다 (고정된 시나리오가 아님).
+  const runPhase2 = (outcomes: Record<string, string> = {}) => {
     let delay = 0;
-    UI_ACTIONS.forEach((action, i) => {
+    UI_ACTIONS.forEach((action) => {
       setTimeout(() => {
         setActiveAction(action.id);
         setActions(prev => prev.map(a => a.id === action.id ? { ...a, status: "running" } : a));
@@ -723,14 +1002,21 @@ export function AIQAPage({
 
       const duration = 700 + Math.random() * 400;
       setTimeout(() => {
-        const hasFail = !!action.error;
+        const errorMessage = outcomes[action.id];
+        const hasFail = Boolean(errorMessage);
         setActions(prev => prev.map(a =>
-          a.id === action.id ? { ...a, status: hasFail ? "failed" : "passed" } : a
+          a.id === action.id ? { ...a, status: hasFail ? "failed" : "passed", error: errorMessage } : a
         ));
         setActiveAction(null);
 
-        if (hasFail && action.clip) {
-          const clip: UIClip = { ...action.clip };
+        if (hasFail) {
+          const clip: UIClip = action.clip ?? {
+            id: `${action.id}-clip`,
+            thumbnail: "",
+            duration: "0:03",
+            errorLabel: action.label,
+            ts: new Date().toLocaleTimeString("ko-KR"),
+          };
           setClips(prev => [...prev, clip]);
           // 관련 파트장에게 알림
           const leader = getLeader("Frontend");
@@ -811,16 +1097,9 @@ export function AIQAPage({
 
       {/* ── AI QA 탭 ── */}
       {mainTab === "qa" && (
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position:"absolute", top:"-10%", left:"-5%", width:"45%", height:"45%", borderRadius:"50%", background: GRADIENT_ORB_1, filter:"blur(50px)" }} />
-        <div style={{ position:"absolute", bottom:"-10%", right:"-5%", width:"50%", height:"50%", borderRadius:"50%", background:"radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter:"blur(50px)" }} />
-      </div>
-
-      <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+      <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+        <div className="relative z-10 flex-1 overflow-y-auto p-5">
+          <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
           <div className="flex items-start justify-between gap-4">
@@ -919,7 +1198,7 @@ export function AIQAPage({
 
                   {phase === "done" && (
                     <button onClick={reset} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all" style={{ background:"rgba(255,255,255,0.80)", border:`1px solid ${BORDER}`, color:TEXT_SECONDARY }}>
-                      <RotateCw className="w-3 h-3" /> Reset
+                      <RotateCw className="w-3 h-3" /> 검사 초기화
                     </button>
                   )}
                   {activeTab === "run" && (
@@ -935,7 +1214,7 @@ export function AIQAPage({
                       }}
                     >
                       {phase !== "idle" && phase !== "done" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                      {phase !== "idle" && phase !== "done" ? "Running…" : "Run QA"}
+                      {phase !== "idle" && phase !== "done" ? "검사 진행 중…" : "AI QA 전체 검사 실행"}
                     </button>
                   )}
                 </>
@@ -1070,7 +1349,7 @@ export function AIQAPage({
                             <p className="text-[11px]" style={{ color:TEXT_SECONDARY }}>파일 목록 수집 중…</p>
                           </div>
                         )}
-                        {scanFiles.map((file, i) => {
+                        {scanFiles.map((file) => {
                           const err = staticErrors.find(e => file.includes(e.file));
                           return (
                             <div key={file} className="flex items-center gap-2.5 rounded-lg px-3 py-2" style={{ background:"rgba(0,0,0,0.025)", border:`1px solid ${BORDER_SUBTLE}` }}>
@@ -1173,12 +1452,31 @@ export function AIQAPage({
 
                     {(phase === "phase2" || phase2Done || (phase === "done")) && (
                       <div className="p-4">
+                        {/* ── 🖥️ 실시간 가상 화면 조작 에뮬레이터 ── */}
+                        <LiveScreenManipulationPlayer
+                          activeAction={activeAction}
+                          actions={actions}
+                          isTesting={phase === "phase2"}
+                          onSelectAction={(id) => setActiveAction(id)}
+                        />
+
+                        {/* 액션 스텝 목록 헤더 */}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
+                            자동화 테스트 단계 ({actions.filter(a => a.status === "passed").length}/{actions.length} 완료)
+                          </span>
+                          <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                            각 단계를 클릭하여 실시간 화면 위치를 확인할 수 있습니다
+                          </span>
+                        </div>
+
                         {/* 액션 스텝 목록 */}
                         <div className="space-y-1.5">
-                          {actions.map((action, i) => (
+                          {actions.map((action) => (
                             <div
                               key={action.id}
-                              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all"
+                              onClick={() => setActiveAction(action.id)}
+                              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all cursor-pointer hover:shadow-sm"
                               style={{
                                 background: activeAction === action.id
                                   ? "rgba(245,158,11,0.08)"
@@ -1332,7 +1630,13 @@ export function AIQAPage({
                       <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>커밋별 QA 현황</p>
                       <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>{filteredCommits.length}</span>
                     </div>
-                    {filteredCommits.map(c => <CommitQARow key={c.id} commit={c} />)}
+                    {filteredCommits.map(c => (
+                      <CommitQARow
+                        key={c.id}
+                        commit={c}
+                        onRunQA={handleSingleCommitQA}
+                      />
+                    ))}
                   </div>
                 </>
               )}

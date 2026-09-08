@@ -195,7 +195,7 @@ export function isInRange(date: string, start: string, end: string): boolean {
 
 export function formatDateKR(date: string): string {
   if (!date) return "";
-  const [y, m, d] = date.split("-");
+  const [, m, d] = date.split("-");
   return `${m}월 ${d}일`;
 }
 

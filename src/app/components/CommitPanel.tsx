@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  GitCommit, CheckSquare, Upload, GitBranch,
+  GitCommit, Upload, GitBranch,
   CheckCircle2, X, ShieldCheck,
 } from "lucide-react";
 import { CHANGE_FILES } from "./commitData";
@@ -8,7 +8,7 @@ import type { CommitFile } from "./commitData";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, BEIGE,
+  ACCENT, ACCENT_BG,
 } from "../colors";
 
 const STATUS_ICON: Record<string, { color: string; label: string }> = {
@@ -42,18 +42,25 @@ function QAModal({
           boxShadow: "0 8px 40px rgba(0,0,0,0.14)",
         }}
       >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1 rounded-lg hover:bg-black/[0.06] transition-colors"
+          aria-label="닫기"
+        >
+          <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+        </button>
         <div className="p-6 text-center">
           <div
             className="w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, rgba(224,231,255,0.7), rgba(221,214,254,0.6))" }}
+            style={{ background: ACCENT_BG }}
           >
             <ShieldCheck className="w-6 h-6" style={{ color: ACCENT }} />
           </div>
           <h3 className="text-sm font-bold mb-1.5" style={{ color: TEXT_PRIMARY }}>
-            커밋 전 QA를 진행할까요?
+            커밋 전 AI QA를 진행할까요?
           </h3>
           <p className="text-[11px] leading-relaxed mb-1" style={{ color: TEXT_SECONDARY }}>
-            AI QA 에이전트가 자동으로 코드를 검사합니다.
+            AI QA 에이전트가 코드를 자동으로 정적/동적 검사합니다.
           </p>
           <div
             className="px-3 py-2 rounded-xl font-mono text-[10px] mb-5 text-left"
@@ -73,12 +80,12 @@ function QAModal({
               onClick={onQAYes}
               className="flex-1 py-2.5 rounded-xl text-xs font-semibold"
               style={{
-                background: "linear-gradient(135deg, #635bff, #8b5cf6)",
-                color: "rgba(255,255,255,0.95)",
-                boxShadow: "0 4px 14px rgba(99,91,255,0.3)",
+                background: ACCENT,
+                color: "#FFFFFF",
+                boxShadow: "0 4px 14px rgba(65,67,27,0.22)",
               }}
             >
-              예, AI QA 실행
+              예, AI QA 실행하기
             </button>
           </div>
         </div>
@@ -251,15 +258,11 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
               className="flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-all"
               style={{
                 borderBottom: `1px solid ${BORDER_SUBTLE}`,
-                background: isSelected ? "rgba(99,91,255,0.06)" : isStaged ? "rgba(99,91,255,0.02)" : "transparent",
-                // 그라데이션 선택 border
-                borderLeft: isSelected ? "2px solid" : "2px solid transparent",
-                borderImage: isSelected
-                  ? "linear-gradient(180deg, #635bff 0%, #8b5cf6 50%, #ec4899 100%) 1"
-                  : "none",
+                background: isSelected ? "rgba(65,67,27,0.06)" : isStaged ? "rgba(65,67,27,0.02)" : "transparent",
+                borderLeft: isSelected ? `2px solid ${ACCENT}` : "2px solid transparent",
               }}
               onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(0,0,0,0.025)"; }}
-              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isStaged ? "rgba(99,91,255,0.02)" : "transparent"; }}
+              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isStaged ? "rgba(65,67,27,0.02)" : "transparent"; }}
             >
               {/* 체크박스 */}
               <div
@@ -314,7 +317,7 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
         <textarea
           value={message}
           onChange={e => setMessage(e.target.value)}
-          placeholder="커밋 메시지 (필수)"
+          placeholder="커밋 메시지를 입력하세요 (필수)"
           rows={2}
           className="w-full px-2.5 py-1.5 text-[10px] leading-relaxed rounded-xl outline-none resize-none"
           style={{
@@ -326,7 +329,7 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
         <div className="flex items-center gap-1.5">
           <div
             className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: "linear-gradient(135deg, #E3DBBB, #AEB784)" }}
+            style={{ background: ACCENT_BG }}
           >
             <span className="text-[7px] font-bold" style={{ color: ACCENT }}>병</span>
           </div>
@@ -339,7 +342,7 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
           className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-semibold transition-all"
           style={{
             background: stagedCount > 0 && message.trim()
-              ? "linear-gradient(135deg, #41431B, #6B7040, #AEB784)"
+              ? ACCENT
               : "rgba(65,67,27,0.06)",
             color: stagedCount > 0 && message.trim() ? "rgba(248,243,225,0.95)" : TEXT_TERTIARY,
             boxShadow: stagedCount > 0 && message.trim() ? "0 4px 14px rgba(65,67,27,0.22)" : "none",
@@ -347,7 +350,7 @@ export function CommitPanel({ onFileSelect, onNavigateQA, selectedFileId, collap
           }}
         >
           <Upload className="w-3 h-3" />
-          Commit &amp; Push
+          Commit &amp; Push to origin
         </button>
       </div>
     </>

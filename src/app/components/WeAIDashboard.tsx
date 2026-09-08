@@ -15,16 +15,15 @@ import {
 // ── 디자인 토큰 ──
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_LOGO,
+  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1,
   CTA_BG, UI_GREEN, UI_GREEN_DARK, UI_GREEN_BG, UI_GREEN_BG7,
   UI_RED, UI_RED_DARK, UI_RED_BG,
-  UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
-  UI_VIOLET, UI_VIOLET_BG, UI_VIOLET_BG7,
+  UI_AMBER, UI_AMBER_DARK,
+  UI_VIOLET, UI_VIOLET_BG7,
   UI_INDIGO, UI_INDIGO_BG,
   UI_GRAY, UI_GRAY_LIGHT, UI_GRAY_BG, UI_GRAY_BG8,
-  TERM_BG, TERM_TEXT, TERM_MUTED, TERM_DIMMER, TERM_GREEN,
-  GRADIENT_HEADER, GRADIENT_HEADER_SM2, GRADIENT_HEADER_SM3,
-  GRADIENT_INDIGO, BTN_DARK, PANEL_BG, CONTENT_BG,
+  GRADIENT_HEADER_SM2,
+  PANEL_BG, CONTENT_BG,
   LANG_GRADLE, LANG_JAVA, LANG_YML,
 } from "../colors";
 
@@ -1285,17 +1284,7 @@ export function WeAIDashboard() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경: 하늘 물드는 그라데이션 */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)" }}
-      />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       {/* 워크스페이스 탭 헤더 */}
       <div
         className="relative z-10 flex items-center gap-1 px-4 pt-3 pb-2.5 shrink-0 flex-wrap"
@@ -1315,7 +1304,7 @@ export function WeAIDashboard() {
         <div className="flex items-center gap-2 mr-3 shrink-0">
           <div
             className="w-5 h-5 rounded-md flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #e0e7ff, #ddd6fe, #fce7f3)" }}
+            style={{ background: ACCENT_BG }}
           >
             <Bot className="w-3 h-3" style={{ color: ACCENT }} />
           </div>

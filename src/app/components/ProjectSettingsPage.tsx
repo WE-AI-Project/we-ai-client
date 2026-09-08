@@ -13,6 +13,13 @@ import {
   ShieldCheck,
   Trash2,
   Users,
+  Plus,
+  Edit2,
+  Check,
+  X,
+  Clock,
+  AlertCircle,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -35,6 +42,9 @@ import {
   ProjectMemberRole,
   ProjectSchedule,
   ProjectScheduleStatus,
+  ProjectSchedulePriority,
+  ProjectScheduleCreatePayload,
+  ProjectScheduleUpdatePayload,
   ProjectStatus,
   ProjectTechStack,
   ProjectTechStackCategory,
@@ -47,6 +57,9 @@ import {
   fetchProjectMembers,
   fetchProjectSchedules,
   fetchProjectTechStacks,
+  createProjectSchedule,
+  updateProjectSchedule,
+  deleteProjectSchedule,
   formatApiError,
   updateProject,
   updateProjectMemberDepartment,
@@ -56,6 +69,7 @@ import {
 } from "../lib/api";
 import { loadSettings, saveSettings } from "../data/projectSettingsStore";
 import { ProjectSettingsSkeleton } from "./SkeletonLoader";
+import { formatRelativeAccessTime } from "./DailyStandupModal";
 
 const MEMBER_DEPARTMENTS: ProjectDepartment[] = [
   "BACKEND",
@@ -170,31 +184,6 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TabButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      type="button"
-      className="rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all"
-      style={{
-        background: active ? ACCENT : FIELD_SURFACE,
-        color: active ? "white" : TEXT_SECONDARY,
-        border: `1px solid ${active ? ACCENT : BORDER}`,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
 function SettingsNavButton({
   active,
   icon: Icon,
@@ -296,6 +285,42 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
   const [savingMemberId, setSavingMemberId] = useState<number | null>(null);
   const [savingTech, setSavingTech] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 일정 관리 및 마감일 수정 상태
+  const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
+  const [scheduleDraft, setScheduleDraft] = useState<{
+    title: string;
+    startDate: string;
+    endDate: string;
+    status: ProjectScheduleStatus;
+    priority: ProjectSchedulePriority;
+    department: ProjectDepartment;
+    assigneeId?: number | null;
+  } | null>(null);
+  const [savingScheduleId, setSavingScheduleId] = useState<number | null>(null);
+
+  // 새 일정 등록 상태
+  const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
+  const [newScheduleForm, setNewScheduleForm] = useState<{
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    department: ProjectDepartment;
+    priority: ProjectSchedulePriority;
+    status: ProjectScheduleStatus;
+    assigneeId?: number | null;
+  }>({
+    title: "",
+    description: "",
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    department: "BACKEND",
+    priority: "MEDIUM",
+    status: "TODO",
+    assigneeId: null,
+  });
+  const [creatingSchedule, setCreatingSchedule] = useState(false);
 
   const scheduleSummary = useMemo(
     () => ({
@@ -670,6 +695,146 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
     }
   };
 
+  const handleStartEditSchedule = (schedule: ProjectSchedule) => {
+    setEditingScheduleId(schedule.scheduleId);
+    setScheduleDraft({
+      title: schedule.title,
+      startDate: schedule.startDate || "",
+      endDate: schedule.endDate || "",
+      status: schedule.status,
+      priority: schedule.priority,
+      department: schedule.department,
+      assigneeId: schedule.assigneeId,
+    });
+  };
+
+  const handleCancelEditSchedule = () => {
+    setEditingScheduleId(null);
+    setScheduleDraft(null);
+  };
+
+  const handleSaveSchedule = async (scheduleId: number) => {
+    if (!projectId || !scheduleDraft) return;
+    if (!scheduleDraft.title.trim()) {
+      toast.error("일정 제목을 입력해주세요.");
+      return;
+    }
+    if (!scheduleDraft.endDate) {
+      toast.error("마감일을 지정해주세요.");
+      return;
+    }
+
+    setSavingScheduleId(scheduleId);
+    try {
+      const updated = await updateProjectSchedule(projectId, scheduleId, {
+        title: scheduleDraft.title.trim(),
+        startDate: scheduleDraft.startDate || null,
+        endDate: scheduleDraft.endDate,
+        status: scheduleDraft.status,
+        priority: scheduleDraft.priority,
+        department: scheduleDraft.department,
+        assigneeId: scheduleDraft.assigneeId || null,
+      });
+
+      setSchedules((prev) =>
+        prev.map((s) => (s.scheduleId === scheduleId ? { ...s, ...updated } : s))
+      );
+      toast.success("일정 및 마감일이 수정되었습니다.");
+      setEditingScheduleId(null);
+      setScheduleDraft(null);
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setSavingScheduleId(null);
+    }
+  };
+
+  const handleQuickUpdateEndDate = async (schedule: ProjectSchedule, newEndDate: string) => {
+    if (!projectId || !newEndDate) return;
+    setSavingScheduleId(schedule.scheduleId);
+    try {
+      const updated = await updateProjectSchedule(projectId, schedule.scheduleId, {
+        title: schedule.title,
+        startDate: schedule.startDate,
+        endDate: newEndDate,
+        status: schedule.status,
+        priority: schedule.priority,
+        department: schedule.department,
+        assigneeId: schedule.assigneeId,
+      });
+
+      setSchedules((prev) =>
+        prev.map((s) => (s.scheduleId === schedule.scheduleId ? { ...s, ...updated, endDate: newEndDate } : s))
+      );
+      toast.success(`마감일이 ${newEndDate}로 변경되었습니다.`);
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setSavingScheduleId(null);
+    }
+  };
+
+  const handleCreateScheduleSubmit = async () => {
+    if (!projectId) return;
+    if (!newScheduleForm.title.trim()) {
+      toast.error("일정 제목을 입력해주세요.");
+      return;
+    }
+    if (!newScheduleForm.endDate) {
+      toast.error("마감일을 지정해주세요.");
+      return;
+    }
+
+    setCreatingSchedule(true);
+    try {
+      const created = await createProjectSchedule(projectId, {
+        title: newScheduleForm.title.trim(),
+        description: newScheduleForm.description.trim() || undefined,
+        startDate: newScheduleForm.startDate,
+        endDate: newScheduleForm.endDate,
+        department: newScheduleForm.department,
+        priority: newScheduleForm.priority,
+        status: newScheduleForm.status,
+        assigneeId: newScheduleForm.assigneeId || undefined,
+      });
+
+      setSchedules((prev) => [created, ...prev]);
+      toast.success("새 일정이 등록되었습니다.");
+      setIsCreatingSchedule(false);
+      setNewScheduleForm({
+        title: "",
+        description: "",
+        startDate: new Date().toISOString().slice(0, 10),
+        endDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+        department: "BACKEND",
+        priority: "MEDIUM",
+        status: "TODO",
+        assigneeId: null,
+      });
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setCreatingSchedule(false);
+    }
+  };
+
+  const handleDeleteSchedule = async (scheduleId: number, title: string) => {
+    if (!projectId) return;
+    const confirm = window.confirm(`"${title}" 일정을 삭제하시겠습니까?`);
+    if (!confirm) return;
+
+    setSavingScheduleId(scheduleId);
+    try {
+      await deleteProjectSchedule(projectId, scheduleId);
+      setSchedules((prev) => prev.filter((s) => s.scheduleId !== scheduleId));
+      toast.success("일정이 삭제되었습니다.");
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setSavingScheduleId(null);
+    }
+  };
+
   if (!projectId) {
     return (
       <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
@@ -721,23 +886,19 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
-      <div className="mx-auto max-w-7xl space-y-5">
+      <div className="w-full max-w-[1600px] mx-auto space-y-4">
         <section
-          className="relative overflow-hidden rounded-[28px] border px-6 py-6"
+          className="relative overflow-hidden rounded-2xl border px-6 py-6"
           style={{
-            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #41431B 100%)",
-            borderColor: "rgba(255,255,255,0.10)",
-            boxShadow: "0 18px 42px rgba(12,14,2,0.20)",
+            background: "#0D1117",
+            borderColor: "rgba(255,255,255,0.08)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
           }}
         >
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-1/2"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(174,183,132,0.16))" }}
-          />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4" style={{ color: "#AEB784" }} />
+                <Settings className="h-4 w-4" style={{ color: "#3B82F6" }} />
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.50)" }}>
                   Project Settings
                 </p>
@@ -781,7 +942,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
         <div className="grid gap-5 xl:grid-cols-[280px,minmax(0,1fr)]">
           <aside className="space-y-4">
             <section
-              className="rounded-[28px] border p-3"
+              className="rounded-xl border p-3"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="space-y-2">
@@ -817,7 +978,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
             </section>
 
             <section
-              className="rounded-[28px] border p-4"
+              className="rounded-xl border p-4"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
@@ -836,7 +997,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
         {activeTab === "overview" && (
           <div className="space-y-4">
             <section
-              className="rounded-[28px] border px-5 py-5"
+              className="rounded-xl border px-5 py-5"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
@@ -964,7 +1125,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
         {activeTab === "team" && (
           <section className="grid gap-5 xl:grid-cols-[1.3fr,0.9fr]">
             <div
-              className="rounded-[28px] border px-5 py-5"
+              className="rounded-xl border px-5 py-5"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
@@ -1003,14 +1164,25 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
                           <button
                             type="button"
                             onClick={() => void handleSelectMember(member.projectMemberId)}
-                            className="text-left"
+                            className="text-left flex-1 min-w-0"
                           >
                             <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
                               {member.name}
                             </p>
-                            <p className="mt-1 text-[12px]" style={{ color: TEXT_TERTIARY }}>
+                            <p className="mt-0.5 text-[12px] truncate" style={{ color: TEXT_TERTIARY }}>
                               {member.email}
                             </p>
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              {(() => {
+                                const rel = formatRelativeAccessTime(member.lastAccessedAt || member.joinedAt);
+                                return (
+                                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${rel.badgeClass}`}>
+                                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: rel.dotColor }} />
+                                    {rel.label}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </button>
 
                           <div className="flex items-center gap-2">
@@ -1109,7 +1281,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
             </div>
 
             <div
-              className="rounded-[28px] border px-5 py-5"
+              className="rounded-xl border px-5 py-5"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
@@ -1150,11 +1322,22 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
 
                   <div className="rounded-2xl border px-4 py-4" style={{ borderColor: BORDER_SUBTLE, background: MUTED_SURFACE }}>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
-                      Joined At
+                      Joined At / Access Status
                     </p>
-                    <p className="mt-2 text-sm" style={{ color: TEXT_PRIMARY }}>
-                      {selectedMemberDetail.joinedAt}
-                    </p>
+                    <div className="mt-2 flex items-center justify-between flex-wrap gap-2">
+                      <p className="text-sm" style={{ color: TEXT_PRIMARY }}>
+                        {selectedMemberDetail.joinedAt}
+                      </p>
+                      {(() => {
+                        const rel = formatRelativeAccessTime(selectedMemberDetail.lastAccessedAt || selectedMemberDetail.joinedAt);
+                        return (
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${rel.badgeClass}`}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: rel.dotColor }} />
+                            {rel.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1166,7 +1349,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
           <section className={isAdmin ? "grid gap-5 xl:grid-cols-[0.95fr,1.05fr]" : ""}>
             {isAdmin && (
             <div
-              className="rounded-[28px] border px-5 py-5"
+              className="rounded-xl border px-5 py-5"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
@@ -1259,7 +1442,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
             )}
 
             <div
-              className="rounded-[28px] border px-5 py-5"
+              className="rounded-xl border px-5 py-5"
               style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
             >
               <div className="mb-4 flex items-center gap-2">
@@ -1338,15 +1521,175 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
 
         {activeTab === "schedules" && (
           <section
-            className="rounded-[28px] border px-5 py-5"
+            className="rounded-xl border px-5 py-5"
             style={{ background: CARD_SURFACE, borderColor: BORDER, boxShadow: PANEL_SHADOW }}
           >
-            <div className="mb-4 flex items-center gap-2">
-              <ListTodo className="h-4 w-4" style={{ color: ACCENT }} />
-              <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-                일정 현황
-              </h2>
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <ListTodo className="h-4 w-4" style={{ color: ACCENT }} />
+                <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
+                  일정 현황
+                </h2>
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-black/5 text-gray-600">
+                  {schedules.length}건
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCreatingSchedule((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-95"
+                style={{ background: ACCENT }}
+              >
+                {isCreatingSchedule ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                {isCreatingSchedule ? "등록 닫기" : "새 일정 추가"}
+              </button>
             </div>
+
+            {/* ── 새 일정 등록 폼 ── */}
+            {isCreatingSchedule && (
+              <div
+                className="mb-5 rounded-2xl border p-4.5 space-y-4 animate-in fade-in duration-150"
+                style={{ background: FIELD_SURFACE, borderColor: ACCENT_BORDER }}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold flex items-center gap-1.5" style={{ color: TEXT_PRIMARY }}>
+                    <Plus className="h-4 w-4" style={{ color: ACCENT }} />
+                    새 일정 등록 (마감일 지정)
+                  </p>
+                  <span className="text-[11px] text-gray-400">부서별 일정을 등록하여 대시보드에 연동합니다</span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  <div className="sm:col-span-2 md:col-span-3">
+                    <InputLabel>일정 제목 *</InputLabel>
+                    <input
+                      value={newScheduleForm.title}
+                      onChange={(e) => setNewScheduleForm((prev) => ({ ...prev, title: e.target.value }))}
+                      placeholder="예: 백엔드 인증 API 리팩토링 및 테스트"
+                      className="mt-1.5 w-full rounded-xl border px-3.5 py-2 text-sm outline-none bg-white"
+                      style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
+                    />
+                  </div>
+
+                  <div>
+                    <InputLabel>담당 부서 (파트) *</InputLabel>
+                    <select
+                      value={newScheduleForm.department}
+                      onChange={(e) =>
+                        setNewScheduleForm((prev) => ({ ...prev, department: e.target.value as ProjectDepartment }))
+                      }
+                      className="mt-1.5 w-full rounded-xl border px-3.5 py-2 text-sm outline-none bg-white"
+                      style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
+                    >
+                      {Object.entries(DEPARTMENT_LABELS).map(([deptKey, deptLabel]) => (
+                        <option key={deptKey} value={deptKey}>
+                          {deptLabel} ({deptKey})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <InputLabel>시작일</InputLabel>
+                    <input
+                      type="date"
+                      value={newScheduleForm.startDate}
+                      onChange={(e) => setNewScheduleForm((prev) => ({ ...prev, startDate: e.target.value }))}
+                      className="mt-1.5 w-full rounded-xl border px-3.5 py-2 text-sm outline-none bg-white font-mono"
+                      style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
+                    />
+                  </div>
+
+                  <div>
+                    <InputLabel>마감일 (종료일) *</InputLabel>
+                    <input
+                      type="date"
+                      value={newScheduleForm.endDate}
+                      onChange={(e) => setNewScheduleForm((prev) => ({ ...prev, endDate: e.target.value }))}
+                      className="mt-1.5 w-full rounded-xl border px-3.5 py-2 text-sm outline-none bg-white font-mono font-bold"
+                      style={{ borderColor: ACCENT, color: ACCENT }}
+                    />
+                  </div>
+
+                  <div>
+                    <InputLabel>우선순위</InputLabel>
+                    <select
+                      value={newScheduleForm.priority}
+                      onChange={(e) =>
+                        setNewScheduleForm((prev) => ({ ...prev, priority: e.target.value as ProjectSchedulePriority }))
+                      }
+                      className="mt-1.5 w-full rounded-xl border px-3.5 py-2 text-sm outline-none bg-white"
+                      style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
+                    >
+                      <option value="LOW">LOW (낮음)</option>
+                      <option value="MEDIUM">MEDIUM (보통)</option>
+                      <option value="HIGH">HIGH (높음/긴급)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <InputLabel>초기 상태</InputLabel>
+                    <select
+                      value={newScheduleForm.status}
+                      onChange={(e) =>
+                        setNewScheduleForm((prev) => ({ ...prev, status: e.target.value as ProjectScheduleStatus }))
+                      }
+                      className="mt-1.5 w-full rounded-xl border px-3.5 py-2 text-sm outline-none bg-white"
+                      style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
+                    >
+                      <option value="TODO">TODO (할 일)</option>
+                      <option value="IN_PROGRESS">IN_PROGRESS (진행 중)</option>
+                      <option value="DONE">DONE (완료)</option>
+                      <option value="COMPLETED">COMPLETED (최종 완료)</option>
+                      <option value="HOLD">HOLD (보류)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <InputLabel>담당 멤버</InputLabel>
+                    <select
+                      value={newScheduleForm.assigneeId ?? ""}
+                      onChange={(e) =>
+                        setNewScheduleForm((prev) => ({
+                          ...prev,
+                          assigneeId: e.target.value ? Number(e.target.value) : null,
+                        }))
+                      }
+                      className="mt-1.5 w-full rounded-xl border px-3.5 py-2 text-sm outline-none bg-white"
+                      style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
+                    >
+                      <option value="">미지정</option>
+                      {members.map((m) => (
+                        <option key={m.userId} value={m.userId}>
+                          {m.name} ({m.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1 border-t border-black/5">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingSchedule(false)}
+                    className="rounded-xl border px-4 py-2 text-xs font-semibold text-gray-600 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    disabled={creatingSchedule}
+                    onClick={() => void handleCreateScheduleSubmit()}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all"
+                    style={{ background: ACCENT }}
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    {creatingSchedule ? "등록 중..." : "일정 등록"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-3 md:grid-cols-4">
               <StatTile label="Total" value={`${scheduleSummary.total}`} />
@@ -1357,55 +1700,218 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
 
             <div className="mt-5 space-y-3">
               {schedules.length === 0 ? (
-                <p className="text-sm" style={{ color: TEXT_TERTIARY }}>
-                  등록된 일정이 없습니다.
+                <p className="text-sm py-4 text-center" style={{ color: TEXT_TERTIARY }}>
+                  등록된 일정이 없습니다. 새 일정을 등록해보세요.
                 </p>
               ) : (
-                schedules?.map((schedule) => {
-                  const statusTone = SCHEDULE_STATUS_COLORS[schedule.status];
+                schedules.map((schedule) => {
+                  const statusTone = SCHEDULE_STATUS_COLORS[schedule.status] || SCHEDULE_STATUS_COLORS.TODO;
+                  const isEditing = editingScheduleId === schedule.scheduleId;
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const isDelayed =
+                    schedule.endDate &&
+                    schedule.endDate < todayStr &&
+                    schedule.status !== "DONE" &&
+                    schedule.status !== "COMPLETED";
+
+                  if (isEditing && scheduleDraft) {
+                    return (
+                      <div
+                        key={schedule.scheduleId}
+                        className="rounded-2xl border p-4.5 space-y-3 animate-in fade-in duration-100"
+                        style={{ background: CARD_SURFACE, borderColor: ACCENT }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-800">일정 및 마감일 수정</span>
+                          <span className="text-[10px] text-gray-400">ID: #{schedule.scheduleId}</span>
+                        </div>
+
+                        <div className="grid gap-2.5 sm:grid-cols-2 md:grid-cols-4">
+                          <div className="sm:col-span-2 md:col-span-4">
+                            <InputLabel>제목</InputLabel>
+                            <input
+                              value={scheduleDraft.title}
+                              onChange={(e) => setScheduleDraft((prev) => prev ? { ...prev, title: e.target.value } : null)}
+                              className="mt-1 w-full rounded-xl border px-3 py-1.5 text-sm bg-white outline-none"
+                              style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
+                            />
+                          </div>
+
+                          <div>
+                            <InputLabel>부서</InputLabel>
+                            <select
+                              value={scheduleDraft.department}
+                              onChange={(e) =>
+                                setScheduleDraft((prev) =>
+                                  prev ? { ...prev, department: e.target.value as ProjectDepartment } : null
+                                )
+                              }
+                              className="mt-1 w-full rounded-xl border px-3 py-1.5 text-xs bg-white outline-none"
+                              style={{ borderColor: BORDER }}
+                            >
+                              {Object.entries(DEPARTMENT_LABELS).map(([deptKey, deptLabel]) => (
+                                <option key={deptKey} value={deptKey}>
+                                  {deptLabel}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <InputLabel>시작일</InputLabel>
+                            <input
+                              type="date"
+                              value={scheduleDraft.startDate}
+                              onChange={(e) =>
+                                setScheduleDraft((prev) => (prev ? { ...prev, startDate: e.target.value } : null))
+                              }
+                              className="mt-1 w-full rounded-xl border px-3 py-1.5 text-xs bg-white font-mono outline-none"
+                              style={{ borderColor: BORDER }}
+                            />
+                          </div>
+
+                          <div>
+                            <InputLabel>마감일 *</InputLabel>
+                            <input
+                              type="date"
+                              value={scheduleDraft.endDate}
+                              onChange={(e) =>
+                                setScheduleDraft((prev) => (prev ? { ...prev, endDate: e.target.value } : null))
+                              }
+                              className="mt-1 w-full rounded-xl border px-3 py-1.5 text-xs bg-white font-mono font-bold outline-none"
+                              style={{ borderColor: ACCENT, color: ACCENT }}
+                            />
+                          </div>
+
+                          <div>
+                            <InputLabel>상태</InputLabel>
+                            <select
+                              value={scheduleDraft.status}
+                              onChange={(e) =>
+                                setScheduleDraft((prev) =>
+                                  prev ? { ...prev, status: e.target.value as ProjectScheduleStatus } : null
+                                )
+                              }
+                              className="mt-1 w-full rounded-xl border px-3 py-1.5 text-xs bg-white outline-none"
+                              style={{ borderColor: BORDER }}
+                            >
+                              <option value="TODO">TODO</option>
+                              <option value="IN_PROGRESS">IN_PROGRESS</option>
+                              <option value="DONE">DONE</option>
+                              <option value="COMPLETED">COMPLETED</option>
+                              <option value="HOLD">HOLD</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2 border-t border-black/5">
+                          <button
+                            type="button"
+                            onClick={handleCancelEditSchedule}
+                            className="rounded-xl border px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white hover:bg-gray-50"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingScheduleId === schedule.scheduleId}
+                            onClick={() => void handleSaveSchedule(schedule.scheduleId)}
+                            className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm"
+                            style={{ background: ACCENT }}
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                            {savingScheduleId === schedule.scheduleId ? "저장 중..." : "저장 완료"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div
                       key={schedule.scheduleId}
-                      className="rounded-2xl border px-4 py-4"
+                      className="rounded-2xl border px-4 py-4 transition-all hover:border-black/20"
                       style={{ background: ROW_SURFACE, borderColor: BORDER_SUBTLE }}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
-                            {schedule.title}
-                          </p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+                              {schedule.title}
+                            </p>
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                              style={{ color: statusTone.color, background: statusTone.bg }}
+                            >
+                              {schedule.status}
+                            </span>
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                              style={{ background: ACCENT_BG, color: ACCENT }}
+                            >
+                              {schedule.priority}
+                            </span>
+                            {isDelayed && (
+                              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-red-700 bg-red-100/70 border border-red-200">
+                                <AlertCircle className="h-3 w-3" />
+                                마감일 초과 (지연)
+                              </span>
+                            )}
+                          </div>
+
                           <p className="mt-1 text-[12px]" style={{ color: TEXT_TERTIARY }}>
-                            {DEPARTMENT_LABELS[schedule.department]} · {schedule.assigneeName}
+                            파트: <strong>{DEPARTMENT_LABELS[schedule.department]}</strong> · 담당: {schedule.assigneeName || "미지정"}
                           </p>
+
                           {schedule.description && (
-                            <p className="mt-2 text-[12px]" style={{ color: TEXT_SECONDARY }}>
+                            <p className="mt-1.5 text-[12px] text-gray-600">
                               {schedule.description}
                             </p>
                           )}
                         </div>
 
-                        <div className="flex flex-wrap gap-2 text-[11px]">
-                          <span
-                            className="rounded-full px-2.5 py-1"
-                            style={{ color: statusTone.color, background: statusTone.bg }}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditSchedule(schedule)}
+                            className="inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-semibold hover:bg-white transition-colors"
+                            style={{ borderColor: BORDER, color: TEXT_PRIMARY }}
                           >
-                            {schedule.status}
-                          </span>
-                          <span
-                            className="rounded-full px-2.5 py-1"
-                            style={{ background: ACCENT_BG, color: ACCENT }}
+                            <Edit2 className="h-3 w-3" />
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteSchedule(schedule.scheduleId, schedule.title)}
+                            className="rounded-xl border p-1.5 text-red-500 hover:bg-red-50 transition-colors"
+                            style={{ borderColor: BORDER_SUBTLE }}
                           >
-                            {schedule.priority}
-                          </span>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
 
-                      <div className="mt-3 flex items-center gap-2 text-[12px]" style={{ color: TEXT_TERTIARY }}>
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        <span>
-                          {schedule.startDate || "-"} ~ {schedule.endDate || "-"}
-                        </span>
+                      {/* ── 마감일 인라인 퀵 피커 바 ── */}
+                      <div className="mt-3 pt-2.5 border-t border-black/5 flex items-center justify-between flex-wrap gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <CalendarDays className="h-3.5 w-3.5 text-gray-400" />
+                          <span>시작: {schedule.startDate || "-"}</span>
+                          <span className="text-gray-300">|</span>
+                          <span className="font-semibold text-gray-700">마감: {schedule.endDate || "미지정"}</span>
+                        </div>
+
+                        {/* 마감일 퀵 데이트피커 */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-gray-500">마감일 변경:</span>
+                          <input
+                            type="date"
+                            value={schedule.endDate || ""}
+                            disabled={savingScheduleId === schedule.scheduleId}
+                            onChange={(e) => void handleQuickUpdateEndDate(schedule, e.target.value)}
+                            className="rounded-lg border px-2 py-1 text-xs outline-none bg-white font-mono font-medium shadow-2xs hover:border-black/30 transition-colors cursor-pointer"
+                            style={{ borderColor: isDelayed ? "#EF4444" : BORDER, color: TEXT_PRIMARY }}
+                          />
+                        </div>
                       </div>
                     </div>
                   );

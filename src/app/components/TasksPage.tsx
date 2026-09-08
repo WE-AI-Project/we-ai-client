@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { CheckSquare, Circle, Clock, Search, ChevronDown, Plus, Tag, User } from "lucide-react";
+import { useState } from "react";
+import { CheckSquare, Clock, Search, Plus, User } from "lucide-react";
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
+  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   UI_RED_DARK, UI_AMBER_DARK, UI_GRAY, UI_GRAY_LIGHT, UI_AMBER, UI_GREEN, UI_RED, UI_INDIGO,
-  UI_INDIGO_BG, GRADIENT_HEADER, BTN_DARK, ACCENT,
+  UI_INDIGO_BG, ACCENT, ACCENT_BG, ACCENT_BORDER, CONTENT_BG, CARD_BG,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -79,16 +79,9 @@ export function TasksPage() {
   });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_HEADER }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
@@ -107,51 +100,52 @@ export function TasksPage() {
             ) : (
               <button
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
-                style={{ background: BTN_DARK, color: "rgba(255,255,255,0.92)" }}
+                style={{ background: ACCENT, color: "#FFFFFF" }}
               >
-                <Plus className="w-3 h-3" /> New Task
+                <Plus className="w-3 h-3" /> 새 작업 등록하기
               </button>
             )}
           </div>
 
-          {/* ── 필터 & 검색 ── */}
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {isLoading ? (
-                /* [스켈레톤] 상태 탭 필터 */
-                <div className="flex gap-1.5 w-full">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="h-6 w-16 rounded-lg" />
-                  ))}
-                  <div className="ml-auto">
-                    <Skeleton className="h-7 w-44 rounded-lg" />
-                  </div>
+          {/* ── 필터 바 ── */}
+          <div
+            className="flex items-center gap-2 p-3 rounded-xl"
+            style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2 w-full">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-7 w-16 rounded-lg" />
+                ))}
+                <div className="ml-auto">
+                  <Skeleton className="h-7 w-44 rounded-lg" />
                 </div>
-              ) : (
-                <>
-                  {/* 상태 탭 */}
-                  {STATUS_TABS.map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                      style={{
-                        background: activeTab === tab
-                          ? "linear-gradient(135deg, rgba(224,231,255,0.8), rgba(232,213,245,0.7))"
-                          : "rgba(0,0,0,0.04)",
-                        color: activeTab === tab ? ACCENT : TEXT_SECONDARY,
-                        border: activeTab === tab ? "1px solid rgba(99,91,255,0.2)" : "1px solid transparent",
-                      }}
+              </div>
+            ) : (
+              <>
+                {/* 상태 탭 */}
+                {STATUS_TABS.map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                    style={{
+                      background: activeTab === tab
+                        ? ACCENT_BG
+                        : "rgba(0,0,0,0.04)",
+                      color: activeTab === tab ? ACCENT : TEXT_SECONDARY,
+                      border: activeTab === tab ? `1px solid ${ACCENT_BORDER}` : "1px solid transparent",
+                    }}
+                  >
+                    {tab}
+                    <span
+                      className="px-1 py-0.5 rounded text-[9px]"
+                      style={{ background: activeTab === tab ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.06)", color: activeTab === tab ? ACCENT : TEXT_TERTIARY }}
                     >
-                      {tab}
-                      <span
-                        className="px-1 py-0.5 rounded text-[9px]"
-                        style={{ background: activeTab === tab ? "rgba(99,91,255,0.12)" : "rgba(0,0,0,0.06)", color: activeTab === tab ? UI_INDIGO : TEXT_TERTIARY }}
-                      >
-                        {counts[tab] ?? 0}
-                      </span>
-                    </button>
-                  ))}
+                      {counts[tab] ?? 0}
+                    </span>
+                  </button>
+                ))}
                   <div className="relative ml-auto">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: TEXT_TERTIARY }} />
                     <input
@@ -167,7 +161,6 @@ export function TasksPage() {
                 </>
               )}
             </div>
-          </div>
 
           {/* ── 태스크 목록 ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   GitCommit,
   GitBranch,
@@ -6,17 +6,15 @@ import {
   CheckCircle2,
   X,
   ShieldCheck,
-  RotateCcw,
+  ShieldAlert,
   ChevronDown,
   ChevronRight,
   FileCode2,
-  GitMerge,
-  Loader2,
   Server,
   Monitor,
-  FolderCode,
 } from "lucide-react";
-import type { CommitFile, DiffLine } from "./commitData";
+import type { CommitFile } from "./commitData";
+import { isSecurityRiskFile } from "./commitData";
 import { FileDiffViewer } from "./FileDiffViewer";
 import { BranchVisualization } from "./BranchVisualization";
 import { setPendingQA } from "../data/qaStore";
@@ -27,8 +25,6 @@ import {
   fetchProjectCommits,
   fetchProjectCommitFiles,
   fetchProjectCommitFileDiff,
-  ProjectCommitSummary,
-  ProjectCommitChangedFile,
   ProjectRepositoryType,
 } from "../lib/api";
 
@@ -42,7 +38,6 @@ import {
   ACCENT,
   ACCENT_BG,
   ACCENT_BORDER,
-  GRADIENT_PAGE,
 } from "../colors";
 
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -453,9 +448,24 @@ const WEAI_FRONTEND_FILES: CommitFile[] = [
       { type: "hunk", content: "@@ -10,7 +10,10 @@" },
       { type: "context", oldNum: 10, newNum: 10, content: "    \"dev\": \"vite\"," },
       { type: "removed", oldNum: 11, content: "    \"dev:preview\": \"vite --mode preview\"" },
-      { type: "added", newNum: 11, content: "    \"dev:preview\": \"vite --mode preview\"," },
-      { type: "added", newNum: 12, content: "    \"start\": \"vite\"" },
       { type: "context", oldNum: 12, newNum: 13, content: "  }," },
+    ],
+  },
+  {
+    id: "fe-8",
+    name: ".env.production",
+    path: ".env.production",
+    ext: "env",
+    status: "modified",
+    additions: 4,
+    deletions: 1,
+    diff: [
+      { type: "hunk", content: "@@ -1,3 +1,6 @@" },
+      { type: "context", oldNum: 1, newNum: 1, content: "VITE_API_BASE_URL=https://api.yhy-server.com" },
+      { type: "removed", oldNum: 2, content: "VITE_OAUTH_CLIENT_SECRET=temp_secret_12345" },
+      { type: "added", newNum: 2, content: "VITE_OAUTH_CLIENT_SECRET=prod_sec_994827103948" },
+      { type: "added", newNum: 3, content: "VITE_JWT_SIGNING_KEY=syn_master_enc_prod_99" },
+      { type: "added", newNum: 4, content: "VITE_ADMIN_ACCESS_TOKEN=eyJhbGciOiJIUzUxMiJ9..." },
     ],
   },
 ];
@@ -481,7 +491,7 @@ function QAModal({
       style={{ background: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)" }}
     >
       <div
-        className="rounded-2xl overflow-hidden"
+        className="rounded-2xl overflow-hidden relative"
         style={{
           width: 360,
           background: "rgba(255,255,255,0.97)",
@@ -489,12 +499,18 @@ function QAModal({
           boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
         }}
       >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1 rounded-lg hover:bg-black/[0.06] transition-colors"
+          aria-label="닫기"
+        >
+          <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+        </button>
         <div className="p-7 text-center">
           <div
             className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
             style={{
-              background:
-                "linear-gradient(135deg, rgba(224,231,255,0.7), rgba(221,214,254,0.6))",
+              background: ACCENT_BG,
             }}
           >
             <ShieldCheck className="w-7 h-7" style={{ color: ACCENT }} />
@@ -523,9 +539,9 @@ function QAModal({
               onClick={onQAYes}
               className="flex-1 py-2.5 rounded-xl text-xs font-semibold"
               style={{
-                background: "linear-gradient(135deg, #41431B, #62683A)",
-                color: "rgba(255,255,255,0.95)",
-                boxShadow: "0 4px 14px rgba(65,67,27,0.24)",
+                background: ACCENT,
+                color: "#FFFFFF",
+                boxShadow: "0 4px 14px rgba(37,99,235,0.24)",
               }}
             >
               예, AI QA 실행
@@ -616,7 +632,10 @@ function FileRow({
   onToggle: (e: React.MouseEvent) => void;
   onSelect: () => void;
 }) {
-  const ec = EXT_COLOR[file.ext] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY };
+  const sec = isSecurityRiskFile(file);
+  const ec = sec.isRisk
+    ? { bg: "rgba(239,68,68,0.15)", color: "#DC2626" }
+    : (EXT_COLOR[file.ext] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY });
   const sm = STATUS_META[file.status] ?? {
     color: "#C09840",
     label: "M",
@@ -626,18 +645,22 @@ function FileRow({
   return (
     <div
       onClick={onSelect}
-      className="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all"
+      className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all ${sec.isRisk ? "group" : ""}`}
       style={{
         borderBottom: `1px solid ${BORDER_SUBTLE}`,
-        background: selected ? "rgba(65,67,27,0.08)" : "transparent",
-        borderLeft: selected ? "2.5px solid" : "2.5px solid transparent",
-        borderImage: selected ? "linear-gradient(180deg, #41431B, #AEB784) 1" : "none",
+        background: selected
+          ? (sec.isRisk ? "rgba(239,68,68,0.14)" : "rgba(65,67,27,0.08)")
+          : (sec.isRisk ? "rgba(239,68,68,0.05)" : "transparent"),
+        borderLeft: selected
+          ? (sec.isRisk ? "2.5px solid #EF4444" : "2.5px solid #41431B")
+          : (sec.isRisk ? "2.5px solid rgba(239,68,68,0.5)" : "2.5px solid transparent"),
+        borderImage: selected && !sec.isRisk ? "linear-gradient(180deg, #41431B, #AEB784) 1" : "none",
       }}
       onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.background = "rgba(0,0,0,0.025)";
+        if (!selected) e.currentTarget.style.background = sec.isRisk ? "rgba(239,68,68,0.09)" : "rgba(0,0,0,0.025)";
       }}
       onMouseLeave={(e) => {
-        if (!selected) e.currentTarget.style.background = "transparent";
+        if (!selected) e.currentTarget.style.background = sec.isRisk ? "rgba(239,68,68,0.05)" : "transparent";
       }}
     >
       {/* 체크박스 */}
@@ -645,8 +668,8 @@ function FileRow({
         onClick={onToggle}
         className="w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 cursor-pointer transition-all"
         style={{
-          background: staged ? ACCENT : "transparent",
-          border: `1.5px solid ${staged ? ACCENT : "rgba(0,0,0,0.22)"}`,
+          background: staged ? (sec.isRisk ? "#DC2626" : ACCENT) : "transparent",
+          border: `1.5px solid ${staged ? (sec.isRisk ? "#DC2626" : ACCENT) : (sec.isRisk ? "rgba(239,68,68,0.6)" : "rgba(0,0,0,0.22)")}`,
         }}
       >
         {staged && (
@@ -654,16 +677,27 @@ function FileRow({
         )}
       </div>
 
-      {/* 확장자 뱃지 */}
-      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={ec}>
-        .{file.ext}
-      </span>
+      {/* 확장자 또는 보안 위험 뱃지 */}
+      {sec.isRisk ? (
+        <span
+          className="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0 animate-pulse"
+          style={{ background: "rgba(239,68,68,0.18)", color: "#DC2626", border: "1px solid rgba(239,68,68,0.35)" }}
+          title={sec.reason}
+        >
+          <ShieldAlert className="w-2.5 h-2.5 shrink-0" />
+          보안위험
+        </span>
+      ) : (
+        <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={ec}>
+          .{file.ext}
+        </span>
+      )}
 
       {/* 파일명 */}
       <span
-        className="flex-1 text-[11px] truncate"
-        style={{ color: staged ? TEXT_PRIMARY : TEXT_TERTIARY }}
-        title={file.path}
+        className={`flex-1 text-[11px] truncate ${sec.isRisk ? "font-semibold text-red-600 dark:text-red-400" : ""}`}
+        style={{ color: sec.isRisk ? "#DC2626" : (staged ? TEXT_PRIMARY : TEXT_TERTIARY) }}
+        title={`${file.path}${sec.isRisk ? ` [보안위험: ${sec.reason}]` : ""}`}
       >
         {file.name}
       </span>
@@ -821,6 +855,7 @@ export function ChangesPage({
       files: stagedFiles.map((f) => f.name),
       hash: Math.random().toString(36).slice(2, 9).toUpperCase(),
       time: new Date().toISOString(),
+      diffFiles: stagedFiles,
     });
     onNavigateQA?.();
   };
@@ -1087,7 +1122,7 @@ export function ChangesPage({
                     <div className="flex items-center gap-2">
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                        style={{ background: "linear-gradient(135deg, #DDE2D3, #F0F1EE)" }}
+                        style={{ background: ACCENT_BG }}
                       >
                         <span className="text-[8px] font-bold" style={{ color: ACCENT }}>
                           시
@@ -1138,6 +1173,16 @@ export function ChangesPage({
                       </span>
                     </div>
 
+                    {/* ── 보안 경고 알림 ── */}
+                    {stagedFiles.some((f) => isSecurityRiskFile(f).isRisk) && (
+                      <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2 text-[10px] text-red-600 dark:text-red-400">
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-500 animate-pulse" />
+                        <span className="leading-tight">
+                          <strong>보안 주의:</strong> 환경 변수(.env) 또는 비밀 키가 스테이징에 포함되어 있습니다. 커밋 전 제외(.synaipseignore)를 권장합니다.
+                        </span>
+                      </div>
+                    )}
+
                     <button
                       onClick={handleCommitClick}
                       disabled={!stagedCount || !message.trim()}
@@ -1145,11 +1190,11 @@ export function ChangesPage({
                       style={{
                         background:
                           stagedCount > 0 && message.trim()
-                            ? "linear-gradient(135deg, #41431B 0%, #62683A 100%)"
+                            ? ACCENT
                             : "rgba(0,0,0,0.07)",
-                        color: stagedCount > 0 && message.trim() ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
+                        color: stagedCount > 0 && message.trim() ? "#FFFFFF" : TEXT_TERTIARY,
                         boxShadow:
-                          stagedCount > 0 && message.trim() ? "0 4px 16px rgba(65,67,27,0.24)" : "none",
+                          stagedCount > 0 && message.trim() ? "0 4px 16px rgba(37,99,235,0.24)" : "none",
                         cursor: stagedCount > 0 && message.trim() ? "pointer" : "not-allowed",
                       }}
                     >

@@ -468,7 +468,7 @@ function RepoColumn({
         <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
           <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
           <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }} title={label}>
-            {label}
+            {isSplit && shortLabel ? shortLabel : label}
           </p>
           <GitBranch className="ml-auto h-3 w-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
         </div>

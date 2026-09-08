@@ -468,10 +468,6 @@ const synaipseGalaxyData: GalaxyGraph = {
   ],
 };
 
-function getCssVar(styles: CSSStyleDeclaration, name: string, fallback: string) {
-  return styles.getPropertyValue(name).trim() || fallback;
-}
-
 function useThemeTokens(): ThemeTokens {
   const [tokens, setTokens] = useState<ThemeTokens>(() => ({
     background: "#050604",
@@ -491,7 +487,6 @@ function useThemeTokens(): ThemeTokens {
 
   useEffect(() => {
     const readTokens = () => {
-      const styles = getComputedStyle(document.documentElement);
       setTokens({
         background: "#050604",
         foreground: "#F7F7F2",

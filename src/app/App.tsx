@@ -45,7 +45,11 @@ import { loadProfile, saveProfile } from "./data/profileStore";
 import { loadDocs } from "./data/chatStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
 import { NotificationPanel } from "./components/NotificationPanel";
-import { DailyStandupModal, isDismissedToday } from "./components/DailyStandupModal";
+import {
+  DailyStandupModal,
+  shouldShowDailyStandup,
+  recordProjectAccessTime,
+} from "./components/DailyStandupModal";
 import {
   AUTH_SESSION_EVENT,
   AuthSession,
@@ -64,10 +68,8 @@ import {
 
 // ── 디자인 토큰 ──
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-  ACCENT, SIDEBAR_BG, SIDEBAR_HOVER, SIDEBAR_ACTIVE,
+  SIDEBAR_BG, SIDEBAR_HOVER, SIDEBAR_ACTIVE,
   GRADIENT_LOGO, GRADIENT_SIDEBAR, GRADIENT_OUTER,
-  ACCENT_BG, CREAM,
   SIDEBAR_TEXT, SIDEBAR_TEXT_ACTIVE, SIDEBAR_TEXT_HOVER,
   SIDEBAR_TEXT_LABEL, SIDEBAR_BORDER,
 } from "./colors";
@@ -258,7 +260,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [joinExiting, setJoinExiting] = useState(false);
   const [sidebarProfile, setSidebarProfile] = useState(() => loadProfile());
-  const [docCount, setDocCount] = useState(() => loadDocs().length);
+  const [, setDocCount] = useState(() => loadDocs().length);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [showStandup, setShowStandup] = useState(false);
@@ -612,9 +614,10 @@ export default function App() {
       });
     }
 
-    if (!isDismissedToday()) {
+    if (shouldShowDailyStandup(project.projectId)) {
       setTimeout(() => setShowStandup(true), 300);
     }
+    recordProjectAccessTime(project.projectId);
   };
 
   const handleLeaveProject = () => {
@@ -649,7 +652,6 @@ export default function App() {
     }
   };
 
-  const handleFileSelect = (file: CommitFile | null) => setDiffFile(file);
   const handleNavigateQA = () => { setDiffFile(null); handleNavClick("AIQA"); };
 
   const handleStandupNavigate = (page: string) => {
@@ -666,10 +668,10 @@ export default function App() {
       case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage projectId={projectId} />;
       case "ServerBuild": return <ServerBuildPage projectId={projectId} />;
-      case "Chat": return <ChatPage projectId={projectId ?? 0} onDocsUpdate={setDocCount} />;
+      case "Chat": return <ChatPage projectId={projectId ?? 0} currentUserId={currentUser?.id} onDocsUpdate={setDocCount} />;
       case "Calendar": return <CalendarPage />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
-      case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
+      case "AIQA": return <AIQAPage projectId={projectId ?? 0} />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
@@ -686,7 +688,7 @@ export default function App() {
     setActiveTab: (id: NavId) => void
   ) => {
     const isFocused = activePanel === panelType;
-    const shouldShowTabs = isSplit || tabs.length > 1;
+    const shouldShowTabs = true; // 상단 탭은 항상 유지되어 다른 탭을 열어도 꺼지지 않음
 
     return (
       <div
@@ -697,7 +699,7 @@ export default function App() {
         onDrop={() => handleTabDrop(panelType)}
       >
         {shouldShowTabs && (
-          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
+          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "36px" }}>
             {tabs.map(tId => {
               const tabLabel = TAB_LABELS[tId];
 
@@ -705,7 +707,7 @@ export default function App() {
                 <div
                   key={tId}
                   draggable
-                  onDragStart={(e) => {
+                  onDragStart={() => {
                     setDraggedTab({ id: tId, from: panelType });
                     setTimeout(() => setIsDraggingTab(true), 0);
                   }}
@@ -930,7 +932,7 @@ export default function App() {
       )}
 
       <div
-        className="flex-1 flex flex-col overflow-hidden relative"
+        className="flex-1 flex flex-col overflow-hidden relative rounded-2xl"
         style={{
           background: SIDEBAR_BG,
           boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)",

@@ -1,32 +1,14 @@
 import { useState, useMemo } from "react";
 import {
   GitBranch,
-  GitMerge,
-  GitCommit,
   Copy,
   Check,
   Search,
-  Filter,
   User,
   Clock,
-  ChevronRight,
-  X,
   FileCode,
   Tag,
-  ArrowUpRight,
-  Sparkles,
-  Layers,
 } from "lucide-react";
-import {
-  BORDER,
-  BORDER_SUBTLE,
-  TEXT_PRIMARY,
-  TEXT_SECONDARY,
-  TEXT_TERTIARY,
-  TEXT_LABEL,
-  ACCENT,
-  ACCENT_BG,
-} from "../colors";
 
 // ── 브랜치 색상 팔레트 ──
 const BRANCH_PALETTE = [
@@ -326,7 +308,7 @@ export function BranchVisualization() {
         className="flex items-center gap-3 px-5 h-12 shrink-0 select-none"
         style={{
           borderBottom: "1px solid rgba(255,255,255,0.08)",
-          background: "linear-gradient(180deg, #161b22 0%, #0d1117 100%)",
+          background: "#161b22",
         }}
       >
         <div className="flex items-center gap-2">
@@ -535,7 +517,7 @@ export function BranchVisualization() {
 
           {/* 2. 커밋 리스트 행들 (우측 텍스트 정렬) */}
           <div className="flex-1 min-w-0 pr-4">
-            {filteredCommits.map((commit, idx) => {
+            {filteredCommits.map((commit) => {
               const isSelected = commit.id === selectedCommitId;
               const color = getBranchColor(commit.branch);
 

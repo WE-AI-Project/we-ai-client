@@ -144,7 +144,7 @@ export function ProjectSettingsSkeleton() {
     <div className="flex-1 overflow-y-auto p-5" style={{ background: PAGE_BG }}>
       <div className="mx-auto max-w-7xl space-y-5">
         <section
-          className="relative overflow-hidden rounded-[28px] border px-6 py-6"
+          className="relative overflow-hidden rounded-xl border px-6 py-6"
           style={{
             background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #41431B 100%)",
             borderColor: "rgba(255,255,255,0.10)",
@@ -199,7 +199,7 @@ export function ProjectSettingsSkeleton() {
 
         <section className="grid gap-5 lg:grid-cols-[280px,1fr]">
           <aside
-            className="rounded-[28px] border px-4 py-4"
+            className="rounded-xl border px-4 py-4"
             style={{
               background: "rgba(255,255,255,0.92)",
               borderColor: BORDER,
@@ -226,7 +226,7 @@ export function ProjectSettingsSkeleton() {
 
           <div className="space-y-5">
             <section
-              className="rounded-[28px] border px-5 py-5"
+              className="rounded-xl border px-5 py-5"
               style={{
                 background: "rgba(255,255,255,0.92)",
                 borderColor: BORDER,
@@ -264,7 +264,7 @@ export function ProjectSettingsSkeleton() {
               {Array.from({ length: 2 }).map((_, sectionIndex) => (
                 <div
                   key={sectionIndex}
-                  className="rounded-[28px] border px-5 py-5"
+                  className="rounded-xl border px-5 py-5"
                   style={{
                     background: "rgba(255,255,255,0.92)",
                     borderColor: BORDER,

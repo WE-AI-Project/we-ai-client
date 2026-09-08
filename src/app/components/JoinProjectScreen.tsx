@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -18,9 +18,6 @@ import {
   ShieldCheck,
   UserCircle2,
   X,
-  Trash2,
-  AlertTriangle,
-  FolderGit2
 } from "lucide-react";
 
 // 만들어둔 공통 알림창 컴포넌트 불러오기
@@ -226,39 +223,6 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
   );
 }
 
-function DepartmentPicker({
-  value,
-  onChange,
-  compact = false,
-}: {
-  value: ProjectDepartment;
-  onChange: (value: ProjectDepartment) => void;
-  compact?: boolean;
-}) {
-  return (
-    <div className={`grid gap-1.5 ${compact ? "grid-cols-4" : "grid-cols-2"}`}>
-      {DEPARTMENTS.map((department) => {
-        const selected = department === value;
-        return (
-          <button
-            key={department}
-            type="button"
-            onClick={() => onChange(department)}
-            className={`rounded-lg font-semibold transition-all ${compact ? "px-2 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"}`}
-            style={{
-              background: selected ? "rgba(65,67,27,0.10)" : "rgba(0,0,0,0.04)",
-              color: selected ? ACCENT : TEXT_TERTIARY,
-              border: `1px solid ${selected ? "rgba(65,67,27,0.18)" : "transparent"}`,
-            }}
-          >
-            {DEPARTMENT_LABELS[department]}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /* 복수 선택이 가능한 파트 선택 컴포넌트 */
 function MultiDepartmentPicker({
   value,
@@ -416,7 +380,7 @@ function CreateProjectModal({
         }}
       >
         <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: "linear-gradient(135deg, #e0e7ff, #e8d5f5)" }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: ACCENT_BG }}>
             <FolderPlus className="h-4 w-4" style={{ color: ACCENT }} />
           </div>
           <div className="flex-1">
@@ -775,7 +739,7 @@ function StartModal({
 }) {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [localPath, setLocalPath] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [joining] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
   useEscapeToClose(onClose);
@@ -830,7 +794,7 @@ function StartModal({
       <div
         className="relative flex w-full flex-col overflow-hidden rounded-2xl"
         style={{
-          maxWidth: 440,
+          maxWidth: 680,
           maxHeight: "88vh",
           background: "rgba(255,255,255,0.97)",
           border: `1px solid ${BORDER}`,
@@ -1147,7 +1111,7 @@ export function JoinProjectScreen({
           </button>
         </div>
 
-        <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center gap-7 px-6">
+        <div className="relative z-10 flex w-full max-w-[680px] flex-col items-center gap-7 px-6">
           <div className="text-center">
             <div
               className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"

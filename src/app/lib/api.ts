@@ -203,6 +203,7 @@ export type ProjectMember = {
   department: ProjectDepartment;
   status: ProjectMemberStatus;
   joinedAt: string;
+  lastAccessedAt?: string | null;
 };
 
 export type ProjectMemberList = {
@@ -521,16 +522,20 @@ export async function fetchProjectMilestones(projectId: number): Promise<Project
   return request<ProjectMilestoneList>(`/api/v1/projects/${projectId}/dashboard/milestones`);
 }
 
-export type DepartmentStatusDetail = {  //프로젝트 파트별 현황 조회
+export type DepartmentStatusDetail = {
   department: ProjectDepartment;
   memberCount: number;
-  totalScheduleCount: number;
+  scheduleCount: number;
+  totalScheduleCount?: number;
   completedScheduleCount: number;
+  todoCount?: number;
+  inProgressCount?: number;
+  holdCount?: number;
   progressRate: number;
   status: string;
 };
 
-export type ProjectDepartmentStatusList = {  //프로젝트 파트별 현황 조회
+export type ProjectDepartmentStatusList = {
   projectId: number;
   departments: DepartmentStatusDetail[];
 };
@@ -606,8 +611,36 @@ export async function updateMyProfile(payload: ProfileUpdatePayload): Promise<vo
   });
 }
 
-export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {  //프로젝트 파트별 현황 조회
-  return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
+export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {
+  const result = await request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
+  if (!result || !Array.isArray(result.departments)) {
+    return { projectId, departments: [] };
+  }
+
+  const normalized = result.departments.map((dept: any) => {
+    const totalCount = Number(dept.totalScheduleCount ?? dept.scheduleCount ?? 0);
+    const completed = Number(dept.completedScheduleCount ?? 0);
+    const rate = Number(dept.progressRate ?? (totalCount > 0 ? Math.round((completed * 100) / totalCount) : 0));
+    const rawStatus = dept.status;
+    const computedStatus =
+      rawStatus ||
+      (totalCount === 0 ? "READY" : rate >= 100 ? "COMPLETED" : "IN_PROGRESS");
+
+    return {
+      ...dept,
+      memberCount: Number(dept.memberCount ?? 0),
+      scheduleCount: totalCount,
+      totalScheduleCount: totalCount,
+      completedScheduleCount: completed,
+      todoCount: Number(dept.todoCount ?? 0),
+      inProgressCount: Number(dept.inProgressCount ?? 0),
+      holdCount: Number(dept.holdCount ?? 0),
+      progressRate: rate,
+      status: computedStatus,
+    };
+  });
+
+  return { projectId: result.projectId ?? projectId, departments: normalized };
 }
 
 export async function leaveProject(projectId: number | string): Promise<void> {  //프로젝트 나가기=탈퇴하기
@@ -1329,7 +1362,7 @@ export async function fetchFilteredProjectSchedules(
 }
 
 export async function createProjectSchedule(
-  projectId: number,
+  projectId: number | string,
   payload: ProjectScheduleCreatePayload
 ): Promise<ProjectSchedule> {
   return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules`, {
@@ -1339,17 +1372,17 @@ export async function createProjectSchedule(
 }
 
 export async function updateProjectSchedule(
-  projectId: number,
-  scheduleId: number,
+  projectId: number | string,
+  scheduleId: number | string,
   payload: ProjectScheduleUpdatePayload
 ): Promise<ProjectSchedule> {
   return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
-    method: "PATCH",
+    method: "PUT",
     body: payload,
   });
 }
 
-export async function deleteProjectSchedule(projectId: number, scheduleId: number): Promise<void> {
+export async function deleteProjectSchedule(projectId: number | string, scheduleId: number | string): Promise<void> {
   await request<void>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
     method: "DELETE",
   });

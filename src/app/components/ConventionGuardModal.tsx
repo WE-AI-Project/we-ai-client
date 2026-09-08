@@ -696,7 +696,7 @@ export function ConventionGuardModal({
           {!scanDone ? (
             /* 스캔 중 스켈레톤 */
             <div className="p-5 space-y-3">
-              {stagedFiles.map((f, i) => (
+              {stagedFiles.map((_, i) => (
                 <div key={i} className="rounded-xl p-3 animate-pulse" style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}` }}>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-3 h-3 rounded" style={{ background: "rgba(0,0,0,0.10)" }} />

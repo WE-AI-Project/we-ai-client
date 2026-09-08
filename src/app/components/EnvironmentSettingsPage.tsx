@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Settings, Copy, Check, Plus, Trash2, Save, Eye, EyeOff,
-  RefreshCw, FileText, Download, Upload, X, AlertTriangle,
+  RefreshCw, FileText, Download, Upload, X, AlertTriangle, ShieldCheck,
 } from "lucide-react";
 import {
   loadEnvVars, saveEnvVars, generateEnvContent, parseEnvContent,
@@ -10,7 +10,7 @@ import {
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
+  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1,
 } from "../colors";
 
 // ── 🚨 [수정] 재사용 가능한 스켈레톤 뼈대 컴포넌트 (하얀색 적용) ──
@@ -228,6 +228,14 @@ export function EnvironmentSettingsPage() {
     });
   };
 
+  const updateKey = (oldKey: string, newKey: string) => {
+    setEnvVars(prev => prev.map(v => v.key === oldKey ? { ...v, key: newKey } : v));
+  };
+
+  const updateDesc = (key: string, desc: string) => {
+    setEnvVars(prev => prev.map(v => v.key === key ? { ...v, desc } : v));
+  };
+
   const updateValue = (key: string, value: string) =>
     setEnvVars(prev => prev.map(v => v.key === key ? { ...v, value } : v));
 
@@ -284,20 +292,49 @@ export function EnvironmentSettingsPage() {
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="max-w-4xl mx-auto space-y-4">
+
+          {/* ── 로컬 보안 정책 배너 ── */}
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl border"
+            style={{
+              background: "rgba(16, 185, 129, 0.08)",
+              borderColor: "rgba(16, 185, 129, 0.25)",
+            }}
+          >
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                  🔒 로컬 전용 보안 환경 변수 관리 (Air-Gapped Local Storage)
+                </span>
+                <span className="text-[8px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-200">
+                  서버 전송 없음
+                </span>
+              </div>
+              <p className="text-[10px] text-emerald-900/80 dark:text-emerald-200/80 mt-0.5 leading-normal">
+                환경 변수는 외부 인터넷 서버로 전송되지 않고 오직 사용자의 로컬 브라우저/작업 디렉토리에만 안전하게 관리됩니다. 값 수정, 추가 및 삭제가 자유롭게 지원됩니다.
+              </p>
+            </div>
+          </div>
 
           {/* ── 헤더 ── */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
-                <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Environment Settings</h1>
+                <Settings className="w-4 h-4" style={{ color: ACCENT }} />
+                <h1 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+                  Environment Settings
+                </h1>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold" style={{ background: ACCENT_BG, color: ACCENT }}>
+                  {profile.toUpperCase()}
+                </span>
               </div>
-              {isLoading ? (
-                <Skeleton className="h-3 w-64 mt-1.5" />
-              ) : (
-                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                  Spring 환경 변수 · JDK 정보 · 프로파일 관리 · .env 파일 편집
+              {!isLoading && (
+                <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  Spring 환경 변수 · API 엔드포인트 · 로컬 경로 관리 · .env 파일 실시간 편집
                 </p>
               )}
             </div>
@@ -318,7 +355,7 @@ export function EnvironmentSettingsPage() {
                     onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
                   >
-                    <FileText className="w-3 h-3" /> .env 파일
+                    <FileText className="w-3 h-3" /> .env 미리보기
                   </button>
                   {/* 업로드 */}
                   <label
@@ -327,7 +364,7 @@ export function EnvironmentSettingsPage() {
                     onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,243,225,0.95)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "rgba(248,243,225,0.80)")}
                   >
-                    <Upload className="w-3 h-3" /> .env 업로드
+                    <Upload className="w-3 h-3" /> .env 불러오기
                     <input type="file" accept=".env,text/plain" className="hidden" onChange={handleFileUpload} />
                   </label>
                   {/* 리셋 */}
@@ -343,11 +380,11 @@ export function EnvironmentSettingsPage() {
                   {/* 저장 */}
                   <button
                     onClick={handleSave}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm"
                     style={{ background: saved ? "#10b981" : "#1c1c1e", color: "rgba(255,255,255,0.92)" }}
                   >
                     <Save className="w-3 h-3" />
-                    {saved ? "저장됨!" : "Apply Changes"}
+                    {saved ? "로컬 저장 완료!" : "로컬 적용 (Apply)"}
                   </button>
                 </>
               )}
@@ -442,7 +479,7 @@ export function EnvironmentSettingsPage() {
             <div
               className="grid px-4 py-2.5 text-[10px] font-semibold shrink-0"
               style={{
-                gridTemplateColumns: "200px 1fr 200px 40px",
+                gridTemplateColumns: "220px 1fr 180px 40px",
                 borderBottom: `1px solid ${BORDER}`,
                 background: "rgba(237,232,210,0.8)",
                 color: TEXT_LABEL,
@@ -452,14 +489,14 @@ export function EnvironmentSettingsPage() {
             </div>
 
             <div className="flex-1 overflow-x-auto">
-              <div style={{ minWidth: 600 }}>
+              <div style={{ minWidth: 640 }}>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
                       className="grid px-4 py-4 items-center"
                       style={{
-                        gridTemplateColumns: "200px 1fr 200px 40px",
+                        gridTemplateColumns: "220px 1fr 180px 40px",
                         borderBottom: i < 4 ? `1px solid ${BORDER_SUBTLE}` : "none",
                       }}
                     >
@@ -475,71 +512,91 @@ export function EnvironmentSettingsPage() {
                     const showVal   = visibleSecrets.has(v.key);
                     return (
                       <div
-                        key={v.key}
+                        key={`${v.key}-${i}`}
                         className="grid px-4 py-3 items-center transition-colors"
                         style={{
-                          gridTemplateColumns: "200px 1fr 200px 40px",
+                          gridTemplateColumns: "220px 1fr 180px 40px",
                           borderBottom: i < envVars.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
                         }}
                         onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.015)")}
                         onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                       >
-                        {/* 키 */}
+                        {/* 키 (인라인 편집 가능) */}
                         <div className="flex items-center gap-1.5 min-w-0 pr-2">
                           {isSecret && (
                             <span className="text-[8px] font-semibold px-1 py-0.5 rounded shrink-0" style={{ background: "rgba(245,158,11,0.10)", color: "#d97706" }}>
                               SECRET
                             </span>
                           )}
-                          <span className="text-[10px] font-mono truncate" style={{ color: ACCENT }}>{v.key}</span>
+                          <input
+                            type="text"
+                            value={v.key}
+                            onChange={e => updateKey(v.key, e.target.value)}
+                            className="flex-1 px-1.5 py-1 text-[10px] font-mono rounded outline-none min-w-0 font-semibold"
+                            style={{
+                              background: "rgba(0,0,0,0.03)",
+                              border: `1px solid transparent`,
+                              color: ACCENT,
+                            }}
+                            onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
+                            onBlur={e  => (e.currentTarget.style.borderColor = "transparent")}
+                          />
                         </div>
 
-                        {/* 값 */}
+                        {/* 값 (실제 값 표시 및 인라인 편집) */}
                         <div className="flex items-center gap-1.5 px-2 min-w-0">
-                          {v.editable ? (
-                            <input
-                              type={isSecret && !showVal ? "password" : "text"}
-                              value={v.value}
-                              onChange={e => updateValue(v.key, e.target.value)}
-                              className="flex-1 px-2 py-1 text-[10px] font-mono rounded outline-none min-w-0 transition-all"
-                              style={{
-                                background: "rgba(0,0,0,0.04)",
-                                border: `1px solid ${BORDER}`,
-                                color: TEXT_PRIMARY,
-                              }}
-                              onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
-                              onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
-                            />
-                          ) : (
-                            <span className="text-[10px] font-mono truncate" style={{ color: TEXT_SECONDARY }}>
-                              {isSecret && !showVal ? "••••••••••••" : v.value}
-                            </span>
-                          )}
+                          <input
+                            type={isSecret && !showVal ? "password" : "text"}
+                            value={v.value}
+                            onChange={e => updateValue(v.key, e.target.value)}
+                            className="flex-1 px-2 py-1 text-[10px] font-mono rounded outline-none min-w-0 transition-all"
+                            style={{
+                              background: "rgba(0,0,0,0.04)",
+                              border: `1px solid ${BORDER}`,
+                              color: TEXT_PRIMARY,
+                            }}
+                            onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
+                            onBlur={e  => (e.currentTarget.style.borderColor = BORDER)}
+                          />
                           {isSecret && (
-                            <button onClick={() => toggleSecret(v.key)} className="p-1 rounded shrink-0 hover:bg-black/[0.06]">
+                            <button
+                              onClick={() => toggleSecret(v.key)}
+                              title={showVal ? "값 숨기기" : "실제 값 보기"}
+                              className="p-1 rounded shrink-0 hover:bg-black/[0.06] transition-colors"
+                            >
                               {showVal
-                                ? <EyeOff className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-                                : <Eye    className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />}
+                                ? <EyeOff className="w-3.5 h-3.5 text-emerald-600" />
+                                : <Eye    className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />}
                             </button>
                           )}
                           <CopyBtn value={v.value} />
                         </div>
 
                         {/* 설명 */}
-                        <span className="text-[9px] truncate px-2" style={{ color: TEXT_TERTIARY }}>{v.desc}</span>
+                        <input
+                          type="text"
+                          value={v.desc}
+                          placeholder="설명 입력..."
+                          onChange={e => updateDesc(v.key, e.target.value)}
+                          className="px-2 py-1 text-[9px] rounded outline-none truncate"
+                          style={{
+                            background: "transparent",
+                            border: `1px solid transparent`,
+                            color: TEXT_SECONDARY,
+                          }}
+                          onFocus={e => (e.currentTarget.style.borderColor = BORDER)}
+                          onBlur={e  => (e.currentTarget.style.borderColor = "transparent")}
+                        />
 
                         {/* 삭제 */}
                         <div className="flex justify-center">
-                          {v.editable ? (
-                            <button
-                              onClick={() => removeVar(v.key)}
-                              className="p-1 rounded transition-all hover:bg-red-50"
-                            >
-                              <Trash2 className="w-3 h-3" style={{ color: "#9ca3af" }} />
-                            </button>
-                          ) : (
-                            <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>—</span>
-                          )}
+                          <button
+                            onClick={() => removeVar(v.key)}
+                            title="환경 변수 삭제"
+                            className="p-1.5 rounded-lg transition-all hover:bg-red-500/10 text-gray-400 hover:text-red-600"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -554,15 +611,15 @@ export function EnvironmentSettingsPage() {
                 <button
                   onClick={() => setEnvVars(prev => [
                     ...prev,
-                    { key: "NEW_VAR", value: "", secret: false, editable: true, desc: "" },
+                    { key: `CUSTOM_KEY_${prev.length + 1}`, value: "custom_value", secret: false, editable: true, desc: "사용자 추가 변수" },
                   ])}
-                  className="flex items-center gap-2 text-[10px] font-semibold transition-all hover:opacity-70"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all hover:bg-black/5"
                   style={{ color: ACCENT }}
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add variable
+                  <Plus className="w-3.5 h-3.5" /> 새 환경 변수 추가
                 </button>
                 <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                  {envVars.length}개 변수 · localStorage 저장
+                  {envVars.length}개 변수 · 오직 로컬(LocalStorage)에만 안전 보관
                 </span>
               </div>
             )}

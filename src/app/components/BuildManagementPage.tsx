@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Hammer, Play, CheckCircle2, XCircle, Clock, RotateCw, Circle, RefreshCw, Terminal } from "lucide-react";
+import { Hammer, Play, CheckCircle2, XCircle, Clock, RotateCw, Circle, RefreshCw } from "lucide-react";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
@@ -201,7 +201,7 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#FFFFFF" }}>
       <div className="flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
