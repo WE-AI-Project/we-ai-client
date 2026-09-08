@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   X, User, Mail, MapPin, Code2, Briefcase, FileText,
   Save, Palette, Search, CheckCircle2, ChevronDown,
@@ -173,7 +174,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
       handleClose();
     } catch (err) {
       console.error("프로필 수정 실서버 동기화 실패:", err);
-      alert("프로필 정보를 서버에 안전하게 저장하지 못했습니다. 다시 시도해 주세요.");
+      toast.error("프로필 정보를 서버에 안전하게 저장하지 못했습니다. 다시 시도해 주세요.");
     } finally {
       setSaving(false);
     }

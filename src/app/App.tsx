@@ -40,6 +40,7 @@ import { ChatPage } from "./components/ChatPage";
 import { ProjectSettingsPage } from "./components/ProjectSettingsPage";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServerBuildPage } from "./components/ServerBuildPage";
+import { NotificationsPage } from "./components/NotificationsPage";
 import type { CommitFile } from "./components/commitData";
 import { loadProfile, saveProfile } from "./data/profileStore";
 import { loadDocs } from "./data/chatStore";
@@ -160,7 +161,7 @@ const SYSTEM_ITEMS = [
 type NavId =
   | "Dashboard" | "Changes" | "Commits" | "ServerBuild"
   | "Chat" | "Calendar" | "EnvSettings" | "AIQA"
-  | "ProjectSettings" | "Profile" | "Galaxy";
+  | "ProjectSettings" | "Profile" | "Galaxy" | "Notifications";
 
 const TAB_LABELS: Record<NavId, string> = {
   Dashboard: "Dashboard",
@@ -174,6 +175,7 @@ const TAB_LABELS: Record<NavId, string> = {
   ProjectSettings: "Project Settings",
   Profile: "Profile",
   Galaxy: "SynAIpse Galaxy",
+  Notifications: "Notifications",
 };
 
 const HEADER_TAB_WIDTH = `${Math.max(...Object.values(TAB_LABELS).map(label => label.length)) + 8}ch`;
@@ -675,6 +677,7 @@ export default function App() {
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
+      case "Notifications": return <NotificationsPage projectId={projectId} />;
       default: return isPublishingSession(authSession)
         ? <WeAIDashboard />
         : <DashboardPage projectId={projectId} projectName={projectName} />;
@@ -940,7 +943,7 @@ export default function App() {
       >
         {(!showTitleBar || titleBarHeight === 0) && (
           <div className="absolute top-3 right-4 z-40 transition-all">
-            <NotificationPanel />
+            <NotificationPanel projectId={projectId ?? undefined} onViewAll={() => handleNavClick("Notifications")} />
           </div>
         )}
 
@@ -994,7 +997,7 @@ export default function App() {
                   스탠드업
                 </button>
 
-                <NotificationPanel />
+                <NotificationPanel projectId={projectId ?? undefined} onViewAll={() => handleNavClick("Notifications")} />
               </div>
             </div>
           )}

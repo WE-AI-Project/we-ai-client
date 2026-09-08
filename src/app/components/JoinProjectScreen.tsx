@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowRight,
@@ -130,7 +131,7 @@ function LocalPathInput({
   const [focused, setFocused] = useState(false);
 
   const handleOpenExplorer = async () => {
-    alert("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
+    toast.info("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
   };
 
   return (
@@ -775,7 +776,7 @@ function StartModal({
       setDetected(await detectProjectStack(localPath.trim()));
     } catch (error) {
       setDetected(null);
-      alert(formatApiError(error));
+      toast.error(formatApiError(error));
     } finally {
       setDetecting(false);
     }

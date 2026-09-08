@@ -1,12 +1,18 @@
-import { useState } from "react";
-import { GitCommit, CheckCircle2, Server, Bot, CheckCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCheck, Trash2 } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-  UI_RED, UI_RED_BG, UI_GREEN, UI_GREEN_BG, UI_GRAY, UI_GRAY_BG, UI_INDIGO, UI_INDIGO_BG,
+  UI_INDIGO,
   GRADIENT_HEADER,
 } from "../colors";
+import {
+  fetchProjectNotifications,
+  deleteNotification,
+  markAllNotificationsAsRead,
+  type NotificationItem,
+} from "../lib/api";
+import { LEVEL_COLORS, getNotificationStyle } from "./NotificationPanel";
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -16,87 +22,104 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
-type Notif = {
-  id: number;
-  type: "agent" | "commit" | "task" | "system";
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-};
+function isToday(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return true;
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
 
-// 더미 알림 데이터 (오늘 + 어제)
-const TODAY_NOTIFS: Notif[] = [
-  { id: 1, type: "agent",  title: "Agent Error — AGT-04 Parser Delta",    body: "JSON parse error: Unexpected token '<' at position 0. Retry #3 failed.",    time: "2m ago",   read: false },
-  { id: 2, type: "task",   title: "Task Completed — Deploy to staging",    body: "Admin marked 'Deploy WE&AI Backend to staging environment' as Done.",      time: "1hr ago",  read: false },
-  { id: 3, type: "commit", title: "2 new commits — WE&AI Backend",         body: "병권 pushed to main: 'Fixed JDK 17 toolchain issue in settings.gradle'",   time: "2hr ago",  read: false },
-  { id: 4, type: "agent",  title: "High Memory — AGT-02 Classifier Beta",  body: "Memory usage reached 83%. Consider scaling or reducing batch size.",        time: "5hr ago",  read: true  },
-];
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return isToday(dateStr)
+    ? d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+}
 
-const YESTERDAY_NOTIFS: Notif[] = [
-  { id: 5, type: "system", title: "Server Restarted",                       body: "Spring Boot server restarted on port 8080. Active profile: dev.",          time: "Yesterday", read: true },
-  { id: 6, type: "commit", title: "PR Merged — feature/agent",              body: "Admin merged 'Refactored Multi-Agent communication logic' into main.",      time: "Yesterday", read: true },
-  { id: 7, type: "task",   title: "Task Assigned — API Documentation",      body: "병권, you have been assigned: 'Write REST API documentation' (Medium).",   time: "Yesterday", read: true },
-  { id: 8, type: "agent",  title: "Agent Restarted — AGT-01 DataSync",      body: "AGT-01 was successfully restarted. Resuming: Fetching API endpoints.",    time: "Yesterday", read: true },
-];
-
-const TYPE_META: Record<Notif["type"], { icon: any; color: string; bg: string; label: string }> = {
-  agent:  { icon: Bot,          color: UI_RED,    bg: UI_RED_BG,    label: "Agent Alert"  },
-  commit: { icon: GitCommit,    color: UI_INDIGO, bg: UI_INDIGO_BG, label: "Commit"       },
-  task:   { icon: CheckCircle2, color: UI_GREEN,  bg: UI_GREEN_BG,  label: "Task Update"  },
-  system: { icon: Server,       color: UI_GRAY,   bg: UI_GRAY_BG,   label: "System"       },
-};
-
-function NotifItem({ notif, onRead }: { notif: Notif; onRead: (id: number) => void }) {
-  const meta = TYPE_META[notif.type];
+function NotifItem({ notif, onRead }: { notif: NotificationItem; onRead: (id: number) => void }) {
+  const meta = getNotificationStyle(notif.type);
   const Icon = meta.icon;
   return (
     <div
       onClick={() => onRead(notif.id)}
       className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-black/[0.02] cursor-pointer relative"
     >
-      {/* 읽지 않은 알림 표시 점 */}
-      {!notif.read && (
+      {!notif.isRead && (
         <div className="absolute left-2 top-4 w-1.5 h-1.5 rounded-full" style={{ background: UI_INDIGO }} />
       )}
-      {/* 아이콘 */}
       <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
         <Icon className="w-4 h-4" style={{ color: meta.color }} />
       </div>
-      {/* 내용 */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: meta.bg, color: meta.color }}>
-            {meta.label}
+            {notif.type}
           </span>
-          {!notif.read && (
+          {!notif.isRead && (
             <span className="text-[9px] font-semibold" style={{ color: UI_INDIGO }}>NEW</span>
           )}
         </div>
-        <p className="text-xs font-medium" style={{ color: notif.read ? TEXT_SECONDARY : TEXT_PRIMARY }}>{notif.title}</p>
+        <p className="text-xs font-medium" style={{ color: notif.isRead ? TEXT_SECONDARY : TEXT_PRIMARY }}>{notif.title}</p>
         <p className="text-[10px] mt-0.5 line-clamp-2" style={{ color: TEXT_TERTIARY }}>{notif.body}</p>
       </div>
-      <span className="text-[10px] shrink-0 mt-0.5" style={{ color: TEXT_TERTIARY }}>{notif.time}</span>
+      <span className="text-[10px] shrink-0 mt-0.5" style={{ color: TEXT_TERTIARY }}>{formatTime(notif.createdAt)}</span>
     </div>
   );
 }
 
-export function NotificationsPage() {
-  const isLoading = false;
+export function NotificationsPage({ projectId }: { projectId: number | string | null }) {
+  const [notifs, setNotifs] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [todayNotifs, setTodayNotifs] = useState(TODAY_NOTIFS);
-  const [yesterdayNotifs, setYesterdayNotifs] = useState(YESTERDAY_NOTIFS);
+  useEffect(() => {
+    let active = true;
+    if (!projectId) {
+      setNotifs([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    fetchProjectNotifications(projectId)
+      .then((data) => { if (active) setNotifs(data || []); })
+      .catch((error) => {
+        console.error("알림 목록을 불러오지 못했습니다:", error);
+        if (active) setNotifs([]);
+      })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [projectId]);
 
-  const unreadCount = todayNotifs.filter(n => !n.read).length;
+  const unreadCount = notifs.filter((n) => !n.isRead).length;
+  const todayNotifs = notifs.filter((n) => isToday(n.createdAt));
+  const earlierNotifs = notifs.filter((n) => !isToday(n.createdAt));
 
   const markRead = (id: number) => {
-    setTodayNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    setYesterdayNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
   };
 
-  const markAllRead = () => {
-    setTodayNotifs(prev => prev.map(n => ({ ...n, read: true })));
-    setYesterdayNotifs(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllRead = async () => {
+    if (!projectId) return;
+    const prev = notifs;
+    setNotifs((ns) => ns.map((n) => ({ ...n, isRead: true })));
+    try {
+      await markAllNotificationsAsRead(projectId);
+    } catch (error) {
+      console.error("전체 읽음 처리에 실패했습니다:", error);
+      setNotifs(prev);
+    }
+  };
+
+  const clearAll = async () => {
+    if (!projectId || notifs.length === 0) return;
+    const prev = notifs;
+    setNotifs([]);
+    try {
+      await Promise.all(notifs.map((n) => deleteNotification(projectId, n.id)));
+    } catch (error) {
+      console.error("알림을 삭제하는 도중 문제가 발생했습니다:", error);
+      setNotifs(prev);
+    }
   };
 
   return (
@@ -123,25 +146,32 @@ export function NotificationsPage() {
                 </p>
               )}
             </div>
-            
-            {isLoading ? (
-              <Skeleton className="h-8 w-28 rounded-lg" />
-            ) : (
-              <button
-                onClick={markAllRead}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
-                style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
-              >
-                <CheckCheck className="w-3 h-3" />
-                Mark all read
-              </button>
+
+            {!isLoading && notifs.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={markAllRead}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
+                  style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+                >
+                  <CheckCheck className="w-3 h-3" />
+                  Mark all read
+                </button>
+                <button
+                  onClick={clearAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
+                  style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: "#B85450" }}
+                >
+                  <Trash2 className="w-3 h-3" />
+                  전체 삭제
+                </button>
+              </div>
             )}
           </div>
 
           {/* ── 알림 타입 요약 카드 ── */}
           <div className="grid grid-cols-4 gap-2">
             {isLoading ? (
-              /* [스켈레톤] 요약 카드 4개 */
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                   <Skeleton className="w-6 h-6 rounded-lg shrink-0" />
@@ -152,9 +182,9 @@ export function NotificationsPage() {
                 </div>
               ))
             ) : (
-              Object.entries(TYPE_META).map(([type, meta]) => {
-                const count = [...todayNotifs, ...yesterdayNotifs].filter(n => n.type === type).length;
-                const Icon = meta.icon;
+              Object.entries(LEVEL_COLORS).map(([type, meta]) => {
+                const count = notifs.filter((n) => n.type === type).length;
+                const { icon: Icon } = getNotificationStyle(type);
                 return (
                   <div key={type} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                     <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: meta.bg }}>
@@ -162,7 +192,7 @@ export function NotificationsPage() {
                     </div>
                     <div>
                       <p className="text-xs font-bold" style={{ color: meta.color }}>{count}</p>
-                      <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{meta.label}</p>
+                      <p className="text-[9px] capitalize" style={{ color: TEXT_TERTIARY }}>{type}</p>
                     </div>
                   </div>
                 );
@@ -170,66 +200,55 @@ export function NotificationsPage() {
             )}
           </div>
 
-          {/* ── 오늘 알림 리스트 ── */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY }}>Today</p>
-              {!isLoading && unreadCount > 0 && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "rgba(99,91,255,0.12)", color: UI_INDIGO }}>
-                  {unreadCount} new
-                </span>
+          {isLoading ? (
+            <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3 px-4 py-3.5" style={{ borderBottom: i < 3 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                  <Skeleton className="w-8 h-8 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2 pt-0.5">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2.5 w-full" />
+                  </div>
+                  <Skeleton className="w-8 h-2 shrink-0 mt-1" />
+                </div>
+              ))}
+            </div>
+          ) : notifs.length === 0 ? (
+            <div className="rounded-2xl flex flex-col items-center justify-center py-16 gap-2" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+              <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>새 알림이 없습니다</p>
+            </div>
+          ) : (
+            <>
+              {/* ── 오늘 알림 리스트 ── */}
+              {todayNotifs.length > 0 && (
+                <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+                  <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY }}>Today</p>
+                  </div>
+                  {todayNotifs.map((n, i) => (
+                    <div key={n.id} style={{ borderBottom: i < todayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                      <NotifItem notif={n} onRead={markRead} />
+                    </div>
+                  ))}
+                </div>
               )}
-            </div>
-            
-            {isLoading ? (
-              /* [스켈레톤] 알림 리스트 (오늘) */
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-start gap-3 px-4 py-3.5" style={{ borderBottom: i < 3 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                  <Skeleton className="w-8 h-8 rounded-xl shrink-0" />
-                  <div className="flex-1 space-y-2 pt-0.5">
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-3.5 w-3/4" />
-                    <Skeleton className="h-2.5 w-full" />
-                  </div>
-                  <Skeleton className="w-8 h-2 shrink-0 mt-1" />
-                </div>
-              ))
-            ) : (
-              todayNotifs.map((n, i) => (
-                <div key={n.id} style={{ borderBottom: i < todayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                  <NotifItem notif={n} onRead={markRead} />
-                </div>
-              ))
-            )}
-          </div>
 
-          {/* ── 어제 알림 리스트 ── */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <div className="px-4 py-2.5" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY }}>Yesterday</p>
-            </div>
-            
-            {isLoading ? (
-              /* [스켈레톤] 알림 리스트 (어제) */
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-start gap-3 px-4 py-3.5" style={{ borderBottom: i < 3 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                  <Skeleton className="w-8 h-8 rounded-xl shrink-0" />
-                  <div className="flex-1 space-y-2 pt-0.5">
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-3.5 w-3/4" />
-                    <Skeleton className="h-2.5 w-full" />
+              {/* ── 이전 알림 리스트 ── */}
+              {earlierNotifs.length > 0 && (
+                <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+                  <div className="px-4 py-2.5" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY }}>Earlier</p>
                   </div>
-                  <Skeleton className="w-8 h-2 shrink-0 mt-1" />
+                  {earlierNotifs.map((n, i) => (
+                    <div key={n.id} style={{ borderBottom: i < earlierNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+                      <NotifItem notif={n} onRead={markRead} />
+                    </div>
+                  ))}
                 </div>
-              ))
-            ) : (
-              yesterdayNotifs.map((n, i) => (
-                <div key={n.id} style={{ borderBottom: i < yesterdayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                  <NotifItem notif={n} onRead={markRead} />
-                </div>
-              ))
-            )}
-          </div>
+              )}
+            </>
+          )}
 
         </div>
       </div>

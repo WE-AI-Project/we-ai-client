@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Calendar, Plus, X, ChevronLeft, ChevronRight,
   User, Flag, Circle,
@@ -90,7 +91,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
     const finalDept = isCustomDept ? customDept.trim() : form.department;
     if (!finalDept) {
-      alert("추가하실 부서명을 입력해주세요.");
+      toast.error("추가하실 부서명을 입력해주세요.");
       return;
     }
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   OLIVE_DARK,
   SAGE,
@@ -508,7 +509,7 @@ function LoginForm({
       }
     } catch (err) {
       console.error(`${provider} 로그인 연동 실패:`, err);
-      alert("소셜 로그인 서버와 연결할 수 없습니다.");
+      toast.error("소셜 로그인 서버와 연결할 수 없습니다.");
     } finally {
       setSocialLoading(null);
     }

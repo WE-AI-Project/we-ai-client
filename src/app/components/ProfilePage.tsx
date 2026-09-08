@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   User, GitCommit, Bot, FolderGit2, MapPin, Mail, Code2,
   Monitor, Cpu, MemoryStick, Wifi,
@@ -242,10 +243,10 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
       // 3. 로컬 상태 업데이트 및 모달 닫기
       setProfile(updatedProfile);
       setEditOpen(false);
-      
+      toast.success("프로필이 성공적으로 저장되었습니다.");
     } catch (error) {
       console.error("프로필 업데이트 실패:", error);
-      alert("프로필 저장에 실패했습니다. 다시 시도해 주세요.");
+      toast.error("프로필 저장에 실패했습니다. 다시 시도해 주세요.");
     }
   };
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   Bell, GitCommit, Bot, AlertCircle,
   CheckCircle2, Info, Check, ChevronRight
@@ -7,16 +8,16 @@ import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
 } from "../colors";
-import { fetchProjectNotifications, deleteNotification, NotificationItem } from "../lib/api";
+import { fetchProjectNotifications, deleteNotification, markAllNotificationsAsRead, NotificationItem } from "../lib/api";
 
-const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
+export const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
   info:    { color: "#6B7A50",    bg: "rgba(107,122,80,0.10)"  },
   success: { color: "#5A8A4A",    bg: "rgba(90,138,74,0.10)"   },
   warning: { color: "#C09840",    bg: "rgba(192,152,64,0.10)"  },
   error:   { color: "#B85450",    bg: "rgba(184,84,80,0.10)"   },
 };
 
-const getNotificationStyle = (type: string) => {
+export const getNotificationStyle = (type: string) => {
   switch (type) {
     case "error":   return { icon: AlertCircle, ...LEVEL_COLORS.error };
     case "success": return { icon: CheckCircle2, ...LEVEL_COLORS.success };
@@ -28,10 +29,11 @@ const getNotificationStyle = (type: string) => {
 };
 
 interface NotificationPanelProps {
-  projectId?: number | string; 
+  projectId?: number | string;
+  onViewAll?: () => void;
 }
 
-export function NotificationPanel({ projectId }: NotificationPanelProps) {
+export function NotificationPanel({ projectId, onViewAll }: NotificationPanelProps) {
   const [open,   setOpen]   = useState(false);
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [anim,   setAnim]   = useState(false);
@@ -87,8 +89,16 @@ export function NotificationPanel({ projectId }: NotificationPanelProps) {
     setNotifs(ns => ns.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
-  const markAll = () => {
+  const markAll = async () => {
+    if (!projectId) return;
+    const prev = notifs;
     setNotifs(ns => ns.map(n => ({ ...n, isRead: true })));
+    try {
+      await markAllNotificationsAsRead(projectId);
+    } catch (error) {
+      console.error("전체 읽음 처리에 실패했습니다:", error);
+      setNotifs(prev);
+    }
   };
 
   const clearAll = async () => {  //전체 삭제
@@ -100,13 +110,13 @@ export function NotificationPanel({ projectId }: NotificationPanelProps) {
       setNotifs([]);
     } catch (error) {
       console.error("알림을 삭제하는 도중 문제가 발생했습니다:", error);
-      alert("일부 알림을 삭제하지 못했습니다.");
+      toast.error("일부 알림을 삭제하지 못했습니다.");
     }
   };
 
   const viewAll = () => {
-    console.log("전체보기 페이지로 이동");
-    setOpen(false); 
+    setOpen(false);
+    onViewAll?.();
   };
 
   return (

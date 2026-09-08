@@ -466,14 +466,16 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
       // 2. 정상적인 API 호출
       await leaveProject(projectId);
       
-      alert("프로젝트에서 정상적으로 나갔습니다.");
+      toast.success("프로젝트에서 정상적으로 나갔습니다.");
       
       // 3. 시작 화면으로 강제 이동 및 새로고침
-      window.location.href = '/'; 
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
       
     } catch (error) {
       console.error("프로젝트 나가기 실패:", error);
-      alert("프로젝트 나가기에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      toast.error("프로젝트 나가기에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     }
   };
 
