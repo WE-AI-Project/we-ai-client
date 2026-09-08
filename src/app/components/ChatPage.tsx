@@ -4,7 +4,7 @@ import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
   FileText, X, CheckCircle2, Download, Mic, MicOff,
   Hash, Globe, Server, ShieldCheck, Wrench, Loader2, Sparkles, Bot,
-  Code2, User, BookOpen, Plus, LogOut, Trash2,
+  Code2, User, BookOpen, Plus, Building2, MessageSquarePlus, LogOut, Trash2,
 } from "lucide-react";
 
 import {
@@ -32,59 +32,25 @@ import {
   OLIVE_DARK,
 } from "../colors";
 
-// ✅ 1. api.ts에서 request 함수만 깔끔하게 가져옵니다.
-import { request, fetchProjectMembers, type ProjectMember } from "../lib/api";
-
-// ✅ 2. 회원님이 요청하셨던 채팅 API 타입과 함수를 파일 내부에 직접 선언합니다! (에러 완벽 차단)
-export type ChatRoom = {
-  chatRoomId: number;
-  name: string;
-  type?: string;
-  memberCount?: number;
-};
-
-export type ChatMessageResponse = {
-  messageId: number;
-  chatRoomId: number;
-  senderId: number;
-  senderName: string;
-  content: string;
-  messageType: string;
-  createdAt: string;
-};
-
-export async function fetchChatRooms(projectId: number | string): Promise<ChatRoom[]> {
-  return request<ChatRoom[]>(`/api/v1/projects/${projectId}/chat/rooms`, {
-    method: "GET",
-  });
-}
-
-export async function fetchChatMessages(projectId: number | string, chatRoomId: number | string): Promise<ChatMessageResponse[]> {
-  return request<ChatMessageResponse[]>(`/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/messages`, {
-    method: "GET",
-  });
-}
-
-export async function sendChatMessage(projectId: number | string, chatRoomId: number | string, content: string): Promise<ChatMessageResponse> {
-  return request<ChatMessageResponse>(`/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/messages`, {
-    method: "POST",
-    body: { content } as any,
-  });
-}
-
-export async function createChatRoom(projectId: number | string, name: string): Promise<ChatRoom> {
-  return request<ChatRoom>(`/api/v1/projects/${projectId}/chat/rooms`, {
-    method: "POST",
-    body: { name, type: "GENERAL" } as any,
-  });
-}
+import {
+  fetchChatRooms,
+  fetchChatMessages,
+  sendChatMessage,
+  fetchDepartments,
+  createChatRoom,
+  fetchProjectMembers,
+  type ChatRoom,
+  type ChatMessageResponse,
+  type Department,
+  type ProjectMember
+} from "../lib/api";
 
 function normalizeChatRoomName(name: string) {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
 }
 
 // ══════════════════════════════════════════════════════════
-// 💡 에러 방지를 위해 파일 내부에 선언한 타입 및 UI 컴포넌트들
+// UI 컴포넌트들
 // ══════════════════════════════════════════════════════════
 
 export type BriefingData = {
@@ -171,79 +137,6 @@ function BriefingLoadingBubble({ fileName }: { fileName: string }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// 💡 기존 프로젝트 지식 데이터 (아바타 표시, AI 등 원본 유지)
-// ══════════════════════════════════════════════════════════
-type BasePartId = "all" | "frontend" | "backend" | "qa" | "devops";
-type PartId = BasePartId | string;
-
-type ChatRoomConfig = {
-  id: PartId;
-  label: string;
-  labelKo: string;
-  icon: any;
-  color: string;
-  bg: string;
-  isCustom?: boolean;
-};
-
-const PROJECT_TEAM = [
-  {
-    name: "병권", part: "Backend", partKo: "백엔드", partId: "backend" as PartId,
-    role: "Backend Dev · Team Lead", avatar: "병",
-    color: "#41431B", bg: "rgba(65,67,27,0.10)",
-    tasks: ["Multi-Agent Controller", "Spring Boot API 설계", "DB 스키마 관리", "에이전트 오케스트레이션"],
-    stack: ["Java 17", "Spring Boot 3.2", "PostgreSQL", "Redis"],
-    status: "online",
-    joinDate: "2025.01",
-  },
-  {
-    name: "지수", part: "Frontend", partKo: "프론트엔드", partId: "frontend" as PartId,
-    role: "Frontend Developer", avatar: "지",
-    color: "#5A8A4A", bg: "rgba(90,138,74,0.10)",
-    tasks: ["React 대시보드 UI", "컴포넌트 라이브러리", "칸반 보드", "데이터 시각화"],
-    stack: ["React 18", "TypeScript", "Tailwind CSS", "Recharts"],
-    status: "online",
-    joinDate: "2025.01",
-  },
-  {
-    name: "민준", part: "Frontend", partKo: "프론트엔드", partId: "frontend" as PartId,
-    role: "Frontend Developer", avatar: "민",
-    color: "#7A8B5A", bg: "rgba(122,139,90,0.10)",
-    tasks: ["채팅 UI", "캘린더 페이지", "알림 시스템", "프로필 페이지"],
-    stack: ["React 18", "TypeScript", "CSS Modules", "Socket.io"],
-    status: "away",
-    joinDate: "2025.02",
-  },
-  {
-    name: "서연", part: "QA", partKo: "QA", partId: "qa" as PartId,
-    role: "QA Engineer", avatar: "서",
-    color: "#B85450", bg: "rgba(184,84,80,0.10)",
-    tasks: ["테스트 자동화 구축", "QA 리포트 작성", "버그 추적·관리", "회귀 테스트"],
-    stack: ["JUnit 5", "Playwright", "JMeter", "Allure"],
-    status: "online",
-    joinDate: "2025.01",
-  },
-  {
-    name: "Admin", part: "DevOps", partKo: "DevOps", partId: "devops" as PartId,
-    role: "DevOps Engineer", avatar: "A",
-    color: "#C09840", bg: "rgba(192,152,64,0.10)",
-    tasks: ["CI/CD 파이프라인", "Docker · Kubernetes", "서버 인프라 관리", "배포 자동화"],
-    stack: ["Docker", "Kubernetes", "Jenkins", "AWS EC2"],
-    status: "online",
-    joinDate: "2025.01",
-  },
-];
-
-const PART_CONFIG: Record<BasePartId, Omit<ChatRoomConfig, "id" | "isCustom">> = {
-  all: { label: "All", labelKo: "전체", icon: Globe, color: "#41431B", bg: "rgba(65,67,27,0.08)" },
-  frontend: { label: "Frontend", labelKo: "프론트엔드", icon: Code2, color: "#5A8A4A", bg: "rgba(90,138,74,0.08)" },
-  backend: { label: "Backend", labelKo: "백엔드", icon: Server, color: "#41431B", bg: "rgba(65,67,27,0.08)" },
-  qa: { label: "QA", labelKo: "QA", icon: ShieldCheck, color: "#B85450", bg: "rgba(184,84,80,0.08)" },
-  devops: { label: "DevOps", labelKo: "DevOps", icon: Wrench, color: "#C09840", bg: "rgba(192,152,64,0.08)" },
-};
-
-// ── AI 응답 생성 유틸리티 ──
 type AIResponseKind = "text" | "rag" | "agent" | "debate";
 interface AIMsg {
   id: string;
@@ -320,13 +213,9 @@ const DEFAULT_AI_AGENTS: AiAgent[] = [
   { agent: "INSPECTOR", name: "Inspector", role: "QA/Security inspector", model: "qwen2.5-coder" },
 ];
 
-// ══════════════════════════════════════════════════════════
-// 아바타
-// ══════════════════════════════════════════════════════════
 function Avatar({ name, size = 7 }: { name: string; size?: number }) {
-  const member = PROJECT_TEAM.find(m => m.name === name);
-  const bg = member ? member.bg : "rgba(65,67,27,0.08)";
-  const color = member ? member.color : OLIVE_DARK;
+  const bg = "rgba(65,67,27,0.08)";
+  const color = OLIVE_DARK;
   const initial = name ? name[0] : "?";
 
   return (
@@ -339,9 +228,6 @@ function Avatar({ name, size = 7 }: { name: string; size?: number }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// 채팅 메시지 버블
-// ══════════════════════════════════════════════════════════
 const FILE_COLOR: Record<string, { bg: string; color: string }> = {
   java: { bg: "rgba(245,158,11,0.10)", color: "#f59e0b" },
   ts: { bg: "rgba(59,130,246,0.10)", color: "#3b82f6" },
@@ -429,7 +315,6 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
   );
 }
 
-// ── AI 메시지 버블 ──
 function AIMessageBubble({ msg }: { msg: AIMsg }) {
   const isUser = msg.role === "user";
   return (
@@ -501,7 +386,6 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
   );
 }
 
-// ── 문서 카드 ──
 function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
   const isAI = doc.title.startsWith("[AI 브리핑]");
   return (
@@ -549,7 +433,6 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
   );
 }
 
-// ── 문서 상세 모달 ──
 function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void }) {
   return (
     <div
@@ -627,22 +510,32 @@ export function ChatPage({
   projectId = 0,
   currentUserId,
   onDocsUpdate,
+  onUnreadUpdate,
 }: {
   projectId?: number | null;
   currentUserId?: number;
   onDocsUpdate?: (count: number) => void;
+  onUnreadUpdate?: (count: number | ((prev: number) => number)) => void;
 }) {
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [serverMessages, setServerMessages] = useState<ChatMessageResponse[]>([]);
 
+  // 프로젝트 팀원 목록 관리 상태
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+
+  // 채팅방 생성 모달 관련 상태
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createType, setCreateType] = useState<"GENERAL" | "DEPARTMENT">("GENERAL");
   const [newRoomName, setNewRoomName] = useState("");
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDept, setSelectedDept] = useState<Department | null>(null);
+  const [isLoadingDepts, setIsLoadingDepts] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-  const [currentMemberRole, setCurrentMemberRole] = useState<ProjectMember["role"] | null>(null);
 
   const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
   const [docs, setDocs] = useState<MeetingDoc[]>(() => loadDocs());
@@ -675,27 +568,37 @@ export function ChatPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 1. 방 목록 불러오기 API 연동
-  useEffect(() => {
+  // 1. 방 목록 및 팀원 정보 불러오기 API 연동
+  const loadChatData = useCallback(() => {
     if (!projectId) return;
     setIsLoadingRooms(true);
 
-    fetchChatRooms(projectId)
-      .then((res: any) => {
-        // 응답 데이터가 배열이 아니라면 내부에 들어있는 배열 속성(.data나 .rooms 등)을 찾아 추출, 그것도 아니면 빈 배열([]) 처리
-        const roomsArray = Array.isArray(res)
-          ? res
-          : (Array.isArray(res?.data) ? res.data : (Array.isArray(res?.rooms) ? res.rooms : []));
-
+    Promise.all([
+      fetchChatRooms(projectId),
+      fetchProjectMembers(projectId)
+    ])
+      .then(([roomsRes, membersRes]) => {
+        const roomsArray = Array.isArray(roomsRes)
+          ? roomsRes
+          : (Array.isArray((roomsRes as any)?.data) ? (roomsRes as any).data
+            : (Array.isArray((roomsRes as any)?.rooms) ? (roomsRes as any).rooms
+              : (Array.isArray((roomsRes as any)?.chatRooms) ? (roomsRes as any).chatRooms : [])));
         setChatRooms(roomsArray);
 
         if (roomsArray.length > 0 && activeRoomId === null) {
           setActiveRoomId(roomsArray[0].chatRoomId);
         }
+
+        const membersArray = membersRes?.members || [];
+        setProjectMembers(membersArray);
       })
-      .catch(() => toast.error("채팅방 데이터를 불러오지 못했습니다."))
+      .catch(() => toast.error("데이터를 불러오지 못했습니다."))
       .finally(() => setIsLoadingRooms(false));
-  }, [projectId]);
+  }, [projectId, activeRoomId]);
+
+  useEffect(() => {
+    loadChatData();
+  }, [loadChatData]);
 
   // 2. 방 선택 시 메시지 불러오기 API 연동
   useEffect(() => {
@@ -704,8 +607,17 @@ export function ChatPage({
     setLocalMessages([]);
 
     fetchChatMessages(projectId, activeRoomId)
-      .then(setServerMessages)
-      .catch(() => toast.error("채팅 메시지를 불러오지 못했습니다."))
+      .then((res: any) => {
+        const msgsArray = Array.isArray(res)
+          ? res
+          : (Array.isArray(res?.data) ? res.data : (Array.isArray(res?.messages) ? res.messages : []));
+
+        setServerMessages(msgsArray);
+      })
+      .catch(() => {
+        toast.error("채팅 메시지를 불러오지 못했습니다.");
+        setServerMessages([]);
+      })
       .finally(() => setIsLoadingMessages(false));
   }, [projectId, activeRoomId]);
 
@@ -730,39 +642,51 @@ export function ChatPage({
       .catch((error) => toast.error(error instanceof Error ? error.message : "AI 에이전트 목록을 불러오지 못했습니다."));
   }, [projectId]);
 
-  useEffect(() => {
-    if (!projectId || !currentUserId) {
-      setCurrentMemberRole(null);
-      return;
+  const handleSelectCreateType = async (type: "GENERAL" | "DEPARTMENT") => {
+    setCreateType(type);
+    setSelectedDept(null);
+    setNewRoomName("");
+
+    if (type === "DEPARTMENT" && projectId) {
+      setIsLoadingDepts(true);
+      try {
+        const res = await fetchDepartments(projectId);
+        const deptsArray = Array.isArray(res)
+          ? res
+          : (Array.isArray((res as any)?.data) ? (res as any).data
+            : (Array.isArray((res as any)?.departments) ? (res as any).departments : []));
+
+        setDepartments(deptsArray);
+      } catch (error) {
+        toast.error("부서 목록을 불러오지 못했습니다.");
+      } finally {
+        setIsLoadingDepts(false);
+      }
+    }
+  };
+
+  const handleCreateRoomSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectId) return;
+
+    let targetName = "";
+    if (createType === "GENERAL") {
+      if (!newRoomName.trim()) {
+        toast.error("채팅방 이름을 입력해 주세요.");
+        return;
+      }
+      targetName = newRoomName.trim();
+    } else {
+      if (!selectedDept) {
+        toast.error("생성할 부서를 선택해 주세요.");
+        return;
+      }
+      targetName = selectedDept.name;
     }
 
-    void fetchProjectMembers(projectId)
-      .then((response) => {
-        const member = response.members?.find((item) => item.userId === currentUserId);
-        setCurrentMemberRole(member?.role ?? null);
-      })
-      .catch(() => setCurrentMemberRole(null));
-  }, [projectId, currentUserId]);
-
-  const handleCreateRoomSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!projectId) {
-      toast.error("프로젝트 정보를 찾을 수 없습니다.");
-      return;
-    }
-
-    const roomName = newRoomName.trim().replace(/\s+/g, " ");
-    if (!roomName) {
-      toast.error("채팅방 이름을 입력해 주세요.");
-      return;
-    }
-
-    const normalizedName = normalizeChatRoomName(roomName);
     const hasDuplicateName = chatRooms.some(
-      (room) => normalizeChatRoomName(room.name) === normalizedName,
+      (room) => normalizeChatRoomName(room.name) === normalizeChatRoomName(targetName),
     );
-
     if (hasDuplicateName) {
       toast.error("이미 같은 이름의 채팅방이 있습니다.");
       return;
@@ -770,18 +694,21 @@ export function ChatPage({
 
     setIsCreatingRoom(true);
     try {
-      const createdRoom = await createChatRoom(projectId, roomName);
+      const newRoom = await createChatRoom(projectId, targetName, createType);
+      const actualName = newRoom?.name || (newRoom as any)?.data?.name || targetName;
+      const actualRoomId = newRoom?.chatRoomId || (newRoom as any)?.data?.chatRoomId;
 
-      setChatRooms((previousRooms) => {
-        if (previousRooms.some((room) => room.chatRoomId === createdRoom.chatRoomId)) {
-          return previousRooms;
-        }
-        return [...previousRooms, createdRoom];
-      });
-      setActiveRoomId(createdRoom.chatRoomId);
-      setNewRoomName("");
+      toast.success(`'${actualName}' 채팅방이 생성되었습니다.`);
+
       setIsCreateModalOpen(false);
-      toast.success(`'${createdRoom.name || roomName}' 채팅방이 생성되었습니다.`);
+      setNewRoomName("");
+      setSelectedDept(null);
+
+      loadChatData();
+
+      if (actualRoomId) {
+        setActiveRoomId(actualRoomId);
+      }
     } catch (error: any) {
       toast.error(error?.message || "채팅방 생성에 실패했습니다.");
     } finally {
@@ -802,6 +729,7 @@ export function ChatPage({
   const activeRoom = Array.isArray(chatRooms)
     ? chatRooms.find(r => r.chatRoomId === activeRoomId)
     : undefined;
+  const currentMemberRole = projectMembers.find((member) => member.userId === currentUserId)?.role;
   const canLeaveChatRoom = currentMemberRole === "MEMBER" && Boolean(activeRoom);
   const canDeleteChatRoom = currentMemberRole === "LEADER" && Boolean(activeRoom);
 
@@ -812,11 +740,10 @@ export function ChatPage({
     return full;
   }, [isMeeting]);
 
-  // ── 실제 API 채팅 전송 로직 ──
   const handleSend = async () => {
     const text = input.trim();
     if (!text) return;
-    
+
     if (!projectId || !activeRoomId) {
       toast.error("선택된 채팅방 정보가 없습니다.");
       return;
@@ -826,13 +753,10 @@ export function ChatPage({
     setTyping(true);
 
     try {
-      // 서버 전송
       const newMsg = await sendChatMessage(projectId, activeRoomId, text);
-      
-      // 서버 응답이 정상적으로 오면 메시지 목록에 추가
       if (newMsg) {
         setServerMessages(prev => [...prev, newMsg]);
-        
+
         if (isMeeting) {
           setMeetingMsgs(prev => [...prev, {
             id: (newMsg.messageId ?? genId()).toString(),
@@ -1001,65 +925,163 @@ export function ChatPage({
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {openDoc && <DocDetailModal doc={openDoc} onClose={() => setOpenDoc(null)} />}
+
+      {/* 채팅방 생성 모달 */}
       {isCreateModalOpen && (
         <div
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-          onMouseDown={() => !isCreatingRoom && setIsCreateModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget && !isCreatingRoom) setIsCreateModalOpen(false); }}
         >
-          <form
-            onSubmit={handleCreateRoomSubmit}
-            onMouseDown={(event) => event.stopPropagation()}
-            className="w-full max-w-sm rounded-2xl p-5 shadow-xl"
-            style={{ background: "#FAF9F6", border: `1px solid ${BORDER}` }}
+          <div
+            className="w-full max-w-sm rounded-2xl p-5 shadow-2xl transition-all"
+            style={{ background: "#FCFCFB", border: `1px solid ${BORDER}` }}
           >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>채팅방 추가</p>
-                <p className="mt-1 text-[10px]" style={{ color: TEXT_TERTIARY }}>같은 이름의 채팅방은 만들 수 없습니다.</p>
+            <div className="flex items-center justify-between pb-3 mb-4" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(65,67,27,0.10)" }}>
+                  <MessageSquarePlus className="w-4 h-4" style={{ color: OLIVE_DARK }} />
+                </div>
+                <h3 className="text-xs font-bold" style={{ color: TEXT_PRIMARY }}>새 채팅방 만들기</h3>
               </div>
               <button
                 type="button"
-                aria-label="채팅방 생성 닫기"
-                disabled={isCreatingRoom}
                 onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-lg p-1 hover:bg-black/5 disabled:opacity-50"
+                disabled={isCreatingRoom}
+                className="p-1 rounded-md hover:bg-black/5 text-gray-400 hover:text-gray-700"
               >
-                <X className="h-4 w-4" style={{ color: TEXT_TERTIARY }} />
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <label className="block text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>
-              채팅방 이름
-              <input
-                value={newRoomName}
-                onChange={(event) => setNewRoomName(event.target.value)}
-                placeholder="예: 프로젝트 기획 회의실"
-                autoFocus
-                disabled={isCreatingRoom}
-                className="mt-1.5 w-full rounded-xl bg-white px-3 py-2.5 text-xs outline-none disabled:opacity-60"
-                style={{ border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
-              />
-            </label>
-            <div className="mt-5 flex justify-end gap-2">
+
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl mb-4" style={{ background: "rgba(65,67,27,0.06)" }}>
               <button
                 type="button"
-                disabled={isCreatingRoom}
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-xl px-3 py-2 text-xs font-semibold hover:bg-black/5 disabled:opacity-50"
-                style={{ color: TEXT_SECONDARY }}
+                onClick={() => handleSelectCreateType("GENERAL")}
+                className="py-1.5 text-[10px] font-bold rounded-lg transition-all"
+                style={{
+                  background: createType === "GENERAL" ? OLIVE_DARK : "transparent",
+                  color: createType === "GENERAL" ? "white" : TEXT_SECONDARY,
+                }}
               >
-                취소
+                일반 채팅
               </button>
               <button
-                type="submit"
-                disabled={isCreatingRoom || !newRoomName.trim()}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-                style={{ background: OLIVE_DARK }}
+                type="button"
+                onClick={() => handleSelectCreateType("DEPARTMENT")}
+                className="py-1.5 text-[10px] font-bold rounded-lg transition-all"
+                style={{
+                  background: createType === "DEPARTMENT" ? OLIVE_DARK : "transparent",
+                  color: createType === "DEPARTMENT" ? "white" : TEXT_SECONDARY,
+                }}
               >
-                {isCreatingRoom && <Loader2 className="h-3 w-3 animate-spin" />}
-                생성
+                부서 채팅
               </button>
             </div>
-          </form>
+
+            <form onSubmit={handleCreateRoomSubmit} className="space-y-4">
+              {createType === "GENERAL" ? (
+                <div>
+                  <label className="block text-[10px] font-semibold mb-1" style={{ color: TEXT_LABEL }}>
+                    채팅방 이름
+                  </label>
+                  <input
+                    type="text"
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    placeholder="예: 프로젝트 기획 회의실"
+                    disabled={isCreatingRoom}
+                    className="w-full px-3 py-2 text-xs rounded-xl outline-none transition-all"
+                    style={{ background: "white", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-semibold mb-1.5" style={{ color: TEXT_LABEL }}>
+                    생성할 부서 선택
+                  </label>
+                  {isLoadingDepts ? (
+                    <div className="text-center py-6 text-[10px]" style={{ color: TEXT_TERTIARY }}>
+                      부서 목록을 불러오는 중입니다...
+                    </div>
+                  ) : departments.length === 0 ? (
+                    <div className="text-center py-6 text-[10px]" style={{ color: TEXT_TERTIARY }}>
+                      생성 가능한 부서 정보가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {departments.map((dept) => {
+                        const isExists = dept.chatRoomExists;
+                        const isSelected = selectedDept?.departmentId === dept.departmentId;
+
+                        return (
+                          <div
+                            key={dept.departmentId}
+                            onClick={() => {
+                              if (!isExists && !isCreatingRoom) {
+                                setSelectedDept(dept);
+                              }
+                            }}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${isExists
+                              ? "opacity-50 cursor-not-allowed bg-black/[0.02]"
+                              : "cursor-pointer hover:border-black/20"
+                              }`}
+                            style={{
+                              borderColor: isSelected ? OLIVE_DARK : BORDER_SUBTLE,
+                              background: isSelected ? "rgba(65,67,27,0.06)" : isExists ? "rgba(0,0,0,0.02)" : "white",
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-3.5 h-3.5" style={{ color: isSelected ? OLIVE_DARK : TEXT_TERTIARY }} />
+                              <span className="font-semibold" style={{ color: isSelected ? OLIVE_DARK : TEXT_PRIMARY }}>
+                                {dept.name}
+                              </span>
+                            </div>
+                            {isExists ? (
+                              <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_TERTIARY }}>
+                                이미 생성됨
+                              </span>
+                            ) : (
+                              <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: isSelected ? OLIVE_DARK : "rgba(65,67,27,0.08)", color: isSelected ? "white" : OLIVE_DARK }}>
+                                {isSelected ? "선택됨" : "생성 가능"}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 생성 제출 버튼 */}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  disabled={isCreatingRoom}
+                  className="px-3 py-2 text-xs font-semibold rounded-xl hover:bg-black/5 transition-all"
+                  style={{ color: TEXT_SECONDARY }}
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    isCreatingRoom ||
+                    (createType === "GENERAL" && !newRoomName.trim()) ||
+                    (createType === "DEPARTMENT" && !selectedDept)
+                  }
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
+                  style={{ background: OLIVE_DARK }}
+                >
+                  {isCreatingRoom && <Loader2 className="w-3 h-3 animate-spin" />}
+                  채팅방 생성
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1152,47 +1174,15 @@ export function ChatPage({
         {mainTab === "chat" && (
           <>
             <div
-              className="flex items-center gap-1 px-3 h-10 shrink-0 overflow-x-auto"
+              className="flex items-center gap-2 px-3 h-10 shrink-0"
               style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}
             >
-              {isLoadingRooms ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="w-20 h-6 rounded-lg mx-1" />
-                ))
-              ) : (
-                Array.isArray(chatRooms) && chatRooms.map((room) => {
-                  const { icon: Icon, color, bg } = getRoomStyle(room.name);
-                  const isActive = activeRoomId === room.chatRoomId;
-
-                  return (
-                    <button
-                      key={room.chatRoomId}
-                      onClick={() => setActiveRoomId(room.chatRoomId)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 transition-all"
-                      style={{
-                        background: isActive ? bg : "transparent",
-                        color: isActive ? color : TEXT_TERTIARY,
-                        border: `1px solid ${isActive ? "rgba(0,0,0,0.08)" : "transparent"}`,
-                      }}
-                    >
-                      <Icon className="w-3 h-3" />
-                      {room.name}
-                      <span
-                        className="text-[8px] px-1 py-0.5 rounded-full ml-0.5"
-                        style={{ background: isActive ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)", color: isActive ? color : TEXT_TERTIARY }}
-                      >
-                        {room.memberCount ?? 0}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-
+              {/* 1. [맨 왼쪽] + 채팅방 추가 버튼 */}
               {!isLoadingRooms && (
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-black/10"
                   title="채팅방 추가"
                   style={{
                     background: "rgba(65,67,27,0.08)",
@@ -1236,18 +1226,113 @@ export function ChatPage({
                 </button>
               )}
 
-              <div className="ml-auto flex items-center gap-1 shrink-0">
-                {!isLoadingRooms && PROJECT_TEAM.slice(0, 4).map(m => (
-                  <div
-                    key={m.name}
-                    title={`${m.name} — ${m.role}`}
-                    className="w-5 h-5 rounded-full flex items-center justify-center"
-                    style={{ background: m.bg, border: `1px solid rgba(255,255,255,0.8)` }}
-                  >
-                    <span className="text-[7px] font-bold" style={{ color: m.color }}>{m.avatar}</span>
-                  </div>
-                ))}
+              {/* 2. [중앙] 채팅방 목록 (가로 스크롤 영역) */}
+              <div className="flex-1 flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                {isLoadingRooms ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="w-20 h-6 rounded-lg shrink-0" />
+                  ))
+                ) : (
+                  <>
+                    {/* 방 목록 렌더링 */}
+                    {Array.isArray(chatRooms) && chatRooms.map((room) => {
+                      const { icon: Icon, color, bg } = getRoomStyle(room.name);
+                      const isActive = activeRoomId === room.chatRoomId;
+
+                      return (
+                        <button
+                          key={room.chatRoomId}
+                          onClick={() => setActiveRoomId(room.chatRoomId)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 transition-all whitespace-nowrap"
+                          style={{
+                            background: isActive ? bg : "transparent",
+                            color: isActive ? color : TEXT_TERTIARY,
+                            border: `1px solid ${isActive ? "rgba(0,0,0,0.08)" : "transparent"}`,
+                          }}
+                        >
+                          <Icon className="w-3 h-3" />
+                          {room.name}
+                          <span
+                            className="text-[8px] px-1 py-0.5 rounded-full ml-0.5"
+                            style={{ background: isActive ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)", color: isActive ? color : TEXT_TERTIARY }}
+                          >
+                            {room.memberCount ?? 0}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
               </div>
+
+              {/* 3. [맨 오른쪽] 팀원 목록 (4명 제한 + 마우스 호버 시 팝업) */}
+              {!isLoadingRooms && (() => {
+                const displayMembers = projectMembers || [];
+                const visibleMembers = displayMembers.slice(0, 4);
+                const remainingCount = displayMembers.length - 4;
+
+                return (
+                  <div className="relative group shrink-0 flex items-center gap-1 pl-2.5 border-l border-black/10">
+                    {/* 기본 4명 아바타 */}
+                    <div className="flex items-center -space-x-1.5">
+                      {visibleMembers.length > 0 ? (
+                        visibleMembers.map((m: any, idx: number) => {
+                          const name = m.name || m.memberName || "팀원";
+                          return (
+                            <div
+                              key={m.userId || m.id || idx}
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-2 ring-white shadow-sm cursor-pointer"
+                              style={{ background: m.color || OLIVE_DARK }}
+                              title={name}
+                            >
+                              {name[0]}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <span className="text-[10px] text-gray-400 pl-1 font-medium">팀원 없음</span>
+                      )}
+                      
+                      {remainingCount > 0 && (
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold ring-2 ring-white shadow-sm cursor-pointer"
+                          style={{ background: "rgba(0,0,0,0.08)", color: TEXT_SECONDARY }}
+                        >
+                          ...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 마우스 호버 시 전체 팀원 목록 팝업창 */}
+                    {displayMembers.length > 0 && (
+                      <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 p-3 bg-white rounded-xl shadow-xl border border-black/10 z-50 min-w-[150px]">
+                        <div className="text-[10px] font-bold pb-1.5 border-b border-black/5 text-gray-500 flex items-center justify-between">
+                          <span>전체 팀원 목록</span>
+                          <span className="text-[9px] font-normal text-gray-400">{displayMembers.length}명</span>
+                        </div>
+                        <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                          {displayMembers.map((m: any, idx: number) => {
+                            const name = m.name || m.memberName || "팀원";
+                            const role = m.role || m.part || "";
+                            return (
+                              <div key={m.userId || m.id || idx} className="flex items-center gap-2 py-0.5">
+                                <div
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+                                  style={{ background: m.color || OLIVE_DARK }}
+                                >
+                                  {name[0]}
+                                </div>
+                                <span className="text-[11px] font-semibold text-gray-700 truncate">{name}</span>
+                                {role && <span className="text-[9px] text-gray-400 ml-auto shrink-0">{role}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: "rgba(248,247,244,0.50)" }}>

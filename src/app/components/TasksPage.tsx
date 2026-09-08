@@ -1,12 +1,22 @@
-import { useState, useEffect } from "react";
-import { CheckSquare, Circle, Clock, Search, ChevronDown, Plus, Tag, User } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { CheckSquare, Circle, Clock, Search, ChevronDown, Plus, Tag, User, Trash2, X, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   UI_RED_DARK, UI_AMBER_DARK, UI_GRAY, UI_GRAY_LIGHT, UI_AMBER, UI_GREEN, UI_RED, UI_INDIGO,
-  UI_INDIGO_BG, GRADIENT_HEADER, BTN_DARK, ACCENT,
+  UI_INDIGO_BG, GRADIENT_HEADER, BTN_DARK, ACCENT, ACCENT_BG, ACCENT_BORDER,
 } from "../colors";
+import {
+  fetchProjectSchedules,
+  createProjectSchedule,
+  updateProjectScheduleStatus,
+  deleteProjectSchedule,
+  type ProjectSchedule,
+  type ProjectScheduleStatus,
+  type ProjectDepartment,
+} from "../lib/api";
 
-// ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
+// ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -18,6 +28,7 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 
 type Task = {
   id: string;
+  scheduleId?: number;
   title: string;
   project: string;
   assignee: string;
@@ -27,23 +38,19 @@ type Task = {
   tag: string;
 };
 
-// 더미 태스크 데이터
-const TASKS: Task[] = [
-  { id: "T-001", title: "Fix JDK 17 compatibility in settings.gradle",       project: "WE&AI Backend",      assignee: "병권",  priority: "high",   status: "in-progress", due: "Today",   tag: "Backend"   },
-  { id: "T-002", title: "Code review: MultiAgentController refactor",         project: "WE&AI Backend",      assignee: "병권",  priority: "high",   status: "todo",        due: "Today",   tag: "Review"    },
-  { id: "T-003", title: "Write REST API documentation",                       project: "WE&AI Backend",      assignee: "병권",  priority: "medium", status: "todo",        due: "Tomorrow","tag": "Docs"    },
-  { id: "T-004", title: "Set up CI/CD pipeline with GitHub Actions",          project: "WE&AI Backend",      assignee: "병권",  priority: "medium", status: "todo",        due: "Jun 3",   tag: "DevOps"    },
-  { id: "T-005", title: "Test Agent Alpha–Beta inter-agent communication",    project: "WE&AI Backend",      assignee: "병권",  priority: "medium", status: "in-progress", due: "Today",   tag: "Testing"   },
-  { id: "T-006", title: "Review Multi-Agent Simulator PR #14",                project: "Multi-Agent Sim",    assignee: "병권",  priority: "high",   status: "review",      due: "Today",   tag: "Review"    },
-  { id: "T-007", title: "Deploy WE&AI Backend to staging environment",        project: "WE&AI Backend",      assignee: "Admin", priority: "high",   status: "done",        due: "Mar 30",  tag: "Deploy"    },
-  { id: "T-008", title: "Update application-dev.yml profile configs",         project: "WE&AI Backend",      assignee: "병권",  priority: "low",    status: "done",        due: "Mar 29",  tag: "Config"    },
-  { id: "T-009", title: "Implement agent error recovery mechanism",           project: "WE&AI Backend",      assignee: "병권",  priority: "high",   status: "todo",        due: "Jun 5",   tag: "Backend"   },
-  { id: "T-010", title: "Document simulation parameter configs",              project: "Multi-Agent Sim",    assignee: "병권",  priority: "low",    status: "todo",        due: "Jun 7",   tag: "Docs"      },
+// 더미/기본 태스크 데이터 (SynAIpse 프로젝트 실제 기능)
+const DEFAULT_TASKS: Task[] = [
+  { id: "T-001", title: "AI 커밋 메시지 생성 엔드포인트 연동", project: "SynAIpse Backend", assignee: "김민혁", priority: "high", status: "in-progress", due: "Today", tag: "AI/Commit" },
+  { id: "T-002", title: "캘린더 및 태스크 일정 CRUD 백엔드 연동", project: "SynAIpse Frontend", assignee: "이지현", priority: "high", status: "in-progress", due: "Today", tag: "Calendar" },
+  { id: "T-003", title: "채팅방 생성 및 부서별 회의 모드 API 검증", project: "SynAIpse Server", assignee: "김민혁", priority: "medium", status: "done", due: "Yesterday", tag: "Chat" },
+  { id: "T-004", title: "Ollama LLM (Qwen2.5 / Llama3.1) 헬스체크", project: "SynAIpse AI Engine", assignee: "김민혁", priority: "high", status: "done", due: "Today", tag: "Ollama" },
+  { id: "T-005", title: "Git Commit Unified Diff 파서 고도화", project: "SynAIpse Frontend", assignee: "신민준", priority: "medium", status: "todo", due: "Tomorrow", tag: "Git/Diff" },
+  { id: "T-006", title: "프로젝트 멤버 권한 및 부서 배정 관리", project: "SynAIpse Client", assignee: "신민준", priority: "low", status: "done", due: "Aug 20", tag: "Settings" },
 ];
 
-const STATUS_TABS = ["All", "To Do", "In Progress", "Review", "Done"] as const;
+const STATUS_TABS = ["All", "To Do", "In Progress", "Done"] as const;
 const STATUS_KEY: Record<string, Task["status"] | "all"> = {
-  "All": "all", "To Do": "todo", "In Progress": "in-progress", "Review": "review", "Done": "done",
+  "All": "all", "To Do": "todo", "In Progress": "in-progress", "Done": "done",
 };
 
 const PRIORITY_STYLE: Record<Task["priority"], { color: string; bg: string }> = {
@@ -54,38 +61,165 @@ const PRIORITY_STYLE: Record<Task["priority"], { color: string; bg: string }> = 
 
 const STATUS_STYLE: Record<Task["status"], { color: string; dot: string }> = {
   "todo":        { color: UI_GRAY, dot: UI_GRAY_LIGHT },
-  "in-progress": { color: UI_INDIGO,    dot: UI_INDIGO    },
+  "in-progress": { color: UI_INDIGO, dot: UI_INDIGO },
   "review":      { color: UI_AMBER, dot: UI_AMBER },
   "done":        { color: UI_GREEN, dot: UI_GREEN },
 };
 
-export function TasksPage() {
-  const isLoading = false;
+function mapBackendToTask(s: ProjectSchedule): Task {
+  const normStatus = (s.status || "TODO").toUpperCase();
+  let status: Task["status"] = "todo";
+  if (normStatus === "DONE" || normStatus === "COMPLETED") status = "done";
+  else if (normStatus === "IN_PROGRESS") status = "in-progress";
 
+  const normPri = (s.priority || "MEDIUM").toUpperCase();
+  let priority: Task["priority"] = "medium";
+  if (normPri === "HIGH") priority = "high";
+  else if (normPri === "LOW") priority = "low";
+
+  return {
+    id: `SCH-${s.scheduleId}`,
+    scheduleId: s.scheduleId,
+    title: s.title,
+    project: s.department ? `SynAIpse ${s.department}` : "SynAIpse",
+    assignee: s.assigneeName || "미지정",
+    priority,
+    status,
+    due: s.endDate ? s.endDate.slice(5) : "진행중",
+    tag: s.department || "General",
+  };
+}
+
+export function TasksPage({ projectId = 1 }: { projectId?: number | null }) {
+  const [tasks, setTasks] = useState<Task[]>(DEFAULT_TASKS);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("All");
   const [search, setSearch] = useState("");
 
-  const filtered = TASKS.filter(t => {
+  // 새 태스크 추가 모달
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDept, setNewDept] = useState<ProjectDepartment>("BACKEND");
+  const [newPriority, setNewPriority] = useState<Task["priority"]>("medium");
+
+  const loadTasks = useCallback(async () => {
+    if (!projectId) {
+      setIsLoading(false);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const res = await fetchProjectSchedules(projectId);
+      if (res && res.schedules && res.schedules.length > 0) {
+        setTasks(res.schedules.map(mapBackendToTask));
+      } else {
+        setTasks(DEFAULT_TASKS);
+      }
+    } catch (err) {
+      console.warn("태스크 목록 조회 실패, 기본 목록 사용:", err);
+      setTasks(DEFAULT_TASKS);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
+
+  const handleToggleStatus = async (task: Task) => {
+    const nextStatus: Task["status"] = task.status === "done" ? "todo" : task.status === "todo" ? "in-progress" : "done";
+    const nextBackendStatus: ProjectScheduleStatus = nextStatus === "done" ? "DONE" : nextStatus === "in-progress" ? "IN_PROGRESS" : "TODO";
+
+    // 낙관적 UI 업데이트
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: nextStatus } : t));
+
+    if (projectId && task.scheduleId) {
+      try {
+        await updateProjectScheduleStatus(projectId, task.scheduleId, { status: nextBackendStatus });
+        toast.success(`태스크 상태가 [${nextStatus.toUpperCase()}] (으)로 변경되었습니다.`);
+      } catch (err) {
+        console.warn("태스크 상태 변경 API 실패:", err);
+      }
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTitle.trim()) {
+      toast.error("태스크 제목을 입력해주세요.");
+      return;
+    }
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const tempId = `T-${Date.now().toString().slice(-4)}`;
+
+    const newTaskItem: Task = {
+      id: tempId,
+      title: newTitle.trim(),
+      project: `SynAIpse ${newDept}`,
+      assignee: "나",
+      priority: newPriority,
+      status: "todo",
+      due: todayStr.slice(5),
+      tag: newDept,
+    };
+
+    setTasks(prev => [newTaskItem, ...prev]);
+    setShowAddModal(false);
+    setNewTitle("");
+
+    if (projectId) {
+      try {
+        const created = await createProjectSchedule(projectId, {
+          title: newTitle.trim(),
+          department: newDept,
+          startDate: todayStr,
+          endDate: todayStr,
+          priority: newPriority === "high" ? "HIGH" : newPriority === "low" ? "LOW" : "MEDIUM",
+          status: "TODO",
+        });
+        if (created && created.scheduleId) {
+          setTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: `SCH-${created.scheduleId}`, scheduleId: created.scheduleId } : t));
+        }
+        toast.success("새 태스크가 생성되었습니다.");
+      } catch (err) {
+        console.warn("태스크 생성 API 실패:", err);
+      }
+    }
+  };
+
+  const handleDeleteTask = async (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTasks(prev => prev.filter(t => t.id !== task.id));
+
+    if (projectId && task.scheduleId) {
+      try {
+        await deleteProjectSchedule(projectId, task.scheduleId);
+        toast.success("태스크가 삭제되었습니다.");
+      } catch (err) {
+        console.warn("태스크 삭제 API 실패:", err);
+      }
+    }
+  };
+
+  const filtered = tasks.filter(t => {
     const matchStatus = STATUS_KEY[activeTab] === "all" || t.status === STATUS_KEY[activeTab];
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
-                        t.project.toLowerCase().includes(search.toLowerCase());
+                        t.project.toLowerCase().includes(search.toLowerCase()) ||
+                        t.tag.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
 
-  const counts: Record<string, number> = { "All": TASKS.length };
-  TASKS.forEach(t => {
+  const counts: Record<string, number> = { "All": tasks.length };
+  tasks.forEach(t => {
     const label = STATUS_TABS.find(s => STATUS_KEY[s] === t.status) ?? "";
-    counts[label] = (counts[label] ?? 0) + 1;
+    if (label) counts[label] = (counts[label] ?? 0) + 1;
   });
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* 배경 */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_HEADER }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter: "blur(50px)" }} />
-      </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
@@ -93,12 +227,12 @@ export function TasksPage() {
           {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>My Tasks</h1>
+              <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>My Tasks & Schedules</h1>
               {isLoading ? (
                 <Skeleton className="h-3 w-32 mt-1.5" />
               ) : (
                 <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                  {TASKS.length}개 작업 · {TASKS.filter(t => t.status !== "done").length}개 미완료
+                  총 {tasks.length}개 작업 · {tasks.filter(t => t.status !== "done").length}개 진행 중 / 미완료
                 </p>
               )}
             </div>
@@ -106,6 +240,7 @@ export function TasksPage() {
               <Skeleton className="h-8 w-24 rounded-lg" />
             ) : (
               <button
+                onClick={() => setShowAddModal(true)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
                 style={{ background: BTN_DARK, color: "rgba(255,255,255,0.92)" }}
               >
@@ -118,9 +253,8 @@ export function TasksPage() {
           <div className="rounded-2xl p-4 space-y-3" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             <div className="flex items-center gap-1.5 flex-wrap">
               {isLoading ? (
-                /* [스켈레톤] 상태 탭 필터 */
                 <div className="flex gap-1.5 w-full">
-                  {Array.from({ length: 5 }).map((_, i) => (
+                  {Array.from({ length: 4 }).map((_, i) => (
                     <Skeleton key={i} className="h-6 w-16 rounded-lg" />
                   ))}
                   <div className="ml-auto">
@@ -129,7 +263,6 @@ export function TasksPage() {
                 </div>
               ) : (
                 <>
-                  {/* 상태 탭 */}
                   {STATUS_TABS.map(tab => (
                     <button
                       key={tab}
@@ -157,7 +290,7 @@ export function TasksPage() {
                     <input
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Search tasks..."
+                      placeholder="태스크 검색..."
                       className="pl-7 pr-3 py-1.5 text-[10px] rounded-lg outline-none w-44 transition-colors"
                       style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
                       onFocus={e => (e.currentTarget.style.borderColor = ACCENT + "50")}
@@ -170,11 +303,10 @@ export function TasksPage() {
           </div>
 
           {/* ── 태스크 목록 ── */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+          <div className="rounded-2xl overflow-hidden shadow-sm" style={{ background: "rgba(255,255,255,0.88)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             {isLoading ? (
-              /* [스켈레톤] 태스크 아이템 목록 (6개) */
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: i < 5 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: i < 4 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
                   <Skeleton className="w-4 h-4 rounded-full shrink-0" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-3 w-3/4" />
@@ -186,13 +318,12 @@ export function TasksPage() {
                   <Skeleton className="w-12 h-4 rounded shrink-0" />
                   <Skeleton className="w-12 h-5 rounded-full shrink-0" />
                   <Skeleton className="w-10 h-4 rounded shrink-0" />
-                  <Skeleton className="w-14 h-3 shrink-0" />
                 </div>
               ))
             ) : filtered.length === 0 ? (
               <div className="py-12 text-center">
                 <CheckSquare className="w-8 h-8 mx-auto mb-2" style={{ color: TEXT_TERTIARY }} />
-                <p className="text-xs" style={{ color: TEXT_TERTIARY }}>No tasks found</p>
+                <p className="text-xs" style={{ color: TEXT_TERTIARY }}>일치하는 태스크가 없습니다.</p>
               </div>
             ) : (
               filtered.map((task, i) => {
@@ -201,12 +332,14 @@ export function TasksPage() {
                 return (
                   <div
                     key={task.id}
-                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-black/[0.02] cursor-pointer"
+                    onClick={() => handleToggleStatus(task)}
+                    className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-black/[0.025] cursor-pointer"
                     style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}
                   >
-                    {/* 상태 원 */}
+                    {/* 상태 토글 원 */}
                     <div
-                      className="w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center"
+                      title="클릭하여 상태 변경"
+                      className="w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all group-hover:scale-110"
                       style={{ borderColor: ss.dot, background: task.status === "done" ? ss.dot : "transparent" }}
                     >
                       {task.status === "done" && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
@@ -227,7 +360,7 @@ export function TasksPage() {
                     </div>
 
                     {/* 태그 */}
-                    <span className="text-[9px] px-1.5 py-0.5 rounded shrink-0" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium shrink-0" style={{ background: ACCENT_BG, color: ACCENT }}>
                       {task.tag}
                     </span>
 
@@ -251,6 +384,15 @@ export function TasksPage() {
                         {task.due}
                       </span>
                     </div>
+
+                    {/* 삭제 버튼 */}
+                    <button
+                      onClick={(e) => handleDeleteTask(task, e)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all shrink-0"
+                      title="태스크 삭제"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 );
               })
@@ -259,6 +401,89 @@ export function TasksPage() {
 
         </div>
       </div>
+
+      {/* ── 새 태스크 생성 모달 ── */}
+      {showAddModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{ background: "rgba(0,0,0,0.30)", backdropFilter: "blur(8px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl"
+            style={{ background: "#FFFFFF", border: `1px solid ${BORDER}` }}
+          >
+            <div className="flex items-center justify-between pb-2" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+              <h3 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>새 태스크 추가</h3>
+              <button onClick={() => setShowAddModal(false)} className="p-1 rounded-lg hover:bg-black/5">
+                <X className="w-4 h-4" style={{ color: TEXT_TERTIARY }} />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold text-gray-500">태스크 제목 *</label>
+              <input
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder="예: AI 토론 스트리밍 에러 처리"
+                className="w-full px-3 py-2 rounded-xl text-xs outline-none"
+                style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-gray-500">부서</label>
+                <select
+                  value={newDept}
+                  onChange={e => setNewDept(e.target.value as ProjectDepartment)}
+                  className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-black/5"
+                  style={{ border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                >
+                  <option value="BACKEND">Backend</option>
+                  <option value="FRONTEND">Frontend</option>
+                  <option value="AI">AI / Agent</option>
+                  <option value="DEVOPS">DevOps</option>
+                  <option value="QA">QA</option>
+                  <option value="DESIGN">Design</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-gray-500">우선순위</label>
+                <select
+                  value={newPriority}
+                  onChange={e => setNewPriority(e.target.value as Task["priority"])}
+                  className="w-full px-3 py-2 rounded-xl text-xs outline-none bg-black/5"
+                  style={{ border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                >
+                  <option value="high">높음 (High)</option>
+                  <option value="medium">중간 (Medium)</option>
+                  <option value="low">낮음 (Low)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold"
+                style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleCreateTask}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold text-white shadow-md hover:opacity-90"
+                style={{ background: "linear-gradient(135deg, #41431B, #62683A)" }}
+              >
+                생성
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

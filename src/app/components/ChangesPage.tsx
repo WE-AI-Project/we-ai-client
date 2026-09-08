@@ -1,12 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   GitCommit, GitBranch, Upload, CheckCircle2, X,
   ShieldCheck, Plus, RotateCcw,
   ChevronDown, ChevronRight, FileCode2, GitMerge, Loader2
 } from "lucide-react";
-// 기존 Mock 데이터(CHANGE_FILES) 임포트 제거
-// import { CHANGE_FILES } from "./commitData";
-// import type { CommitFile } from "./commitData";
+import { CHANGE_FILES, type CommitFile } from "./commitData";
 import { FileDiffViewer } from "./FileDiffViewer";
 import { BranchVisualization } from "./BranchVisualization";
 import { setPendingQA } from "../data/qaStore";
@@ -17,6 +15,8 @@ import {
   fetchProjectCommits, 
   fetchProjectCommitFiles, 
   fetchProjectCommitFileDiff,
+  fetchCurrentUser,
+  loadSession,
   ProjectCommitSummary,
   ProjectCommitChangedFile,
   ProjectRepositoryType
@@ -177,7 +177,7 @@ function FileRow({
 }
 
 export function ChangesPage({
-  projectId = 0, // 기본값 처리 (실제로는 props로 받아야 함)
+  projectId = 1,
   onNavigateQA,
 }: {
   projectId?: number | null;
@@ -185,6 +185,7 @@ export function ChangesPage({
 }) {
   const [isLoading, setIsLoading] = useState(true);
   const [repoType, setRepoType] = useState<ProjectRepositoryType>("BACKEND");
+  const [userName, setUserName] = useState<string>("SynAIpse");
   
   // 🌟 API로 받아온 데이터 상태
   const [latestCommitHash, setLatestCommitHash] = useState<string | null>(null);
@@ -206,67 +207,112 @@ export function ChangesPage({
   // 컨벤션 가드
   const [showConvention, setShowConvention] = useState(false);
 
-  // 🌟 API 데이터 호출 로직
+  // 사용자 정보 조회
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const user = await fetchCurrentUser();
+        if (user && user.name) {
+          setUserName(user.name);
+          return;
+        }
+      } catch {}
+      const session = loadSession();
+      if (session?.username) {
+        setUserName(session.username);
+      }
+    }
+    loadUser();
+  }, []);
+
+  // 🌟 파일 선택 시 Diff 데이터 불러오기
+  const handleFileSelect = async (file: UICommitFile, hash: string | null = latestCommitHash) => {
+    setSelectedFile(file);
+    if (!projectId || !hash || fileDiffs[file.id]) return;
+
+    try {
+      const diffData = await fetchProjectCommitFileDiff(projectId, repoType, hash, file.path);
+      setFileDiffs(prev => ({ ...prev, [file.id]: diffData }));
+    } catch (error) {
+      console.warn("파일 Diff 조회 실패:", error);
+    }
+  };
+
+  // 🌟 API 데이터 호출 로직 (실제 백엔드 + Fallback SynAIpse 커밋 데이터)
   useEffect(() => {
     async function loadCommitData() {
-      if (!projectId) return;
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        // 1. 가장 최근 커밋 목록 가져오기 (가장 최신 1개)
-        const commitData = await fetchProjectCommits(projectId, repoType, 1);
-        
-        if (commitData.commits.length > 0) {
-          const hash = commitData.commits[0].commitHash;
-          setLatestCommitHash(hash);
+        if (projectId) {
+          const commitData = await fetchProjectCommits(projectId, repoType, 1);
+          if (commitData && commitData.commits && commitData.commits.length > 0) {
+            const hash = commitData.commits[0].commitHash;
+            setLatestCommitHash(hash);
 
-          // 2. 해당 커밋의 변경된 파일 목록 가져오기
-          const filesData = await fetchProjectCommitFiles(projectId, repoType, hash);
-          
-          // UI용 ID를 부여하여 매핑
-          const mappedFiles = filesData.files.map(f => ({
-            ...f,
-            id: f.path // path를 고유 ID로 사용
-          }));
-          
-          setChangedFiles(mappedFiles);
-          
-          // 처음 불러올 때 모든 파일을 Staged 처리하고 첫 번째 파일을 선택
-          setStaged(new Set(mappedFiles.map(f => f.id)));
-          if (mappedFiles.length > 0) {
-            handleFileSelect(mappedFiles[0], hash);
+            const filesData = await fetchProjectCommitFiles(projectId, repoType, hash);
+            if (filesData && filesData.files && filesData.files.length > 0) {
+              const mappedFiles = filesData.files.map(f => ({
+                ...f,
+                id: f.path
+              }));
+              setChangedFiles(mappedFiles);
+              setStaged(new Set(mappedFiles.map(f => f.id)));
+              handleFileSelect(mappedFiles[0], hash);
+              setIsLoading(false);
+              return;
+            }
           }
-        } else {
-          setChangedFiles([]);
-          setSelectedFile(null);
         }
       } catch (error) {
-        console.error("커밋 데이터를 불러오는데 실패했습니다.", error);
-      } finally {
-        setIsLoading(false);
+        console.warn("백엔드 커밋 파일 목록 조회 실패, SynAIpse 로컬 변경사항으로 대체:", error);
       }
+
+      // Fallback: CHANGE_FILES (SynAIpse 실제 GitHub 코드 Diff)
+      const fallbackFiles: UICommitFile[] = CHANGE_FILES.map(cf => ({
+        id: cf.id,
+        path: cf.path,
+        fileName: cf.name,
+        extension: cf.ext,
+        status: (cf.status === "added" ? "ADDED" : cf.status === "deleted" ? "DELETED" : "MODIFIED") as any,
+        additions: cf.additions,
+        deletions: cf.deletions,
+      }));
+
+      const initialDiffs: Record<string, any> = {};
+      CHANGE_FILES.forEach(cf => {
+        initialDiffs[cf.id] = { diff: cf.diff };
+      });
+      setFileDiffs(initialDiffs);
+      setChangedFiles(fallbackFiles);
+      setStaged(new Set(fallbackFiles.map(f => f.id)));
+      if (fallbackFiles.length > 0) {
+        setSelectedFile(fallbackFiles[0]);
+      }
+      setIsLoading(false);
     }
 
     loadCommitData();
   }, [projectId, repoType]);
 
-  // 🌟 파일 선택 시 Diff 데이터 불러오기
-  const handleFileSelect = async (file: UICommitFile, hash: string | null = latestCommitHash) => {
-    setSelectedFile(file);
-    if (!projectId || !hash || fileDiffs[file.id]) return; // 이미 캐싱된 경우 패스
-
-    try {
-      const diffData = await fetchProjectCommitFileDiff(projectId, repoType, hash, file.path);
-      // 기존 fileDiffs 캐시에 추가
-      setFileDiffs(prev => ({ ...prev, [file.id]: diffData }));
-    } catch (error) {
-      console.error("파일 Diff를 불러오는데 실패했습니다.", error);
-    }
-  };
-
-
   const stagedFiles   = changedFiles.filter(f => staged.has(f.id));
   const unstagedFiles = changedFiles.filter(f => !staged.has(f.id));
   const stagedCount   = staged.size;
+
+  const stagedFilesWithDiff = useMemo(() => {
+    return stagedFiles.map(file => {
+      const cached = fileDiffs[file.id];
+      return {
+        id: file.id,
+        name: file.fileName,
+        path: file.path,
+        ext: file.extension,
+        status: (file.status || "MODIFIED").toLowerCase() as any,
+        additions: file.additions,
+        deletions: file.deletions,
+        diff: cached?.diff || [],
+      };
+    });
+  }, [stagedFiles, fileDiffs]);
 
   const toggleStage = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -282,16 +328,14 @@ export function ChangesPage({
 
   const handleCommitClick = () => {
     if (!stagedCount || !message.trim()) return;
-    // ① 먼저 컨벤션 가드 실행
     setShowConvention(true);
   };
 
-  // 컨벤션 가드 → 무시하고 QA 단계로
   const handleConventionIgnore = () => {
     setShowConvention(false);
     setShowQA(true);
   };
-  // 컨벤션 가드 → 수정 후 재검사 (모달 닫기)
+
   const handleConventionFix = () => {
     setShowConvention(false);
   };
@@ -299,10 +343,9 @@ export function ChangesPage({
   // QA 페이지로 이동할 때 커밋 정보 전달
   const handleQAYes = () => {
     setShowQA(false);
-    // 커밋 정보를 qaStore에 저장
     setPendingQA({
       message: message.trim(),
-      author:  "병권", // 차후 fetchCurrentUser 연동 가능
+      author:  userName,
       branch:  "main",
       files:   stagedFiles.map(f => f.fileName),
       hash:    Math.random().toString(36).slice(2, 9).toUpperCase(),
@@ -325,7 +368,6 @@ export function ChangesPage({
   const totalAdd = changedFiles.reduce((s, f) => s + f.additions, 0);
   const totalDel = changedFiles.reduce((s, f) => s + f.deletions, 0);
 
-  // 현재 선택된 파일의 Diff 데이터를 찾아서 조합 (임시 렌더링용)
   const currentDiffData = selectedFile ? fileDiffs[selectedFile.id] : null;
 
   return (
@@ -556,9 +598,11 @@ export function ChangesPage({
                         className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
                         style={{ background: "linear-gradient(135deg, #DDE2D3, #F0F1EE)" }}
                       >
-                        <span className="text-[8px] font-bold" style={{ color: ACCENT }}>병</span>
+                        <span className="text-[8px] font-bold" style={{ color: ACCENT }}>
+                          {userName.charAt(0) || "U"}
+                        </span>
                       </div>
-                      <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>병권</span>
+                      <span className="text-[10px] font-medium" style={{ color: TEXT_SECONDARY }}>{userName}</span>
                       <div className="flex items-center gap-1 ml-auto">
                         <GitBranch className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
                         <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>main</span>
@@ -566,11 +610,9 @@ export function ChangesPage({
                     </div>
 
                     {/* ── AI 커밋 메시지 생성기 ── */}
-                    {/* ※ 주의: AICommitGenerator의 props 타입이 기존 CommitFile을 기대한다면 
-                        임시로 매핑을 해주거나 해당 컴포넌트도 UICommitFile 타입으로 맞춰주어야 합니다. */}
                     <AICommitGenerator
-                      projectId={projectId ?? 0}
-                      stagedFiles={stagedFiles as any} 
+                      projectId={projectId ?? 1}
+                      stagedFiles={stagedFilesWithDiff as any} 
                       onApply={msg => setMessage(msg)}
                     />
 
@@ -690,7 +732,7 @@ export function ChangesPage({
       {showConvention && (
         <ConventionGuardModal
           stagedFiles={stagedFiles.map(f => f.fileName)}
-          userName="병권"
+          userName={userName}
           onIgnore={handleConventionIgnore}
           onFix={handleConventionFix}
           onClose={() => setShowConvention(false)}

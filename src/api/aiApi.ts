@@ -130,25 +130,34 @@ export function resolveProjectId(projectId?: number | null): number {
   return projectId;
 }
 
-export function buildDiffFromCommitFiles(files: CommitFile[]): string {
+export function buildDiffFromCommitFiles(files: any[]): string {
   return files.map((file) => {
-    const oldPath = `a/${file.path}`;
-    const newPath = `b/${file.path}`;
-    const body = file.diff
-      .map((line) => {
-        if (line.type === "added") return `+${line.content}`;
-        if (line.type === "removed") return `-${line.content}`;
-        return ` ${line.content}`;
-      })
-      .join("\n");
+    if (typeof file.diff === "string" && file.diff.trim()) {
+      return file.diff;
+    }
 
-    return [
-      `diff --git ${oldPath} ${newPath}`,
-      `--- ${oldPath}`,
-      `+++ ${newPath}`,
-      "@@",
-      body,
-    ].join("\n");
+    const oldPath = `a/${file.path || file.fileName || "unknown"}`;
+    const newPath = `b/${file.path || file.fileName || "unknown"}`;
+
+    if (Array.isArray(file.diff)) {
+      const body = file.diff
+        .map((line: any) => {
+          if (line.type === "added") return `+${line.content}`;
+          if (line.type === "removed") return `-${line.content}`;
+          if (line.type === "hunk") return line.content;
+          return ` ${line.content}`;
+        })
+        .join("\n");
+
+      return [
+        `diff --git ${oldPath} ${newPath}`,
+        `--- ${oldPath}`,
+        `+++ ${newPath}`,
+        body,
+      ].join("\n");
+    }
+
+    return `diff --git ${oldPath} ${newPath}\n--- ${oldPath}\n+++ ${newPath}\n@@ -1,1 +1,1 @@\n+// Modified ${file.name || file.fileName || "file"}`;
   }).join("\n\n");
 }
 
@@ -243,9 +252,8 @@ export type SocialProvider = "google" | "kakao" | "naver";
 export async function fetchSocialLoginUrl(
   provider: SocialProvider
 ): Promise<{ authorizationUrl: string }> {
-  // 실제 백엔드 API 주소에 맞게 호출합니다. (예: /api/auth/{provider}/url)
-  // VITE_API_BASE_URL 등 기존에 쓰시던 baseURL 환경변수가 있다면 적용해주세요.
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/${provider}/url`, {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  const response = await fetch(`${baseUrl}/api/v1/auth/${provider}/url`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -256,5 +264,6 @@ export async function fetchSocialLoginUrl(
     throw new Error(`${provider} 로그인 주소를 가져오는 데 실패했습니다.`);
   }
 
-  return response.json();
+  const json = await response.json();
+  return json?.data ?? json;
 }

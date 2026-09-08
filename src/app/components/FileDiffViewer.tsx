@@ -66,22 +66,99 @@ function DiffLineRow({ line, idx }: { line: DiffLine; idx: number }) {
   );
 }
 
+export function parseUnifiedDiff(diffText: string): DiffLine[] {
+  if (!diffText || !diffText.trim()) {
+    return [];
+  }
+
+  const diffLines: DiffLine[] = [];
+  let oldLineNumber = 0;
+  let newLineNumber = 0;
+
+  for (const line of diffText.split(/\r?\n/)) {
+    if (line.startsWith("@@")) {
+      const match = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        oldLineNumber = Number(match[1]);
+        newLineNumber = Number(match[2]);
+      }
+      diffLines.push({ type: "hunk", content: line });
+      continue;
+    }
+
+    if (
+      line.startsWith("diff --git ") ||
+      line.startsWith("index ") ||
+      line.startsWith("--- ") ||
+      line.startsWith("+++ ") ||
+      line.startsWith("new file mode ") ||
+      line.startsWith("deleted file mode ") ||
+      line.startsWith("similarity index ") ||
+      line.startsWith("rename from ") ||
+      line.startsWith("rename to ") ||
+      line.startsWith("Binary files ") ||
+      line.startsWith("\\ No newline at end of file")
+    ) {
+      continue;
+    }
+
+    if (line.startsWith("+")) {
+      diffLines.push({
+        type: "added",
+        newNum: newLineNumber || undefined,
+        content: line.slice(1),
+      });
+      newLineNumber += 1;
+      continue;
+    }
+
+    if (line.startsWith("-")) {
+      diffLines.push({
+        type: "removed",
+        oldNum: oldLineNumber || undefined,
+        content: line.slice(1),
+      });
+      oldLineNumber += 1;
+      continue;
+    }
+
+    diffLines.push({
+      type: "context",
+      oldNum: oldLineNumber || undefined,
+      newNum: newLineNumber || undefined,
+      content: line.startsWith(" ") ? line.slice(1) : line,
+    });
+    oldLineNumber += 1;
+    newLineNumber += 1;
+  }
+
+  return diffLines;
+}
+
 type Props = {
-  file:    CommitFile;
+  file:    any;
   onClose?: () => void;
 };
 
 export function FileDiffViewer({ file, onClose }: Props) {
-  const extColor = EXT_COLOR[file.ext] ?? TEXT_SECONDARY;
-  const totalAdded   = file.additions;
-  const totalRemoved = file.deletions;
+  const ext = file.ext || file.extension || "txt";
+  const extColor = EXT_COLOR[ext] ?? TEXT_SECONDARY;
+  const totalAdded   = file.additions || 0;
+  const totalRemoved = file.deletions || 0;
 
-  const statusLabel = file.status === "added"    ? "NEW FILE"
-                    : file.status === "deleted"  ? "DELETED"
+  const rawStatus = (file.status || "modified").toLowerCase();
+  const statusLabel = rawStatus === "added"    ? "NEW FILE"
+                    : rawStatus === "deleted"  ? "DELETED"
                     : "MODIFIED";
-  const statusColor = file.status === "added"    ? "#10b981"
-                    : file.status === "deleted"  ? "#ef4444"
+  const statusColor = rawStatus === "added"    ? "#10b981"
+                    : rawStatus === "deleted"  ? "#ef4444"
                     : "#f59e0b";
+
+  const diffLines: DiffLine[] = Array.isArray(file.diff)
+    ? file.diff
+    : typeof file.diff === "string"
+    ? parseUnifiedDiff(file.diff)
+    : [];
 
   return (
     <div className="flex flex-col h-full" style={{ background: "#0d1117" }}>
@@ -142,7 +219,7 @@ export function FileDiffViewer({ file, onClose }: Props) {
 
       {/* ── Diff 본문 ── */}
       <div className="flex-1 overflow-y-auto overflow-x-auto">
-        {file.diff.length === 0 ? (
+        {diffLines.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-[11px]" style={{ color: "#8b949e" }}>
               {file.status === "deleted" ? "파일이 삭제되었습니다." : "변경 내용 없음"}
@@ -150,7 +227,7 @@ export function FileDiffViewer({ file, onClose }: Props) {
           </div>
         ) : (
           <div className="py-2">
-            {file.diff.map((line, i) => (
+            {diffLines.map((line, i) => (
               <DiffLineRow key={i} line={line} idx={i} />
             ))}
           </div>
