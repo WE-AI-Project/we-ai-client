@@ -29,7 +29,6 @@ import { SynAIpseGalaxyPage } from "./components/SynAIpseGalaxyPage";
 import { JoinProjectScreen } from "./components/JoinProjectScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { DashboardPage } from "./components/DashboardPage";
-import { WeAIDashboard } from "./components/WeAIDashboard";
 import { EnvironmentSettingsPage } from "./components/EnvironmentSettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { CommitDiffPage } from "./components/CommitDiffPage";
@@ -41,6 +40,7 @@ import { ProjectSettingsPage } from "./components/ProjectSettingsPage";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServerBuildPage } from "./components/ServerBuildPage";
 import { NotificationsPage } from "./components/NotificationsPage";
+import { TasksPage } from "./components/TasksPage";
 import type { CommitFile } from "./components/commitData";
 import { loadProfile, saveProfile } from "./data/profileStore";
 import { loadDocs } from "./data/chatStore";
@@ -57,13 +57,11 @@ import {
   CurrentUser,
   ProjectDetail,
   ProjectLaunchTarget,
-  PUBLISHING_USER,
   clearSession,
   fetchCurrentUser,
   fetchProjectDetail,
   loadSession,
   logout,
-  isPublishingSession,
   refreshSession,
 } from "./lib/api";
 
@@ -161,7 +159,7 @@ const SYSTEM_ITEMS = [
 type NavId =
   | "Dashboard" | "Changes" | "Commits" | "ServerBuild"
   | "Chat" | "Calendar" | "EnvSettings" | "AIQA"
-  | "ProjectSettings" | "Profile" | "Galaxy" | "Notifications";
+  | "ProjectSettings" | "Profile" | "Galaxy" | "Notifications" | "Tasks";
 
 const TAB_LABELS: Record<NavId, string> = {
   Dashboard: "Dashboard",
@@ -176,6 +174,7 @@ const TAB_LABELS: Record<NavId, string> = {
   Profile: "Profile",
   Galaxy: "SynAIpse Galaxy",
   Notifications: "Notifications",
+  Tasks: "Tasks",
 };
 
 const HEADER_TAB_WIDTH = `${Math.max(...Object.values(TAB_LABELS).map(label => label.length)) + 8}ch`;
@@ -332,20 +331,6 @@ export default function App() {
         return;
       }
 
-      if (isPublishingSession(existingSession)) {
-        if (active) {
-          setAuthSession(existingSession);
-          setCurrentUser(PUBLISHING_USER);
-          setProjectId(111);
-          setProject("퍼블리싱 테스트 프로젝트");
-          setProjectCode("PUBLISH-111");
-          setLocalPath("");
-          setScreen("workspace");
-          setAuthBootstrapping(false);
-        }
-        return;
-      }
-
       try {
         const refreshedSession = await refreshSession(existingSession.refreshToken);
         const user = await fetchCurrentUser();
@@ -383,7 +368,7 @@ export default function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (!projectId || isPublishingSession(authSession)) {
+    if (!projectId) {
       return;
     }
 
@@ -573,15 +558,6 @@ export default function App() {
     setAuthSession(session);
     setCurrentUser(user);
 
-    if (isPublishingSession(session)) {
-      setScreen("workspace");
-      setProjectId(111);
-      setProject("퍼블리싱 테스트 프로젝트");
-      setProjectCode("PUBLISH-111");
-      setLocalPath("");
-      return;
-    }
-
     setScreen("join");
     setProjectId(null);
     setProject("");
@@ -664,9 +640,7 @@ export default function App() {
 
   const renderPage = (nav: NavId) => {
     switch (nav) {
-      case "Dashboard": return isPublishingSession(authSession)
-        ? <WeAIDashboard />
-        : <DashboardPage projectId={projectId} projectName={projectName} />;
+      case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
       case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage projectId={projectId} />;
       case "ServerBuild": return <ServerBuildPage projectId={projectId} />;
@@ -678,9 +652,8 @@ export default function App() {
       case "Profile": return <ProfilePage />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
       case "Notifications": return <NotificationsPage projectId={projectId} />;
-      default: return isPublishingSession(authSession)
-        ? <WeAIDashboard />
-        : <DashboardPage projectId={projectId} projectName={projectName} />;
+      case "Tasks": return <TasksPage projectId={projectId} />;
+      default: return <DashboardPage projectId={projectId} projectName={projectName} />;
     }
   };
 

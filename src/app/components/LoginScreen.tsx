@@ -43,7 +43,6 @@ import {
   PasswordFindResponse,
   SocialProvider,
   VerificationCodeDispatchResponse,
-  createPublishingSession,
   fetchCurrentUser,
   formatApiError,
   login,
@@ -477,12 +476,6 @@ function LoginForm({
     setError("");
     setLoading(true);
     try {
-      const publishingLogin = createPublishingSession(email, password);
-      if (publishingLogin) {
-        onAuthenticated(publishingLogin.session, publishingLogin.user);
-        return;
-      }
-
       const session = await login({
         email: email.trim(),
         password,
@@ -1276,7 +1269,7 @@ function EmailCodeLoginForm({
           <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
             만료 시각: {dispatchResult.expiresAt}
           </p>
-          {dispatchResult.debugCode && (
+          {import.meta.env.DEV && dispatchResult.debugCode && (
             <p className="mt-1 text-[9px]" style={{ color: LOGIN_ICON_MUTED }}>
               dev mock code: {dispatchResult.debugCode}
             </p>

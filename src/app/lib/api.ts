@@ -1,12 +1,8 @@
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 const isDev = import.meta.env.DEV;
-const isPreview = import.meta.env.VITE_IS_PREVIEW === "true";
 
 const AUTH_SESSION_KEY = "weai_auth_session_v1";
-const PUBLISHING_ACCESS_TOKEN = "weai-publishing-preview";
-const publishingLoginEnabled =
-  import.meta.env.VITE_ENABLE_PUBLISHING_LOGIN?.trim().toLowerCase() !== "false";
 
 export const AUTH_SESSION_EVENT = "weai:auth-session-changed";
 
@@ -62,14 +58,6 @@ export type AuthSession = {
   username: string;
   email: string;
   role: UserRole;
-};
-
-export const PUBLISHING_USER: CurrentUser = {
-  id: 111,
-  username: "111",
-  name: "퍼블리싱 테스트",
-  email: "111",
-  role: "USER",
 };
 
 export type VerificationCodeDispatchResponse = {
@@ -873,8 +861,7 @@ export async function request<T>(
   if (
     response.status === 401 &&
     options.retryOnAuthFailure !== false &&
-    normalizedPath !== "/api/v1/auth/refresh" &&
-    !isPublishingSession(session)
+    normalizedPath !== "/api/v1/auth/refresh"
   ) {
     const refreshToken = loadSession()?.refreshToken;
 
@@ -923,33 +910,6 @@ export function saveSession(session: AuthSession) {
   emitSessionEvent();
 }
 
-export function createPublishingSession(
-  id: string,
-  password: string
-): { session: AuthSession; user: CurrentUser } | null {
-  if (!publishingLoginEnabled || id.trim() !== "111" || password !== "111") {
-    return null;
-  }
-
-  const session: AuthSession = {
-    tokenType: "PublishingPreview",
-    accessToken: PUBLISHING_ACCESS_TOKEN,
-    accessTokenExpiresInSeconds: 0,
-    refreshToken: PUBLISHING_ACCESS_TOKEN,
-    refreshTokenExpiresInSeconds: 0,
-    username: PUBLISHING_USER.username,
-    email: PUBLISHING_USER.email,
-    role: PUBLISHING_USER.role,
-  };
-
-  saveSession(session);
-  return { session, user: PUBLISHING_USER };
-}
-
-export function isPublishingSession(session: AuthSession | null | undefined): boolean {
-  return session?.accessToken === PUBLISHING_ACCESS_TOKEN;
-}
-
 export function clearSession() {
   if (typeof window === "undefined") {
     return;
@@ -987,24 +947,6 @@ export async function signUp(payload: SignUpPayload): Promise<void> {
 }
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 이메일/비밀번호 로그인 성공");
-    
-    const dummySession: AuthSession = {
-      tokenType: "Bearer",
-      accessToken: "preview_access_token_123",
-      accessTokenExpiresInSeconds: 3600,
-      refreshToken: "preview_refresh_token_456",
-      refreshTokenExpiresInSeconds: 86400,
-      username: payload.email.split("@")[0] || "preview_user",
-      email: payload.email,
-      role: "ADMIN",
-    };
-    
-    saveSession(dummySession);
-    return dummySession;
-  }
-  
   const session = await request<AuthSession>(
     "/api/v1/auth/login",
     {
@@ -1021,15 +963,6 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
 export async function findPassword(
   payload: PasswordFindPayload
 ): Promise<PasswordFindResponse> {
-  if (isPreview) {
-    return {
-      email: payload.email,
-      deliveryMode: "SIMULATED",
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      debugTemporaryPassword: "Ab3!x9MzQp7",
-    };
-  }
-
   return request<PasswordFindResponse>(
     "/api/v1/auth/password/find",
     {
@@ -1043,18 +976,6 @@ export async function findPassword(
 export async function sendEmailLoginCode(
   payload: EmailCodeSendPayload
 ): Promise<VerificationCodeDispatchResponse> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 인증 코드(123456)가 발송되었습니다.");
-    return {
-      purpose: "EMAIL_LOGIN",
-      deliveryChannel: payload.deliveryChannel,
-      deliveryTarget: payload.email,
-      deliveryMode: "MOCK",
-      expiresAt: new Date(Date.now() + 300000).toISOString(),
-      debugCode: "123456", // 아무 번호나 입력해도 통과하게 하거나, 이 번호로 확인
-    };
-  }
-
   return request<VerificationCodeDispatchResponse>(
     "/api/v1/auth/email-login/code",
     {
@@ -1066,22 +987,6 @@ export async function sendEmailLoginCode(
 }
 
 export async function loginWithEmailCode(payload: EmailCodeLoginPayload): Promise<AuthSession> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 이메일 코드 로그인 성공");
-    const dummySession: AuthSession = {
-      tokenType: "Bearer",
-      accessToken: "preview_access_token_123",
-      accessTokenExpiresInSeconds: 3600,
-      refreshToken: "preview_refresh_token_456",
-      refreshTokenExpiresInSeconds: 86400,
-      username: payload.email.split("@")[0] || "preview_user",
-      email: payload.email,
-      role: "ADMIN", // 교수님이 볼 때 모든 권한이 있도록 ADMIN 부여
-    };
-    saveSession(dummySession);
-    return dummySession;
-  }
-
   const session = await request<AuthSession>(
     "/api/v1/auth/email-login",
     {
@@ -1157,7 +1062,7 @@ export async function logout(): Promise<void> {
   clearSession();
 
   try {
-    if (refreshToken && !isPublishingSession(session)) {
+    if (refreshToken) {
       await request<void>(
         "/api/v1/auth/logout",
         {
@@ -1173,17 +1078,6 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
-  if (isPreview) {
-    const session = loadSession(); // 위에서 저장한 dummySession을 불러옴
-    return {
-      id: 9999, // 가짜 유저 ID
-      username: session?.username || "evaluator",
-      name: "SynAIpse 평가자", // 화면 우측 상단 등에 표시될 이름
-      email: session?.email || "preview@synaipse.com",
-      role: "ADMIN",
-    };
-  }
-
   return request<CurrentUser>("/api/v1/users/me");
 }
 
