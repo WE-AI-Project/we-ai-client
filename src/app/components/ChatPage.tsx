@@ -4,7 +4,7 @@ import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
   FileText, X, CheckCircle2, Download, Mic, MicOff,
   Hash, Globe, Server, ShieldCheck, Wrench, Loader2, Sparkles, Bot,
-  Code2, User, BookOpen, Plus,
+  Code2, User, BookOpen, Plus, LogOut, Trash2,
 } from "lucide-react";
 
 import {
@@ -33,7 +33,7 @@ import {
 } from "../colors";
 
 // ✅ 1. api.ts에서 request 함수만 깔끔하게 가져옵니다.
-import { request } from "../lib/api";
+import { request, fetchProjectMembers, type ProjectMember } from "../lib/api";
 
 // ✅ 2. 회원님이 요청하셨던 채팅 API 타입과 함수를 파일 내부에 직접 선언합니다! (에러 완벽 차단)
 export type ChatRoom = {
@@ -70,6 +70,17 @@ export async function sendChatMessage(projectId: number | string, chatRoomId: nu
     method: "POST",
     body: { content } as any,
   });
+}
+
+export async function createChatRoom(projectId: number | string, name: string): Promise<ChatRoom> {
+  return request<ChatRoom>(`/api/v1/projects/${projectId}/chat/rooms`, {
+    method: "POST",
+    body: { name, type: "GENERAL" } as any,
+  });
+}
+
+function normalizeChatRoomName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
 }
 
 // ══════════════════════════════════════════════════════════
@@ -628,6 +639,10 @@ export function ChatPage({
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [currentMemberRole, setCurrentMemberRole] = useState<ProjectMember["role"] | null>(null);
 
   const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
   const [docs, setDocs] = useState<MeetingDoc[]>(() => loadDocs());
@@ -715,6 +730,65 @@ export function ChatPage({
       .catch((error) => toast.error(error instanceof Error ? error.message : "AI 에이전트 목록을 불러오지 못했습니다."));
   }, [projectId]);
 
+  useEffect(() => {
+    if (!projectId || !currentUserId) {
+      setCurrentMemberRole(null);
+      return;
+    }
+
+    void fetchProjectMembers(projectId)
+      .then((response) => {
+        const member = response.members?.find((item) => item.userId === currentUserId);
+        setCurrentMemberRole(member?.role ?? null);
+      })
+      .catch(() => setCurrentMemberRole(null));
+  }, [projectId, currentUserId]);
+
+  const handleCreateRoomSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!projectId) {
+      toast.error("프로젝트 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    const roomName = newRoomName.trim().replace(/\s+/g, " ");
+    if (!roomName) {
+      toast.error("채팅방 이름을 입력해 주세요.");
+      return;
+    }
+
+    const normalizedName = normalizeChatRoomName(roomName);
+    const hasDuplicateName = chatRooms.some(
+      (room) => normalizeChatRoomName(room.name) === normalizedName,
+    );
+
+    if (hasDuplicateName) {
+      toast.error("이미 같은 이름의 채팅방이 있습니다.");
+      return;
+    }
+
+    setIsCreatingRoom(true);
+    try {
+      const createdRoom = await createChatRoom(projectId, roomName);
+
+      setChatRooms((previousRooms) => {
+        if (previousRooms.some((room) => room.chatRoomId === createdRoom.chatRoomId)) {
+          return previousRooms;
+        }
+        return [...previousRooms, createdRoom];
+      });
+      setActiveRoomId(createdRoom.chatRoomId);
+      setNewRoomName("");
+      setIsCreateModalOpen(false);
+      toast.success(`'${createdRoom.name || roomName}' 채팅방이 생성되었습니다.`);
+    } catch (error: any) {
+      toast.error(error?.message || "채팅방 생성에 실패했습니다.");
+    } finally {
+      setIsCreatingRoom(false);
+    }
+  };
+
   const getRoomStyle = (name: string) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes("프론트") || lowerName.includes("frontend")) return { icon: Code2, color: "#5A8A4A", bg: "rgba(90,138,74,0.08)" };
@@ -728,6 +802,8 @@ export function ChatPage({
   const activeRoom = Array.isArray(chatRooms)
     ? chatRooms.find(r => r.chatRoomId === activeRoomId)
     : undefined;
+  const canLeaveChatRoom = currentMemberRole === "MEMBER" && Boolean(activeRoom);
+  const canDeleteChatRoom = currentMemberRole === "LEADER" && Boolean(activeRoom);
 
   const addLocalMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
@@ -925,6 +1001,67 @@ export function ChatPage({
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {openDoc && <DocDetailModal doc={openDoc} onClose={() => setOpenDoc(null)} />}
+      {isCreateModalOpen && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          onMouseDown={() => !isCreatingRoom && setIsCreateModalOpen(false)}
+        >
+          <form
+            onSubmit={handleCreateRoomSubmit}
+            onMouseDown={(event) => event.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl p-5 shadow-xl"
+            style={{ background: "#FAF9F6", border: `1px solid ${BORDER}` }}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>채팅방 추가</p>
+                <p className="mt-1 text-[10px]" style={{ color: TEXT_TERTIARY }}>같은 이름의 채팅방은 만들 수 없습니다.</p>
+              </div>
+              <button
+                type="button"
+                aria-label="채팅방 생성 닫기"
+                disabled={isCreatingRoom}
+                onClick={() => setIsCreateModalOpen(false)}
+                className="rounded-lg p-1 hover:bg-black/5 disabled:opacity-50"
+              >
+                <X className="h-4 w-4" style={{ color: TEXT_TERTIARY }} />
+              </button>
+            </div>
+            <label className="block text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>
+              채팅방 이름
+              <input
+                value={newRoomName}
+                onChange={(event) => setNewRoomName(event.target.value)}
+                placeholder="예: 프로젝트 기획 회의실"
+                autoFocus
+                disabled={isCreatingRoom}
+                className="mt-1.5 w-full rounded-xl bg-white px-3 py-2.5 text-xs outline-none disabled:opacity-60"
+                style={{ border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isCreatingRoom}
+                onClick={() => setIsCreateModalOpen(false)}
+                className="rounded-xl px-3 py-2 text-xs font-semibold hover:bg-black/5 disabled:opacity-50"
+                style={{ color: TEXT_SECONDARY }}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={isCreatingRoom || !newRoomName.trim()}
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                style={{ background: OLIVE_DARK }}
+              >
+                {isCreatingRoom && <Loader2 className="h-3 w-3 animate-spin" />}
+                생성
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(160deg, #f5f4ef 0%, #f0efe8 40%, #ede9df 100%)" }} />
 
@@ -1054,7 +1191,7 @@ export function ChatPage({
               {!isLoadingRooms && (
                 <button
                   type="button"
-                  onClick={() => toast.info("API 준비 중입니다.")}
+                  onClick={() => setIsCreateModalOpen(true)}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all"
                   title="채팅방 추가"
                   style={{
@@ -1064,6 +1201,38 @@ export function ChatPage({
                   }}
                 >
                   <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {canLeaveChatRoom && (
+                <button
+                  type="button"
+                  title="채팅방 나가기"
+                  aria-label="채팅방 나가기"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                  style={{
+                    background: "rgba(184,84,80,0.08)",
+                    color: "#B85450",
+                    border: "1px solid rgba(184,84,80,0.18)",
+                  }}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {canDeleteChatRoom && (
+                <button
+                  type="button"
+                  title="채팅방 삭제"
+                  aria-label="채팅방 삭제"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                  style={{
+                    background: "rgba(184,84,80,0.08)",
+                    color: "#B85450",
+                    border: "1px solid rgba(184,84,80,0.18)",
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
 

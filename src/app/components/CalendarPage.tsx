@@ -474,7 +474,11 @@ function ScheduleCard({
 }
 
 // ══ 메인 CalendarPage ══
-export function CalendarPage() {
+type CalendarPageProps = {
+  projectId?: number | null;
+};
+
+export function CalendarPage(_props: CalendarPageProps = {}) {
   const [schedules, setSchedules] = useState<Schedule[]>(() => loadSchedules());
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
