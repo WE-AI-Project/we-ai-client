@@ -38,6 +38,7 @@ import {
   BORDER_SUBTLE,
   CREAM,
   TEXT_PRIMARY,
+  TEXT_ON_DARK,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
 } from "../colors";
@@ -971,10 +972,10 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
       {!canShowContent ? (
         <div className="relative z-10 flex flex-1 items-center justify-center" style={{ background: PANEL_BG }}>
           <div className="text-center">
-            <p className="text-sm font-semibold" style={{ color: TEXT_PRIMARY }}>
+            <p className="text-sm font-semibold" style={{ color: TEXT_ON_DARK }}>
               프로젝트를 먼저 선택해주세요.
             </p>
-            <p className="mt-2 text-xs" style={{ color: TEXT_TERTIARY }}>
+            <p className="mt-2 text-xs" style={{ color: "#B5B9DE" }}>
               커밋 히스토리는 활성 프로젝트를 기준으로 조회됩니다.
             </p>
           </div>
