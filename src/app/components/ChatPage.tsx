@@ -4,7 +4,7 @@ import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
   FileText, X, CheckCircle2, Download, Mic, MicOff,
   Hash, Globe, Server, ShieldCheck, Wrench, Loader2, Sparkles, Bot,
-  Code2, User, BookOpen, Plus, Building2, MessageSquarePlus,
+  Code2, User, BookOpen, Plus, Building2, MessageSquarePlus, LogOut, Trash2,
 } from "lucide-react";
 
 import {
@@ -53,6 +53,10 @@ import {
 } from "../lib/api";
 
 const ALLOWED_BRIEFING_EXTENSIONS = ["pdf", "txt", "md", "doc", "docx", "ppt", "pptx"];
+
+function normalizeChatRoomName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
+}
 
 // ══════════════════════════════════════════════════════════
 // UI 컴포넌트들
@@ -723,6 +727,14 @@ export function ChatPage({
       targetName = selectedDept.name;
     }
 
+    const hasDuplicateName = chatRooms.some(
+      (room) => normalizeChatRoomName(room.name) === normalizeChatRoomName(targetName),
+    );
+    if (hasDuplicateName) {
+      toast.error("이미 같은 이름의 채팅방이 있습니다.");
+      return;
+    }
+
     setIsCreatingRoom(true);
     try {
       const newRoom = await createChatRoom(projectId, targetName, createType);
@@ -760,6 +772,9 @@ export function ChatPage({
   const activeRoom = Array.isArray(chatRooms)
     ? chatRooms.find(r => r.chatRoomId === activeRoomId)
     : undefined;
+  const currentMemberRole = projectMembers.find((member) => member.userId === currentUserId)?.role;
+  const canLeaveChatRoom = currentMemberRole === "MEMBER" && Boolean(activeRoom);
+  const canDeleteChatRoom = currentMemberRole === "LEADER" && Boolean(activeRoom);
 
   const addLocalMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
@@ -1232,6 +1247,38 @@ export function ChatPage({
                   }}
                 >
                   <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {canLeaveChatRoom && (
+                <button
+                  type="button"
+                  title="채팅방 나가기"
+                  aria-label="채팅방 나가기"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                  style={{
+                    background: "rgba(184,84,80,0.08)",
+                    color: "#B85450",
+                    border: "1px solid rgba(184,84,80,0.18)",
+                  }}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {canDeleteChatRoom && (
+                <button
+                  type="button"
+                  title="채팅방 삭제"
+                  aria-label="채팅방 삭제"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                  style={{
+                    background: "rgba(184,84,80,0.08)",
+                    color: "#B85450",
+                    border: "1px solid rgba(184,84,80,0.18)",
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
 
