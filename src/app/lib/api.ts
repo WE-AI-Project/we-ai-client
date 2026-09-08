@@ -4,9 +4,6 @@ const isDev = import.meta.env.DEV;
 const isPreview = import.meta.env.VITE_IS_PREVIEW === "true";
 
 const AUTH_SESSION_KEY = "weai_auth_session_v1";
-const PUBLISHING_ACCESS_TOKEN = "weai-publishing-preview";
-const publishingLoginEnabled =
-  import.meta.env.VITE_ENABLE_PUBLISHING_LOGIN?.trim().toLowerCase() !== "false";
 
 export const AUTH_SESSION_EVENT = "weai:auth-session-changed";
 
@@ -62,14 +59,6 @@ export type AuthSession = {
   username: string;
   email: string;
   role: UserRole;
-};
-
-export const PUBLISHING_USER: CurrentUser = {
-  id: 111,
-  username: "111",
-  name: "퍼블리싱 테스트",
-  email: "111",
-  role: "USER",
 };
 
 export type VerificationCodeDispatchResponse = {
@@ -470,6 +459,172 @@ export async function createChatRoom(projectId: number | string, name: string, t
   });
 }
 
+// ── 채팅 문서 업로드 & AI 브리핑 ──
+export type DocumentStatus = "UPLOADED" | "BRIEFING_CREATED" | "FAILED" | "DELETED";
+export type BriefingStatus = "PENDING" | "COMPLETED" | "FAILED";
+
+export type DocumentUploadResponse = {
+  documentId: number;
+  projectId: number;
+  originalFileName: string;
+  fileUrl: string;
+  fileSize: number;
+  fileContentType?: string | null;
+  extension: string;
+  status: DocumentStatus;
+  createdAt: string;
+};
+
+export type DocumentBriefingResponse = {
+  briefingId: number;
+  documentId: number;
+  projectId: number;
+  documentName: string;
+  summary: string;
+  keyPoints: string[];
+  actionItems: string[];
+  risks: string[];
+  keywords: string[];
+  status: BriefingStatus;
+  createdAt: string;
+};
+
+export type BriefingSummary = {
+  briefingId: number;
+  documentId: number;
+  documentName: string;
+  summary: string;
+  keyPoints: string[];
+  creatorId: number;
+  creatorName: string;
+  status: BriefingStatus;
+  createdAt: string;
+};
+
+export type DocumentBriefingListResponse = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  briefings: BriefingSummary[];
+};
+
+export async function uploadChatDocument(  //채팅 문서 업로드
+  projectId: number | string,
+  file: File,
+  description?: string
+): Promise<DocumentUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (description) formData.append("description", description);
+  return request<DocumentUploadResponse>(`/api/v1/projects/${projectId}/chat/documents`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function createDocumentBriefing(  //문서 브리핑 생성
+  projectId: number | string,
+  documentId: number
+): Promise<DocumentBriefingResponse> {
+  return request<DocumentBriefingResponse>(`/api/v1/projects/${projectId}/chat/documents/${documentId}/briefing`, {
+    method: "POST",
+  });
+}
+
+export async function fetchDocumentBriefings(  //문서 브리핑 목록 조회
+  projectId: number | string,
+  params: { page?: number; size?: number; keyword?: string; status?: string } = {}
+): Promise<DocumentBriefingListResponse> {
+  const queryString = buildQueryString(params as Record<string, string | number | null | undefined>);
+  return request<DocumentBriefingListResponse>(`/api/v1/projects/${projectId}/chat/document-briefings${queryString}`, {
+    method: "GET",
+  });
+}
+
+// ── 채팅 회의 모드 & 회의록 ──
+export type MeetingStatus = "IN_PROGRESS" | "ENDED" | "CANCELED";
+
+export type MeetingStartResponse = {
+  meetingId: number;
+  projectId: number;
+  chatRoomId: number | null;
+  title: string;
+  description?: string | null;
+  hostUserId: number;
+  hostUserName: string;
+  status: MeetingStatus;
+  startedAt: string;
+};
+
+export type MeetingEndResponse = {
+  meetingId: number;
+  minuteId: number;
+  projectId: number;
+  title: string;
+  content: string;
+  summary?: string | null;
+  actionItems: string[];
+  status: MeetingStatus;
+  startedAt: string;
+  endedAt: string;
+  createdAt: string;
+};
+
+export type MeetingMinuteSummary = {
+  minuteId: number;
+  meetingId: number;
+  title: string;
+  summary?: string | null;
+  writerId: number;
+  writerName: string;
+  participantCount: number;
+  startedAt: string;
+  endedAt: string;
+  createdAt: string;
+};
+
+export type MeetingMinuteListResponse = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  minutes: MeetingMinuteSummary[];
+};
+
+export async function startChatMeeting(  //회의 모드 시작
+  projectId: number | string,
+  payload: { title: string; description?: string; chatRoomId?: number }
+): Promise<MeetingStartResponse> {
+  return request<MeetingStartResponse>(`/api/v1/projects/${projectId}/chat/meetings/start`, {
+    method: "POST",
+    body: payload as any,
+  });
+}
+
+export async function endChatMeeting(  //회의 모드 종료 및 회의록 저장
+  projectId: number | string,
+  meetingId: number,
+  payload: { content: string; summary?: string; actionItems?: string[]; participants?: number[] }
+): Promise<MeetingEndResponse> {
+  return request<MeetingEndResponse>(`/api/v1/projects/${projectId}/chat/meetings/${meetingId}/end`, {
+    method: "POST",
+    body: payload as any,
+  });
+}
+
+export async function fetchMeetingMinutes(  //회의록 목록 조회
+  projectId: number | string,
+  params: { page?: number; size?: number; keyword?: string; startDate?: string; endDate?: string } = {}
+): Promise<MeetingMinuteListResponse> {
+  const queryString = buildQueryString(params as Record<string, string | number | null | undefined>);
+  return request<MeetingMinuteListResponse>(`/api/v1/projects/${projectId}/chat/meetings/minutes${queryString}`, {
+    method: "GET",
+  });
+}
+
 export async function fetchDailyStandup(projectId: number | string) { //데일리 스탠드업 브리핑
   return request<any>(`/api/v1/projects/${projectId}/daily-standup`, {
     method: "GET",
@@ -859,8 +1014,7 @@ export async function request<T>(
   if (
     response.status === 401 &&
     options.retryOnAuthFailure !== false &&
-    normalizedPath !== "/api/v1/auth/refresh" &&
-    !isPublishingSession(session)
+    normalizedPath !== "/api/v1/auth/refresh"
   ) {
     const refreshToken = loadSession()?.refreshToken;
 
@@ -907,33 +1061,6 @@ export function saveSession(session: AuthSession) {
 
   window.localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
   emitSessionEvent();
-}
-
-export function createPublishingSession(
-  id: string,
-  password: string
-): { session: AuthSession; user: CurrentUser } | null {
-  if (!publishingLoginEnabled || id.trim() !== "111" || password !== "111") {
-    return null;
-  }
-
-  const session: AuthSession = {
-    tokenType: "PublishingPreview",
-    accessToken: PUBLISHING_ACCESS_TOKEN,
-    accessTokenExpiresInSeconds: 0,
-    refreshToken: PUBLISHING_ACCESS_TOKEN,
-    refreshTokenExpiresInSeconds: 0,
-    username: PUBLISHING_USER.username,
-    email: PUBLISHING_USER.email,
-    role: PUBLISHING_USER.role,
-  };
-
-  saveSession(session);
-  return { session, user: PUBLISHING_USER };
-}
-
-export function isPublishingSession(session: AuthSession | null | undefined): boolean {
-  return session?.accessToken === PUBLISHING_ACCESS_TOKEN;
 }
 
 export function clearSession() {
@@ -1147,7 +1274,7 @@ export async function logout(): Promise<void> {
   clearSession();
 
   try {
-    if (refreshToken && !isPublishingSession(session)) {
+    if (refreshToken) {
       await request<void>(
         "/api/v1/auth/logout",
         {
@@ -1189,6 +1316,10 @@ export async function createProject(payload: ProjectCreatePayload): Promise<Proj
 }
 
 export async function detectProjectStack(localPath: string): Promise<ProjectStackDetection> {
+  if (window.electronAPI) {
+    return window.electronAPI.detectStack(localPath);
+  }
+
   if (isDev) {
     const response = await fetch("/__local/detect-stack", {
       method: "POST",

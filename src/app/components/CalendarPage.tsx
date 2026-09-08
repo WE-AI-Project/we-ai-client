@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import {
   Schedule, Dept, SchedulePriority, ScheduleStatus,
   DEPT_COLOR, STATUS_META, PRIORITY_META,
-  loadSchedules, saveSchedules, genId,
+  genId,
   getDaysInMonth, getFirstDayOfMonth, dateStr,
   isInRange, formatDateKR, today as getTodayStr,
 } from "../data/scheduleStore";
@@ -566,7 +566,7 @@ function ScheduleCard({
 
 // ══ 메인 CalendarPage ══
 export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
-  const [schedules, setSchedules] = useState<Schedule[]>(() => loadSchedules());
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [deptFilter, setDeptFilter] = useState<Dept>("전체");
@@ -578,6 +578,8 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // 🌟 백엔드 API 연동: 프로젝트 일정 목록 조회
+  // 로그인이 필요한 앱이라 오프라인 상태에서는 애초에 이 화면까지 진입할 수 없으므로,
+  // 오프라인 폴백은 두지 않는다 — 실패는 사유 불문 전부 동일하게 오류로 처리한다.
   const loadApiSchedules = useCallback(async () => {
     if (!projectId) {
       setIsLoading(false);
@@ -586,17 +588,9 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
     try {
       setIsLoading(true);
       const res = await fetchProjectSchedules(projectId);
-      if (res && res.schedules && res.schedules.length > 0) {
-        const converted = res.schedules.map(convertBackendSchedule);
-        setSchedules(converted);
-        saveSchedules(converted);
-      } else {
-        const local = loadSchedules();
-        setSchedules(local);
-      }
+      setSchedules((res?.schedules ?? []).map(convertBackendSchedule));
     } catch (err) {
-      console.warn("프로젝트 일정 API 조회 실패, 로컬 캐시 사용:", err);
-      setSchedules(loadSchedules());
+      toast.error(err instanceof Error ? err.message : "일정을 불러오지 못했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -636,11 +630,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
   const confirmDeleteDept = () => {
     if (!deptToDelete) return;
-    setSchedules(prev => {
-      const next = prev.filter(s => s.department !== deptToDelete);
-      saveSchedules(next);
-      return next;
-    });
+    setSchedules(prev => prev.filter(s => s.department !== deptToDelete));
 
     setDeptColors(prev => {
       const next = { ...prev };
@@ -687,65 +677,62 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   const selectedDaySchedules = selectedDay ? (daySchedules[selectedDay] ?? []) : [];
 
   const handleSave = async (s: Schedule) => {
-    // 낙관적 UI 업데이트
-    setSchedules(prev => {
-      const next = prev.some(x => x.id === s.id)
-        ? prev.map(x => x.id === s.id ? s : x)
-        : [...prev, s];
-      saveSchedules(next);
-      return next;
-    });
+    const previous = schedules;
+
+    // 낙관적 UI 업데이트 — 실패 시 아래에서 롤백
+    setSchedules(prev =>
+      prev.some(x => x.id === s.id) ? prev.map(x => x.id === s.id ? s : x) : [...prev, s]
+    );
     setEditSchedule(null);
 
-    if (projectId) {
-      try {
-        const isNumericId = /^\d+$/.test(s.id);
-        if (isNumericId) {
-          await updateProjectSchedule(projectId, Number(s.id), {
-            title: s.title,
-            description: s.desc,
-            department: mapDeptToBackendDepartment(s.department),
-            startDate: s.startDate,
-            endDate: s.endDate,
-            priority: mapPriorityToBackend(s.priority),
-            status: mapStatusToBackend(s.status),
-          });
-          toast.success("일정이 수정되었습니다.");
-        } else {
-          const created = await createProjectSchedule(projectId, {
-            title: s.title,
-            description: s.desc,
-            department: mapDeptToBackendDepartment(s.department),
-            startDate: s.startDate,
-            endDate: s.endDate,
-            priority: mapPriorityToBackend(s.priority),
-            status: mapStatusToBackend(s.status),
-          });
-          if (created && created.scheduleId) {
-            setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, id: String(created.scheduleId) } : x));
-          }
-          toast.success("새 일정이 등록되었습니다.");
+    if (!projectId) return;
+
+    try {
+      const isNumericId = /^\d+$/.test(s.id);
+      if (isNumericId) {
+        await updateProjectSchedule(projectId, Number(s.id), {
+          title: s.title,
+          description: s.desc,
+          department: mapDeptToBackendDepartment(s.department),
+          startDate: s.startDate,
+          endDate: s.endDate,
+          priority: mapPriorityToBackend(s.priority),
+          status: mapStatusToBackend(s.status),
+        });
+        toast.success("일정이 수정되었습니다.");
+      } else {
+        const created = await createProjectSchedule(projectId, {
+          title: s.title,
+          description: s.desc,
+          department: mapDeptToBackendDepartment(s.department),
+          startDate: s.startDate,
+          endDate: s.endDate,
+          priority: mapPriorityToBackend(s.priority),
+          status: mapStatusToBackend(s.status),
+        });
+        if (created && created.scheduleId) {
+          setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, id: String(created.scheduleId) } : x));
         }
-      } catch (err) {
-        console.warn("백엔드 일정 동기화 실패 (로컬 유지됨):", err);
+        toast.success("새 일정이 등록되었습니다.");
       }
+    } catch (err) {
+      setSchedules(previous); // 실패 시 낙관적 업데이트 롤백 — 가짜 성공 상태로 방치하지 않음
+      toast.error(err instanceof Error ? err.message : "일정 저장에 실패했습니다. 다시 시도해 주세요.");
     }
   };
 
   const handleDelete = async (id: string) => {
-    setSchedules(prev => {
-      const next = prev.filter(s => s.id !== id);
-      saveSchedules(next);
-      return next;
-    });
+    const previous = schedules;
+    setSchedules(prev => prev.filter(s => s.id !== id));
 
-    if (projectId && /^\d+$/.test(id)) {
-      try {
-        await deleteProjectSchedule(projectId, Number(id));
-        toast.success("일정이 삭제되었습니다.");
-      } catch (err) {
-        console.warn("백엔드 일정 삭제 실패:", err);
-      }
+    if (!projectId || !/^\d+$/.test(id)) return;
+
+    try {
+      await deleteProjectSchedule(projectId, Number(id));
+      toast.success("일정이 삭제되었습니다.");
+    } catch (err) {
+      setSchedules(previous); // 실패 시 롤백
+      toast.error(err instanceof Error ? err.message : "일정 삭제에 실패했습니다.");
     }
   };
 

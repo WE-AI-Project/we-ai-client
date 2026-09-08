@@ -133,6 +133,11 @@ function LocalPathInput({
   const [focused, setFocused] = useState(false);
 
   const handleOpenExplorer = async () => {
+    if (window.electronAPI) {
+      const picked = await window.electronAPI.pickFolder();
+      if (picked) onChange(picked);
+      return;
+    }
     alert("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
   };
 
@@ -176,7 +181,7 @@ function LocalPathInput({
           type="button"
           onClick={() => void handleOpenExplorer()}
           className="shrink-0 rounded p-1 hover:bg-black/[0.05]"
-          title="절대경로 입력 안내"
+          title={window.electronAPI ? "폴더 선택" : "절대경로 입력 안내"}
         >
           <FolderOpen className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
         </button>

@@ -43,7 +43,6 @@ import {
   PasswordFindResponse,
   SocialProvider,
   VerificationCodeDispatchResponse,
-  createPublishingSession,
   fetchCurrentUser,
   formatApiError,
   login,
@@ -478,12 +477,6 @@ function LoginForm({
     setError("");
     setLoading(true);
     try {
-      const publishingLogin = createPublishingSession(email, password);
-      if (publishingLogin) {
-        onAuthenticated(publishingLogin.session, publishingLogin.user);
-        return;
-      }
-
       const session = await login({
         email: email.trim(),
         password,

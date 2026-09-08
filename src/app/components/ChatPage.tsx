@@ -9,10 +9,11 @@ import {
 
 import {
   ChatMessage, MeetingDoc,
-  loadDocs, saveDocs,
   generateMeetingSummary, formatTime, formatDate, genId,
-  generateDocBriefing, briefingToMeetingDoc,
 } from "../data/chatStore";
+
+import { briefingSummaryToMeetingDoc, meetingMinuteSummaryToMeetingDoc } from "../lib/docMappers";
+import { subscribeToRoom } from "../lib/chatSocket";
 
 import {
   askAiAgent,
@@ -39,11 +40,19 @@ import {
   fetchDepartments,
   createChatRoom,
   fetchProjectMembers,
+  uploadChatDocument,
+  createDocumentBriefing,
+  fetchDocumentBriefings,
+  startChatMeeting,
+  endChatMeeting,
+  fetchMeetingMinutes,
   type ChatRoom,
   type ChatMessageResponse,
   type Department,
   type ProjectMember
 } from "../lib/api";
+
+const ALLOWED_BRIEFING_EXTENSIONS = ["pdf", "txt", "md", "doc", "docx", "ppt", "pptx"];
 
 // ══════════════════════════════════════════════════════════
 // UI 컴포넌트들
@@ -534,11 +543,13 @@ export function ChatPage({
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
-  const [docs, setDocs] = useState<MeetingDoc[]>(() => loadDocs());
+  const [docs, setDocs] = useState<MeetingDoc[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [input, setInput] = useState("");
   const [aiInput, setAIInput] = useState("");
 
   const [isMeeting, setIsMeeting] = useState(false);
+  const [activeMeetingId, setActiveMeetingId] = useState<number | null>(null);
   const [meetingStart, setMeetingStart] = useState<Date | null>(null);
   const [meetingMsgs, setMeetingMsgs] = useState<ChatMessage[]>([]);
   const [elapsed, setElapsed] = useState(0);
@@ -596,7 +607,7 @@ export function ChatPage({
     loadChatData();
   }, [loadChatData]);
 
-  // 2. 방 선택 시 메시지 불러오기 API 연동
+  // 2. 방 선택 시 메시지 불러오기 API 연동 + 실시간 수신 구독
   useEffect(() => {
     if (!projectId || !activeRoomId) return;
     setIsLoadingMessages(true);
@@ -615,6 +626,15 @@ export function ChatPage({
         setServerMessages([]);
       })
       .finally(() => setIsLoadingMessages(false));
+
+    const subscription = subscribeToRoom(projectId, activeRoomId, (incoming: ChatMessageResponse) => {
+      setServerMessages(prev => {
+        if (prev.some(m => m.messageId === incoming.messageId)) return prev;
+        return [...prev, incoming];
+      });
+    });
+
+    return () => { subscription.unsubscribe(); };
   }, [projectId, activeRoomId]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [serverMessages, localMessages, activeRoomId]);
@@ -630,6 +650,29 @@ export function ChatPage({
   }, [isMeeting]);
 
   useEffect(() => { onDocsUpdate?.(docs.length); }, [docs.length]);
+
+  // 3. 문서 브리핑 / 회의록 불러오기 API 연동
+  const loadDocsData = useCallback(async () => {
+    if (!projectId) return;
+    setIsLoadingDocs(true);
+    try {
+      const [briefingsRes, minutesRes] = await Promise.all([
+        fetchDocumentBriefings(projectId),
+        fetchMeetingMinutes(projectId),
+      ]);
+      const merged = [
+        ...(briefingsRes?.briefings ?? []).map(briefingSummaryToMeetingDoc),
+        ...(minutesRes?.minutes ?? []).map(meetingMinuteSummaryToMeetingDoc),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setDocs(merged);
+    } catch (error) {
+      toast.error("문서를 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => { loadDocsData(); }, [loadDocsData]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -830,11 +873,20 @@ export function ChatPage({
     e.target.value = "";
   };
 
-  const handleBriefingFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBriefingFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "file";
     e.target.value = "";
+
+    if (!ALLOWED_BRIEFING_EXTENSIONS.includes(ext)) {
+      toast.error("지원하지 않는 파일 형식입니다 (pdf, txt, md, doc, docx, ppt, pptx만 가능)");
+      return;
+    }
+    if (!projectId) {
+      toast.error("프로젝트 정보가 없습니다.");
+      return;
+    }
 
     addLocalMessage({
       sender: "나", avatar: "나", role: "me",
@@ -845,50 +897,54 @@ export function ChatPage({
     setBriefingLoading(file.name);
     setTimeout(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, 80);
 
-    const delay = 2200 + Math.random() * 800;
-    setTimeout(() => {
-      const briefing = generateDocBriefing(file.name, ext);
-      const meetingDoc = briefingToMeetingDoc(briefing);
+    try {
+      const uploaded = await uploadChatDocument(projectId, file);
+      const briefingRes = await createDocumentBriefing(projectId, uploaded.documentId);
 
       setBriefingLoading(null);
       addLocalMessage({
         sender: "WE&AI", avatar: "AI", role: "other",
         content: `**${file.name}** 한글 브리핑이 완료됐습니다.`,
         type: "briefing",
-        briefing,
+        briefing: { fileName: file.name, summary: briefingRes.summary, points: briefingRes.keyPoints },
       });
 
-      setTimeout(() => {
-        setDocs(prev => {
-          const next = [meetingDoc, ...prev];
-          saveDocs(next);
-          return next;
-        });
-      }, 1200);
-    }, delay);
+      await loadDocsData();
+    } catch (error) {
+      setBriefingLoading(null);
+      toast.error(error instanceof Error ? error.message : "문서 분석에 실패했습니다.");
+    }
   };
 
-  const startMeeting = () => {
-    setIsMeeting(true); setMeetingStart(new Date()); setMeetingMsgs([]); setElapsed(0); setDocSaved(false);
-    addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "회의 모드가 시작되었습니다.", type: "system" });
+  const startMeeting = async () => {
+    if (!projectId) { toast.error("프로젝트 정보가 없습니다."); return; }
+    const now = new Date();
+    const title = `${now.toLocaleDateString("ko-KR")} 회의 — ${now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
+    try {
+      const res = await startChatMeeting(projectId, { title, chatRoomId: activeRoomId ?? undefined });
+      setActiveMeetingId(res.meetingId);
+      setIsMeeting(true); setMeetingStart(new Date()); setMeetingMsgs([]); setElapsed(0); setDocSaved(false);
+      addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "회의 모드가 시작되었습니다.", type: "system" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "회의 시작에 실패했습니다.");
+    }
   };
 
-  const endMeeting = () => {
+  const endMeeting = async () => {
+    if (!projectId || !activeMeetingId) { setIsMeeting(false); setMicOn(false); return; }
     setIsMeeting(false); setMicOn(false);
     addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "⏹️ 회의 모드 종료. 문서로 저장 중...", type: "system" });
     setSavingDoc(true);
-    setTimeout(() => {
-      const now = new Date();
-      const title = `${now.toLocaleDateString("ko-KR")} 회의 — ${now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
-      const newDoc: MeetingDoc = {
-        id: genId(), title, createdAt: now.toISOString(),
-        summary: generateMeetingSummary(meetingMsgs),
-        messages: meetingMsgs,
-        tags: ["회의", "자동저장", now.toLocaleDateString("ko-KR").replace(/\. /g, "-").replace(".", "")],
-      };
-      setDocs(prev => { const next = [newDoc, ...prev]; saveDocs(next); return next; });
-      setSavingDoc(false); setDocSaved(true); setMainTab("docs");
-    }, 1500);
+    try {
+      const content = generateMeetingSummary(meetingMsgs);
+      await endChatMeeting(projectId, activeMeetingId, { content });
+      await loadDocsData();
+      setMainTab("docs");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "회의록 저장에 실패했습니다.");
+    } finally {
+      setSavingDoc(false); setDocSaved(true); setActiveMeetingId(null);
+    }
   };
 
   const formatElapsed = (s: number) =>
@@ -1620,7 +1676,7 @@ export function ChatPage({
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {isLoadingRooms ? (
+              {isLoadingDocs ? (
                 /* [스켈레톤] 문서 카드들 */
                 Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="rounded-xl p-3 border bg-white/50 border-black/5 space-y-2">
