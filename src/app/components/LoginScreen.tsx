@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   OLIVE_DARK,
   SAGE,
-  TEXT_PRIMARY,
   STATUS_ERROR,
   STATUS_SUCCESS,
   LOGIN_MUTED,
@@ -15,15 +14,12 @@ import {
   LOGIN_SHADOW_1,
   LOGIN_SHADOW_2,
   INPUT_BG,
-  TEXT_LABEL,
-  TEXT_SECONDARY,
   CONTENT_BG,
   CARD_BG,
   PANEL_BG,
   ACCENT_BG,
   ACCENT_BORDER,
   BORDER,
-  TEXT_TERTIARY,
 } from "../colors";
 import {
   FolderGit2,
@@ -76,6 +72,11 @@ const THICK_SHADOW = [
   "0 12px 28px rgba(0,0,0,0.12)",
   "0 32px 64px rgba(0,0,0,0.14)",
 ].join(", ");
+
+const TEXT_PRIMARY = "#FFFFFF";
+const TEXT_SECONDARY = "#D9DCFF";
+const TEXT_TERTIARY = "#B5B9DE";
+const TEXT_LABEL = "#8F95C6";
 
 type CardMode = "login" | "signup" | "email-code" | "password-find";
 type FeedbackTone = "success" | "error" | "info";
@@ -240,7 +241,7 @@ function OtpInput({
             fontSize: 20,
             background: digit ? "#FFFFFF" : INPUT_BG,
             border: `2px solid ${digit ? OLIVE_DARK : "rgba(0,0,0,0.08)"}`,
-            color: TEXT_PRIMARY,
+            color: digit ? "#1B1F3A" : TEXT_PRIMARY,
             transition: "all 0.15s",
             boxShadow: digit ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
           }}
@@ -308,7 +309,7 @@ function Field({
           placeholder={placeholder}
           disabled={disabled}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-          style={{ color: TEXT_PRIMARY }}
+          style={{ color: focused ? "#1B1F3A" : TEXT_PRIMARY }}
         />
         {right}
       </div>

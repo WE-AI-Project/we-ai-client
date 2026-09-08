@@ -12,10 +12,12 @@ export const CREAM         = "#0A0D3A";   // 크림 (서브 배경)
 export const BRIGHT_BEIGE  = "#23272A";   // 아주 밝은 베이지
 
 // ── 텍스트 (콘텐츠 영역 밝은 배경용) ─────────────────────
-export const TEXT_PRIMARY   = "#FFFFFF";   // 기본 텍스트 (중립 다크)
-export const TEXT_SECONDARY = "#D9DCFF";   // 보조 텍스트
-export const TEXT_TERTIARY  = "#B5B9DE";   // 3차 텍스트
-export const TEXT_LABEL     = "#8F95C6";   // 레이블 텍스트
+export const TEXT_PRIMARY   = "#1B1F3A";   // 밝은 콘텐츠 영역의 기본 텍스트
+export const TEXT_SECONDARY = "#454B70";   // 밝은 콘텐츠 영역의 보조 텍스트
+export const TEXT_TERTIARY  = "#656B91";   // 밝은 콘텐츠 영역의 3차 텍스트
+export const TEXT_LABEL     = "#767DA6";   // 밝은 콘텐츠 영역의 레이블 텍스트
+export const TEXT_ON_DARK   = "#FFFFFF";   // 어두운 표면 위 기본 텍스트
+export const TEXT_ON_DARK_MUTED = "#B5B9DE"; // 어두운 표면 위 보조 텍스트
 
 // ── 사이드바 텍스트 (어두운 사이드바 배경 전용) ───────────
 export const SIDEBAR_TEXT        = "rgba(255,255,255,0.55)";
