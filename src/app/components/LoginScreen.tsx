@@ -17,6 +17,13 @@ import {
   INPUT_BG,
   TEXT_LABEL,
   TEXT_SECONDARY,
+  CONTENT_BG,
+  CARD_BG,
+  PANEL_BG,
+  ACCENT_BG,
+  ACCENT_BORDER,
+  BORDER,
+  TEXT_TERTIARY,
 } from "../colors";
 import {
   FolderGit2,
@@ -1530,8 +1537,9 @@ export function LoginScreen({ onAuthenticated }: Props) {
 
   return (
     <div
-      className="relative flex size-full items-center justify-center overflow-hidden bg-[#F5F4F1]"
+      className="relative flex size-full items-center justify-center overflow-hidden"
       style={{
+        background: CONTENT_BG,
         opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.42s ease" : "none",
       }}
@@ -1569,7 +1577,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           </div>
 
           <h1 className="mb-4 text-center text-[44px] font-bold leading-tight tracking-tight sm:text-[52px]">
-            <span style={{ color: "#1A1C06" }}>Welcome to</span>
+            <span style={{ color: TEXT_PRIMARY }}>Welcome to</span>
             <br />
             <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
           </h1>
@@ -1585,7 +1593,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
               <span
                 key={tag}
                 className="rounded-full px-3 py-1.5 text-[11px] font-medium"
-                style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
+                style={{ background: ACCENT_BG, color: TEXT_SECONDARY, border: `1px solid ${ACCENT_BORDER}` }}
               >
                 {tag}
               </span>
@@ -1629,7 +1637,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
       {cardOpen && (
         <div
           className="absolute inset-0 z-20"
-          style={{ background: "rgba(15,17,5,0.50)" }}
+          style={{ background: "rgba(10,13,58,0.72)" }}
           onClick={() => setCardOpen(false)}
         />
       )}
@@ -1653,17 +1661,17 @@ export function LoginScreen({ onAuthenticated }: Props) {
           type="button"
           onClick={() => setCardOpen(false)}
           className="absolute -right-3 -top-3 z-50 flex h-8 w-8 items-center justify-center rounded-full"
-          style={{ background: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.14)", color: TEXT_LABEL }}
+          style={{ background: PANEL_BG, boxShadow: "0 2px 12px rgba(0,0,0,0.32)", color: TEXT_TERTIARY }}
         >
           <X className="h-4 w-4" />
         </button>
 
         <div
           style={{
-            background: "#FFFFFF",
+            background: CARD_BG,
             borderRadius: 20,
             boxShadow: THICK_SHADOW,
-            border: "1px solid rgba(0,0,0,0.05)",
+            border: `1px solid ${BORDER}`,
             overflow: "hidden",
             height: cardHeight != null ? cardHeight + 3 : "auto",
             transition: "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",

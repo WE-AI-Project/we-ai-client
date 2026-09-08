@@ -4,18 +4,18 @@
 // ============================================================
 
 // ── 베이스 팔레트 ──────────────────────────────────────────
-export const SIDEBAR_DEEP  = "#131507";   // 사이드바/타이틀바 — 초극다크 올리브
-export const OLIVE_DARK    = "#41431B";   // 다크 올리브 (메인 액센트)
-export const SAGE          = "#AEB784";   // 세이지 그린 (서브 액센트)
-export const BEIGE         = "#E3DBBB";   // 워밍 베이지
-export const CREAM         = "#F8F3E1";   // 크림 (서브 배경)
-export const BRIGHT_BEIGE  = "#FEFCF5";   // 아주 밝은 베이지
+export const SIDEBAR_DEEP  = "#0A0D3A";   // 사이드바/타이틀바 — 초극다크 올리브
+export const OLIVE_DARK    = "#5865F2";   // 다크 올리브 (메인 액센트)
+export const SAGE          = "#35ED7E";   // 세이지 그린 (서브 액센트)
+export const BEIGE         = "#1E2353";   // 워밍 베이지
+export const CREAM         = "#0A0D3A";   // 크림 (서브 배경)
+export const BRIGHT_BEIGE  = "#23272A";   // 아주 밝은 베이지
 
 // ── 텍스트 (콘텐츠 영역 밝은 배경용) ─────────────────────
-export const TEXT_PRIMARY   = "#20231B";   // 기본 텍스트 (중립 다크)
-export const TEXT_SECONDARY = "#4F554A";   // 보조 텍스트
-export const TEXT_TERTIARY  = "#747A70";   // 3차 텍스트
-export const TEXT_LABEL     = "#858B80";   // 레이블 텍스트
+export const TEXT_PRIMARY   = "#FFFFFF";   // 기본 텍스트 (중립 다크)
+export const TEXT_SECONDARY = "#D9DCFF";   // 보조 텍스트
+export const TEXT_TERTIARY  = "#B5B9DE";   // 3차 텍스트
+export const TEXT_LABEL     = "#8F95C6";   // 레이블 텍스트
 
 // ── 사이드바 텍스트 (어두운 사이드바 배경 전용) ───────────
 export const SIDEBAR_TEXT        = "rgba(255,255,255,0.55)";
@@ -25,20 +25,20 @@ export const SIDEBAR_TEXT_LABEL  = "rgba(255,255,255,0.28)";
 export const SIDEBAR_TEXT_MUTED  = "rgba(255,255,255,0.18)";
 
 // ── 서피스 / 배경 ─────────────────────────────────────────
-export const OUTER_BG       = "#0C0E02";   // 최외부 래퍼 배경 (극다크 올리브)
-export const SIDEBAR_BG     = "#131507";   // 사이드바 배경
-export const TITLEBAR_BG    = "#131507";   // 타이틀바 배경
-export const CONTENT_BG     = "#F3F4F1";   // 메인 콘텐츠 배경
-export const PANEL_BG       = "#ECEEE9";   // 패널 배경
-export const CARD_BG        = "#FBFCFA";   // 카드 배경
-export const INPUT_BG       = "#F0F1EE";   // 인풋 배경
-export const TABLE_HEADER_BG = "#E9ECE6";  // 테이블 헤더 배경
-export const TABLE_BG       = "#F7F8F5";   // 테이블 배경
-export const LOGIN_BG       = "#F5F4F1";   // 로그인/프로젝트 선택 배경
+export const OUTER_BG       = "#000000";   // 최외부 래퍼 배경 (극다크 올리브)
+export const SIDEBAR_BG     = "#0A0D3A";   // 사이드바 배경
+export const TITLEBAR_BG    = "#0A0D3A";   // 타이틀바 배경
+export const CONTENT_BG     = "#0A0D3A";   // 메인 콘텐츠 배경
+export const PANEL_BG       = "#1E2353";   // 패널 배경
+export const CARD_BG        = "#23272A";   // 카드 배경
+export const INPUT_BG       = "#1E2353";   // 인풋 배경
+export const TABLE_HEADER_BG = "#1E2353";  // 테이블 헤더 배경
+export const TABLE_BG       = "#23272A";   // 테이블 배경
+export const LOGIN_BG       = "#0A0D3A";   // 로그인/프로젝트 선택 배경
 
 // ── 보더 ──────────────────────────────────────────────────
-export const BORDER         = "rgba(32,35,27,0.12)";
-export const BORDER_SUBTLE  = "rgba(32,35,27,0.07)";
+export const BORDER         = "rgba(255,255,255,0.14)";
+export const BORDER_SUBTLE  = "rgba(255,255,255,0.08)";
 export const SIDEBAR_BORDER = "rgba(255,255,255,0.08)";
 
 // ── 인터랙션 (사이드바 어두운 배경 기준) ──────────────────
@@ -46,27 +46,27 @@ export const SIDEBAR_HOVER   = "rgba(255,255,255,0.06)";
 export const SIDEBAR_ACTIVE  = "rgba(255,255,255,0.10)";
 
 // ── 액센트 ────────────────────────────────────────────────
-export const ACCENT         = "#41431B";
-export const ACCENT_SAGE    = "#AEB784";
-export const ACCENT_MID     = "#6B7040";
-export const ACCENT_BG      = "rgba(65,67,27,0.09)";
-export const ACCENT_BORDER  = "rgba(65,67,27,0.22)";
+export const ACCENT         = "#5865F2";
+export const ACCENT_SAGE    = "#35ED7E";
+export const ACCENT_MID     = "#EC48BD";
+export const ACCENT_BG      = "rgba(88,101,242,0.16)";
+export const ACCENT_BORDER  = "rgba(88,101,242,0.45)";
 
 // ── UI 상태 색상 (범용 시맨틱 컬러) ──────────────────────
-export const UI_GREEN       = "#10b981";   // 성공/활성/러닝
-export const UI_GREEN_DARK  = "#059669";   // 진한 그린
+export const UI_GREEN       = "#35ED7E";   // 성공/활성/러닝
+export const UI_GREEN_DARK  = "#20C96A";   // 진한 그린
 export const UI_RED         = "#ef4444";   // 에러/삭제
 export const UI_RED_DARK    = "#dc2626";   // 진한 레드 (critical)
 export const UI_AMBER       = "#f59e0b";   // 경고/수정
 export const UI_AMBER_DARK  = "#d97706";   // 진한 앰버
-export const UI_VIOLET      = "#8b5cf6";   // 정보/메모리/보라
-export const UI_INDIGO      = "#635bff";   // 인디고 액센트
+export const UI_VIOLET      = "#EC48BD";   // 정보/메모리/보라
+export const UI_INDIGO      = "#5865F2";   // 인디고 액센트
 export const UI_GRAY        = "#6b7280";   // 비활성/유휴
 export const UI_GRAY_LIGHT  = "#9ca3af";   // 연한 그레이
 export const UI_GRAY_BORDER = "#d1d5db";   // 보더/비활성 도트
-export const UI_CYAN        = "#06b6d4";   // 시안 (네트워크 등)
+export const UI_CYAN        = "#00B0F4";   // 시안 (네트워크 등)
 export const UI_BLUE        = "#3b82f6";   // 블루 (TypeScript 등)
-export const UI_PINK        = "#ec4899";   // 핑크 (CSS 등)
+export const UI_PINK        = "#EC48BD";   // 핑크 (CSS 등)
 
 // ── UI 상태 배경 ──────────────────────────────────────────
 export const UI_GREEN_BG    = "rgba(16,185,129,0.10)";
@@ -124,45 +124,45 @@ export const OLIVE_DARK_BG  = "#212308";   // 올리브 다크 배경
 
 // ── 그라디언트 ─────────────────────────────────────────────
 /** 페이지 헤더 — 파스텔 레인보우 */
-export const GRADIENT_HEADER      = "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 20%, #e8d5f5 40%, #fce7f3 60%, #fde6d5 80%, #fef3c7 100%)";
-export const GRADIENT_HEADER_SM   = "linear-gradient(135deg, #e0e7ff, #ddd6fe, #e8d5f5, #fce7f3)";
-export const GRADIENT_HEADER_SM2  = "linear-gradient(135deg, #e0e7ff, #e8d5f5, #fce7f3)";
-export const GRADIENT_HEADER_SM3  = "linear-gradient(135deg, #e0e7ff, #ddd6fe, #fce7f3)";
+export const GRADIENT_HEADER      = "linear-gradient(135deg, #0A0D3A 0%, #1E2353 35%, #5865F2 68%, #EC48BD 100%)";
+export const GRADIENT_HEADER_SM   = "linear-gradient(135deg, #0A0D3A, #1E2353, #5865F2, #EC48BD)";
+export const GRADIENT_HEADER_SM2  = "linear-gradient(135deg, #0A0D3A, #5865F2, #EC48BD)";
+export const GRADIENT_HEADER_SM3  = "linear-gradient(135deg, #1E2353, #5865F2, #EC48BD)";
 /** 인디고 그라디언트 (CTA 버튼 등) */
-export const GRADIENT_INDIGO      = "linear-gradient(135deg, #635bff, #8b5cf6)";
+export const GRADIENT_INDIGO      = "linear-gradient(135deg, #5865F2, #EC48BD)";
 /** 인디고 세로 레인보우 보더 */
 export const GRADIENT_RAINBOW_BORDER = "linear-gradient(180deg, #635bff 0%, #8b5cf6 45%, #ec4899 80%, #fbbf24 100%) 1";
 export const GRADIENT_RAINBOW_BORDER2 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 40%, #ec4899 80%, #fbbf24 100%) 1";
 export const GRADIENT_RAINBOW_BORDER3 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 50%, #ec4899 100%) 1";
 
 /** 페이지 콘텐츠 배경 — 화이트 */
-export const GRADIENT_PAGE = "#F3F4F1";
+export const GRADIENT_PAGE = "#0A0D3A";
 /** 사이드바 배경 — 초극다크 올리브 단색 */
-export const GRADIENT_SIDEBAR = "#131507";
+export const GRADIENT_SIDEBAR = "#0A0D3A";
 /** 외부 래퍼 배경 — 극다크 올리브 단색 */
-export const GRADIENT_OUTER = "#0C0E02";
+export const GRADIENT_OUTER = "#000000";
 /** 로고/아이콘 배경 — 세이지 단색 */
-export const GRADIENT_LOGO = "#AEB784";
+export const GRADIENT_LOGO = "#5865F2";
 /** 활성 항목 배경 (사이드바) — 화이트 틴트 */
-export const GRADIENT_ACTIVE = "rgba(255,255,255,0.10)";
+export const GRADIENT_ACTIVE = "rgba(88,101,242,0.28)";
 /** 콘텐츠 영역 활성 항목 배경 */
-export const GRADIENT_ACTIVE_LIGHT = "rgba(174,183,132,0.35)";
+export const GRADIENT_ACTIVE_LIGHT = "rgba(88,101,242,0.30)";
 /** 배경 orb — 제거 */
 export const GRADIENT_ORB_1 = "transparent";
 export const GRADIENT_ORB_2 = "transparent";
 export const GRADIENT_ORB_3 = "transparent";
 /** 카드 배경 — 화이트 단색 */
-export const GRADIENT_CARD = "#FBFCFA";
+export const GRADIENT_CARD = "#23272A";
 /** 헤더 배너 배경 — 연한 크림 단색 */
-export const GRADIENT_BANNER = "#E9ECE4";
+export const GRADIENT_BANNER = "#1E2353";
 
 // ── 상태 색상 (올리브 테마) ──────────────────────────────
-export const STATUS_RUNNING = "#5A8A4A";
-export const STATUS_IDLE    = "#9A9B72";
+export const STATUS_RUNNING = "#35ED7E";
+export const STATUS_IDLE    = "#B5B9DE";
 export const STATUS_ERROR   = "#B85450";
-export const STATUS_SUCCESS = "#5A8A4A";
-export const STATUS_WARNING = "#C09840";
-export const STATUS_STOPPED = "#888A62";
+export const STATUS_SUCCESS = "#35ED7E";
+export const STATUS_WARNING = "#00B0F4";
+export const STATUS_STOPPED = "#8F95C6";
 
 // ── 코드 / 터미널 영역 (올리브 테마) ────────────────────
 export const CODE_BG     = "#0E1003";
@@ -171,15 +171,15 @@ export const CODE_FG     = "#D4CC9E";
 export const CODE_MUTED  = "#9A9B72";
 
 // ── 로그인 화면 전용 ──────────────────────────────────────
-export const LOGIN_MUTED       = "#9A9B7A";   // 뮤트 올리브 텍스트
-export const LOGIN_ICON_MUTED  = "#B8B6A8";   // 뮤트 아이콘
-export const LOGIN_CHECKBOX    = "#C8C5B8";   // 체크박스 비활성
-export const LOGIN_CHEVRON     = "#C0BDB0";   // 화살표 색
-export const LOGIN_OLIVE_TEXT  = "#6B6D4A";   // 올리브 텍스트
-export const LOGIN_DISABLED_BG = "#ECEAE4";   // 비활성 버튼 배경
-export const LOGIN_DISABLED_BG2 = "#E8E6DF";  // 비활성 배경2
-export const LOGIN_SHADOW_1    = "#E2E0DA";   // 카드 그림자1
-export const LOGIN_SHADOW_2    = "#D4D2CC";   // 카드 그림자2
+export const LOGIN_MUTED       = "#B5B9DE";   // 뮤트 올리브 텍스트
+export const LOGIN_ICON_MUTED  = "#8F95C6";   // 뮤트 아이콘
+export const LOGIN_CHECKBOX    = "#8F95C6";   // 체크박스 비활성
+export const LOGIN_CHEVRON     = "#B5B9DE";   // 화살표 색
+export const LOGIN_OLIVE_TEXT  = "#D9DCFF";   // 올리브 텍스트
+export const LOGIN_DISABLED_BG = "#1E2353";   // 비활성 버튼 배경
+export const LOGIN_DISABLED_BG2 = "#23272A";  // 비활성 배경2
+export const LOGIN_SHADOW_1    = "#13184A";   // 카드 그림자1
+export const LOGIN_SHADOW_2    = "#0A0D3A";   // 카드 그림자2
 
 // ── 파일 타입 색상 ────────────────────────────────────────
 export const FILE_COLORS: Record<string, { bg: string; color: string }> = {
@@ -220,14 +220,14 @@ export const BRANCH_COLORS = [
 ];
 
 // ── 차트 색상 ─────────────────────────────────────────────
-export const CHART_1 = "#41431B";
-export const CHART_2 = "#AEB784";
-export const CHART_3 = "#C09840";
-export const CHART_4 = "#5A8A4A";
-export const CHART_5 = "#B87850";
+export const CHART_1 = "#5865F2";
+export const CHART_2 = "#35ED7E";
+export const CHART_3 = "#EC48BD";
+export const CHART_4 = "#00B0F4";
+export const CHART_5 = "#F59E0B";
 
 // ── 빌드 올리브 배경 ──────────────────────────────────────
-export const BUILD_OLIVE_BG = "#1E1F0A";
+export const BUILD_OLIVE_BG = "#0A0D3A";
 
 // ── 언어 색상 (GitHub 언어 기반) ──────────────────────────
 export const LANG_GRADLE = "#02A0FF";

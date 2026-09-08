@@ -1233,6 +1233,12 @@ export async function updateProject(
   });
 }
 
+export async function deleteProject(projectId: number | string): Promise<void> {
+  return request<void>(`/api/v1/projects/${projectId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchProjectMembers(projectId: number): Promise<ProjectMemberList> {
   return request<ProjectMemberList>(`/api/v1/projects/${projectId}/members`);
 }

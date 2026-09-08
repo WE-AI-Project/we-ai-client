@@ -40,6 +40,7 @@ import {
   ProjectTechStackCategory,
   ProjectTechStackInput,
   createProjectTechStack,
+  deleteProject,
   deleteProjectMember,
   deleteProjectTechStack,
   fetchProjectDetail,
@@ -452,6 +453,28 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!projectId || !isAdmin) {
+      toast.error("프로젝트 리더만 프로젝트를 삭제할 수 있습니다.");
+      return;
+    }
+
+    const isConfirmed = window.confirm(
+      "프로젝트를 삭제하시겠습니까?\n삭제된 프로젝트와 데이터는 복구할 수 없습니다."
+    );
+
+    if (!isConfirmed) return;
+
+    try {
+      await deleteProject(projectId);
+      alert("프로젝트가 삭제되었습니다.");
+      window.location.href = "/";
+    } catch (error) {
+      console.error("프로젝트 삭제 실패:", error);
+      alert("프로젝트 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  };
+
   const handleMemberRoleSave = async (member: ProjectMember) => {
     if (!isAdmin) {
       toast.error("관리자만 프로젝트 멤버를 관리할 수 있습니다.");
@@ -725,19 +748,19 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
         <section
           className="relative overflow-hidden rounded-[28px] border px-6 py-6"
           style={{
-            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #41431B 100%)",
+            background: "linear-gradient(135deg, #0A0D3A 0%, #1E2353 45%, #5865F2 74%, #EC48BD 118%)",
             borderColor: "rgba(255,255,255,0.10)",
-            boxShadow: "0 18px 42px rgba(12,14,2,0.20)",
+            boxShadow: "0 18px 42px rgba(88,101,242,0.28)",
           }}
         >
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-1/2"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(174,183,132,0.16))" }}
+            style={{ background: "linear-gradient(90deg, transparent, rgba(236,72,189,0.28))" }}
           />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4" style={{ color: "#AEB784" }} />
+                <Settings className="h-4 w-4" style={{ color: "#35ED7E" }} />
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.50)" }}>
                   Project Settings
                 </p>
@@ -753,7 +776,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
                   <Hash className="h-3.5 w-3.5" />
                   {detail.projectCode}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(174,183,132,0.18)", color: "#E3DBBB" }}>
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(53,237,126,0.18)", color: "#FFFFFF" }}>
                   <ShieldCheck className="h-3.5 w-3.5" />
                   {detail.status}
                 </span>
@@ -946,15 +969,27 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
               </div>
 
               <div className="mt-5 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleLeaveProject}
-                  className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white"
-                  style={{ background: STATUS_ERROR }}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  Leave Project
-                </button>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteProject}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white"
+                    style={{ background: STATUS_ERROR }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    프로젝트 삭제
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleLeaveProject}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white"
+                    style={{ background: STATUS_ERROR }}
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    프로젝트 나가기
+                  </button>
+                )}
               </div>
 
             </section>
