@@ -11,19 +11,21 @@ export type EnvVar = {
 
 const STORAGE_KEY = "weai_env_vars_v2";
 
-// ── 기본 .env 파일 변수 목록 ──
+// ── 기본 .env 파일 변수 목록 (로컬 보안 전용) ──
 export const DEFAULT_ENV_VARS: EnvVar[] = [
-  { key: "SPRING_PROFILES_ACTIVE", value: "dev",                              secret: false, editable: true,  desc: "활성 Spring Boot 프로파일" },
-  { key: "SERVER_PORT",            value: "8080",                             secret: false, editable: true,  desc: "Spring Boot 서버 포트" },
-  { key: "JAVA_HOME",              value: "C:\\Program Files\\Java\\jdk-17.0.18", secret: false, editable: false, desc: "JDK 설치 경로 (자동 감지)" },
-  { key: "GRADLE_HOME",            value: "C:\\Users\\user\\.gradle",         secret: false, editable: false, desc: "Gradle 홈 디렉토리" },
-  { key: "DB_URL",                 value: "jdbc:h2:mem:weaidb",               secret: false, editable: true,  desc: "데이터베이스 연결 URL (dev)" },
-  { key: "DB_USERNAME",            value: "sa",                               secret: false, editable: true,  desc: "DB 사용자명" },
-  { key: "DB_PASSWORD",            value: "weai-dev-secret",                  secret: true,  editable: true,  desc: "DB 비밀번호" },
-  { key: "AGENT_MAX_THREADS",      value: "6",                                secret: false, editable: true,  desc: "에이전트 최대 스레드 수" },
-  { key: "AGENT_RETRY_DELAY_MS",   value: "5000",                             secret: false, editable: true,  desc: "에이전트 재시도 간격 (ms)" },
-  { key: "JWT_SECRET",             value: "weai-jwt-secret-key-256bit",       secret: true,  editable: true,  desc: "JWT 서명 키" },
-  { key: "LOG_LEVEL",              value: "DEBUG",                            secret: false, editable: true,  desc: "Spring 로그 레벨 (dev)" },
+  { key: "VITE_API_BASE_URL",        value: "https://api.yhy-server.com",                     secret: false, editable: true, desc: "시나입스 백엔드 API 엔드포인트" },
+  { key: "SPRING_PROFILES_ACTIVE",   value: "dev",                                            secret: false, editable: true, desc: "활성 Spring Boot 프로파일" },
+  { key: "SERVER_PORT",              value: "8080",                                           secret: false, editable: true, desc: "Spring Boot 서버 포트" },
+  { key: "SPRING_DATASOURCE_URL",    value: "jdbc:mysql://api.yhy-server.com:3306/weaidb",    secret: false, editable: true, desc: "MySQL 메인 DB 접속 URL" },
+  { key: "SPRING_DATASOURCE_USERNAME", value: "root",                                         secret: false, editable: true, desc: "데이터베이스 접속 계정" },
+  { key: "SPRING_DATASOURCE_PASSWORD", value: "weai-prod-db-pw!@#",                           secret: true,  editable: true, desc: "데이터베이스 비밀번호" },
+  { key: "JWT_SECRET",               value: "synaipse-master-security-jwt-secret-key-256bit", secret: true,  editable: true, desc: "JWT 인증 토큰 서명 키" },
+  { key: "JWT_EXPIRATION_SECONDS",   value: "1800",                                           secret: false, editable: true, desc: "Access Token 유효 시간 (초)" },
+  { key: "WORKSPACE_LOCAL_PATH",     value: "C:\\Users\\USER\\orca\\workspaces\\we-ai-client\\pteropod", secret: false, editable: true, desc: "로컬 프론트엔드 작업 디렉토리" },
+  { key: "MARS_EXPO_PROJECT_PATH",   value: "D:\\Mars_expo_project",                          secret: false, editable: true, desc: "동양미래대 MARS Expo 로컬 경로" },
+  { key: "MARS_EXPO_REPO_URL",       value: "https://github.com/DongyangMARS/web",            secret: false, editable: true, desc: "MARS Expo 깃허브 원격 저장소" },
+  { key: "AI_QA_ENABLED",            value: "true",                                           secret: false, editable: true, desc: "AI QA 및 자동화 검증 활성화 여부" },
+  { key: "MULTI_AGENT_CONCURRENCY",  value: "8",                                              secret: false, editable: true, desc: "동시 멀티 에이전트 스레드 풀 크기" },
 ];
 
 // ── localStorage에서 읽기 ──

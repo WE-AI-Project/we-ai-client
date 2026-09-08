@@ -1,4 +1,5 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   OLIVE_DARK,
   SAGE,
@@ -436,7 +437,7 @@ function SocialBtn({
   );
 }
 
-async function resolveAuthenticatedUser(session: AuthSession) {
+async function resolveAuthenticatedUser(_session: AuthSession) {
   return fetchCurrentUser();
 }
 
@@ -447,7 +448,6 @@ function LoginForm({
   onSwitchToSignup,
   onSwitchToEmailCode,
   onSwitchToPasswordFind,
-  onSocialLogin,
 }: {
   initialEmail?: string;
   notice: Feedback | null;
@@ -503,7 +503,7 @@ function LoginForm({
       }
     } catch (err) {
       console.error(`${provider} 로그인 연동 실패:`, err);
-      alert("소셜 로그인 서버와 연결할 수 없습니다.");
+      toast.error("소셜 로그인 서버와 연결할 수 없습니다.");
     } finally {
       setSocialLoading(null);
     }
@@ -716,8 +716,8 @@ function SignupForm({
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [otpError, setOtpError] = useState("");
-  const [dispatchResult, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
-  
+  const [, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
+
   // 약관 동의 상태
   const [agreeAll, setAgreeAll] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
@@ -778,7 +778,6 @@ function SignupForm({
     setOtpError("");
 
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
       const result = createLocalVerificationDispatch(email.trim());
       setDispatchResult(result);
       setOtpSent(true);
@@ -789,20 +788,16 @@ function SignupForm({
 
   const handleOtpComplete = (code: string) => {
     setOtpError("");
-    setOtpVerifying(true);
+    setOtpVerifying(false);
 
-    window.setTimeout(() => {
-      setOtpVerifying(false);
+    if (code.length === 6) {
+      setVerified(true);
+      setOtpError("");
+      return;
+    }
 
-      if (code.length === 6) {
-        setVerified(true);
-        setOtpError("");
-        return;
-      }
-
-      setVerified(false);
-      setOtpError("6자리 인증번호를 입력해주세요.");
-    }, 700);
+    setVerified(false);
+    setOtpError("6자리 인증번호를 입력해주세요.");
   };
 
   const handleSignup = async () => {
@@ -1275,7 +1270,7 @@ function EmailCodeLoginForm({
           <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
             만료 시각: {dispatchResult.expiresAt}
           </p>
-          {dispatchResult.debugCode && (
+          {import.meta.env.DEV && dispatchResult.debugCode && (
             <p className="mt-1 text-[9px]" style={{ color: LOGIN_ICON_MUTED }}>
               dev mock code: {dispatchResult.debugCode}
             </p>
@@ -1480,9 +1475,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
 
   const handleAuthenticatedInternal = (session: AuthSession, user: CurrentUser) => {
     setExiting(true);
-    window.setTimeout(() => {
-      onAuthenticated(session, user);
-    }, 450);
+    window.setTimeout(() => onAuthenticated(session, user), 420);
   };
 
   const switchMode = (

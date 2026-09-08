@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Sparkles, AlertTriangle, CheckCircle2, XCircle, Circle, RefreshCw } from "lucide-react";
 import {
@@ -93,9 +93,8 @@ export function QAReportsPage() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
-
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">
@@ -116,8 +115,7 @@ export function QAReportsPage() {
             ) : (
               <button
                 onClick={() => {
-                  setIsLoading(true);
-                  setTimeout(() => setIsLoading(false), 2000); // 리스캔 시 2초 로딩
+                  setIsLoading(false);
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-black/[0.05] transition-all"
                 style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}

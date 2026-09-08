@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowRight,
@@ -18,9 +19,6 @@ import {
   ShieldCheck,
   UserCircle2,
   X,
-  Trash2,
-  AlertTriangle,
-  FolderGit2
 } from "lucide-react";
 
 // 만들어둔 공통 알림창 컴포넌트 불러오기
@@ -138,7 +136,7 @@ function LocalPathInput({
       if (picked) onChange(picked);
       return;
     }
-    alert("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
+    toast.info("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
   };
 
   return (
@@ -227,39 +225,6 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
       <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
         팀 구성 및 기술 스택은 <strong>Project Settings</strong>에서 세부 설정 가능합니다.
       </p>
-    </div>
-  );
-}
-
-function DepartmentPicker({
-  value,
-  onChange,
-  compact = false,
-}: {
-  value: ProjectDepartment;
-  onChange: (value: ProjectDepartment) => void;
-  compact?: boolean;
-}) {
-  return (
-    <div className={`grid gap-1.5 ${compact ? "grid-cols-4" : "grid-cols-2"}`}>
-      {DEPARTMENTS.map((department) => {
-        const selected = department === value;
-        return (
-          <button
-            key={department}
-            type="button"
-            onClick={() => onChange(department)}
-            className={`rounded-lg font-semibold transition-all ${compact ? "px-2 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"}`}
-            style={{
-              background: selected ? "rgba(112,130,56,0.10)" : "rgba(0,0,0,0.04)",
-              color: selected ? ACCENT : TEXT_TERTIARY,
-              border: `1px solid ${selected ? "rgba(112,130,56,0.18)" : "transparent"}`,
-            }}
-          >
-            {DEPARTMENT_LABELS[department]}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -780,7 +745,7 @@ function StartModal({
 }) {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [localPath, setLocalPath] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [joining] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
   useEscapeToClose(onClose);
@@ -798,16 +763,12 @@ function StartModal({
       return;
     }
 
-    setJoining(true);
-    window.setTimeout(() => {
-      onSelect({
-        projectId: selectedProject.projectId,
-        projectName: selectedProject.projectName,
-        projectCode: selectedProject.projectCode,
-        localPath: localPath.trim() || undefined,
-      });
-      setJoining(false);
-    }, 300);
+    onSelect({
+      projectId: selectedProject.projectId,
+      projectName: selectedProject.projectName,
+      projectCode: selectedProject.projectCode,
+      localPath: localPath.trim() || undefined,
+    });
   };
 
   const handlePathDetect = async () => {
@@ -820,7 +781,7 @@ function StartModal({
       setDetected(await detectProjectStack(localPath.trim()));
     } catch (error) {
       setDetected(null);
-      alert(formatApiError(error));
+      toast.error(formatApiError(error));
     } finally {
       setDetecting(false);
     }
@@ -839,7 +800,7 @@ function StartModal({
       <div
         className="relative flex w-full flex-col overflow-hidden rounded-2xl"
         style={{
-          maxWidth: 440,
+          maxWidth: 680,
           maxHeight: "88vh",
           background: "rgba(255,255,255,0.97)",
           border: `1px solid ${BORDER}`,
@@ -1156,7 +1117,7 @@ export function JoinProjectScreen({
           </button>
         </div>
 
-        <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center gap-7 px-6">
+        <div className="relative z-10 flex w-full max-w-[680px] flex-col items-center gap-7 px-6">
           <div className="text-center">
             <div
               className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"

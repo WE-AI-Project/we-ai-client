@@ -1,7 +1,6 @@
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 const isDev = import.meta.env.DEV;
-const isPreview = import.meta.env.VITE_IS_PREVIEW === "true";
 
 const AUTH_SESSION_KEY = "weai_auth_session_v1";
 
@@ -192,6 +191,7 @@ export type ProjectMember = {
   department: ProjectDepartment;
   status: ProjectMemberStatus;
   joinedAt: string;
+  lastAccessedAt?: string | null;
 };
 
 export type ProjectMemberList = {
@@ -695,16 +695,20 @@ export async function fetchProjectMilestones(projectId: number): Promise<Project
   return request<ProjectMilestoneList>(`/api/v1/projects/${projectId}/dashboard/milestones`);
 }
 
-export type DepartmentStatusDetail = {  //프로젝트 파트별 현황 조회
+export type DepartmentStatusDetail = {
   department: ProjectDepartment;
   memberCount: number;
-  totalScheduleCount: number;
+  scheduleCount: number;
+  totalScheduleCount?: number;
   completedScheduleCount: number;
+  todoCount?: number;
+  inProgressCount?: number;
+  holdCount?: number;
   progressRate: number;
   status: string;
 };
 
-export type ProjectDepartmentStatusList = {  //프로젝트 파트별 현황 조회
+export type ProjectDepartmentStatusList = {
   projectId: number;
   departments: DepartmentStatusDetail[];
 };
@@ -780,8 +784,36 @@ export async function updateMyProfile(payload: ProfileUpdatePayload): Promise<vo
   });
 }
 
-export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {  //프로젝트 파트별 현황 조회
-  return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
+export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {
+  const result = await request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
+  if (!result || !Array.isArray(result.departments)) {
+    return { projectId, departments: [] };
+  }
+
+  const normalized = result.departments.map((dept: any) => {
+    const totalCount = Number(dept.totalScheduleCount ?? dept.scheduleCount ?? 0);
+    const completed = Number(dept.completedScheduleCount ?? 0);
+    const rate = Number(dept.progressRate ?? (totalCount > 0 ? Math.round((completed * 100) / totalCount) : 0));
+    const rawStatus = dept.status;
+    const computedStatus =
+      rawStatus ||
+      (totalCount === 0 ? "READY" : rate >= 100 ? "COMPLETED" : "IN_PROGRESS");
+
+    return {
+      ...dept,
+      memberCount: Number(dept.memberCount ?? 0),
+      scheduleCount: totalCount,
+      totalScheduleCount: totalCount,
+      completedScheduleCount: completed,
+      todoCount: Number(dept.todoCount ?? 0),
+      inProgressCount: Number(dept.inProgressCount ?? 0),
+      holdCount: Number(dept.holdCount ?? 0),
+      progressRate: rate,
+      status: computedStatus,
+    };
+  });
+
+  return { projectId: result.projectId ?? projectId, departments: normalized };
 }
 
 export async function leaveProject(projectId: number | string): Promise<void> {  //프로젝트 나가기=탈퇴하기
@@ -1100,25 +1132,6 @@ export async function signUp(payload: SignUpPayload): Promise<void> {
 }
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 이메일/비밀번호 로그인 성공");
-    await new Promise((resolve) => setTimeout(resolve, 500)); // 0.5초 로딩 딜레이
-    
-    const dummySession: AuthSession = {
-      tokenType: "Bearer",
-      accessToken: "preview_access_token_123",
-      accessTokenExpiresInSeconds: 3600,
-      refreshToken: "preview_refresh_token_456",
-      refreshTokenExpiresInSeconds: 86400,
-      username: payload.email.split("@")[0] || "preview_user",
-      email: payload.email,
-      role: "ADMIN",
-    };
-    
-    saveSession(dummySession);
-    return dummySession;
-  }
-  
   const session = await request<AuthSession>(
     "/api/v1/auth/login",
     {
@@ -1135,16 +1148,6 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
 export async function findPassword(
   payload: PasswordFindPayload
 ): Promise<PasswordFindResponse> {
-  if (isPreview) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return {
-      email: payload.email,
-      deliveryMode: "SIMULATED",
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      debugTemporaryPassword: "Ab3!x9MzQp7",
-    };
-  }
-
   return request<PasswordFindResponse>(
     "/api/v1/auth/password/find",
     {
@@ -1158,19 +1161,6 @@ export async function findPassword(
 export async function sendEmailLoginCode(
   payload: EmailCodeSendPayload
 ): Promise<VerificationCodeDispatchResponse> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 인증 코드(123456)가 발송되었습니다.");
-    await new Promise((resolve) => setTimeout(resolve, 500)); // 로딩 딜레이
-    return {
-      purpose: "EMAIL_LOGIN",
-      deliveryChannel: payload.deliveryChannel,
-      deliveryTarget: payload.email,
-      deliveryMode: "MOCK",
-      expiresAt: new Date(Date.now() + 300000).toISOString(),
-      debugCode: "123456", // 아무 번호나 입력해도 통과하게 하거나, 이 번호로 확인
-    };
-  }
-
   return request<VerificationCodeDispatchResponse>(
     "/api/v1/auth/email-login/code",
     {
@@ -1182,23 +1172,6 @@ export async function sendEmailLoginCode(
 }
 
 export async function loginWithEmailCode(payload: EmailCodeLoginPayload): Promise<AuthSession> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 이메일 코드 로그인 성공");
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const dummySession: AuthSession = {
-      tokenType: "Bearer",
-      accessToken: "preview_access_token_123",
-      accessTokenExpiresInSeconds: 3600,
-      refreshToken: "preview_refresh_token_456",
-      refreshTokenExpiresInSeconds: 86400,
-      username: payload.email.split("@")[0] || "preview_user",
-      email: payload.email,
-      role: "ADMIN", // 교수님이 볼 때 모든 권한이 있도록 ADMIN 부여
-    };
-    saveSession(dummySession);
-    return dummySession;
-  }
-
   const session = await request<AuthSession>(
     "/api/v1/auth/email-login",
     {
@@ -1290,17 +1263,6 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
-  if (isPreview) {
-    const session = loadSession(); // 위에서 저장한 dummySession을 불러옴
-    return {
-      id: 9999, // 가짜 유저 ID
-      username: session?.username || "evaluator",
-      name: "SynAIpse 평가자", // 화면 우측 상단 등에 표시될 이름
-      email: session?.email || "preview@synaipse.com",
-      role: "ADMIN",
-    };
-  }
-
   return request<CurrentUser>("/api/v1/users/me");
 }
 
@@ -1483,7 +1445,7 @@ export async function fetchFilteredProjectSchedules(
 }
 
 export async function createProjectSchedule(
-  projectId: number,
+  projectId: number | string,
   payload: ProjectScheduleCreatePayload
 ): Promise<ProjectSchedule> {
   return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules`, {
@@ -1493,18 +1455,100 @@ export async function createProjectSchedule(
 }
 
 export async function updateProjectSchedule(
-  projectId: number,
-  scheduleId: number,
+  projectId: number | string,
+  scheduleId: number | string,
   payload: ProjectScheduleUpdatePayload
 ): Promise<ProjectSchedule> {
   return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
-    method: "PATCH",
+    method: "PUT",
     body: payload,
   });
 }
 
-export async function deleteProjectSchedule(projectId: number, scheduleId: number): Promise<void> {
+export async function deleteProjectSchedule(projectId: number | string, scheduleId: number | string): Promise<void> {
   await request<void>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
     method: "DELETE",
   });
 }
+
+export type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG" | "STARTED" | "TRACE";
+
+export type ServerLogEntry = {
+  id: number;
+  time: string;
+  level: LogLevel;
+  thread: string;
+  logger: string;
+  message: string;
+};
+
+export async function fetchRecentServerLogs(projectId?: number | null): Promise<ServerLogEntry[]> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/server/logs`
+    : `/api/v1/server/logs`;
+  return request<ServerLogEntry[]>(path, { method: "GET" });
+}
+
+export function getServerLogStreamUrl(projectId?: number | null): string {
+  const session = loadSession();
+  const token = session?.accessToken;
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/server/logs/stream`
+    : `/api/v1/server/logs/stream`;
+
+  const baseUrl = apiBaseUrl || "";
+  const fullUrl = `${baseUrl}${path}`;
+  if (token) {
+    const separator = fullUrl.includes("?") ? "&" : "?";
+    return `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
+  return fullUrl;
+}
+
+export type BuildTaskItem = {
+  taskName: string;
+  displayName: string;
+  description: string;
+  command: string;
+  category: string;
+  dangerous: boolean;
+  enabled: boolean;
+};
+
+export type BuildTaskListResponse = {
+  projectId: number;
+  buildTool: string;
+  tasks: BuildTaskItem[];
+};
+
+export type BuildTaskExecutionResponse = {
+  taskName: string;
+  command: string;
+  status: "SUCCESS" | "FAILED";
+  exitCode: number;
+  duration: string;
+  logs: string[];
+  executedAt: string;
+};
+
+export async function fetchBuildTasks(projectId?: number | null): Promise<BuildTaskListResponse> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/build/tasks`
+    : `/api/v1/build/tasks`;
+  return request<BuildTaskListResponse>(path, { method: "GET" });
+}
+
+export async function executeBuildTask(
+  taskName: string,
+  projectId?: number | null
+): Promise<BuildTaskExecutionResponse> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/build/execute`
+    : `/api/v1/build/execute`;
+  return request<BuildTaskExecutionResponse>(path, {
+    method: "POST",
+    body: { taskName },
+  });
+}
+
+

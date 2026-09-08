@@ -40,184 +40,6 @@ const TAG_COLORS: Record<string, string> = {
   style:    "#A67B5B",
 };
 
-function classifyFiles(files: CommitFile[]) {
-  const java    = files.filter(f => f.ext === "java");
-  const config  = files.filter(f => ["yml", "gradle", "env"].includes(f.ext));
-  const front   = files.filter(f => ["tsx", "ts", "css"].includes(f.ext));
-  const added   = files.filter(f => f.status === "added");
-  const deleted = files.filter(f => f.status === "deleted");
-  const modified= files.filter(f => f.status === "modified");
-
-  const totalAdd = files.reduce((s, f) => s + f.additions, 0);
-  const totalDel = files.reduce((s, f) => s + f.deletions, 0);
-
-  return { java, config, front, added, deleted, modified, totalAdd, totalDel };
-}
-
-/** 파일명에서 의미 있는 컨텍스트 추출 */
-function extractContext(files: CommitFile[]) {
-  const names = files.map(f => f.name.replace(/\.[^.]+$/, ""));
-
-  const agents       = names.filter(n => /agent|Agent/i.test(n));
-  const controllers  = names.filter(n => /controller|Controller/i.test(n));
-  const services     = names.filter(n => /service|Service/i.test(n));
-  const hooks        = names.filter(n => /use[A-Z]/.test(n));
-  const configs      = names.filter(n => /settings|gradle|yml|env|config/i.test(n));
-
-  return { agents, controllers, services, hooks, configs, names };
-}
-
-/** diff 내용에서 키워드 분석 */
-function analyzeDiff(files: CommitFile[]) {
-  const allContent = files.flatMap(f => f.diff.map(d => d.content)).join(" ");
-
-  const hasSpringAI   = /spring.ai|SpringAI/i.test(allContent);
-  const hasConcurrent = /ConcurrentHashMap|concurrent/i.test(allContent);
-  const hasScheduler  = /Scheduler|scheduler/i.test(allContent);
-  const hasAutowired  = /@Autowired|@Component/i.test(allContent);
-  const hasActuator   = /actuator/i.test(allContent);
-  const hasRestTemplate = /RestTemplate/i.test(allContent);
-  const hasMotion     = /motion|animation/i.test(allContent);
-  const hasPolling    = /polling|setInterval|pollingRef/i.test(allContent);
-  const hasJDK        = /JavaLanguageVersion|toolchain|sourceCompatibility/i.test(allContent);
-
-  return {
-    hasSpringAI, hasConcurrent, hasScheduler, hasAutowired, hasActuator,
-    hasRestTemplate, hasMotion, hasPolling, hasJDK,
-  };
-}
-
-function generateMessages(files: CommitFile[]): GeneratedMsg[] {
-  if (files.length === 0) return [];
-
-  const cls = classifyFiles(files);
-  const ctx = extractContext(files);
-  const diff = analyzeDiff(files);
-
-  const msgs: GeneratedMsg[] = [];
-
-  // ──── 1. Conventional (영문 + 스코프) ────
-  let tag1    = "feat";
-  let scope1  = "";
-  let title1  = "";
-  let body1   = "";
-
-  // 스코프 결정
-  if (cls.java.length > 0 && cls.front.length === 0)       scope1 = "backend";
-  else if (cls.front.length > 0 && cls.java.length === 0)  scope1 = "frontend";
-  else if (cls.config.length > 0 && cls.java.length === 0) scope1 = "config";
-
-  // 태그 + 제목 결정
-  if (diff.hasJDK) {
-    tag1   = "chore"; scope1 = "build";
-    title1 = "migrate Java toolchain to JDK 17 languageVersion API";
-    body1  = "Replace deprecated sourceCompatibility with toolchain.languageVersion for Gradle 8.x compatibility.";
-  } else if (ctx.agents.length >= 1 && cls.added.length >= 1) {
-    tag1   = "feat"; scope1 = scope1 || "agent";
-    const agentName = ctx.agents[0].replace(/Agent$/i, "").trim();
-    title1 = `add ${agentName} agent with REST data sync`;
-    body1  = `Introduce ${ctx.agents[0]} implementing the Agent interface.\nUses RestTemplate for endpoint polling and structured status reporting.`;
-  } else if (ctx.controllers.length >= 1 && diff.hasConcurrent) {
-    tag1   = "refactor"; scope1 = scope1 || "controller";
-    title1 = "replace ArrayList with ConcurrentHashMap in AgentRegistry";
-    body1  = "Thread-safe agent storage with DI-based AgentScheduler integration.\nSorted status responses via Comparator.comparing.";
-  } else if (diff.hasMotion && ctx.hooks.length === 0) {
-    tag1   = "feat"; scope1 = "ui";
-    title1 = `add motion animation to ${cls.front[0]?.name ?? "component"}`;
-    body1  = "Wrap component with motion.div for layout animation.\nExpanded state toggled on click with useCallback memoization.";
-  } else if (diff.hasPolling && ctx.hooks.length >= 1) {
-    tag1   = "feat"; scope1 = "hooks";
-    title1 = `add ${ctx.hooks[0]} real-time polling hook`;
-    body1  = "3-second interval polling with automatic cleanup on unmount.\nTyped AgentStatus union type for state safety.";
-  } else if (cls.deleted.length >= 1 && cls.added.length === 0) {
-    tag1   = "chore";
-    title1 = `remove deprecated ${cls.deleted.map(f => f.name).join(", ")}`;
-    body1  = "Clean up legacy files no longer referenced in the codebase.";
-  } else if (cls.config.length >= cls.java.length && cls.config.length > 0) {
-    tag1   = "chore"; scope1 = "config";
-    const configName = ctx.configs[0] || cls.config[0]?.name || "settings";
-    title1 = `update ${configName} for dev environment`;
-    body1  = diff.hasActuator
-      ? "Enable Spring Actuator and bump jackson-databind version."
-      : `Adjust datasource URL and add weai agent thread/retry configuration.`;
-  } else {
-    tag1   = cls.modified.length > cls.added.length ? "refactor" : "feat";
-    title1 = `update ${files.slice(0, 2).map(f => f.name).join(" and ")}`;
-    body1  = `${cls.totalAdd} additions, ${cls.totalDel} deletions across ${files.length} file${files.length > 1 ? "s" : ""}.`;
-  }
-
-  msgs.push({
-    id: "1", tag: tag1, scope: scope1, title: title1, body: body1,
-    style: "conventional", tagColor: TAG_COLORS[tag1] ?? ACCENT,
-  });
-
-  // ──── 2. Short (한 줄, 간결) ────
-  let tag2 = "feat", title2 = "", scope2 = "";
-
-  if (diff.hasJDK) {
-    tag2 = "chore"; scope2 = "build"; title2 = "update Java toolchain to JDK 17";
-  } else if (ctx.agents.length >= 1 && cls.added.length >= 1) {
-    tag2 = "feat"; scope2 = "agent";
-    title2 = `add ${ctx.agents[0]}`;
-  } else if (ctx.controllers.length >= 1 && diff.hasConcurrent) {
-    tag2 = "refactor"; scope2 = "controller";
-    title2 = "use ConcurrentHashMap for thread-safe agent registry";
-  } else if (diff.hasPolling) {
-    tag2 = "feat"; scope2 = "hooks";
-    title2 = `add ${ctx.hooks[0] ?? "polling"} hook`;
-  } else if (diff.hasMotion) {
-    tag2 = "feat"; scope2 = "ui";
-    title2 = "add animation to agent card";
-  } else if (cls.deleted.length >= 1) {
-    tag2 = "chore"; title2 = `remove ${cls.deleted[0].name}`;
-  } else {
-    tag2 = cls.added.length > 0 ? "feat" : "refactor";
-    title2 = `${tag2 === "feat" ? "add" : "update"} ${files[0].name}`;
-  }
-
-  msgs.push({
-    id: "2", tag: tag2, scope: scope2, title: title2, body: "",
-    style: "short", tagColor: TAG_COLORS[tag2] ?? ACCENT,
-  });
-
-  // ──── 3. Korean (한국어 설명형) ────
-  let title3 = "", body3 = "";
-
-  if (diff.hasJDK) {
-    title3 = "빌드 환경 Java 툴체인 JDK 17로 마이그레이션";
-    body3  = "Gradle 8.x 호환을 위해 sourceCompatibility 방식을 JavaLanguageVersion API로 전환";
-  } else if (ctx.agents.length >= 1 && cls.added.length >= 1) {
-    title3 = `${ctx.agents[0]} 에이전트 신규 구현`;
-    body3  = `Agent 인터페이스 구현 — RestTemplate 기반 데이터 동기화 및 상태 보고 포함`;
-  } else if (ctx.controllers.length >= 1 && diff.hasConcurrent) {
-    title3 = "멀티에이전트 레지스트리 스레드 안전성 개선";
-    body3  = "ArrayList → ConcurrentHashMap 교체, AgentScheduler 의존성 주입 방식으로 리팩터링";
-  } else if (diff.hasPolling && ctx.hooks.length >= 1) {
-    title3 = `${ctx.hooks[0]} 실시간 폴링 훅 추가`;
-    body3  = "3초 주기 자동 갱신, 언마운트 시 인터벌 정리 처리";
-  } else if (diff.hasMotion) {
-    title3 = "에이전트 카드에 모션 애니메이션 적용";
-    body3  = "motion.div 레이아웃 애니메이션 + 클릭 시 확장 토글";
-  } else if (cls.deleted.length >= 1) {
-    title3 = `레거시 ${cls.deleted.map(f => f.name).join(", ")} 제거`;
-    body3  = "더 이상 사용하지 않는 파일 정리";
-  } else if (cls.config.length > 0) {
-    title3 = "개발 환경 설정 업데이트";
-    body3  = diff.hasActuator
-      ? "Spring Actuator 활성화, jackson-databind 버전 업그레이드"
-      : "데이터소스 URL 수정, 에이전트 스레드·재시도 설정 추가";
-  } else {
-    title3 = `${files.slice(0, 2).map(f => f.name).join(", ")} 수정`;
-    body3  = `총 +${cls.totalAdd} −${cls.totalDel} 변경 (${files.length}개 파일)`;
-  }
-
-  msgs.push({
-    id: "3", tag: "feat", scope: "", title: title3, body: body3,
-    style: "korean", tagColor: ACCENT,
-  });
-
-  return msgs;
-}
 
 /** 커밋 메시지 포맷팅 */
 function formatMsg(msg: GeneratedMsg): string {
@@ -236,7 +58,7 @@ function normalizeCommitCandidates(response: Awaited<ReturnType<typeof generateC
     : [{ message: response.message ?? response.commitMessage ?? response.commit_msg }];
 
   return candidates
-    .map((candidate, index) => {
+    .map((candidate, index): GeneratedMsg | null => {
       const rawMessage = candidate.message ?? candidate.commitMessage ?? candidate.commit_msg ?? candidate.title ?? "";
       if (!rawMessage.trim()) return null;
 
@@ -254,7 +76,7 @@ function normalizeCommitCandidates(response: Awaited<ReturnType<typeof generateC
         body: candidate.body ?? bodyLines.join("\n").trim(),
         style: index === 0 ? "conventional" : "short",
         tagColor: TAG_COLORS[tag] ?? ACCENT,
-      } satisfies GeneratedMsg;
+      };
     })
     .filter((message): message is GeneratedMsg => message !== null);
 }
@@ -330,7 +152,6 @@ export function AICommitGenerator({
   const [expanded,   setExpanded]   = useState<string | null>(null);
   const [revealed,   setRevealed]   = useState<Set<string>>(new Set());
   const [dotCount,   setDotCount]   = useState(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 로딩 점 애니메이션
   useEffect(() => {
@@ -338,28 +159,6 @@ export function AICommitGenerator({
     const t = setInterval(() => setDotCount(d => (d + 1) % 4), 380);
     return () => clearInterval(t);
   }, [loading]);
-
-  const runGenerate = () => {
-    if (loading) return;
-    setLoading(true);
-    setMessages([]);
-    setApplied(null);
-    setRevealed(new Set());
-
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      const generated = generateMessages(stagedFiles);
-      setMessages(generated);
-      setLoading(false);
-
-      // 순차적으로 카드 드러내기
-      generated.forEach((m, i) => {
-        setTimeout(() => {
-          setRevealed(prev => new Set([...prev, m.id]));
-        }, i * 200);
-      });
-    }, 1400 + Math.random() * 400);
-  };
 
   const runGenerateFromApi = async () => {
     if (loading) return;
@@ -571,7 +370,6 @@ export function AICommitGenerator({
                 const isCopied   = copied  === msg.id;
                 const isExpanded = expanded === msg.id;
                 const isVisible  = revealed.has(msg.id);
-                const formatted  = formatMsg(msg);
 
                 return (
                   <div

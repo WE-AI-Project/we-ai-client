@@ -5,11 +5,14 @@ import { BuildManagementPage } from "./BuildManagementPage";
 import {
   BORDER_SUBTLE,
   GRADIENT_SIDEBAR,
-  SIDEBAR_BORDER,
 } from "../colors";
 
+interface ServerBuildPageProps {
+  projectId?: number | null;
+}
+
 // ── Server & Build 탭 통합 페이지 ──
-export function ServerBuildPage() {
+export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
   const [tab, setTab] = useState<"logs" | "build">("logs");
 
   return (
@@ -53,8 +56,8 @@ export function ServerBuildPage() {
 
       {/* 탭 콘텐츠 */}
       <div className="flex-1 flex overflow-hidden">
-        {tab === "logs"  ? <ServerLogsPage />      : null}
-        {tab === "build" ? <BuildManagementPage /> : null}
+        {tab === "logs" ? <ServerLogsPage projectId={projectId} /> : null}
+        {tab === "build" ? <BuildManagementPage projectId={projectId} /> : null}
       </div>
     </div>
   );

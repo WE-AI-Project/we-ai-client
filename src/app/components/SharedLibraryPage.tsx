@@ -1,10 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BookOpen, Search, FileText, Link, Download, File, Code2, BookMarked, Layers } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  UI_RED_DARK, UI_RED_BG8, UI_GREEN, UI_GREEN_BG8, UI_GREEN_BG7, UI_AMBER, UI_AMBER_BG8, UI_AMBER_BG7,
-  UI_VIOLET, UI_VIOLET_BG8, UI_VIOLET_BG7, UI_INDIGO,
-  GRADIENT_HEADER, BTN_DARK,
   CONTENT_BG,
 } from "../colors";
 
@@ -75,9 +72,8 @@ export function SharedLibraryPage() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
-
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
           <div className="flex items-center justify-between">

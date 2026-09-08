@@ -157,6 +157,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif;
   }
 
   /**
@@ -210,3 +211,21 @@
     line-height: 1.5;
   }
 }
+
+/* ============================================================
+   Fluent 2 Design System Spacing & Typography Utilities
+   (D:\SynAIpse\we-ai-client\design.md)
+   ============================================================ */
+.fluent-title-1 { font-size: 32px; line-height: 40px; font-weight: 600; }
+.fluent-title-2 { font-size: 24px; line-height: 32px; font-weight: 600; }
+.fluent-title-3 { font-size: 20px; line-height: 28px; font-weight: 600; }
+.fluent-body-strong { font-size: 14px; line-height: 20px; font-weight: 600; }
+.fluent-body { font-size: 14px; line-height: 20px; font-weight: 400; }
+.fluent-caption-1 { font-size: 12px; line-height: 16px; font-weight: 400; }
+.fluent-caption-2 { font-size: 10px; line-height: 14px; font-weight: 400; }
+
+.fluent-radius-small { border-radius: 4px; }
+.fluent-radius-medium { border-radius: 8px; }
+.fluent-radius-large { border-radius: 12px; }
+.fluent-radius-full { border-radius: 9999px; }
+

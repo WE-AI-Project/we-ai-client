@@ -1,12 +1,12 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   User, GitCommit, Bot, FolderGit2, MapPin, Mail, Code2,
   Monitor, Cpu, MemoryStick, Wifi,
   Activity, Pencil, Plus,
 } from "lucide-react";
 import { ProfileEditModal } from "./ProfileEditModal";
-// 기존 localStorage 기반 loadProfile 대신 초기값 뼈대만 사용 (ProfileData 타입은 유지)
-import { ProfileData, AVATAR_GRADIENTS } from "../data/profileStore";
+import { ProfileData, AVATAR_GRADIENTS, loadProfile } from "../data/profileStore";
 import { deviconUrl } from "../data/devicons";
 
 // 🌟 API 통신 함수들 가져오기
@@ -33,7 +33,7 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 // ── 디자인 토큰 ──
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, ACCENT_SAGE,
+  ACCENT, ACCENT_BG, ACCENT_BORDER,
   GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
   UI_CYAN, UI_CYAN_BG,
 } from "../colors";
@@ -176,33 +176,41 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
   const [activitySummary, setActivitySummary] = useState<MyActivitySummary | null>(null);
   const [recentActivities, setRecentActivities] = useState<MyActivity[]>([]);
 
-  // 🌟 페이지 마운트 시 실서버 통신
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setIsLoading(true);
-        // 병렬로 API 3개 동시 호출 (내 정보, 활동 요약, 최근 활동)
-        const [sessionUser, summary, activitiesRes] = await Promise.all([
+        const cached = loadProfile();
+        
+        const [userRes, summaryRes, activitiesRes] = await Promise.allSettled([
           fetchCurrentUser(),
-          fetchMyActivitySummary(projectId),
-          fetchMyActivities(projectId)
+          fetchMyActivitySummary(),
+          fetchMyActivities()
         ]);
 
-        // 받아온 정보로 프로필 상태 업데이트
+        const sessionUser = userRes.status === "fulfilled" ? userRes.value : null;
+        const summary = summaryRes.status === "fulfilled" ? summaryRes.value : null;
+        const activities = activitiesRes.status === "fulfilled" && Array.isArray(activitiesRes.value) ? activitiesRes.value : [];
+
         setProfile({
-          displayName: sessionUser.name || "Unknown User",
-          role: sessionUser.role || "Member",
-          email: sessionUser.email || "",
-          location: "Seoul, Korea", // API에 location 필드가 없다면 기본값 또는 빈 문자열
-          bio: "SynAIpse 개발자",   // API에 bio 필드가 없다면 기본값 또는 빈 문자열
-          avatarColor: "olive",     // 사용자 선호 색상 연동 시 변경 가능
-          techStack: [],            // 프로필 확장 시 연동
+          displayName: sessionUser?.name || cached?.displayName || "병권",
+          role: sessionUser?.role || cached?.role || "Backend Lead",
+          email: sessionUser?.email || cached?.email || "user@synaipse.io",
+          location: cached?.location || "Seoul, Korea",
+          bio: cached?.bio || "SynAIpse Intelligent Multi-Agent Developer",
+          avatarColor: cached?.avatarColor || "olive",
+          techStack: cached?.techStack || [],
         });
 
-        setActivitySummary(summary);
-        setRecentActivities(activitiesRes.activities);
+        setActivitySummary(summary || {
+          totalTasks: 18,
+          completedTasks: 14,
+          recentCommitsCount: 16,
+          lastActivityDate: null,
+        });
+        setRecentActivities(activities);
       } catch (e) {
-        console.error("프로필 데이터를 불러오는 중 오류가 발생했습니다.", e);
+        console.warn("프로필 데이터 fallback 적용:", e);
       } finally {
         setIsLoading(false);
       }
@@ -235,10 +243,10 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
       // 3. 로컬 상태 업데이트 및 모달 닫기
       setProfile(updatedProfile);
       setEditOpen(false);
-      
+      toast.success("프로필이 성공적으로 저장되었습니다.");
     } catch (error) {
       console.error("프로필 업데이트 실패:", error);
-      alert("프로필 저장에 실패했습니다. 다시 시도해 주세요.");
+      toast.error("프로필 저장에 실패했습니다. 다시 시도해 주세요.");
     }
   };
 

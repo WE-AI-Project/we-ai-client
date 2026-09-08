@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Cpu, MemoryStick, Play, Square, RotateCw, ChevronDown, Terminal, Circle, Filter } from "lucide-react";
+import { Bot, RotateCw, Terminal } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  ACCENT, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
 } from "../colors";
 
 // ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──

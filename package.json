@@ -12,6 +12,7 @@
     "dev": "vite",
     "dev:local": "vite --mode local-backend",
     "dev:preview": "vite --mode preview",
+    "start": "vite",
     "electron:dev": "concurrently -k -n VITE,ELECTRON -c blue,magenta \"vite\" \"wait-on tcp:5183 && electron .\"",
     "electron:build": "vite build && electron-builder",
     "electron:build:dir": "vite build && electron-builder --dir"

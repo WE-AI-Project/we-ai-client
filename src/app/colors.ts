@@ -242,3 +242,4 @@ export const CHAT_AVATARS = [
   "#5A8A4A",
   "#C09840",
 ];
+

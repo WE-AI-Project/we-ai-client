@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Settings, User, Bell, Monitor, Palette, Shield, Save, ChevronRight } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT, ACCENT_SAGE,
-  UI_GREEN, UI_GREEN_BG, UI_RED, UI_RED_BG, UI_AMBER, UI_AMBER_BG, UI_VIOLET, UI_VIOLET_BG, UI_INDIGO,
-  GRADIENT_HEADER, BTN_DARK,
   CONTENT_BG,
 } from "../colors";
 
@@ -102,7 +100,7 @@ export function SettingsPage() {
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-2xl mx-auto space-y-4">
+        <div className="w-full max-w-[1400px] mx-auto space-y-4">
 
           {/* ── 헤더 + 저장 버튼 ── */}
           <div className="flex items-center justify-between">
@@ -114,12 +112,14 @@ export function SettingsPage() {
               {isLoading ? (
                 <Skeleton className="h-3 w-32 mt-1.5" />
               ) : (
-                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>앱 환경 · 알림 · 개발 설정</p>
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  SynAIpse 개발 환경 및 알림, 테마 설정을 관리합니다.
+                </p>
               )}
             </div>
             
             {isLoading ? (
-              <Skeleton className="h-8 w-28 rounded-lg" />
+              <Skeleton className="h-8 w-24 rounded-lg" />
             ) : (
               <button
                 onClick={handleSave}

@@ -40,11 +40,17 @@ import { ChatPage } from "./components/ChatPage";
 import { ProjectSettingsPage } from "./components/ProjectSettingsPage";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServerBuildPage } from "./components/ServerBuildPage";
+import { NotificationsPage } from "./components/NotificationsPage";
+import { TasksPage } from "./components/TasksPage";
 import type { CommitFile } from "./components/commitData";
 import { loadProfile, saveProfile } from "./data/profileStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
 import { NotificationPanel } from "./components/NotificationPanel";
-import { DailyStandupModal, isDismissedToday } from "./components/DailyStandupModal";
+import {
+  DailyStandupModal,
+  shouldShowDailyStandup,
+  recordProjectAccessTime,
+} from "./components/DailyStandupModal";
 import {
   AUTH_SESSION_EVENT,
   AuthSession,
@@ -61,10 +67,9 @@ import {
 
 // ── 디자인 토큰 ──
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-  ACCENT, SIDEBAR_BG, SIDEBAR_HOVER, SIDEBAR_ACTIVE,
+  SIDEBAR_BG, SIDEBAR_HOVER, SIDEBAR_ACTIVE,
   GRADIENT_LOGO, GRADIENT_SIDEBAR, GRADIENT_OUTER,
-  ACCENT_BG, CREAM, CONTENT_BG,
+  CONTENT_BG,
   SIDEBAR_TEXT, SIDEBAR_TEXT_ACTIVE, SIDEBAR_TEXT_HOVER,
   SIDEBAR_TEXT_LABEL, SIDEBAR_BORDER,
 } from "./colors";
@@ -155,7 +160,7 @@ const SYSTEM_ITEMS = [
 type NavId =
   | "Dashboard" | "Changes" | "Commits" | "ServerBuild"
   | "Chat" | "Calendar" | "EnvSettings" | "AIQA"
-  | "ProjectSettings" | "Profile" | "Galaxy";
+  | "ProjectSettings" | "Profile" | "Galaxy" | "Notifications" | "Tasks";
 
 const TAB_LABELS: Record<NavId, string> = {
   Dashboard: "Dashboard",
@@ -169,6 +174,8 @@ const TAB_LABELS: Record<NavId, string> = {
   ProjectSettings: "Project Settings",
   Profile: "Profile",
   Galaxy: "SynAIpse Galaxy",
+  Notifications: "Notifications",
+  Tasks: "Tasks",
 };
 
 const HEADER_TAB_WIDTH = `${Math.max(...Object.values(TAB_LABELS).map(label => label.length)) + 8}ch`;
@@ -560,41 +567,36 @@ export default function App() {
   };
 
   const handleJoin = (project: ProjectLaunchTarget) => {
-    setJoinExiting(true);
-    setTimeout(() => {
-      setProjectId(project.projectId);
-      setProject(project.projectName);
-      setProjectCode(project.projectCode ?? genProjectCode());
-      setLocalPath(project.localPath ?? "");
-      setScreen("workspace");
+    setProjectId(project.projectId);
+    setProject(project.projectName);
+    setProjectCode(project.projectCode ?? genProjectCode());
+    setLocalPath(project.localPath ?? "");
+    setScreen("workspace");
 
-      setLeftTabs(["Dashboard"]);
-      setActiveLeftTab("Dashboard");
-      setRightTabs([]);
-      setIsSplit(false);
-      setActivePanel("left");
+    setLeftTabs(["Dashboard"]);
+    setActiveLeftTab("Dashboard");
+    setRightTabs([]);
+    setIsSplit(false);
+    setActivePanel("left");
 
-      setDiffFile(null);
-      setIsLoading(true);
-      setJoinExiting(false);
+    setDiffFile(null);
+    setIsLoading(false);
+    setJoinExiting(false);
 
-      if (project.localPath || project.projectName) {
-        const cur = loadSettings();
-        saveSettings({
-          ...cur,
-          projectName: project.projectName || cur.projectName,
-          repository: project.localPath || cur.repository,
-          description: cur.description || `${project.projectName} project`,
-        });
-      }
+    if (project.localPath || project.projectName) {
+      const cur = loadSettings();
+      saveSettings({
+        ...cur,
+        projectName: project.projectName || cur.projectName,
+        repository: project.localPath || cur.repository,
+        description: cur.description || `${project.projectName} project`,
+      });
+    }
 
-      setTimeout(() => {
-        setIsLoading(false);
-        if (!isDismissedToday()) {
-          setTimeout(() => setShowStandup(true), 700);
-        }
-      }, 1000);
-    }, 440);
+    if (shouldShowDailyStandup(project.projectId)) {
+      setTimeout(() => setShowStandup(true), 300);
+    }
+    recordProjectAccessTime(project.projectId);
   };
 
   const handleLeaveProject = () => {
@@ -629,7 +631,6 @@ export default function App() {
     }
   };
 
-  const handleFileSelect = (file: CommitFile | null) => setDiffFile(file);
   const handleNavigateQA = () => { setDiffFile(null); handleNavClick("AIQA"); };
 
   const handleStandupNavigate = (page: string) => {
@@ -643,7 +644,7 @@ export default function App() {
       case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
       case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage projectId={projectId} />;
-      case "ServerBuild": return <ServerBuildPage />;
+      case "ServerBuild": return <ServerBuildPage projectId={projectId} />;
       case "Chat":
         return (
           <ChatPage
@@ -655,10 +656,12 @@ export default function App() {
         );
       case "Calendar": return <CalendarPage projectId={projectId ?? 1} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
-      case "AIQA": return <AIQAPage projectId={projectId ?? 0} autoStart />;
+      case "AIQA": return <AIQAPage projectId={projectId ?? 0} />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
       case "Profile": return <ProfilePage projectId={projectId ?? 1} />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
+      case "Notifications": return <NotificationsPage projectId={projectId} />;
+      case "Tasks": return <TasksPage projectId={projectId} />;
       default: return <DashboardPage projectId={projectId} projectName={projectName} />;
     }
   };
@@ -670,7 +673,7 @@ export default function App() {
     setActiveTab: (id: NavId) => void
   ) => {
     const isFocused = activePanel === panelType;
-    const shouldShowTabs = isSplit || tabs.length > 1;
+    const shouldShowTabs = true; // 상단 탭은 항상 유지되어 다른 탭을 열어도 꺼지지 않음
 
     return (
       <div
@@ -681,7 +684,7 @@ export default function App() {
         onDrop={() => handleTabDrop(panelType)}
       >
         {shouldShowTabs && (
-          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "35px" }}>
+          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "36px" }}>
             {tabs.map(tId => {
               const tabLabel = TAB_LABELS[tId];
 
@@ -689,7 +692,7 @@ export default function App() {
                 <div
                   key={tId}
                   draggable
-                  onDragStart={(e) => {
+                  onDragStart={() => {
                     setDraggedTab({ id: tId, from: panelType });
                     setTimeout(() => setIsDraggingTab(true), 0);
                   }}
@@ -938,7 +941,7 @@ export default function App() {
       )}
 
       <div
-        className="flex-1 flex flex-col overflow-hidden relative"
+        className="flex-1 flex flex-col overflow-hidden relative rounded-2xl"
         style={{
           background: SIDEBAR_BG,
           boxShadow: "0 2px 4px rgba(0,0,0,0.25), 0 12px 48px rgba(0,0,0,0.35)",

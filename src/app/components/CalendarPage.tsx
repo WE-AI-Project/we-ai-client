@@ -1,8 +1,8 @@
-﻿import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Calendar, Plus, X, ChevronLeft, ChevronRight,
-  User, Flag, CheckCircle2, Clock, Circle, Tag,
-  Edit2, Trash2, Save, AlertCircle, Loader2,
+  User, Flag, Circle,
+  Edit2, Trash2, Save,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,8 +27,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  BRIGHT_BEIGE, CREAM, PANEL_BG, CONTENT_BG, BEIGE,
-  GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  BRIGHT_BEIGE, CREAM, CONTENT_BG, BEIGE,
 } from "../colors";
 
 function mapBackendDepartmentToDept(dept?: string): Dept {
@@ -182,7 +181,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
     const finalDept = isCustomDept ? customDept.trim() : form.department;
     if (!finalDept) {
-      alert("추가하실 부서명을 입력해주세요.");
+      toast.error("추가하실 부서명을 입력해주세요.");
       return;
     }
 
@@ -465,7 +464,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
         <div className="flex gap-2 px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
           <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: BEIGE, color: TEXT_SECONDARY }}>
-            취소
+            작성 취소
           </button>
           <button
             type="button"
@@ -479,7 +478,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
             }}
           >
             <Save className="w-3.5 h-3.5" />
-            저장
+            일정 저장하기
           </button>
         </div>
       </div>
@@ -573,7 +572,6 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   const [statusFilter, setStatusFilter] = useState<ScheduleStatus | "전체">("전체");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
-  const [view, setView] = useState<"month" | "list">("month");
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -797,13 +795,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   };
 
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: GRADIENT_ORB_2, filter: "blur(50px)" }} />
-      </div>
-
+    <div className="w-full h-full flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 flex overflow-hidden h-full">
 
         {/* ══ 왼쪽: 사이드 패널 ══ */}
@@ -1085,13 +1077,14 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
             {/* 날짜 셀 그리드 */}
             <div
-              className="grid grid-cols-7 flex-1 gap-px"
+              className="grid grid-cols-7 flex-1 gap-px rounded-lg overflow-hidden border"
               style={{
                 background: BORDER,
-                gridTemplateRows: `repeat(${totalCells / 7}, 115px)`,
+                gridTemplateRows: `repeat(${totalCells / 7}, minmax(80px, 1fr))`,
                 height: "100%",
                 minHeight: 0,
-                overflowY: "auto"
+                overflowY: "auto",
+                borderColor: BORDER,
               }}
             >
               {isLoading ? (
