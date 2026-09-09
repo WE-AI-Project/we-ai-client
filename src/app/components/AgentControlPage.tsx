@@ -1,9 +1,18 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, RotateCw, Terminal } from "lucide-react";
+import { Bot, RotateCw, Terminal, Plug, Loader2, CheckCircle2, XCircle, KeyRound, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "sonner";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
 } from "../colors";
+import {
+  loadCustomEndpointConfig,
+  saveCustomEndpointConfig,
+  testCustomEndpointConnection,
+  type CustomEndpointConfig,
+  type CustomEndpointDialect,
+  type CustomEndpointTestResult,
+} from "../lib/customEndpoint";
 
 // ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -105,6 +114,243 @@ function AgentToggle({ agent, onToggle }: { agent: Agent; onToggle: () => void }
   );
 }
 
+const DIALECT_LABEL: Record<CustomEndpointDialect, string> = {
+  "ollama-native": "Ollama (네이티브)",
+  "openai-compatible": "OpenAI 호환 (vLLM, LM Studio 등)",
+};
+
+// ── 커스텀 AI 엔드포인트 설정 카드 ──
+// 사용자가 기본 백엔드 대신 신뢰하는 다른 서버(팀원의 로컬 Ollama, ngrok 주소 등)로
+// 직접 AI 요청을 보낼 수 있게 하는 설정 UI. 실제 저장/헬스체크/호출 로직은
+// ../lib/customEndpoint.ts에 있으며, Electron 환경에서는 electron/main.cjs가
+// 메인 프로세스에서 안전하게 처리한다(API 키는 렌더러로 다시 노출되지 않음).
+function CustomEndpointCard() {
+  const [expanded, setExpanded] = useState(false);
+  const [loaded, setLoaded] = useState<CustomEndpointConfig | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [dialect, setDialect] = useState<CustomEndpointDialect>("ollama-native");
+  const [model, setModel] = useState("llama3.1");
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<CustomEndpointTestResult | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadCustomEndpointConfig().then(cfg => {
+      setLoaded(cfg);
+      setEnabled(cfg.enabled);
+      setBaseUrl(cfg.baseUrl);
+      setDialect(cfg.dialect);
+      setModel(cfg.model);
+      if (cfg.enabled || cfg.baseUrl) setExpanded(true);
+    });
+  }, []);
+
+  const healthPath = dialect === "openai-compatible" ? "/v1/models" : "/api/tags";
+
+  const handleTest = async () => {
+    if (!baseUrl.trim()) {
+      toast.error("먼저 서버 주소를 입력해 주세요.");
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await testCustomEndpointConnection({ baseUrl, healthPath, apiKey: apiKeyInput || undefined });
+      setTestResult(result);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (enabled && !baseUrl.trim()) {
+      toast.error("사용하려면 서버 주소가 필요합니다.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await saveCustomEndpointConfig({
+        enabled,
+        baseUrl,
+        dialect,
+        healthPath,
+        model,
+        apiKey: apiKeyInput.length > 0 ? apiKeyInput : undefined,
+      });
+      setLoaded(saved);
+      setApiKeyInput("");
+      toast.success("커스텀 엔드포인트 설정이 저장되었습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveKey = async () => {
+    setSaving(true);
+    try {
+      const saved = await saveCustomEndpointConfig({ enabled, baseUrl, dialect, healthPath, model, apiKey: null });
+      setLoaded(saved);
+      toast.success("저장된 API 키를 삭제했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden shrink-0"
+      style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
+    >
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-2.5 px-4 py-3 text-left"
+      >
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_BG }}>
+          <Plug className="w-4 h-4" style={{ color: ACCENT }} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>커스텀 AI 엔드포인트</p>
+          <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+            {loaded?.enabled && loaded.baseUrl ? `사용 중 · ${loaded.baseUrl}` : "기본 서버 대신 다른 AI 서버를 연결합니다"}
+          </p>
+        </div>
+        <span
+          className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+          style={{
+            background: loaded?.enabled ? "rgba(90,138,74,0.10)" : "rgba(0,0,0,0.06)",
+            color: loaded?.enabled ? "#5A8A4A" : TEXT_TERTIARY,
+          }}
+        >
+          {loaded?.enabled ? "ON" : "OFF"}
+        </span>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} /> : <ChevronDown className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 pt-1 space-y-3" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
+          <div className="flex items-center justify-between pt-3">
+            <div>
+              <p className="text-[10.5px] font-semibold" style={{ color: TEXT_PRIMARY }}>이 엔드포인트 사용</p>
+              <p className="text-[9.5px]" style={{ color: TEXT_TERTIARY }}>켜면 AI 채팅 요청이 아래 서버로 직접 전송됩니다 (프로젝트 문서 검색은 지원되지 않습니다)</p>
+            </div>
+            <button
+              onClick={() => setEnabled(v => !v)}
+              className="relative w-10 h-5 rounded-full transition-all shrink-0"
+              style={{ background: enabled ? "#10b981" : "rgba(0,0,0,0.14)" }}
+            >
+              <div className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all" style={{ left: enabled ? "calc(100% - 1.125rem)" : "0.125rem" }} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <label className="col-span-2 space-y-1">
+              <span className="text-[9.5px] font-semibold" style={{ color: TEXT_LABEL }}>서버 주소 (Base URL)</span>
+              <input
+                value={baseUrl}
+                onChange={e => { setBaseUrl(e.target.value); setTestResult(null); }}
+                placeholder="http://192.168.0.10:11434 또는 https://xxxx.ngrok-free.app"
+                className="w-full px-2.5 py-1.5 text-[11px] rounded-lg outline-none font-mono"
+                style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-[9.5px] font-semibold" style={{ color: TEXT_LABEL }}>API 방언</span>
+              <select
+                value={dialect}
+                onChange={e => setDialect(e.target.value as CustomEndpointDialect)}
+                className="w-full px-2.5 py-1.5 text-[11px] rounded-lg outline-none"
+                style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              >
+                {(Object.keys(DIALECT_LABEL) as CustomEndpointDialect[]).map(d => (
+                  <option key={d} value={d}>{DIALECT_LABEL[d]}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-[9.5px] font-semibold" style={{ color: TEXT_LABEL }}>모델명</span>
+              <input
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                placeholder="llama3.1"
+                className="w-full px-2.5 py-1.5 text-[11px] rounded-lg outline-none font-mono"
+                style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              />
+            </label>
+
+            <label className="col-span-2 space-y-1">
+              <span className="text-[9.5px] font-semibold flex items-center gap-1" style={{ color: TEXT_LABEL }}>
+                <KeyRound className="w-2.5 h-2.5" /> API 키 (선택 — 프록시/터널에 인증이 있는 경우만)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={apiKeyInput}
+                  onChange={e => setApiKeyInput(e.target.value)}
+                  type="password"
+                  placeholder={loaded?.hasApiKey ? "저장된 키가 있습니다 · 새 값 입력 시 교체" : "비워두면 인증 없이 연결"}
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-[11px] rounded-lg outline-none font-mono"
+                  style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                />
+                {loaded?.hasApiKey && (
+                  <button
+                    onClick={handleRemoveKey}
+                    disabled={saving}
+                    className="shrink-0 text-[9px] font-semibold px-2 py-1.5 rounded-lg hover:bg-black/[0.06]"
+                    style={{ color: "#B85450" }}
+                  >
+                    키 삭제
+                  </button>
+                )}
+              </div>
+            </label>
+          </div>
+
+          {testResult && (
+            <div
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-[10px]"
+              style={{
+                background: testResult.ok ? "rgba(90,138,74,0.08)" : "rgba(184,84,80,0.08)",
+                color: testResult.ok ? "#5A8A4A" : "#B85450",
+              }}
+            >
+              {testResult.ok ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <XCircle className="w-3 h-3 shrink-0" />}
+              {testResult.ok
+                ? `연결 성공 · ${testResult.latencyMs}ms${testResult.modelsFound != null ? ` · 모델 ${testResult.modelsFound}개 발견` : ""}`
+                : testResult.reason}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleTest}
+              disabled={testing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:bg-black/[0.04]"
+              style={{ border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+            >
+              {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plug className="w-3 h-3" />}
+              연결 테스트
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all ml-auto"
+              style={{ background: ACCENT, color: "white", border: `1px solid ${ACCENT_BORDER}` }}
+            >
+              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              저장
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AgentControlPage() {
   const [agents, setAgents]           = useState(INITIAL_AGENTS);
   const [selectedAgent, setSelected]  = useState<string | null>(null);
@@ -199,6 +445,9 @@ export function AgentControlPage() {
               )}
             </div>
           </div>
+
+          {/* ── 커스텀 AI 엔드포인트 설정 ── */}
+          <CustomEndpointCard />
 
           {/* ── 에이전트 카드 목록 ── */}
           <div className="grid grid-cols-2 gap-3 shrink-0">

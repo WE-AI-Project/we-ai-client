@@ -1,5 +1,6 @@
 import { ApiError, request } from "../app/lib/api";
 import type { CommitFile } from "../app/components/commitData";
+import { callCustomEndpointIfEnabled } from "../app/lib/customEndpoint";
 
 export type DebateTurn = {
   round?: number;
@@ -248,6 +249,14 @@ export async function runAiQa(request: QaRequest): Promise<QaResponse> {
 }
 
 export async function runAiChat(request: AiChatRequest): Promise<AiChatResponse> {
+  // 커스텀 엔드포인트가 설정·활성화되어 있으면 우리 백엔드 대신 그쪽으로 직접 질의한다.
+  // 주의: 이 경로에서는 우리 백엔드가 해주는 프로젝트 문서 기반 RAG 컨텍스트 검색이
+  // 빠지므로 항상 contexts: []로 반환된다 — 호출부에서 이를 구분해 안내해야 한다.
+  const customResult = await callCustomEndpointIfEnabled(request.question);
+  if (customResult) {
+    return { answer: customResult.answer, contexts: [] };
+  }
+
   return aiRequest<AiChatResponse>("/api/v1/ai/chat", {
     method: "POST",
     body: {
