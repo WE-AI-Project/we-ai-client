@@ -160,6 +160,12 @@ function formatAiChatAnswer(response: AiChatResponse): string {
   const answer = response.answer?.trim();
   const contexts = (response.contexts ?? []).filter(Boolean);
 
+  // 커스텀 엔드포인트 응답은 애초에 프로젝트 문서 RAG를 거치지 않으므로 항상 contexts가
+  // 비어있다 — "표본 부족" 경고는 백엔드 RAG 응답에만 의미가 있으므로 여기선 생략한다.
+  if (response.source === "custom-endpoint") {
+    return compactAiAnswer(answer || "답변");
+  }
+
   if (!answer && contexts.length === 0) {
     return "주의: 충분한 프로젝트의 표본이 없습니다.";
   }

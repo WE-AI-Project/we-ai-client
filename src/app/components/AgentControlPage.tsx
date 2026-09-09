@@ -181,7 +181,11 @@ function CustomEndpointCard() {
       });
       setLoaded(saved);
       setApiKeyInput("");
-      toast.success("커스텀 엔드포인트 설정이 저장되었습니다.");
+      if (saved.keySaveFailed) {
+        toast.error("다른 설정은 저장됐지만, 이 기기에서는 API 키를 안전하게 저장할 수 없어 키는 저장되지 않았습니다.");
+      } else {
+        toast.success("커스텀 엔드포인트 설정이 저장되었습니다.");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
     } finally {

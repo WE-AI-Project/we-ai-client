@@ -111,6 +111,8 @@ export type AiChatRequest = {
 export type AiChatResponse = {
   answer: string;
   contexts?: string[];
+  /** "custom-endpoint"면 프로젝트 문서 RAG 검색을 거치지 않은 응답이라는 뜻 (contexts는 항상 빈 배열) */
+  source?: "backend" | "custom-endpoint";
 };
 
 export class AiApiError extends Error {
@@ -254,7 +256,7 @@ export async function runAiChat(request: AiChatRequest): Promise<AiChatResponse>
   // 빠지므로 항상 contexts: []로 반환된다 — 호출부에서 이를 구분해 안내해야 한다.
   const customResult = await callCustomEndpointIfEnabled(request.question);
   if (customResult) {
-    return { answer: customResult.answer, contexts: [] };
+    return { answer: customResult.answer, contexts: [], source: "custom-endpoint" };
   }
 
   return aiRequest<AiChatResponse>("/api/v1/ai/chat", {

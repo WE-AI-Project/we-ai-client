@@ -130,19 +130,25 @@ ipcMain.handle("custom-endpoint:save", async (_event, draft) => {
   };
 
   // apiKey는 저장 폼에서 값이 입력됐을 때만 전달됨 (빈 문자열=변경 안 함, null=삭제)
+  let keySaveFailed = false;
   if (draft.apiKey === null) {
     next.apiKeyEncrypted = undefined;
   } else if (typeof draft.apiKey === "string" && draft.apiKey.length > 0) {
-    next.apiKeyEncrypted = safeStorage.isEncryptionAvailable()
-      ? safeStorage.encryptString(draft.apiKey).toString("base64")
-      : undefined; // 이 머신에서 암호화를 못 쓰면 평문 저장 대신 아예 저장하지 않음
+    if (safeStorage.isEncryptionAvailable()) {
+      next.apiKeyEncrypted = safeStorage.encryptString(draft.apiKey).toString("base64");
+    } else {
+      // 이 머신에서 OS 자격 증명 저장소를 못 쓰는 경우 — 평문 저장 대신 아예 저장하지 않고,
+      // 렌더러가 사용자에게 알릴 수 있도록 실패 사실을 응답에 명시한다.
+      next.apiKeyEncrypted = undefined;
+      keySaveFailed = true;
+    }
   }
 
   await fs.mkdir(path.dirname(CUSTOM_ENDPOINT_FILE), { recursive: true });
   await fs.writeFile(CUSTOM_ENDPOINT_FILE, JSON.stringify(next, null, 2), "utf-8");
 
   const { apiKeyEncrypted, ...safe } = next;
-  return { ...safe, hasApiKey: Boolean(apiKeyEncrypted) };
+  return { ...safe, hasApiKey: Boolean(apiKeyEncrypted), keySaveFailed };
 });
 
 // 저장 "전" 테스트 — 폼에 입력된(아직 저장 안 된) 값을 그대로 검증한다.
@@ -186,29 +192,41 @@ ipcMain.handle("custom-endpoint:call", async (_event, prompt) => {
   const headers = { "Content-Type": "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) };
   const baseUrl = cfg.baseUrl.replace(/\/+$/, "");
 
-  if (cfg.dialect === "openai-compatible") {
+  try {
+    if (cfg.dialect === "openai-compatible") {
+      const res = await fetchWithTimeout(
+        `${baseUrl}/v1/chat/completions`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ model: cfg.model, messages: [{ role: "user", content: prompt }], stream: false }),
+        },
+        60000
+      );
+      if (!res.ok) throw new Error(`커스텀 엔드포인트 응답 실패 (${res.status})`);
+      const data = await res.json().catch(() => {
+        throw new Error("커스텀 엔드포인트가 JSON이 아닌 응답을 반환했습니다.");
+      });
+      return { answer: data?.choices?.[0]?.message?.content ?? "" };
+    }
+
     const res = await fetchWithTimeout(
-      `${baseUrl}/v1/chat/completions`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ model: cfg.model, messages: [{ role: "user", content: prompt }], stream: false }),
-      },
+      `${baseUrl}/api/generate`,
+      { method: "POST", headers, body: JSON.stringify({ model: cfg.model, prompt, stream: false }) },
       60000
     );
     if (!res.ok) throw new Error(`커스텀 엔드포인트 응답 실패 (${res.status})`);
-    const data = await res.json();
-    return { answer: data?.choices?.[0]?.message?.content ?? "" };
+    const data = await res.json().catch(() => {
+      throw new Error("커스텀 엔드포인트가 JSON이 아닌 응답을 반환했습니다.");
+    });
+    return { answer: data?.response ?? "" };
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new Error("커스텀 엔드포인트가 60초 내 응답하지 않았습니다. 서버 상태나 모델 크기를 확인해 주세요.");
+    }
+    if (err instanceof Error) throw err;
+    throw new Error("커스텀 엔드포인트 호출 중 알 수 없는 오류가 발생했습니다.");
   }
-
-  const res = await fetchWithTimeout(
-    `${baseUrl}/api/generate`,
-    { method: "POST", headers, body: JSON.stringify({ model: cfg.model, prompt, stream: false }) },
-    60000
-  );
-  if (!res.ok) throw new Error(`커스텀 엔드포인트 응답 실패 (${res.status})`);
-  const data = await res.json();
-  return { answer: data?.response ?? "" };
 });
 
 app.whenReady().then(() => {

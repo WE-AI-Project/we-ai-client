@@ -20,6 +20,8 @@ export type CustomEndpointConfig = {
   healthPath: string;
   model: string;
   hasApiKey: boolean;
+  /** true면 방금 입력한 API 키가 이 기기에서 암호화 저장소를 쓸 수 없어 저장되지 못했다는 뜻 */
+  keySaveFailed?: boolean;
 };
 
 export type CustomEndpointSaveDraft = {
