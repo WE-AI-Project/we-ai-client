@@ -1377,8 +1377,9 @@ export function ChangesPage({
       {/* ── 컨벤션 가드 모달 ── */}
       {showConvention && (
         <ConventionGuardModal
-          stagedFiles={stagedFiles.map((f) => f.name)}
-          userName="시연용 마스터"
+          projectId={projectId ?? 0}
+          stagedFiles={stagedFiles.map((f) => ({ name: f.name, path: f.path }))}
+          userName={loadSession()?.username}
           onIgnore={handleConventionIgnore}
           onFix={handleConventionFix}
           onClose={() => setShowConvention(false)}

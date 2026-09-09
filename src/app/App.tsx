@@ -615,23 +615,23 @@ export default function App() {
   const renderPage = (nav: NavId) => {
     switch (nav) {
       case "Dashboard": return <DashboardPage projectId={projectId} projectName={projectName} />;
-      case "Changes": return <ChangesPage projectId={projectId ?? 0} onNavigateQA={handleNavigateQA} />;
+      case "Changes": return <ChangesPage projectId={projectId} onNavigateQA={handleNavigateQA} />;
       case "Commits": return <CommitDiffPage projectId={projectId} />;
       case "ServerBuild": return <ServerBuildPage projectId={projectId} />;
       case "Chat":
         return (
           <ChatPage
-            projectId={projectId ?? 0}
+            projectId={projectId}
             currentUserId={currentUser?.id}
             onDocsUpdate={setDocCount}
             onUnreadUpdate={setUnreadChatCount}
           />
         );
-      case "Calendar": return <CalendarPage projectId={projectId ?? 1} />;
+      case "Calendar": return <CalendarPage projectId={projectId} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
-      case "AIQA": return <AIQAPage projectId={projectId ?? 0} />;
+      case "AIQA": return <AIQAPage projectId={projectId} />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
-      case "Profile": return <ProfilePage projectId={projectId ?? 1} />;
+      case "Profile": return <ProfilePage projectId={projectId} />;
       case "Galaxy": return <SynAIpseGalaxyPage />;
       case "Notifications": return <NotificationsPage projectId={projectId} />;
       case "Tasks": return <TasksPage projectId={projectId} />;
@@ -903,11 +903,11 @@ export default function App() {
 
   return (
     <div className="size-full flex p-3" style={{ background: GRADIENT_OUTER }}>
-      {showStandup && (
+      {showStandup && projectId != null && (
         <DailyStandupModal
           userName={sidebarProfile.displayName}
           userPart={sidebarProfile.role}
-          projectId={projectId ?? 0}
+          projectId={projectId}
           onClose={() => setShowStandup(false)}
           onNavigate={handleStandupNavigate}
         />

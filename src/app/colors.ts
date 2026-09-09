@@ -130,7 +130,7 @@ export const TRAFFIC_GREEN  = "#28ca41";
 // ── 버튼/서피스 ────────────────────────────────────────────
 export const BTN_DARK       = "#1c1c1e";   // 다크 버튼 배경
 // TODO: 아래 두 값은 구 올리브 팔레트 원본 hex가 그대로 남아있음(신규 네이비/인디고 팔레트로 미이관).
-// 사용처(WeAIDashboard.tsx 등)가 여전히 라이트 배경 전제로 짜여 있어, 값만 바꾸면 그 화면들이 깨진다.
+// 사용처가 여전히 라이트 배경 전제로 짜여 있어, 값만 바꾸면 그 화면들이 깨진다.
 // 값 교체는 해당 사용처 전체를 다크 배경으로 맞추는 별도 작업으로 처리할 것.
 export const CTA_BG         = "#2A2C10";   // CTA 배경 — legacy 올리브 hex, 미이관
 export const OLIVE_DARK_BG  = "#212308";   // 배경 — legacy 올리브 hex, 미이관

@@ -4,7 +4,7 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle,
   Loader2, Bot, Monitor, Play, RotateCw,
   FileCode, GitCommit, Clock, ChevronDown,
-  ChevronUp, User, Calendar, MousePointer, Video,
+  ChevronUp, Calendar, MousePointer, Video,
   Bell, Code2, Film, X, Globe, Home,
   Settings, GitPullRequest,
 } from "lucide-react";
@@ -18,6 +18,13 @@ import {
   generateLocalSemanticQaAnalysis,
   type QaResponse,
 } from "../../api/aiApi";
+import {
+  fetchQaReports,
+  fetchQaReportDetail,
+  type QaReportSummary,
+  type QaReportDetail,
+  type QaReportStatus,
+} from "../lib/api";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
@@ -78,73 +85,13 @@ type Notification = {
   severity:  Severity;
 };
 
-// ── 커밋 QA 상태 ──
-type CommitQAStatus = "passed" | "failed" | "partial" | "pending" | "skipped";
-type CommitQAResult = {
-  id: string; hash: string; message: string; author: string;
-  date: string; branch: string; qaStatus: CommitQAStatus;
-  parts: { name: string; status: CommitQAStatus; tests: number; passed: number; failed: number; note?: string }[];
-};
-
-const COMMIT_QA_DATA: CommitQAResult[] = [
-  {
-    id:"c1", hash:"a3f9d21", message:"Refactored Multi-Agent communication logic",
-    author:"병권", date:"2025-03-31 14:22", branch:"feat/multi-agent",
-    qaStatus:"failed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"failed",  tests:8,  passed:6,  failed:2, note:"ParserAgent NullPointerException" },
-      { name:"Frontend (React/TS)",   status:"passed",  tests:5,  passed:5,  failed:0 },
-      { name:"Agent Integration",     status:"partial", tests:4,  passed:3,  failed:1, note:"DataSync ↔ Classifier handshake 타임아웃" },
-    ],
-  },
-  {
-    id:"c2", hash:"b7c3e18", message:"Fixed JDK 17 toolchain issue in settings.gradle",
-    author:"병권", date:"2025-03-31 11:05", branch:"fix/toolchain",
-    qaStatus:"passed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"passed", tests:8, passed:8, failed:0 },
-      { name:"Frontend (React/TS)",   status:"passed", tests:5, passed:5, failed:0 },
-      { name:"Agent Integration",     status:"passed", tests:4, passed:4, failed:0 },
-    ],
-  },
-  {
-    id:"c3", hash:"d2a1f45", message:"Added DataSyncAgent retry mechanism",
-    author:"병권", date:"2025-03-30 19:47", branch:"feat/agent-retry",
-    qaStatus:"passed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"passed",  tests:12, passed:12, failed:0 },
-      { name:"Frontend (React/TS)",   status:"skipped", tests:0,  passed:0,  failed:0, note:"해당 없음" },
-      { name:"Agent Integration",     status:"passed",  tests:6,  passed:6,  failed:0 },
-    ],
-  },
-  {
-    id:"c4", hash:"e5b8c72", message:"Updated AgentScheduler queue flush logic",
-    author:"병권", date:"2025-03-30 15:30", branch:"fix/scheduler",
-    qaStatus:"partial",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"partial", tests:6, passed:4, failed:2, note:"ConcurrentModificationException (risk)" },
-      { name:"Frontend (React/TS)",   status:"passed",  tests:3, passed:3, failed:0 },
-      { name:"Agent Integration",     status:"skipped", tests:0, passed:0, failed:0, note:"스케줄러 격리 테스트 미완성" },
-    ],
-  },
-  {
-    id:"c5", hash:"f1d7a09", message:"Initial project setup — Spring Boot 3.2.5",
-    author:"병권", date:"2025-03-29 10:00", branch:"main",
-    qaStatus:"passed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"passed", tests:4, passed:4, failed:0 },
-      { name:"Frontend (React/TS)",   status:"passed", tests:4, passed:4, failed:0 },
-      { name:"Agent Integration",     status:"passed", tests:2, passed:2, failed:0 },
-    ],
-  },
-];
-
-const QA_STATUS_META: Record<CommitQAStatus, { color: string; bg: string; label: string; icon: any }> = {
-  passed:  { color:"#10b981", bg:"rgba(16,185,129,0.10)",  label:"Passed",  icon:CheckCircle2  },
-  failed:  { color:"#ef4444", bg:"rgba(239,68,68,0.10)",   label:"Failed",  icon:XCircle       },
-  partial: { color:"#f59e0b", bg:"rgba(245,158,11,0.10)",  label:"Partial", icon:AlertTriangle },
-  pending: { color:"#9b9b9b", bg:"rgba(0,0,0,0.06)",       label:"Pending", icon:Clock         },
-  skipped: { color:"#7d7f5b", bg:"rgba(125,127,91,0.10)",  label:"Skipped", icon:ChevronDown   },
+// ── 커밋 QA 상태 (실제 백엔드 QaReportStatus 기반) ──
+const QA_STATUS_META: Record<QaReportStatus, { color: string; bg: string; label: string; icon: any }> = {
+  SUCCESS:  { color:"#10b981", bg:"rgba(16,185,129,0.10)",  label:"Success",  icon:CheckCircle2  },
+  FAILED:   { color:"#ef4444", bg:"rgba(239,68,68,0.10)",   label:"Failed",   icon:XCircle       },
+  RUNNING:  { color:"#3b82f6", bg:"rgba(59,130,246,0.10)",  label:"Running",  icon:Loader2       },
+  PENDING:  { color:"#9b9b9b", bg:"rgba(0,0,0,0.06)",       label:"Pending",  icon:Clock         },
+  CANCELED: { color:"#7d7f5b", bg:"rgba(125,127,91,0.10)",  label:"Canceled", icon:XCircle       },
 };
 
 // ── Phase 1: AI QA 응답 → 정적 분석 오류 목록으로 변환 ──
@@ -700,34 +647,42 @@ function LiveScreenManipulationPlayer({
 
 // ── CommitQARow ──
 function CommitQARow({
-  commit,
-  onRunQA,
+  projectId,
+  report,
 }: {
-  commit: CommitQAResult;
-  onRunQA?: (commit: CommitQAResult) => void;
+  projectId: number;
+  report: QaReportSummary;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [running, setRunning] = useState(false);
-  const sm  = QA_STATUS_META[commit.qaStatus];
+  const [detail, setDetail] = useState<QaReportDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const sm  = QA_STATUS_META[report.status];
   const Icon  = sm.icon;
-  const total = commit.parts.reduce((a,p) => a + p.tests,  0);
-  const pass  = commit.parts.reduce((a,p) => a + p.passed, 0);
+  const totalTests = report.testPassCount + report.testFailCount;
+  const createdLabel = (() => {
+    const d = new Date(report.createdAt);
+    return Number.isNaN(d.getTime()) ? report.createdAt : d.toLocaleString("ko-KR");
+  })();
 
-  const handleCommitQA = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRunning(true);
-    setTimeout(() => {
-      setRunning(false);
-      if (onRunQA) onRunQA(commit);
-      toast.success(`커밋 #${commit.hash} AI QA 검증이 완료되었습니다.`);
-    }, 1200);
+  const toggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && !detail && !detailLoading) {
+      setDetailLoading(true);
+      setDetailError(null);
+      fetchQaReportDetail(projectId, report.qaReportId)
+        .then(setDetail)
+        .catch((err: any) => setDetailError(err?.message || "QA 리포트 상세 조회에 실패했습니다."))
+        .finally(() => setDetailLoading(false));
+    }
   };
 
   return (
     <div style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-        onClick={() => setExpanded(e => !e)}
+        onClick={toggle}
         onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.015)")}
         onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
       >
@@ -737,44 +692,17 @@ function CommitQARow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold" style={{ background:"rgba(0,0,0,0.05)", color:ACCENT }}>
-              #{commit.hash}
-            </span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:TEXT_SECONDARY }}>
-              {commit.branch}
+              #{report.commitId}
             </span>
           </div>
-          <p className="text-[11px] mt-0.5 truncate font-medium" style={{ color:TEXT_PRIMARY }}>{commit.message}</p>
+          <p className="text-[11px] mt-0.5 truncate font-medium" style={{ color:TEXT_PRIMARY }}>{report.commitMessage}</p>
           <div className="flex items-center gap-3 mt-0.5 text-[9px]" style={{ color:TEXT_TERTIARY }}>
-            <span className="flex items-center gap-1"><User className="w-2.5 h-2.5" />{commit.author}</span>
-            <span className="flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />{commit.date}</span>
-            {total > 0 && <span className="flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5" />{pass}/{total}</span>}
+            <span className="flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />{createdLabel}</span>
+            {totalTests > 0 && <span className="flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5" />{report.testPassCount}/{totalTests}</span>}
+            {report.totalIssueCount > 0 && <span>이슈 {report.totalIssueCount}건{report.criticalCount > 0 ? ` (심각 ${report.criticalCount})` : ""}</span>}
           </div>
         </div>
 
-        {/* 개별 커밋 QA 실행 버튼 */}
-        <button
-          type="button"
-          onClick={handleCommitQA}
-          disabled={running}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all shrink-0"
-          style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
-          onMouseEnter={e => (e.currentTarget.style.background = "rgba(65,67,27,0.14)")}
-          onMouseLeave={e => (e.currentTarget.style.background = ACCENT_BG)}
-        >
-          {running ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Play className="w-2.5 h-2.5" />}
-          QA 실행
-        </button>
-
-        <div className="hidden sm:flex items-center gap-1 shrink-0">
-          {commit.parts.map(p => {
-            const psm = QA_STATUS_META[p.status]; const PI = psm.icon;
-            return (
-              <div key={p.name} className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background:psm.bg }} title={p.name}>
-                <PI className="w-2.5 h-2.5" style={{ color:psm.color }} />
-              </div>
-            );
-          })}
-        </div>
         <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ background:sm.bg, color:sm.color }}>
           {sm.label}
         </span>
@@ -785,34 +713,48 @@ function CommitQARow({
 
       {expanded && (
         <div className="px-4 pb-3" style={{ borderTop:`1px solid ${BORDER_SUBTLE}`, background:"rgba(0,0,0,0.015)" }}>
-          <div className="pt-3 space-y-2">
-            {commit.parts.map(part => {
-              const psm = QA_STATUS_META[part.status]; const pct = part.tests > 0 ? Math.round((part.passed / part.tests)*100) : 0; const PI = psm.icon;
-              return (
-                <div key={part.name} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background:psm.bg }}>
-                    <PI className="w-3 h-3" style={{ color:psm.color }} />
+          {detailLoading ? (
+            <div className="pt-3 space-y-2">
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-3 w-3/4" />
+            </div>
+          ) : detailError ? (
+            <p className="pt-3 text-[10px]" style={{ color:"#ef4444" }}>{detailError}</p>
+          ) : detail && (detail.issues.length > 0 || detail.testResults.length > 0) ? (
+            <div className="pt-3 space-y-2">
+              {detail.summary && <p className="text-[10px]" style={{ color:TEXT_SECONDARY }}>{detail.summary}</p>}
+              {detail.issues.map(issue => (
+                <div key={issue.issueId} className="rounded-xl px-3 py-2.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: issue.severity === "CRITICAL" ? "rgba(239,68,68,0.10)" : issue.severity === "MAJOR" ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.06)",
+                        color: issue.severity === "CRITICAL" ? "#ef4444" : issue.severity === "MAJOR" ? "#f59e0b" : TEXT_TERTIARY,
+                      }}
+                    >{issue.severity}</span>
+                    <p className="text-[10px] font-semibold flex-1 min-w-0 truncate" style={{ color:TEXT_PRIMARY }}>{issue.title}</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>{part.name}</p>
-                    {part.note && <p className="text-[9px] mt-0.5" style={{ color:TEXT_TERTIARY }}>{part.note}</p>}
-                    {part.tests > 0 && (
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background:"rgba(0,0,0,0.08)" }}>
-                          <div className="h-full rounded-full" style={{ width:`${pct}%`, background:part.failed>0?"linear-gradient(90deg,#10b981,#ef4444)":"#10b981" }} />
-                        </div>
-                        <span className="text-[9px] shrink-0 font-mono" style={{ color:TEXT_TERTIARY }}>{part.passed}/{part.tests}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[9px] shrink-0">
-                    {part.tests > 0 && <><span style={{ color:"#10b981" }}>✓{part.passed}</span>{part.failed>0&&<span style={{ color:"#ef4444" }}>✗{part.failed}</span>}</>}
-                    <span className="px-1.5 py-0.5 rounded-full font-semibold" style={{ background:psm.bg, color:psm.color }}>{psm.label}</span>
-                  </div>
+                  {issue.filePath && (
+                    <p className="text-[9px] mt-1 font-mono" style={{ color:TEXT_TERTIARY }}>
+                      {issue.filePath}{issue.lineNumber ? `:${issue.lineNumber}` : ""}
+                    </p>
+                  )}
+                  {issue.description && <p className="text-[9px] mt-1" style={{ color:TEXT_SECONDARY }}>{issue.description}</p>}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+              {detail.testResults.map((t, i) => (
+                <div key={i} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
+                  <span className="text-[10px]" style={{ color:TEXT_PRIMARY }}>{t.testName}</span>
+                  <span className="text-[9px] font-semibold" style={{ color: t.status === "PASSED" ? "#10b981" : t.status === "FAILED" ? "#ef4444" : TEXT_TERTIARY }}>
+                    {t.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="pt-3 text-[10px]" style={{ color:TEXT_TERTIARY }}>세부 이슈/테스트 결과가 없습니다.</p>
+          )}
         </div>
       )}
     </div>
@@ -860,8 +802,23 @@ export function AIQAPage({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotif,     setShowNotif]      = useState(false);
 
-  // ── 커밋 탭 필터 ──
-  const [commitFilter, setCommitFilter] = useState<CommitQAStatus | "all">("all");
+  // ── 커밋 탭: 실제 QA 리포트 이력 ──
+  const [commitFilter, setCommitFilter] = useState<QaReportStatus | "all">("all");
+  const [commitReports, setCommitReports] = useState<QaReportSummary[]>([]);
+  const [commitReportsLoading, setCommitReportsLoading] = useState(false);
+  const [commitReportsError, setCommitReportsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== "commit" || !projectId) return;
+    let cancelled = false;
+    setCommitReportsLoading(true);
+    setCommitReportsError(null);
+    fetchQaReports(projectId, { size: 50 })
+      .then((res) => { if (!cancelled) setCommitReports(res.reports); })
+      .catch((err: any) => { if (!cancelled) setCommitReportsError(err?.message || "QA 리포트를 불러오지 못했습니다."); })
+      .finally(() => { if (!cancelled) setCommitReportsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, projectId]);
 
   // ── 타이머 ──
   useEffect(() => {
@@ -898,11 +855,6 @@ export function AIQAPage({
     setPhase2Done(false);
     setNotifications([]);
     void runPhase1FromApi();
-  };
-
-  const handleSingleCommitQA = (_commit: CommitQAResult) => {
-    setActiveTab("run");
-    startQA();
   };
 
   const reset = () => {
@@ -1047,7 +999,7 @@ export function AIQAPage({
   const passedActions = actions.filter(a => a.status === "passed").length;
   const failedActions = actions.filter(a => a.status === "failed").length;
   const unreadNotif   = notifications.filter(n => !n.read).length;
-  const filteredCommits = commitFilter === "all" ? COMMIT_QA_DATA : COMMIT_QA_DATA.filter(c => c.qaStatus === commitFilter);
+  const filteredCommits = commitFilter === "all" ? commitReports : commitReports.filter(r => r.status === commitFilter);
 
   const SEV_COLOR: Record<Severity, { color: string; bg: string }> = {
     critical: { color: "#ef4444", bg: "rgba(239,68,68,0.10)"  },
@@ -1582,7 +1534,7 @@ export function AIQAPage({
           {/* ════ 커밋별 QA 탭 ════ */}
           {activeTab === "commit" && (
             <div className="space-y-3">
-              {isLoading ? (
+              {commitReportsLoading ? (
                 /* [스켈레톤] 커밋 통계 및 목록 */
                 <>
                   <div className="grid grid-cols-4 gap-2.5">
@@ -1603,11 +1555,15 @@ export function AIQAPage({
                     ))}
                   </div>
                 </>
+              ) : commitReportsError ? (
+                <div className="rounded-2xl p-6 text-center" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}` }}>
+                  <p className="text-[11px]" style={{ color:"#ef4444" }}>{commitReportsError}</p>
+                </div>
               ) : (
                 <>
                   {/* 통계 */}
                   <div className="grid grid-cols-4 gap-2.5">
-                    {([["passed","통과",COMMIT_QA_DATA.filter(c=>c.qaStatus==="passed").length,"#10b981"],["failed","실패",COMMIT_QA_DATA.filter(c=>c.qaStatus==="failed").length,"#ef4444"],["partial","부분",COMMIT_QA_DATA.filter(c=>c.qaStatus==="partial").length,"#f59e0b"],["pending","대기",COMMIT_QA_DATA.filter(c=>c.qaStatus==="pending").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
+                    {([["SUCCESS","성공",commitReports.filter(r=>r.status==="SUCCESS").length,"#10b981"],["FAILED","실패",commitReports.filter(r=>r.status==="FAILED").length,"#ef4444"],["RUNNING","진행중",commitReports.filter(r=>r.status==="RUNNING").length,"#3b82f6"],["PENDING","대기",commitReports.filter(r=>r.status==="PENDING").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
                       <button
                         key={status}
                         onClick={() => setCommitFilter(commitFilter === status ? "all" : status)}
@@ -1630,13 +1586,17 @@ export function AIQAPage({
                       <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>커밋별 QA 현황</p>
                       <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>{filteredCommits.length}</span>
                     </div>
-                    {filteredCommits.map(c => (
-                      <CommitQARow
-                        key={c.id}
-                        commit={c}
-                        onRunQA={handleSingleCommitQA}
-                      />
-                    ))}
+                    {filteredCommits.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-[10px]" style={{ color:TEXT_TERTIARY }}>표시할 QA 리포트가 없습니다.</p>
+                    ) : (
+                      filteredCommits.map(r => (
+                        <CommitQARow
+                          key={r.qaReportId}
+                          projectId={projectId ?? 0}
+                          report={r}
+                        />
+                      ))
+                    )}
                   </div>
                 </>
               )}

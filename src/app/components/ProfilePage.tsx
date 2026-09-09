@@ -155,7 +155,7 @@ function TechBadge({ name, slug, variant }: { name: string; slug: string; varian
 
 // ── 메인 ProfilePage ──
 // props로 현재 진입한 프로젝트 ID를 받도록 확장 (기본값 설정)
-export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) {
+export function ProfilePage({ projectId }: { projectId?: number | string | null }) {
   // 로딩 상태 관리를 위해 true로 시작
   const [isLoading, setIsLoading] = useState(true);
 

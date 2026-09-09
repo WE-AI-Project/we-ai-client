@@ -1735,5 +1735,82 @@ export async function checkProjectCommitConvention(
   );
 }
 
+// ── QA 리포트 (커밋별 AI QA 실행 이력) ──
+
+export type QaReportStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "CANCELED";
+
+export type QaReportSummary = {
+  qaReportId: number;
+  qaRunId: number | null;
+  commitId: string;
+  commitMessage: string;
+  status: QaReportStatus;
+  totalIssueCount: number;
+  criticalCount: number;
+  majorCount: number;
+  minorCount: number;
+  testPassCount: number;
+  testFailCount: number;
+  createdAt: string;
+};
+
+export type QaReportListResult = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  reports: QaReportSummary[];
+};
+
+export async function fetchQaReports(
+  projectId: number | string,
+  params?: { page?: number; size?: number; status?: string; commitId?: string }
+): Promise<QaReportListResult> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.status) query.set("status", params.status);
+  if (params?.commitId) query.set("commitId", params.commitId);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return request<QaReportListResult>(`/api/v1/projects/${projectId}/qa/reports${qs}`, { method: "GET" });
+}
+
+export type QaIssueSeverity = "CRITICAL" | "MAJOR" | "MINOR";
+export type QaIssueStatus = "OPEN" | "RESOLVED" | "IGNORED";
+
+export type QaIssueDetail = {
+  issueId: number;
+  severity: QaIssueSeverity;
+  title: string;
+  description: string;
+  filePath: string;
+  lineNumber: number | null;
+  suggestion: string;
+  status: QaIssueStatus;
+};
+
+export type QaTestResultDetail = {
+  testName: string;
+  testType: string;
+  status: "PASSED" | "FAILED" | "SKIPPED" | string;
+  message: string;
+  durationMs: number | null;
+};
+
+export type QaReportDetail = QaReportSummary & {
+  projectId: number;
+  summary: string;
+  issues: QaIssueDetail[];
+  testResults: QaTestResultDetail[];
+};
+
+export async function fetchQaReportDetail(
+  projectId: number | string,
+  qaReportId: number | string
+): Promise<QaReportDetail> {
+  return request<QaReportDetail>(`/api/v1/projects/${projectId}/qa/reports/${qaReportId}`, { method: "GET" });
+}
+
 
 

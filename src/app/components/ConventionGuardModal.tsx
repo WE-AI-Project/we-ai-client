@@ -2,7 +2,7 @@
 import {
   ShieldAlert, X, AlertCircle, AlertTriangle, Info,
   CheckCircle2, ChevronDown, ChevronRight,
-  RefreshCw, Zap, BookOpen, SkipForward,
+  RefreshCw, BookOpen, SkipForward,
   FileCode2, Bot,
 } from "lucide-react";
 import {
@@ -12,6 +12,7 @@ import {
   UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG,
   GRADIENT_LOGO, OLIVE_DARK,
 } from "../colors";
+import { fetchProjectChangedFileDiff } from "../lib/api";
 
 // ─────────────────────────────────────────────────────────────
 // 타입 정의
@@ -19,26 +20,28 @@ import {
 export type Severity = "error" | "warning" | "info";
 
 export type ConventionRule = {
-  id:          string;
-  name:        string;
-  category:    "naming" | "style" | "typescript" | "java" | "structure";
-  description: string;
-  severity:    Severity;
-  bad:         string;
-  good:        string;
+  id:           string;
+  name:         string;
+  category:     "naming" | "style" | "typescript" | "java" | "structure";
+  description:  string;
+  severity:     Severity;
+  bad:          string;
+  good:         string;
+  // 이 규칙이 실제 정적 분석(정규식 기반)으로 자동 감지되는지 여부.
+  // false인 규칙은 "팀 컨벤션 규칙" 탭에 참고용으로만 표시되고, 위반 목록에는 나타나지 않는다.
+  autoDetected: boolean;
 };
 
 export type Violation = {
-  id:          string;
-  ruleId:      string;
-  severity:    Severity;
-  file:        string;
-  ext:         string;
-  line:        number;
-  code:        string;        // 위반 코드 스니펫
-  suggestion:  string;        // 수정 제안 코드
-  message:     string;        // AI 설명
-  autoFixable: boolean;
+  id:         string;
+  ruleId:     string;
+  severity:   Severity;
+  file:       string;
+  ext:        string;
+  line:       number;
+  code:       string;   // 실제 diff에서 추출한 위반 코드 라인
+  suggestion: string;   // 규칙 기반 자동 치환 제안
+  message:    string;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -47,76 +50,76 @@ export type Violation = {
 export const CONVENTION_RULES: ConventionRule[] = [
   // ── Naming ──
   {
-    id: "N001", name: "변수명 camelCase", category: "naming", severity: "error",
+    id: "N001", name: "변수명 camelCase", category: "naming", severity: "error", autoDetected: true,
     description: "변수와 함수 이름은 camelCase를 사용합니다. snake_case는 금지입니다.",
     bad:  "String agent_id = \"AGT-01\";",
     good: "String agentId = \"AGT-01\";",
   },
   {
-    id: "N002", name: "상수명 UPPER_SNAKE_CASE", category: "naming", severity: "error",
+    id: "N002", name: "상수명 UPPER_SNAKE_CASE", category: "naming", severity: "error", autoDetected: true,
     description: "상수(final, const)는 대문자 + 언더스코어를 사용합니다.",
     bad:  "final int maxRetry = 3;",
     good: "final int MAX_RETRY = 3;",
   },
   {
-    id: "N003", name: "클래스명 PascalCase", category: "naming", severity: "error",
+    id: "N003", name: "클래스명 PascalCase", category: "naming", severity: "error", autoDetected: true,
     description: "클래스와 React 컴포넌트 이름은 PascalCase를 사용합니다.",
     bad:  "class agentController { }",
     good: "class AgentController { }",
   },
   {
-    id: "N004", name: "boolean 변수 is/has/can 접두사", category: "naming", severity: "warning",
+    id: "N004", name: "boolean 변수 is/has/can 접두사", category: "naming", severity: "warning", autoDetected: true,
     description: "boolean 타입 변수는 is, has, can으로 시작해야 합니다.",
     bad:  "boolean loading = false;",
     good: "boolean isLoading = false;",
   },
   {
-    id: "N005", name: "메서드명 동사로 시작", category: "naming", severity: "warning",
+    id: "N005", name: "메서드명 동사로 시작", category: "naming", severity: "warning", autoDetected: false,
     description: "메서드 이름은 동사로 시작해야 합니다. (get, set, fetch, handle, create...)",
     bad:  "public List<Agent> agents() { }",
     good: "public List<Agent> getAgents() { }",
   },
   // ── TypeScript ──
   {
-    id: "T001", name: "any 타입 사용 금지", category: "typescript", severity: "error",
+    id: "T001", name: "any 타입 사용 금지", category: "typescript", severity: "error", autoDetected: true,
     description: "TypeScript에서 any 타입은 타입 안전성을 해칩니다. 명시적 타입을 사용하세요.",
     bad:  "const data: any = fetchAgents();",
     good: "const data: AgentStatus[] = fetchAgents();",
   },
   {
-    id: "T002", name: "var 사용 금지", category: "typescript", severity: "error",
+    id: "T002", name: "var 사용 금지", category: "typescript", severity: "error", autoDetected: true,
     description: "var 대신 const 또는 let을 사용합니다. var는 블록 스코프를 지원하지 않습니다.",
     bad:  "var agentList = [];",
     good: "const agentList: Agent[] = [];",
   },
   {
-    id: "T003", name: "함수 반환 타입 명시", category: "typescript", severity: "warning",
+    id: "T003", name: "함수 반환 타입 명시", category: "typescript", severity: "warning", autoDetected: false,
     description: "TypeScript 함수는 반환 타입을 명시해야 합니다.",
     bad:  "function getStatus() { return status; }",
     good: "function getStatus(): AgentStatus { return status; }",
   },
   // ── Java ──
   {
-    id: "J001", name: "Java 접근 제어자 명시", category: "java", severity: "warning",
+    id: "J001", name: "Java 접근 제어자 명시", category: "java", severity: "warning", autoDetected: false,
     description: "모든 필드와 메서드에 접근 제어자(public/private/protected)를 명시합니다.",
     bad:  "String agentId;",
     good: "private String agentId;",
   },
   {
-    id: "J002", name: "매직 넘버 상수화", category: "java", severity: "warning",
+    id: "J002", name: "매직 넘버 상수화", category: "java", severity: "warning", autoDetected: false,
     description: "코드에 직접 쓰인 숫자(매직 넘버)는 상수로 분리해야 합니다.",
     bad:  "if (retryCount > 3) { }",
     good: "if (retryCount > MAX_RETRY_COUNT) { }",
   },
   // ── Style ──
   {
-    id: "S001", name: "중첩 삼항 연산자 금지", category: "style", severity: "warning",
+    id: "S001", name: "중첩 삼항 연산자 금지", category: "style", severity: "warning", autoDetected: true,
     description: "삼항 연산자의 중첩은 가독성을 해칩니다. if-else 또는 변수 분리를 사용하세요.",
     bad:  "const label = a ? b ? 'x' : 'y' : 'z';",
     good: "const label = a ? (b ? 'x' : 'y') : 'z'; // 또는 if-else 사용",
   },
   {
-    id: "S002", name: "빈 catch 블록 금지", category: "style", severity: "error",
+    id: "S002", name: "빈 catch 블록 금지", category: "style", severity: "error", autoDetected: true,
     description: "빈 catch 블록은 예외를 무시합니다. 최소한 로그를 남겨야 합니다.",
     bad:  "try { ... } catch (Exception e) { }",
     good: "try { ... } catch (Exception e) { log.error(\"Error\", e); }",
@@ -124,141 +127,207 @@ export const CONVENTION_RULES: ConventionRule[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-// 스테이징 파일별 위반 데이터 생성
+// 실제 정적 분석 — 스테이징된 파일의 real diff를 가져와 추가된(+) 라인만
+// CONVENTION_RULES(autoDetected=true) 정규식으로 검사한다. 파일명이나
+// 확장자만 보고 결과를 지어내지 않고, 실제 코드 내용을 검사한다.
 // ─────────────────────────────────────────────────────────────
-function generateViolations(fileNames: string[]): Violation[] {
-  const all: Violation[] = [];
-  let idSeq = 1;
 
-  fileNames.forEach(name => {
-    const ext = name.split(".").pop()?.toLowerCase() ?? "";
+type AddedLine = { lineNumber: number; content: string };
 
-    if (ext === "java") {
-      if (/controller/i.test(name)) {
-        all.push(
-          {
-            id: `v${idSeq++}`, ruleId: "N001", severity: "error", file: name, ext,
-            line: 18,
-            code:       "private List<Agent> agent_list = new ArrayList<>();",
-            suggestion: "private List<Agent> agentList = new ArrayList<>();",
-            message:    "agent_list는 snake_case입니다. 팀 규칙에 따라 camelCase를 사용해 주세요.",
-            autoFixable: true,
-          },
-          {
-            id: `v${idSeq++}`, ruleId: "N001", severity: "error", file: name, ext,
-            line: 24,
-            code:       "String agent_Id = agent.getId();",
-            suggestion: "String agentId = agent.getId();",
-            message:    "변수명에 언더스코어(agent_Id)가 포함되어 있습니다. agentId로 수정하세요.",
-            autoFixable: true,
-          },
-          {
-            id: `v${idSeq++}`, ruleId: "N002", severity: "error", file: name, ext,
-            line: 9,
-            code:       "private static final int maxAgentCount = 6;",
-            suggestion: "private static final int MAX_AGENT_COUNT = 6;",
-            message:    "상수 maxAgentCount는 UPPER_SNAKE_CASE로 작성해야 합니다.",
-            autoFixable: true,
-          },
-          {
-            id: `v${idSeq++}`, ruleId: "J001", severity: "warning", file: name, ext,
-            line: 32,
-            code:       "Map<String, AgentStatus> statusMap;",
-            suggestion: "private Map<String, AgentStatus> statusMap;",
-            message:    "statusMap 필드에 접근 제어자가 없습니다. private을 명시해 주세요.",
-            autoFixable: true,
-          },
-          {
-            id: `v${idSeq++}`, ruleId: "S002", severity: "error", file: name, ext,
-            line: 58,
-            code:       "} catch (InterruptedException e) {\n    // TODO\n}",
-            suggestion: "} catch (InterruptedException e) {\n    log.error(\"Agent interrupted\", e);\n    Thread.currentThread().interrupt();\n}",
-            message:    "빈 catch 블록은 예외를 삼킵니다. 최소한 로그를 남겨야 합니다.",
-            autoFixable: false,
-          },
-        );
-      } else if (/agent/i.test(name)) {
-        all.push(
-          {
-            id: `v${idSeq++}`, ruleId: "N004", severity: "warning", file: name, ext,
-            line: 15,
-            code:       "private boolean running = false;",
-            suggestion: "private boolean isRunning = false;",
-            message:    "boolean 변수 running은 isRunning으로 명명해야 합니다.",
-            autoFixable: true,
-          },
-          {
-            id: `v${idSeq++}`, ruleId: "N002", severity: "error", file: name, ext,
-            line: 11,
-            code:       "private static final int max_retry = 3;",
-            suggestion: "private static final int MAX_RETRY = 3;",
-            message:    "상수 max_retry가 snake_case이고 소문자입니다. MAX_RETRY로 수정하세요.",
-            autoFixable: true,
-          },
-          {
-            id: `v${idSeq++}`, ruleId: "J002", severity: "warning", file: name, ext,
-            line: 47,
-            code:       "if (fetchResponse.getStatusCode().value() == 200) {",
-            suggestion: "if (fetchResponse.getStatusCode().is2xxSuccessful()) {",
-            message:    "200이라는 매직 넘버 대신 Spring 제공 is2xxSuccessful()을 사용하세요.",
-            autoFixable: false,
-          },
-          {
-            id: `v${idSeq++}`, ruleId: "N005", severity: "warning", file: name, ext,
-            line: 29,
-            code:       "public AgentStatus status() {",
-            suggestion: "public AgentStatus getStatus() {",
-            message:    "메서드명 status()는 명사입니다. getStatus()처럼 동사로 시작해야 합니다.",
-            autoFixable: true,
-          },
-        );
+/** unified diff 텍스트에서 추가된(+) 라인만, 새 파일 기준 실제 줄 번호와 함께 추출 */
+function parseAddedLines(diffContent: string): AddedLine[] {
+  const result: AddedLine[] = [];
+  let newLine = 0;
+  for (const raw of diffContent.split("\n")) {
+    const hunk = raw.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      newLine = parseInt(hunk[1], 10);
+      continue;
+    }
+    if (raw.startsWith("+++") || raw.startsWith("---")) continue;
+    if (raw.startsWith("+")) {
+      result.push({ lineNumber: newLine, content: raw.slice(1) });
+      newLine++;
+    } else if (!raw.startsWith("-")) {
+      newLine++;
+    }
+  }
+  return result;
+}
+
+function toCamelCase(name: string): string {
+  return name.replace(/_([a-zA-Z0-9])/g, (_, c: string) => c.toUpperCase());
+}
+function toUpperSnake(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
+}
+function toPascalCase(name: string): string {
+  return name.length === 0 ? name : name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+const BOOL_PREFIXES = ["is", "has", "can", "should", "will"];
+
+type RuleHit = { ruleId: string; severity: Severity; message: string; suggestion: string };
+
+/** 한 줄(추가된 코드 라인)에 대해 단일 라인 기준 규칙을 검사한다 */
+function detectLineViolations(line: string, ext: string): RuleHit[] {
+  const hits: RuleHit[] = [];
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("import ") || trimmed.startsWith("package ")) {
+    return hits;
+  }
+
+  const isJava = ext === "java";
+  const isTs = ext === "ts" || ext === "tsx";
+
+  // T001: any 타입
+  if (isTs && /:\s*any\b/.test(trimmed)) {
+    hits.push({
+      ruleId: "T001", severity: "error",
+      message: "any 타입은 타입 안전성을 해칩니다. 명시적 타입을 사용하세요.",
+      suggestion: trimmed.replace(/:\s*any\b/, ": unknown /* TODO: 구체적 타입 지정 */"),
+    });
+  }
+
+  // T002: var 사용 금지
+  if ((isTs || ext === "js" || ext === "jsx") && /(^|[^.\w$])var\s+[a-zA-Z_$]/.test(trimmed)) {
+    hits.push({
+      ruleId: "T002", severity: "error",
+      message: "var 대신 const 또는 let을 사용하세요.",
+      suggestion: trimmed.replace(/\bvar\b/, "const"),
+    });
+  }
+
+  // N003: 클래스명이 소문자로 시작
+  const classMatch = trimmed.match(/\bclass\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
+  if (classMatch && /^[a-z]/.test(classMatch[1])) {
+    hits.push({
+      ruleId: "N003", severity: "error",
+      message: `클래스명 ${classMatch[1]}는 PascalCase여야 합니다.`,
+      suggestion: trimmed.replace(classMatch[1], toPascalCase(classMatch[1])),
+    });
+  }
+
+  // S001: 한 줄에 중첩된 삼항 연산자 (물음표 2개, 콜론 2개)
+  if ((trimmed.match(/\?/g)?.length ?? 0) >= 2 && /\?[^?:]*\?[^?:]*:[^?:]*:/.test(trimmed)) {
+    hits.push({
+      ruleId: "S001", severity: "warning",
+      message: "중첩된 삼항 연산자는 가독성을 해칩니다. if-else로 분리하세요.",
+      suggestion: "// TODO: if-else 또는 변수 분리로 리팩터링",
+    });
+  }
+
+  if (isJava) {
+    // N002: final 상수인데 UPPER_SNAKE_CASE가 아님
+    const finalMatch = trimmed.match(/\bfinal\s+(?:static\s+)?[\w<>\[\],\s]+?\s([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/);
+    if (finalMatch && !/^[A-Z0-9_]+$/.test(finalMatch[1])) {
+      hits.push({
+        ruleId: "N002", severity: "error",
+        message: `상수 ${finalMatch[1]}는 UPPER_SNAKE_CASE로 작성해야 합니다.`,
+        suggestion: trimmed.replace(finalMatch[1], toUpperSnake(finalMatch[1])),
+      });
+    } else {
+      // N001: snake_case 필드/변수명 (final 상수가 아닌 경우만)
+      const snakeMatch = trimmed.match(/[\sA-Za-z_$][\w<>\[\],]*[\s>]([a-z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+)\s*[=;)]/);
+      if (snakeMatch) {
+        hits.push({
+          ruleId: "N001", severity: "error",
+          message: `${snakeMatch[1]}는 snake_case입니다. camelCase로 수정하세요.`,
+          suggestion: trimmed.replace(snakeMatch[1], toCamelCase(snakeMatch[1])),
+        });
       }
     }
 
-    if (ext === "ts" || ext === "tsx") {
-      all.push(
-        {
-          id: `v${idSeq++}`, ruleId: "T001", severity: "error", file: name, ext,
-          line: 8,
-          code:       "const agentData: any = useAgents();",
-          suggestion: "const agentData: AgentStatus[] = useAgents();",
-          message:    "any 타입은 TypeScript의 타입 안전성을 무력화합니다. 명시적 타입을 사용하세요.",
-          autoFixable: false,
-        },
-        {
-          id: `v${idSeq++}`, ruleId: "N004", severity: "warning", file: name, ext,
-          line: 22,
-          code:       "const [expanded, setExpanded] = useState(false);",
-          suggestion: "const [isExpanded, setIsExpanded] = useState(false);",
-          message:    "boolean 상태 expanded는 isExpanded로 명명해야 합니다.",
-          autoFixable: true,
-        },
-        {
-          id: `v${idSeq++}`, ruleId: "T003", severity: "warning", file: name, ext,
-          line: 35,
-          code:       "function fetchAgentStatus(id: string) {",
-          suggestion: "function fetchAgentStatus(id: string): Promise<AgentStatus> {",
-          message:    "함수 반환 타입이 명시되지 않았습니다. 반환 타입을 추가해 주세요.",
-          autoFixable: false,
-        },
-      );
+    // N004: boolean 필드/변수가 is/has/can 접두사 없음
+    const boolMatch = trimmed.match(/\bboolean\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*[=;)]/);
+    if (boolMatch && !BOOL_PREFIXES.some(p => boolMatch[1].toLowerCase().startsWith(p))) {
+      hits.push({
+        ruleId: "N004", severity: "warning",
+        message: `boolean 변수 ${boolMatch[1]}는 is/has/can으로 시작해야 합니다.`,
+        suggestion: trimmed.replace(boolMatch[1], `is${toPascalCase(boolMatch[1])}`),
+      });
+    }
+  }
+
+  if (isTs) {
+    // N004: useState(true/false) boolean 상태가 is/has/can 접두사 없음
+    const stateMatch = trimmed.match(/const\s*\[\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*,\s*set[A-Za-z0-9_$]+\s*\]\s*=\s*useState(?:<[^>]+>)?\(\s*(?:true|false)\s*\)/);
+    if (stateMatch && !BOOL_PREFIXES.some(p => stateMatch[1].toLowerCase().startsWith(p))) {
+      hits.push({
+        ruleId: "N004", severity: "warning",
+        message: `boolean 상태 ${stateMatch[1]}는 is/has/can으로 시작해야 합니다.`,
+        suggestion: trimmed.replace(stateMatch[1], `is${toPascalCase(stateMatch[1])}`),
+      });
+    }
+  }
+
+  return hits;
+}
+
+/** 추가된 라인들 중 "catch (...) { ... }"가 비어있는 경우(같은 줄 또는 바로 다음 줄이 닫는 중괄호)를 찾는다 */
+function detectEmptyCatchBlocks(addedLines: AddedLine[]): (RuleHit & { lineNumber: number; code: string })[] {
+  const hits: (RuleHit & { lineNumber: number; code: string })[] = [];
+  for (let i = 0; i < addedLines.length; i++) {
+    const line = addedLines[i];
+    const trimmed = line.content.trim();
+    if (!/catch\s*\([^)]*\)\s*\{/.test(trimmed)) continue;
+
+    if (/catch\s*\([^)]*\)\s*\{\s*\}/.test(trimmed)) {
+      hits.push({ ruleId: "S002", severity: "error", message: "빈 catch 블록은 예외를 무시합니다. 최소한 로그를 남겨야 합니다.", suggestion: "catch 블록에 최소 log.error(...) 등을 추가하세요.", lineNumber: line.lineNumber, code: line.content });
+      continue;
+    }
+    if (/catch\s*\([^)]*\)\s*\{\s*$/.test(trimmed)) {
+      const next = addedLines[i + 1]?.content.trim();
+      if (next === "}" || next === undefined) {
+        hits.push({ ruleId: "S002", severity: "error", message: "빈 catch 블록은 예외를 무시합니다. 최소한 로그를 남겨야 합니다.", suggestion: "catch 블록에 최소 log.error(...) 등을 추가하세요.", lineNumber: line.lineNumber, code: line.content });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * 스테이징된 파일들의 실제 diff(추가된 라인)를 서버에서 가져와 정적 분석을 수행한다.
+ * 파일 하나의 diff 조회가 실패해도 나머지 파일은 계속 분석하며, 실패한 파일은 결과에 포함하지 않는다.
+ */
+async function analyzeStagedFiles(
+  projectId: number,
+  files: { name: string; path: string }[]
+): Promise<Violation[]> {
+  const violations: Violation[] = [];
+  let idSeq = 1;
+
+  for (const file of files) {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    let addedLines: AddedLine[];
+    try {
+      const diff = await fetchProjectChangedFileDiff(projectId, file.path, true);
+      addedLines = parseAddedLines(diff.diffContent || "");
+    } catch {
+      continue; // diff를 가져올 수 없는 파일은 건너뜀 (가짜 결과를 만들지 않음)
     }
 
-    if (ext === "gradle") {
-      all.push(
-        {
-          id: `v${idSeq++}`, ruleId: "N002", severity: "info", file: name, ext,
-          line: 3,
-          code:       "def springVersion = '3.2.0'",
-          suggestion: "def SPRING_VERSION = '3.2.0'",
-          message:    "Gradle 스크립트의 전역 변수도 팀 상수 명명 규칙(UPPER_SNAKE)을 따르면 더 명확합니다.",
-          autoFixable: true,
-        },
-      );
+    for (const line of addedLines) {
+      for (const hit of detectLineViolations(line.content, ext)) {
+        violations.push({
+          id: `v${idSeq++}`, ruleId: hit.ruleId, severity: hit.severity,
+          file: file.name, ext, line: line.lineNumber,
+          code: line.content.trim(), suggestion: hit.suggestion, message: hit.message,
+        });
+      }
     }
-  });
+    if (ext === "java") {
+      for (const hit of detectEmptyCatchBlocks(addedLines)) {
+        violations.push({
+          id: `v${idSeq++}`, ruleId: hit.ruleId, severity: hit.severity,
+          file: file.name, ext, line: hit.lineNumber,
+          code: hit.code.trim(), suggestion: hit.suggestion, message: hit.message,
+        });
+      }
+    }
+  }
 
-  return all;
+  return violations;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -280,13 +349,12 @@ const CAT_META: Record<string, { label: string; color: string }> = {
 
 // 위반 항목 카드
 function ViolationCard({
-  v, idx, visible, autoFix,
+  v, idx, visible,
 }: {
-  v: Violation; idx: number; visible: boolean; autoFix: (id: string) => void;
+  v: Violation; idx: number; visible: boolean;
 }) {
   const [show, setShow]     = useState(false);
   const [open, setOpen]     = useState(false);
-  const [fixed, setFixed]   = useState(false);
   const meta = SEV_META[v.severity];
   const SevIcon = meta.icon;
 
@@ -295,19 +363,6 @@ function ViolationCard({
     const t = setTimeout(() => setShow(true), idx * 75);
     return () => clearTimeout(t);
   }, [visible, idx]);
-
-  const handleFix = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setFixed(true);
-    autoFix(v.id);
-  };
-
-  if (fixed) return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: UI_GREEN_BG, border: `1px solid ${UI_GREEN}25` }}>
-      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: UI_GREEN }} />
-      <span className="text-[10px]" style={{ color: UI_GREEN }}>자동 수정 완료 — {v.file}:{v.line}</span>
-    </div>
-  );
 
   return (
     <div
@@ -336,27 +391,11 @@ function ViolationCard({
             <span className="text-[7.5px] px-1 py-0.5 rounded font-mono" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_TERTIARY }}>
               L{v.line}
             </span>
-            {v.autoFixable && (
-              <span className="text-[7.5px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: UI_GREEN_BG, color: UI_GREEN }}>
-                ✦ 자동 수정 가능
-              </span>
-            )}
           </div>
           <p className="text-[9px] mt-0.5 truncate" style={{ color: TEXT_TERTIARY }}>{v.message}</p>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {v.autoFixable && (
-            <button
-              onClick={handleFix}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[8px] font-semibold transition-all"
-              style={{ background: UI_GREEN_BG, color: UI_GREEN, border: `1px solid ${UI_GREEN}30` }}
-              onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.92)"}
-              onMouseLeave={e => e.currentTarget.style.filter = ""}
-            >
-              <Zap className="w-2.5 h-2.5" />Fix
-            </button>
-          )}
           {open
             ? <ChevronDown  className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
             : <ChevronRight className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
@@ -390,10 +429,9 @@ function ViolationCard({
 
 // 파일 그룹
 function FileViolationGroup({
-  file, violations, groupIdx, visible, autoFix,
+  file, violations, groupIdx, visible,
 }: {
   file: string; violations: Violation[]; groupIdx: number; visible: boolean;
-  autoFix: (id: string) => void;
 }) {
   const [open, setOpen]   = useState(true);
   const [show, setShow]   = useState(false);
@@ -461,7 +499,7 @@ function FileViolationGroup({
       {open && (
         <div className="p-2.5 space-y-1.5">
           {violations.map((v, i) => (
-            <ViolationCard key={v.id} v={v} idx={i} visible={show} autoFix={autoFix} />
+            <ViolationCard key={v.id} v={v} idx={i} visible={show} />
           ))}
         </div>
       )}
@@ -473,13 +511,15 @@ function FileViolationGroup({
 // 메인 모달 컴포넌트
 // ─────────────────────────────────────────────────────────────
 export function ConventionGuardModal({
+  projectId,
   stagedFiles,
-  userName = "병권",
+  userName,
   onIgnore,
   onFix,
   onClose,
 }: {
-  stagedFiles:  string[];      // 스테이징된 파일명 배열
+  projectId:    number;
+  stagedFiles:  { name: string; path: string }[]; // 스테이징된 파일 (표시용 이름 + 실제 diff 조회용 경로)
   userName?:    string;
   onIgnore:     () => void;    // 무시하고 커밋
   onFix:        () => void;    // 수정 후 재검사
@@ -487,35 +527,26 @@ export function ConventionGuardModal({
 }) {
   const [visible,     setVisible]     = useState(false);
   const [scanDone,    setScanDone]    = useState(false);
-  const [fixedIds,    setFixedIds]    = useState<Set<string>>(new Set());
   const [activeTab,   setActiveTab]   = useState<"violations" | "rules">("violations");
 
-  // 위반 생성 + 자동 수정 상태
   const [violations, setViolations] = useState<Violation[]>([]);
 
   useEffect(() => {
     const t1 = setTimeout(() => setVisible(true), 60);
-    const t2 = setTimeout(() => {
-      setViolations(generateViolations(stagedFiles));
+    let cancelled = false;
+    setScanDone(false);
+    analyzeStagedFiles(projectId, stagedFiles).then((result) => {
+      if (cancelled) return;
+      setViolations(result);
       setScanDone(true);
-    }, 1400);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, []);
+    });
+    return () => { cancelled = true; clearTimeout(t1); };
+  }, [projectId, stagedFiles]);
 
-  const handleAutoFix = (id: string) => {
-    setFixedIds(prev => new Set([...prev, id]));
-  };
-  const handleAutoFixAll = () => {
-    const fixable = violations.filter(v => v.autoFixable).map(v => v.id);
-    setFixedIds(new Set(fixable));
-  };
-
-  const activeViolations = violations.filter(v => !fixedIds.has(v.id));
+  const activeViolations = violations;
   const errorCount   = activeViolations.filter(v => v.severity === "error").length;
   const warnCount    = activeViolations.filter(v => v.severity === "warning").length;
   const infoCount    = activeViolations.filter(v => v.severity === "info").length;
-  const fixableCount = activeViolations.filter(v => v.autoFixable).length;
-  const totalFixed   = fixedIds.size;
 
   // 파일별 그룹핑
   const byFile = activeViolations.reduce<Record<string, Violation[]>>((acc, v) => {
@@ -524,9 +555,10 @@ export function ConventionGuardModal({
     return acc;
   }, {});
 
+  const displayName = userName || "팀원";
   const greetingText = errorCount > 0
-    ? `${userName} 님, 우리 팀 약속이랑 다른 코드가 발견됐어요! 커밋 전에 확인해 주세요.`
-    : `${userName} 님, 오류는 없지만 몇 가지 개선 제안이 있어요. 확인해 볼까요?`;
+    ? `${displayName} 님, 우리 팀 약속이랑 다른 코드가 발견됐어요! 커밋 전에 확인해 주세요.`
+    : `${displayName} 님, 오류는 없지만 몇 가지 개선 제안이 있어요. 확인해 볼까요?`;
 
   const handleClose = () => {
     setVisible(false);
@@ -592,7 +624,7 @@ export function ConventionGuardModal({
                 <span
                   className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
                   style={{ background: ACCENT_BG, color: ACCENT }}
-                >AI 분석</span>
+                >정적 분석</span>
               </div>
 
               {/* 스캔 중 프로그레스 */}
@@ -633,19 +665,12 @@ export function ConventionGuardModal({
                 { label: "오류",   n: errorCount, color: "#B85450", bg: UI_RED_BG    },
                 { label: "경고",   n: warnCount,  color: "#C09840", bg: UI_AMBER_BG  },
                 { label: "정보",   n: infoCount,  color: "#5A8A4A", bg: UI_GREEN_BG  },
-                { label: "자동 수정 가능", n: fixableCount, color: ACCENT, bg: ACCENT_BG },
               ].filter(s => s.n > 0).map(s => (
                 <div key={s.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: s.bg, border: `1px solid ${s.color}25` }}>
                   <span className="text-[11px] font-bold" style={{ color: s.color }}>{s.n}</span>
                   <span className="text-[9px]" style={{ color: s.color + "cc" }}>{s.label}</span>
                 </div>
               ))}
-              {totalFixed > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: UI_GREEN_BG }}>
-                  <CheckCircle2 className="w-3 h-3" style={{ color: UI_GREEN }} />
-                  <span className="text-[9px] font-semibold" style={{ color: UI_GREEN }}>{totalFixed}개 수정됨</span>
-                </div>
-              )}
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{stagedFiles.length}개 파일 분석</span>
               </div>
@@ -675,19 +700,6 @@ export function ConventionGuardModal({
                 {tab.label}
               </button>
             ))}
-
-            {fixableCount > 0 && activeTab === "violations" && (
-              <button
-                onClick={handleAutoFixAll}
-                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
-                style={{ background: UI_GREEN_BG, color: UI_GREEN, border: `1px solid ${UI_GREEN}30` }}
-                onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.92)"}
-                onMouseLeave={e => e.currentTarget.style.filter = ""}
-              >
-                <Zap className="w-3 h-3" />
-                전체 자동 수정 ({fixableCount}건)
-              </button>
-            )}
           </div>
         )}
 
@@ -724,7 +736,7 @@ export function ConventionGuardModal({
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: UI_GREEN_BG }}>
                     <CheckCircle2 className="w-6 h-6" style={{ color: UI_GREEN }} />
                   </div>
-                  <p className="text-[12px] font-semibold" style={{ color: UI_GREEN }}>모든 위반이 수정됐어요!</p>
+                  <p className="text-[12px] font-semibold" style={{ color: UI_GREEN }}>위반 사항이 발견되지 않았어요!</p>
                   <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>이제 커밋할 준비가 됐습니다</p>
                 </div>
               ) : (
@@ -735,7 +747,6 @@ export function ConventionGuardModal({
                     violations={vs}
                     groupIdx={gi}
                     visible={scanDone}
-                    autoFix={handleAutoFix}
                   />
                 ))
               )}
@@ -767,6 +778,14 @@ export function ConventionGuardModal({
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-[10px] font-bold" style={{ color: TEXT_PRIMARY }}>{rule.name}</span>
                                   <span className="text-[7.5px] font-mono" style={{ color: TEXT_LABEL }}>{rule.id}</span>
+                                  <span
+                                    className="text-[7px] px-1 py-0.5 rounded font-semibold"
+                                    style={rule.autoDetected
+                                      ? { background: UI_GREEN_BG, color: UI_GREEN }
+                                      : { background: "rgba(0,0,0,0.05)", color: TEXT_TERTIARY }}
+                                  >
+                                    {rule.autoDetected ? "자동 감지" : "수동 검토"}
+                                  </span>
                                 </div>
                                 <p className="text-[9px] mt-0.5 leading-relaxed" style={{ color: TEXT_SECONDARY }}>{rule.description}</p>
                               </div>

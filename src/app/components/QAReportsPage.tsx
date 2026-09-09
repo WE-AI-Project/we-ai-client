@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Sparkles, AlertTriangle, CheckCircle2, XCircle, Circle, RefreshCw } from "lucide-react";
+import { Sparkles, AlertTriangle, XCircle, Circle, RefreshCw } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   UI_RED, UI_RED_DARK, UI_RED_BG7, UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
@@ -8,6 +8,12 @@ import {
   ACCENT,
   CONTENT_BG,
 } from "../colors";
+import {
+  fetchQaReports,
+  fetchQaReportDetail,
+  type QaReportSummary,
+  type QaIssueDetail,
+} from "../lib/api";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -19,47 +25,19 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
-// 모듈별 테스트 결과 더미 데이터
-const TEST_RESULTS = [
-  { module: "MultiAgentCtrl", passed: 18, failed: 2, skipped: 1 },
-  { module: "DataSync",       passed: 24, failed: 0, skipped: 0 },
-  { module: "Parser",         passed: 11, failed: 5, skipped: 2 },
-  { module: "Scheduler",      passed: 16, failed: 1, skipped: 1 },
-  { module: "Logger",         passed: 9,  failed: 0, skipped: 0 },
-  { module: "ApiGateway",     passed: 14, failed: 2, skipped: 3 },
-];
+// 실제 QA 리포트 이슈 하나 + 그 이슈가 속한 리포트(커밋) 정보
+type IssueRow = { report: QaReportSummary; issue: QaIssueDetail };
 
-// QA 이슈 목록 더미 데이터
-type Issue = {
-  id: string;
-  severity: "critical" | "major" | "minor" | "info";
-  module: string;
-  title: string;
-  detail: string;
-  status: "open" | "in-review" | "resolved";
+const SEV_META: Record<QaIssueDetail["severity"], { color: string; bg: string; label: string; icon: any }> = {
+  CRITICAL: { color: UI_RED_DARK,   bg: UI_RED_BG7,   label: "Critical", icon: XCircle      },
+  MAJOR:    { color: UI_AMBER_DARK, bg: UI_AMBER_BG,  label: "Major",    icon: AlertTriangle },
+  MINOR:    { color: UI_GRAY,       bg: UI_GRAY_BG,   label: "Minor",    icon: AlertTriangle },
 };
 
-const ISSUES: Issue[] = [
-  { id: "QA-001", severity: "critical", module: "Parser",        title: "JSON Parse Exception — unhandled edge case",         detail: "Null pointer when input starts with '<'. No fallback.", status: "open"      },
-  { id: "QA-002", severity: "major",    module: "MultiAgentCtrl",title: "Race condition in agent handshake protocol",          detail: "Two agents may write to shared state simultaneously.",  status: "in-review" },
-  { id: "QA-003", severity: "major",    module: "ApiGateway",    title: "Timeout not configured for upstream API calls",       detail: "Requests may hang indefinitely. Add timeout policy.",   status: "open"      },
-  { id: "QA-004", severity: "minor",    module: "Scheduler",     title: "Task retry delay uses hardcoded value",               detail: "Retry interval (5s) should be configurable via yml.",   status: "in-review" },
-  { id: "QA-005", severity: "minor",    module: "DataSync",      title: "Logging level inconsistency",                         detail: "DEBUG logs appear in prod profile. Filter by profile.", status: "resolved"  },
-  { id: "QA-006", severity: "info",     module: "Logger",        title: "Log rotation archive path is environment-specific",  detail: "Hardcoded Windows path 'logs/' may fail on Linux.",    status: "resolved"  },
-  { id: "QA-007", severity: "critical", module: "MultiAgentCtrl",title: "Agent error escalation path not implemented",         detail: "Supervisor callback is a stub method. Needs impl.",     status: "open"      },
-];
-
-const SEV_META: Record<Issue["severity"], { color: string; bg: string; label: string; icon: any }> = {
-  critical: { color: UI_RED_DARK, bg: UI_RED_BG7,   label: "Critical", icon: XCircle      },
-  major:    { color: UI_AMBER_DARK, bg: UI_AMBER_BG,  label: "Major",    icon: AlertTriangle },
-  minor:    { color: UI_GRAY, bg: UI_GRAY_BG, label: "Minor",    icon: AlertTriangle },
-  info:     { color: ACCENT,   bg: "rgba(112,130,56,0.10)",   label: "Info",     icon: CheckCircle2 },
-};
-
-const STATUS_META: Record<Issue["status"], { color: string; label: string }> = {
-  "open":      { color: UI_RED, label: "Open"      },
-  "in-review": { color: UI_AMBER, label: "In Review" },
-  "resolved":  { color: UI_GREEN, label: "Resolved"  },
+const STATUS_META: Record<QaIssueDetail["status"], { color: string; label: string }> = {
+  OPEN:     { color: UI_RED,   label: "Open"     },
+  RESOLVED: { color: UI_GREEN, label: "Resolved" },
+  IGNORED:  { color: UI_GRAY,  label: "Ignored"  },
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -74,22 +52,50 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function QAReportsPage() {
+export function QAReportsPage({ projectId }: { projectId: number }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reports, setReports] = useState<QaReportSummary[]>([]);
+  const [issueRows, setIssueRows] = useState<IssueRow[]>([]);
+  const [lastScanAt, setLastScanAt] = useState<Date | null>(null);
 
   const [severityFilter, setSeverityFilter] = useState<string>("all");
 
-  const totalPassed  = TEST_RESULTS.reduce((s, t) => s + t.passed,  0);
-  const totalFailed  = TEST_RESULTS.reduce((s, t) => s + t.failed,  0);
-  const totalTests   = totalPassed + totalFailed + TEST_RESULTS.reduce((s, t) => s + t.skipped, 0);
-  const coverage     = Math.round((totalPassed / totalTests) * 100);
-  const riskScore    = totalFailed >= 5 ? "High" : totalFailed >= 2 ? "Medium" : "Low";
+  const load = () => {
+    if (!projectId) return;
+    setIsLoading(true);
+    setError(null);
+    (async () => {
+      const list = await fetchQaReports(projectId, { size: 20 });
+      setReports(list.reports);
+      // 최근 리포트 10건의 상세(이슈 목록)를 가져와 프로젝트 전체 이슈 뷰로 펼친다.
+      const details = await Promise.all(
+        list.reports.slice(0, 10).map((r) => fetchQaReportDetail(projectId, r.qaReportId).catch(() => null))
+      );
+      const rows: IssueRow[] = [];
+      details.forEach((d, i) => {
+        if (!d) return;
+        d.issues.forEach((issue) => rows.push({ report: list.reports[i], issue }));
+      });
+      setIssueRows(rows);
+      setLastScanAt(new Date());
+    })()
+      .catch((err: any) => setError(err?.message || "QA 리포트를 불러오지 못했습니다."))
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(load, [projectId]);
+
+  const totalPassed  = reports.reduce((s, r) => s + r.testPassCount, 0);
+  const totalFailed  = reports.reduce((s, r) => s + r.testFailCount, 0);
+  const totalTests   = totalPassed + totalFailed;
+  const coverage     = totalTests > 0 ? Math.round((totalPassed / totalTests) * 100) : 0;
+  const criticalCount = issueRows.filter(x => x.issue.severity === "CRITICAL").length;
+  const openCount     = issueRows.filter(x => x.issue.status === "OPEN").length;
+  const riskScore    = criticalCount > 0 ? "High" : openCount >= 3 ? "Medium" : "Low";
   const riskColor    = riskScore === "High" ? UI_RED : riskScore === "Medium" ? UI_AMBER : UI_GREEN;
 
-  const openCount     = ISSUES.filter(i => i.status === "open").length;
-  const criticalCount = ISSUES.filter(i => i.severity === "critical").length;
-
-  const filteredIssues = ISSUES.filter(i => severityFilter === "all" || i.severity === severityFilter);
+  const filteredIssues = issueRows.filter(x => severityFilter === "all" || x.issue.severity === severityFilter);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
@@ -106,17 +112,17 @@ export function QAReportsPage() {
               {isLoading ? (
                 <Skeleton className="h-3 w-48 mt-1.5" />
               ) : (
-                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>SynAIpse Backend Server · Last scan: Today 09:41</p>
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+                  SynAIpse Backend Server{lastScanAt ? ` · Last loaded: ${lastScanAt.toLocaleTimeString("ko-KR")}` : ""}
+                </p>
               )}
             </div>
-            
+
             {isLoading ? (
               <Skeleton className="h-7 w-20 rounded-lg" />
             ) : (
               <button
-                onClick={() => {
-                  setIsLoading(false);
-                }}
+                onClick={load}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-black/[0.05] transition-all"
                 style={{ background: "rgba(255,255,255,0.8)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
               >
@@ -124,6 +130,12 @@ export function QAReportsPage() {
               </button>
             )}
           </div>
+
+          {error && (
+            <div className="rounded-xl p-3 text-[11px]" style={{ background: UI_RED_BG7, color: UI_RED_DARK, border: `1px solid ${BORDER}` }}>
+              {error}
+            </div>
+          )}
 
           {/* ── 요약 카드 ── */}
           <div className="grid grid-cols-4 gap-2.5">
@@ -150,32 +162,37 @@ export function QAReportsPage() {
             )}
           </div>
 
-          {/* ── 테스트 결과 막대 차트 ── */}
+          {/* ── 테스트 결과 막대 차트 (커밋별 QA 리포트 기준) ── */}
           <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Test Results by Module</p>
+              <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Test Results by Commit</p>
               {!isLoading && (
                 <div className="flex items-center gap-3 text-[10px]" style={{ color: TEXT_TERTIARY }}>
                   <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#10b981" }} /> Passed</span>
                   <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#ef4444" }} /> Failed</span>
-                  <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#d1d5db" }} /> Skipped</span>
                 </div>
               )}
             </div>
-            
+
             {isLoading ? (
               /* [스켈레톤] 막대 차트 영역 */
               <Skeleton className="w-full h-[160px] rounded-xl" />
+            ) : reports.length === 0 ? (
+              <p className="text-[11px] py-8 text-center" style={{ color: TEXT_TERTIARY }}>표시할 QA 리포트가 없습니다.</p>
             ) : (
               <ResponsiveContainer width="100%" height={160}>
-                <BarChart id="qa-test-results" data={TEST_RESULTS} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={10}>
+                <BarChart
+                  id="qa-test-results"
+                  data={reports.slice().reverse().map(r => ({ commit: r.commitId, passed: r.testPassCount, failed: r.testFailCount }))}
+                  margin={{ top: 4, right: 8, left: -24, bottom: 0 }}
+                  barSize={10}
+                >
                   <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
-                  <XAxis dataKey="module" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="commit" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="passed"  name="Passed"  fill="#10b981" radius={[3,3,0,0]} />
                   <Bar dataKey="failed"  name="Failed"  fill="#ef4444" radius={[3,3,0,0]} />
-                  <Bar dataKey="skipped" name="Skipped" fill="#d1d5db" radius={[3,3,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -198,17 +215,17 @@ export function QAReportsPage() {
                     <Skeleton key={i} className="h-5 w-10 rounded" />
                   ))
                 ) : (
-                  ["all", "critical", "major", "minor", "info"].map(f => (
+                  ["all", "CRITICAL", "MAJOR", "MINOR"].map(f => (
                     <button
                       key={f}
                       onClick={() => setSeverityFilter(f)}
-                      className="px-2 py-0.5 rounded text-[9px] font-semibold capitalize transition-all"
+                      className="px-2 py-0.5 rounded text-[9px] font-semibold transition-all"
                       style={{
                         background: severityFilter === f ? "#1c1c1e" : "rgba(0,0,0,0.05)",
                         color: severityFilter === f ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
                       }}
                     >
-                      {f === "all" ? "All" : f}
+                      {f === "all" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
                     </button>
                   ))
                 )}
@@ -237,13 +254,14 @@ export function QAReportsPage() {
                 <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>해당하는 이슈가 없습니다.</p>
               </div>
             ) : (
-              filteredIssues.map((issue, i) => {
+              filteredIssues.map((row, i) => {
+                const { issue, report } = row;
                 const sev = SEV_META[issue.severity];
                 const Icon = sev.icon;
                 const sts = STATUS_META[issue.status];
                 return (
                   <div
-                    key={issue.id}
+                    key={issue.issueId}
                     className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-black/[0.02]"
                     style={{ borderBottom: i < filteredIssues.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}
                   >
@@ -252,12 +270,16 @@ export function QAReportsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                        <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>{issue.id}</span>
+                        <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>#{report.commitId}</span>
                         <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}>{issue.module}</span>
+                        {issue.filePath && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}>
+                            {issue.filePath}{issue.lineNumber ? `:${issue.lineNumber}` : ""}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] font-medium" style={{ color: TEXT_PRIMARY }}>{issue.title}</p>
-                      <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{issue.detail}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>{issue.description}</p>
                     </div>
                     <span className="text-[10px] font-semibold shrink-0 mt-0.5" style={{ color: sts.color }}>{sts.label}</span>
                   </div>
