@@ -285,6 +285,34 @@ export async function fetchAiAgents(): Promise<AiAgent[]> {
   return aiRequest<AiAgent[]>("/api/v1/ai/agents", { method: "GET" });
 }
 
+export type AgentMetrics = {
+  agent: AiAgentKey;
+  displayName: string;
+  role: string;
+  model: string;
+  totalInvocations: number;
+  successCount: number;
+  failureCount: number;
+  avgDurationMs: number;
+  lastInvokedAt: string | null;
+};
+
+export async function fetchAgentMetrics(): Promise<AgentMetrics[]> {
+  return aiRequest<AgentMetrics[]>("/api/v1/ai/agents/metrics", { method: "GET" });
+}
+
+export type AgentInvocation = {
+  projectId: number;
+  success: boolean;
+  durationMs: number;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+export async function fetchAgentInvocations(agent: AiAgentKey, limit = 20): Promise<AgentInvocation[]> {
+  return aiRequest<AgentInvocation[]>(`/api/v1/ai/agents/${agent}/invocations?limit=${limit}`, { method: "GET" });
+}
+
 export async function askAiAgent(agent: AiAgentKey, request: EditorContextRequest): Promise<SingleAgentResponse> {
   return aiRequest<SingleAgentResponse>(`/api/v1/ai/agents/${agent}/ask`, {
     method: "POST",

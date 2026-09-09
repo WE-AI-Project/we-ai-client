@@ -1,9 +1,20 @@
-import { useState } from "react";
-import { BookOpen, Search, FileText, Link, Download, File, Code2, BookMarked, Layers } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BookOpen, Search, FileText, Download, File, Code2, BookMarked, Layers, Plus, X, Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
   CONTENT_BG,
 } from "../colors";
+import {
+  fetchLibraryResources,
+  uploadLibraryResource,
+  viewLibraryResource,
+  deleteLibraryResource,
+  buildApiUrl,
+  loadSession,
+  type LibraryResource,
+  type LibraryResourceCategory,
+} from "../lib/api";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -15,60 +26,189 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
-type Resource = {
-  id: string;
-  title: string;
-  category: "Docs" | "Guide" | "Reference" | "Template";
-  desc: string;
-  author: string;
-  updated: string;
-  views: number;
-  fileType: "pdf" | "md" | "yml" | "java" | "link";
+const CATEGORIES: (LibraryResourceCategory | "All")[] = ["All", "DOCS", "GUIDE", "REFERENCE", "TEMPLATE"];
+const CATEGORY_LABEL: Record<LibraryResourceCategory, string> = {
+  DOCS: "Docs",
+  GUIDE: "Guide",
+  REFERENCE: "Reference",
+  TEMPLATE: "Template",
 };
 
-const RESOURCES: Resource[] = [
-  { id: "R-001", title: "WE&AI REST API Reference",           category: "Docs",      desc: "Spring Boot REST API 엔드포인트 전체 명세. Request/Response 스키마, 인증 방식 포함.",  author: "Admin",  updated: "Today",     views: 128, fileType: "md"   },
-  { id: "R-002", title: "Local Development Setup Guide",      category: "Guide",     desc: "JDK 17 설치, Gradle 설정, application-dev.yml 환경변수 구성 단계별 가이드.",       author: "병권",  updated: "2d ago",    views: 95,  fileType: "md"   },
-  { id: "R-003", title: "Multi-Agent System Architecture",    category: "Reference", desc: "에이전트 간 통신 프로토콜, 작업 할당 흐름, 오류 처리 아키텍처 다이어그램.",             author: "Admin",  updated: "1w ago",    views: 74,  fileType: "pdf"  },
-  { id: "R-004", title: "application-dev.yml Template",       category: "Template",  desc: "Spring profile 'dev' 설정 템플릿. DB, 서버 포트, 에이전트 파라미터 포함.",          author: "병권",  updated: "3d ago",    views: 61,  fileType: "yml"  },
-  { id: "R-005", title: "JDK 17 Migration Guide",             category: "Guide",     desc: "JDK 11→17 마이그레이션 체크리스트. toolchain 플러그인 설정 및 호환성 이슈 정리.",    author: "병권",  updated: "5d ago",    views: 52,  fileType: "md"   },
-  { id: "R-006", title: "Agent Communication Protocol Spec",  category: "Reference", desc: "에이전트 간 메시지 포맷 명세. JSON 스키마, 헤더 필드, 에러 코드 테이블.",           author: "Admin",  updated: "1w ago",    views: 47,  fileType: "pdf"  },
-  { id: "R-007", title: "MultiAgentController.java Sample",   category: "Template",  desc: "에이전트 컨트롤러 기본 구조 샘플 코드. Spring Component, 의존성 주입 패턴.",        author: "Admin",  updated: "4d ago",    views: 88,  fileType: "java" },
-  { id: "R-008", title: "Gradle Build Scripts Cheatsheet",    category: "Reference", desc: "자주 쓰는 Gradle 태스크 모음: bootRun, build, test, clean, dependencies.",        author: "병권",  updated: "Today",     views: 34,  fileType: "md"   },
-];
-
-const CATEGORIES = ["All", "Docs", "Guide", "Reference", "Template"] as const;
-
-const FILE_META: Record<Resource["fileType"], { color: string; bg: string; label: string; icon: any }> = {
-  pdf:  { color: "#dc2626", bg: "rgba(239,68,68,0.08)",   label: "PDF",  icon: FileText  },
-  md:   { color: ACCENT,   bg: "rgba(112,130,56,0.08)",   label: "MD",   icon: FileText  },
-  yml:  { color: "#10b981", bg: "rgba(16,185,129,0.08)",  label: "YML",  icon: File      },
-  java: { color: "#f59e0b", bg: "rgba(245,158,11,0.08)",  label: "JAVA", icon: Code2     },
-  link: { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)",  label: "LINK", icon: Link      },
+const CAT_META: Record<LibraryResourceCategory, { color: string; bg: string }> = {
+  DOCS:      { color: ACCENT,    bg: "rgba(88,101,242,0.10)" },
+  GUIDE:     { color: "#10b981", bg: "rgba(16,185,129,0.08)" },
+  REFERENCE: { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)" },
+  TEMPLATE:  { color: "#f59e0b", bg: "rgba(245,158,11,0.08)" },
 };
 
-const CAT_META: Record<Resource["category"], { color: string; bg: string }> = {
-  Docs:      { color: ACCENT,    bg: "rgba(112,130,56,0.08)"   },
-  Guide:     { color: "#10b981", bg: "rgba(16,185,129,0.08)"  },
-  Reference: { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)"  },
-  Template:  { color: "#f59e0b", bg: "rgba(245,158,11,0.08)"  },
-};
+function fileMeta(extension: string): { color: string; bg: string; label: string; icon: any } {
+  const ext = extension.toLowerCase();
+  if (ext === "pdf") return { color: "#dc2626", bg: "rgba(239,68,68,0.08)", label: "PDF", icon: FileText };
+  if (["md", "txt"].includes(ext)) return { color: ACCENT, bg: "rgba(88,101,242,0.08)", label: ext.toUpperCase(), icon: FileText };
+  if (["yml", "yaml"].includes(ext)) return { color: "#10b981", bg: "rgba(16,185,129,0.08)", label: "YML", icon: File };
+  if (["java", "ts", "tsx", "js", "jsx"].includes(ext)) return { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", label: ext.toUpperCase(), icon: Code2 };
+  return { color: TEXT_TERTIARY, bg: "rgba(0,0,0,0.05)", label: ext ? ext.toUpperCase() : "FILE", icon: File };
+}
 
-export function SharedLibraryPage() {
-  const isLoading = false;
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const diffMs = Date.now() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "1d ago";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return `${Math.floor(diffDays / 7)}w ago`;
+}
+
+// ── 업로드 모달 ──
+function UploadModal({ projectId, onClose, onUploaded }: { projectId: number; onClose: () => void; onUploaded: (r: LibraryResource) => void }) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState<LibraryResourceCategory>("DOCS");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!title.trim()) { toast.error("제목을 입력해 주세요."); return; }
+    if (!file) { toast.error("업로드할 파일을 선택해 주세요."); return; }
+    setSubmitting(true);
+    try {
+      const uploaded = await uploadLibraryResource(projectId, file, title.trim(), category, description.trim() || undefined);
+      toast.success("자료가 업로드되었습니다.");
+      onUploaded(uploaded);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "업로드에 실패했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="w-full max-w-md rounded-2xl p-5 space-y-3" style={{ background: "#FAFAF7" }}>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>공유 자료 업로드</p>
+          <button onClick={onClose}><X className="w-4 h-4" style={{ color: TEXT_TERTIARY }} /></button>
+        </div>
+
+        <label className="block space-y-1">
+          <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>제목</span>
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="w-full px-2.5 py-1.5 text-[12px] rounded-lg outline-none"
+            style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+          />
+        </label>
+
+        <label className="block space-y-1">
+          <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>카테고리</span>
+          <select
+            value={category}
+            onChange={e => setCategory(e.target.value as LibraryResourceCategory)}
+            className="w-full px-2.5 py-1.5 text-[12px] rounded-lg outline-none"
+            style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+          >
+            {(["DOCS", "GUIDE", "REFERENCE", "TEMPLATE"] as const).map(c => (
+              <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block space-y-1">
+          <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>설명 (선택)</span>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={2}
+            className="w-full px-2.5 py-1.5 text-[12px] rounded-lg outline-none resize-none"
+            style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+          />
+        </label>
+
+        <label className="block space-y-1">
+          <span className="text-[10px] font-semibold" style={{ color: TEXT_LABEL }}>파일</span>
+          <input
+            type="file"
+            onChange={e => setFile(e.target.files?.[0] ?? null)}
+            className="w-full text-[11px]"
+          />
+        </label>
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-semibold"
+          style={{ background: ACCENT, color: "white" }}
+        >
+          {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+          업로드
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function SharedLibraryPage({ projectId }: { projectId: number }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [resources, setResources] = useState<LibraryResource[]>([]);
+  const [showUpload, setShowUpload] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [activeCategory, setActiveCategory] = useState<LibraryResourceCategory | "All">("All");
 
-  const filtered = RESOURCES.filter(r => {
+  const currentUsername = loadSession()?.username;
+
+  const load = () => {
+    if (!projectId) return;
+    setIsLoading(true);
+    setError(null);
+    fetchLibraryResources(projectId, { size: 100 })
+      .then(res => setResources(res.resources))
+      .catch((err: any) => setError(err?.message || "공유 자료를 불러오지 못했습니다."))
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(load, [projectId]);
+
+  const handleDownload = async (resource: LibraryResource) => {
+    try {
+      const updated = await viewLibraryResource(projectId, resource.id);
+      setResources(prev => prev.map(r => (r.id === resource.id ? updated : r)));
+    } catch {
+      // 조회수 반영에 실패해도 다운로드 자체는 계속 진행한다.
+    }
+    window.open(buildApiUrl(resource.fileUrl), "_blank", "noopener,noreferrer");
+  };
+
+  const handleDelete = async (resource: LibraryResource) => {
+    try {
+      await deleteLibraryResource(projectId, resource.id);
+      setResources(prev => prev.filter(r => r.id !== resource.id));
+      toast.success("삭제되었습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+    }
+  };
+
+  const filtered = resources.filter(r => {
     const matchCat = activeCategory === "All" || r.category === activeCategory;
-    const matchSearch = r.title.toLowerCase().includes(search.toLowerCase()) ||
-                        r.desc.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = r.title.toLowerCase().includes(q) || (r.description ?? "").toLowerCase().includes(q);
     return matchCat && matchSearch;
   });
 
-  const catCounts: Record<string, number> = { All: RESOURCES.length };
-  RESOURCES.forEach(r => { catCounts[r.category] = (catCounts[r.category] ?? 0) + 1; });
+  const catCounts: Record<string, number> = { All: resources.length };
+  resources.forEach(r => { catCounts[r.category] = (catCounts[r.category] ?? 0) + 1; });
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
@@ -88,12 +228,24 @@ export function SharedLibraryPage() {
                 <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>팀 문서 · 가이드 · 레퍼런스 · 템플릿</p>
               )}
             </div>
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold"
+              style={{ background: ACCENT, color: "white" }}
+            >
+              <Plus className="w-3.5 h-3.5" /> Upload
+            </button>
           </div>
+
+          {error && (
+            <div className="rounded-xl p-3 text-[11px]" style={{ background: "rgba(184,84,80,0.08)", color: "#B85450", border: `1px solid ${BORDER}` }}>
+              {error}
+            </div>
+          )}
 
           {/* ── 통계 바 ── */}
           <div className="grid grid-cols-4 gap-2">
             {isLoading ? (
-              /* [스켈레톤] 상단 요약 카드 4개 */
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                   <Skeleton className="w-7 h-7 rounded-lg shrink-0" />
@@ -105,10 +257,10 @@ export function SharedLibraryPage() {
               ))
             ) : (
               [
-                { label: "Total Resources", value: RESOURCES.length, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Layers    },
-                { label: "Docs",            value: catCounts.Docs ?? 0,      color: ACCENT,    bg: "rgba(112,130,56,0.07)",  icon: FileText  },
-                { label: "Guides",          value: catCounts.Guide ?? 0,     color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: BookMarked},
-                { label: "Templates",       value: catCounts.Template ?? 0,  color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: File      },
+                { label: "Total Resources", value: resources.length, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Layers    },
+                { label: "Docs",            value: catCounts.DOCS ?? 0,      color: ACCENT,    bg: "rgba(88,101,242,0.07)",  icon: FileText  },
+                { label: "Guides",          value: catCounts.GUIDE ?? 0,     color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: BookMarked},
+                { label: "Templates",       value: catCounts.TEMPLATE ?? 0,  color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: File      },
               ].map(s => {
                 const Icon = s.icon;
                 return (
@@ -160,7 +312,7 @@ export function SharedLibraryPage() {
                         color: activeCategory === cat ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
                       }}
                     >
-                      {cat}
+                      {cat === "All" ? "All" : CATEGORY_LABEL[cat]}
                       <span className="text-[9px] opacity-60">{catCounts[cat] ?? 0}</span>
                     </button>
                   ))}
@@ -172,7 +324,6 @@ export function SharedLibraryPage() {
           {/* ── 리소스 카드 그리드 ── */}
           <div className="grid grid-cols-2 gap-3">
             {isLoading ? (
-              /* [스켈레톤] 문서 카드 그리드 (6개) */
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="rounded-2xl p-4 transition-all" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -201,17 +352,20 @@ export function SharedLibraryPage() {
             ) : filtered.length === 0 ? (
               <div className="col-span-2 py-12 text-center rounded-2xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                 <BookOpen className="w-8 h-8 mx-auto mb-2" style={{ color: TEXT_TERTIARY }} />
-                <p className="text-xs" style={{ color: TEXT_TERTIARY }}>No resources found</p>
+                <p className="text-xs" style={{ color: TEXT_TERTIARY }}>
+                  {resources.length === 0 ? "아직 업로드된 자료가 없습니다." : "No resources found"}
+                </p>
               </div>
             ) : (
               filtered.map(r => {
-                const fm = FILE_META[r.fileType];
+                const fm = fileMeta(r.extension);
                 const cm = CAT_META[r.category];
                 const FIcon = fm.icon;
+                const canDelete = currentUsername && currentUsername === r.uploaderName;
                 return (
                   <div
                     key={r.id}
-                    className="rounded-2xl p-4 cursor-pointer transition-all hover:scale-[1.01]"
+                    className="rounded-2xl p-4 transition-all hover:scale-[1.01]"
                     style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
                   >
                     {/* 헤더 */}
@@ -223,30 +377,49 @@ export function SharedLibraryPage() {
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold truncate" style={{ color: TEXT_PRIMARY }}>{r.title}</p>
                           <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded inline-block mt-0.5" style={{ background: cm.bg, color: cm.color }}>
-                            {r.category}
+                            {CATEGORY_LABEL[r.category]}
                           </span>
                         </div>
                       </div>
                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: fm.bg, color: fm.color }}>
-                        .{r.fileType}
+                        .{r.extension || "file"}
                       </span>
                     </div>
 
                     {/* 설명 */}
-                    <p className="text-[10px] leading-relaxed line-clamp-2 mb-3" style={{ color: TEXT_SECONDARY }}>{r.desc}</p>
+                    {r.description && (
+                      <p className="text-[10px] leading-relaxed line-clamp-2 mb-3" style={{ color: TEXT_SECONDARY }}>{r.description}</p>
+                    )}
 
                     {/* 메타 */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                        <span>by {r.author}</span>
+                        <span>by {r.uploaderName}</span>
                         <span>·</span>
-                        <span>{r.updated}</span>
+                        <span>{formatRelativeTime(r.createdAt)}</span>
+                        <span>·</span>
+                        <span>{formatFileSize(r.fileSize)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{r.views} views</span>
-                        <button className="w-5 h-5 rounded-md flex items-center justify-center transition-all hover:scale-110" style={{ background: "rgba(0,0,0,0.05)" }}>
+                        <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{r.viewCount} views</span>
+                        <button
+                          onClick={() => handleDownload(r)}
+                          title="다운로드"
+                          className="w-5 h-5 rounded-md flex items-center justify-center transition-all hover:scale-110"
+                          style={{ background: "rgba(0,0,0,0.05)" }}
+                        >
                           <Download className="w-2.5 h-2.5" style={{ color: TEXT_SECONDARY }} />
                         </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDelete(r)}
+                            title="삭제"
+                            className="w-5 h-5 rounded-md flex items-center justify-center transition-all hover:scale-110"
+                            style={{ background: "rgba(184,84,80,0.10)" }}
+                          >
+                            <Trash2 className="w-2.5 h-2.5" style={{ color: "#B85450" }} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -257,6 +430,14 @@ export function SharedLibraryPage() {
 
         </div>
       </div>
+
+      {showUpload && (
+        <UploadModal
+          projectId={projectId}
+          onClose={() => setShowUpload(false)}
+          onUploaded={(r) => setResources(prev => [r, ...prev])}
+        />
+      )}
     </div>
   );
 }

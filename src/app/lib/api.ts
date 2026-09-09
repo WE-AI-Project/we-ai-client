@@ -1704,6 +1704,50 @@ export async function createProjectCommit(
   });
 }
 
+export type ProjectGitBranch = {
+  name: string;
+  current: boolean;
+  remote: boolean;
+  lastCommitHash: string | null;
+  lastCommitMessage: string | null;
+};
+
+export type ProjectGitCommitNode = {
+  commitHash: string;
+  shortCommitHash: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  committedAt: string;
+  branchNames: string[];
+};
+
+export type ProjectGitCommitEdge = {
+  from: string;
+  to: string;
+  type: string;
+};
+
+export type ProjectGitBranchGraph = {
+  projectId: number;
+  currentBranch: string | null;
+  branches: ProjectGitBranch[];
+  nodes: ProjectGitCommitNode[];
+  edges: ProjectGitCommitEdge[];
+};
+
+export async function fetchProjectBranchGraph(
+  projectId: number | string,
+  params?: { branch?: string; maxCount?: number; includeRemote?: boolean }
+): Promise<ProjectGitBranchGraph> {
+  const query = new URLSearchParams();
+  if (params?.branch) query.set("branch", params.branch);
+  if (params?.maxCount !== undefined) query.set("maxCount", String(params.maxCount));
+  if (params?.includeRemote !== undefined) query.set("includeRemote", String(params.includeRemote));
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return request<ProjectGitBranchGraph>(`/api/v1/projects/${projectId}/changes/branches/graph${qs}`, { method: "GET" });
+}
+
 export type ConventionIssue = {
   target: string;
   code: string;
@@ -1810,6 +1854,77 @@ export async function fetchQaReportDetail(
   qaReportId: number | string
 ): Promise<QaReportDetail> {
   return request<QaReportDetail>(`/api/v1/projects/${projectId}/qa/reports/${qaReportId}`, { method: "GET" });
+}
+
+// ── 공유 자료실 (Shared Library) ──
+
+export type LibraryResourceCategory = "DOCS" | "GUIDE" | "REFERENCE" | "TEMPLATE";
+
+export type LibraryResource = {
+  id: number;
+  title: string;
+  category: LibraryResourceCategory;
+  description: string | null;
+  originalFileName: string;
+  fileUrl: string;
+  fileSize: number;
+  extension: string;
+  uploaderName: string;
+  viewCount: number;
+  createdAt: string;
+};
+
+export type LibraryResourceListResult = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  resources: LibraryResource[];
+};
+
+export async function fetchLibraryResources(
+  projectId: number | string,
+  params?: { page?: number; size?: number; category?: LibraryResourceCategory }
+): Promise<LibraryResourceListResult> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.category) query.set("category", params.category);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return request<LibraryResourceListResult>(`/api/v1/projects/${projectId}/library${qs}`, { method: "GET" });
+}
+
+export async function uploadLibraryResource(
+  projectId: number | string,
+  file: File,
+  title: string,
+  category: LibraryResourceCategory,
+  description?: string
+): Promise<LibraryResource> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("title", title);
+  formData.append("category", category);
+  if (description) formData.append("description", description);
+  return request<LibraryResource>(`/api/v1/projects/${projectId}/library`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function viewLibraryResource(
+  projectId: number | string,
+  resourceId: number
+): Promise<LibraryResource> {
+  return request<LibraryResource>(`/api/v1/projects/${projectId}/library/${resourceId}/view`, { method: "POST" });
+}
+
+export async function deleteLibraryResource(
+  projectId: number | string,
+  resourceId: number
+): Promise<void> {
+  await request<void>(`/api/v1/projects/${projectId}/library/${resourceId}`, { method: "DELETE" });
 }
 
 

@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
-import { BarChart2, TrendingUp, GitCommit, CheckSquare, Bot } from "lucide-react";
+import { BarChart2, TrendingUp, GitCommit, CheckSquare, ListTodo } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
   CONTENT_BG,
 } from "../colors";
+import {
+  fetchProjectBranchGraph,
+  fetchProjectSchedules,
+  type ProjectSchedule,
+} from "../lib/api";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -18,39 +23,6 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
     />
   );
 }
-
-// 지난 14일 커밋 + 작업완료 라인 데이터
-const DAILY_ACTIVITY = [
-  { date: "Mar 17", commits: 1, tasks: 2 }, { date: "Mar 18", commits: 0, tasks: 1 },
-  { date: "Mar 19", commits: 2, tasks: 3 }, { date: "Mar 20", commits: 3, tasks: 2 },
-  { date: "Mar 21", commits: 1, tasks: 0 }, { date: "Mar 22", commits: 0, tasks: 0 },
-  { date: "Mar 23", commits: 0, tasks: 0 }, { date: "Mar 24", commits: 4, tasks: 5 },
-  { date: "Mar 25", commits: 2, tasks: 3 }, { date: "Mar 26", commits: 1, tasks: 2 },
-  { date: "Mar 27", commits: 3, tasks: 4 }, { date: "Mar 28", commits: 2, tasks: 3 },
-  { date: "Mar 29", commits: 1, tasks: 2 }, { date: "Mar 30", commits: 3, tasks: 3 },
-];
-
-// 주별 작업 완료 막대 데이터
-const WEEKLY_TASKS = [
-  { week: "W1 (Mar 3)",  todo: 8, done: 5, backlog: 3 },
-  { week: "W2 (Mar 10)", todo: 10, done: 7, backlog: 3 },
-  { week: "W3 (Mar 17)", todo: 9,  done: 6, backlog: 2 },
-  { week: "W4 (Mar 24)", todo: 11, done: 8, backlog: 4 },
-];
-
-// 에이전트 성능 요약
-const AGENT_PERF = [
-  { name: "DataSync Alpha",  uptime: "99.1%", tasksCompleted: 142, avgCpu: 38, status: "running" },
-  { name: "Classifier Beta", uptime: "97.3%", tasksCompleted: 89,  avgCpu: 72, status: "running" },
-  { name: "Logger Gamma",    uptime: "99.8%", tasksCompleted: 201, avgCpu: 4,  status: "idle"    },
-  { name: "Parser Delta",    uptime: "81.2%", tasksCompleted: 54,  avgCpu: 0,  status: "error"   },
-  { name: "Scheduler Eps",   uptime: "98.6%", tasksCompleted: 118, avgCpu: 18, status: "running" },
-  { name: "Analyzer Zeta",   uptime: "96.4%", tasksCompleted: 77,  avgCpu: 5,  status: "idle"    },
-];
-
-const STATUS_COLOR: Record<string, string> = {
-  running: "#10b981", idle: "#9ca3af", error: "#ef4444",
-};
 
 const RANGES = ["7 Days", "14 Days", "30 Days"] as const;
 
@@ -66,18 +38,117 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function AnalyticsPage() {
-  const [range, setRange] = useState<string>("14 Days");
-  
-  const isLoading = false;
+function dateKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
 
-  const sliceCount = range === "7 Days" ? 7 : range === "14 Days" ? 14 : 14;
-  const chartData = DAILY_ACTIVITY.slice(-sliceCount);
+function dateLabel(key: string): string {
+  const d = new Date(`${key}T00:00:00`);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function isDoneStatus(status: ProjectSchedule["status"]): boolean {
+  return status === "DONE" || status === "COMPLETED";
+}
+
+function isoWeekLabel(d: Date): string {
+  const monday = new Date(d);
+  const day = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - day);
+  return `${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+}
+
+export function AnalyticsPage({ projectId }: { projectId: number }) {
+  const [range, setRange] = useState<string>("14 Days");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [commitDates, setCommitDates] = useState<string[]>([]);
+  const [schedules, setSchedules] = useState<ProjectSchedule[]>([]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    Promise.all([
+      fetchProjectBranchGraph(projectId, { maxCount: 300 }),
+      fetchProjectSchedules(projectId),
+    ])
+      .then(([graph, scheduleList]) => {
+        if (cancelled) return;
+        setCommitDates(graph.nodes.map(n => n.committedAt));
+        setSchedules(scheduleList.schedules);
+      })
+      .catch((err: any) => { if (!cancelled) setError(err?.message || "분석 데이터를 불러오지 못했습니다."); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  const sliceCount = range === "7 Days" ? 7 : range === "14 Days" ? 14 : 30;
+
+  // 실제 커밋(branch graph)과 실제 완료 일정(schedule endDate)을 날짜별로 집계한다.
+  const chartData = useMemo(() => {
+    const days: { date: string; key: string; commits: number; tasks: number }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = sliceCount - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = dateKey(d);
+      days.push({ date: dateLabel(key), key, commits: 0, tasks: 0 });
+    }
+    const byKey = new Map(days.map(d => [d.key, d]));
+
+    commitDates.forEach(iso => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return;
+      const row = byKey.get(dateKey(d));
+      if (row) row.commits += 1;
+    });
+
+    schedules.forEach(s => {
+      if (!isDoneStatus(s.status) || !s.endDate) return;
+      const d = new Date(s.endDate);
+      if (Number.isNaN(d.getTime())) return;
+      const row = byKey.get(dateKey(d));
+      if (row) row.tasks += 1;
+    });
+
+    return days;
+  }, [commitDates, schedules, sliceCount]);
+
+  // 최근 4주간 일정 상태(todo/done/backlog)를 실제 데이터로 집계한다.
+  const weeklyTasks = useMemo(() => {
+    const weeks: { week: string; weekStart: Date; todo: number; done: number; backlog: number }[] = [];
+    const today = new Date();
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() - i * 7);
+      weeks.push({ week: `W${4 - i} (${isoWeekLabel(weekStart)})`, weekStart, todo: 0, done: 0, backlog: 0 });
+    }
+
+    schedules.forEach(s => {
+      const reference = s.endDate || s.createdAt;
+      const d = new Date(reference);
+      if (Number.isNaN(d.getTime())) return;
+      // 각 일정을 가장 가까운(이전) 주 버킷에 배정한다.
+      let bucket = weeks[0];
+      for (const w of weeks) {
+        if (d >= w.weekStart) bucket = w;
+      }
+      if (isDoneStatus(s.status)) bucket.done += 1;
+      else if (s.status === "HOLD") bucket.backlog += 1;
+      else bucket.todo += 1;
+    });
+
+    return weeks;
+  }, [schedules]);
 
   const totalCommits = chartData.reduce((s, d) => s + d.commits, 0);
-  const totalTasks   = chartData.reduce((s, d) => s + d.tasks, 0);
-  const activeAgents = AGENT_PERF.filter(a => a.status === "running").length;
-  const avgUptime    = (AGENT_PERF.reduce((s, a) => s + parseFloat(a.uptime), 0) / AGENT_PERF.length).toFixed(1);
+  const totalTasksDone = chartData.reduce((s, d) => s + d.tasks, 0);
+  const openTasks = schedules.filter(s => s.status === "TODO" || s.status === "IN_PROGRESS").length;
+  const doneCount = schedules.filter(s => isDoneStatus(s.status)).length;
+  const completionRate = schedules.length > 0 ? Math.round((doneCount / schedules.length) * 100) : 0;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
@@ -94,12 +165,11 @@ export function AnalyticsPage() {
               {isLoading ? (
                 <Skeleton className="w-48 h-3 mt-1.5" />
               ) : (
-                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>프로젝트 활동 · 작업 트렌드 · 에이전트 성능</p>
+                <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>프로젝트 활동 · 작업 트렌드 (실제 커밋/일정 데이터)</p>
               )}
             </div>
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
               {isLoading ? (
-                /* [스켈레톤] 기간 선택 탭 */
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="w-[52px] h-6 rounded-lg mx-0.5" />
                 ))
@@ -121,10 +191,15 @@ export function AnalyticsPage() {
             </div>
           </div>
 
+          {error && (
+            <div className="rounded-xl p-3 text-[11px]" style={{ background: "rgba(184,84,80,0.08)", color: "#B85450", border: `1px solid ${BORDER}` }}>
+              {error}
+            </div>
+          )}
+
           {/* ── 요약 통계 ── */}
           <div className="grid grid-cols-4 gap-2.5">
             {isLoading ? (
-              /* [스켈레톤] 상단 요약 카드 4개 */
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
                   <Skeleton className="w-6 h-6 rounded-lg mb-2" />
@@ -134,10 +209,10 @@ export function AnalyticsPage() {
               ))
             ) : (
               [
-                { label: "Commits",       value: totalCommits, color: ACCENT,    bg: "rgba(112,130,56,0.07)",  icon: GitCommit    },
-                { label: "Tasks Done",    value: totalTasks,   color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: CheckSquare  },
-                { label: "Active Agents", value: activeAgents, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Bot          },
-                { label: "Avg Uptime",    value: `${avgUptime}%`, color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: TrendingUp },
+                { label: "Commits",         value: totalCommits,        color: ACCENT,    bg: "rgba(88,101,242,0.07)",  icon: GitCommit   },
+                { label: "Tasks Done",      value: totalTasksDone,      color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: CheckSquare },
+                { label: "Open Tasks",      value: openTasks,           color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: ListTodo    },
+                { label: "Completion Rate", value: `${completionRate}%`, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: TrendingUp },
               ].map(s => {
                 const Icon = s.icon;
                 return (
@@ -156,7 +231,6 @@ export function AnalyticsPage() {
           {/* ── 일별 활동 라인 차트 ── */}
           <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             {isLoading ? (
-              /* [스켈레톤] 라인 차트 영역 */
               <>
                 <Skeleton className="w-64 h-3.5 mb-4" />
                 <Skeleton className="w-full h-[180px] rounded-xl" />
@@ -182,7 +256,6 @@ export function AnalyticsPage() {
           {/* ── 주별 태스크 막대 차트 ── */}
           <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             {isLoading ? (
-              /* [스켈레톤] 막대 차트 영역 */
               <>
                 <Skeleton className="w-40 h-3.5 mb-4" />
                 <Skeleton className="w-full h-[150px] rounded-xl" />
@@ -191,7 +264,7 @@ export function AnalyticsPage() {
               <>
                 <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Weekly Task Progress</p>
                 <ResponsiveContainer width="100%" height={150}>
-                  <BarChart id="analytics-weekly-bar" data={WEEKLY_TASKS} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={12}>
+                  <BarChart id="analytics-weekly-bar" data={weeklyTasks} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={12}>
                     <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
                     <XAxis dataKey="week" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} allowDecimals={false} />
@@ -203,74 +276,6 @@ export function AnalyticsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </>
-            )}
-          </div>
-
-          {/* ── 에이전트 성능 테이블 ── */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
-            <div className="px-4 py-3" style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(247,247,245,0.8)" }}>
-              {isLoading ? (
-                <Skeleton className="w-48 h-3.5" />
-              ) : (
-                <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Agent Performance Summary</p>
-              )}
-            </div>
-            
-            <div className="grid text-[10px] font-semibold px-4 py-2" style={{ gridTemplateColumns: "1fr 80px 100px 80px 60px", color: TEXT_LABEL, borderBottom: `1px solid ${BORDER}` }}>
-              {isLoading ? (
-                /* [스켈레톤] 테이블 헤더 */
-                <>
-                  <Skeleton className="h-2.5 w-12" />
-                  <Skeleton className="h-2.5 w-10" />
-                  <Skeleton className="h-2.5 w-16" />
-                  <Skeleton className="h-2.5 w-12" />
-                  <Skeleton className="h-2.5 w-10" />
-                </>
-              ) : (
-                <>
-                  <span>Agent</span>
-                  <span>Status</span>
-                  <span>Tasks Done</span>
-                  <span>Avg CPU</span>
-                  <span>Uptime</span>
-                </>
-              )}
-            </div>
-
-            {isLoading ? (
-              /* [스켈레톤] 테이블 본문 행 (6줄) */
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="grid px-4 py-3 items-center gap-4" style={{ gridTemplateColumns: "1fr 80px 100px 80px 60px", borderBottom: i < 5 ? `1px solid rgba(0,0,0,0.04)` : "none" }}>
-                  <Skeleton className="h-3 w-28" />
-                  <Skeleton className="h-3 w-14 rounded-full" />
-                  <Skeleton className="h-3 w-6" />
-                  <Skeleton className="h-2.5 w-16 rounded-full" />
-                  <Skeleton className="h-3 w-10" />
-                </div>
-              ))
-            ) : (
-              /* 실제 데이터 렌더링 */
-              AGENT_PERF.map((a, i) => (
-                <div
-                  key={a.name}
-                  className="grid px-4 py-2.5 items-center text-xs hover:bg-black/[0.02] transition-colors"
-                  style={{ gridTemplateColumns: "1fr 80px 100px 80px 60px", borderBottom: i < AGENT_PERF.length - 1 ? `1px solid rgba(0,0,0,0.04)` : "none" }}
-                >
-                  <span className="font-medium" style={{ color: TEXT_PRIMARY }}>{a.name}</span>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLOR[a.status] }} />
-                    <span className="capitalize text-[10px]" style={{ color: TEXT_SECONDARY }}>{a.status}</span>
-                  </div>
-                  <span className="text-[10px] font-mono" style={{ color: TEXT_PRIMARY }}>{a.tasksCompleted}</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-10 h-1 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.07)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${a.avgCpu}%`, background: a.avgCpu > 70 ? "#ef4444" : ACCENT }} />
-                    </div>
-                    <span className="text-[10px] font-mono" style={{ color: TEXT_TERTIARY }}>{a.avgCpu}%</span>
-                  </div>
-                  <span className="text-[10px] font-mono" style={{ color: TEXT_SECONDARY }}>{a.uptime}</span>
-                </div>
-              ))
             )}
           </div>
 

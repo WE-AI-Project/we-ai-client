@@ -21,6 +21,9 @@ import {
   X,
   Menu,
   ChevronsUpDown,
+  BarChart2,
+  BookOpen,
+  ClipboardCheck,
 } from "lucide-react";
 
 // ── 페이지 컴포넌트 ──
@@ -40,6 +43,9 @@ import { CalendarPage } from "./components/CalendarPage";
 import { ServerBuildPage } from "./components/ServerBuildPage";
 import { NotificationsPage } from "./components/NotificationsPage";
 import { TasksPage } from "./components/TasksPage";
+import { QAReportsPage } from "./components/QAReportsPage";
+import { AnalyticsPage } from "./components/AnalyticsPage";
+import { SharedLibraryPage } from "./components/SharedLibraryPage";
 import type { CommitFile } from "./components/commitData";
 import { loadProfile, saveProfile } from "./data/profileStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
@@ -146,17 +152,21 @@ const NAV_ITEMS = [
   { id: "Chat", icon: MessageCircle, label: "Chat" },
   { id: "Calendar", icon: CalendarDays, label: "Calendar" },
   { id: "Galaxy", icon: Orbit, label: "SynAIpse Galaxy" },
+  { id: "Analytics", icon: BarChart2, label: "Analytics" },
 ] as const;
 
 const SYSTEM_ITEMS = [
   { id: "EnvSettings", icon: Settings, label: "Environment" },
   { id: "AIQA", icon: ShieldCheck, label: "QA & Agents" },
+  { id: "QAReports", icon: ClipboardCheck, label: "QA Reports" },
+  { id: "SharedLibrary", icon: BookOpen, label: "Shared Library" },
   { id: "ProjectSettings", icon: FolderGit2, label: "Project Settings" },
 ] as const;
 
 type NavId =
   | "Dashboard" | "Changes" | "Commits" | "ServerBuild"
   | "Chat" | "Calendar" | "EnvSettings" | "AIQA"
+  | "QAReports" | "SharedLibrary" | "Analytics"
   | "ProjectSettings" | "Profile" | "Galaxy" | "Notifications" | "Tasks";
 
 const TAB_LABELS: Record<NavId, string> = {
@@ -168,6 +178,9 @@ const TAB_LABELS: Record<NavId, string> = {
   Calendar: "Calendar",
   EnvSettings: "Environment",
   AIQA: "QA & Agents",
+  QAReports: "QA Reports",
+  SharedLibrary: "Shared Library",
+  Analytics: "Analytics",
   ProjectSettings: "Project Settings",
   Profile: "Profile",
   Galaxy: "SynAIpse Galaxy",
@@ -630,9 +643,12 @@ export default function App() {
       case "Calendar": return <CalendarPage projectId={projectId} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage projectId={projectId} />;
+      case "QAReports": return <QAReportsPage projectId={projectId ?? 0} />;
+      case "SharedLibrary": return <SharedLibraryPage projectId={projectId ?? 0} />;
+      case "Analytics": return <AnalyticsPage projectId={projectId ?? 0} />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;
       case "Profile": return <ProfilePage projectId={projectId} />;
-      case "Galaxy": return <SynAIpseGalaxyPage />;
+      case "Galaxy": return <SynAIpseGalaxyPage projectId={projectId ?? 0} projectName={projectName} />;
       case "Notifications": return <NotificationsPage projectId={projectId} />;
       case "Tasks": return <TasksPage projectId={projectId} />;
       default: return <DashboardPage projectId={projectId} projectName={projectName} />;

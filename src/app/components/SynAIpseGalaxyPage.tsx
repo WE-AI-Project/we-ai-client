@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import { GitMerge, Loader2, Network, Radio } from "lucide-react";
+import { GitBranch, Loader2, Network } from "lucide-react";
+import { fetchProjectBranchGraph, type ProjectGitBranchGraph } from "../lib/api";
 
-type NodeStatus = "working" | "merged";
-type NodeLevel = "project" | "repo" | "branch" | "commit";
-type RepoKey = "project" | "client" | "server";
+type NodeLevel = "project" | "branch" | "commit";
 
 type GalaxyNode = {
   id: string;
   name: string;
   level: NodeLevel;
-  repo: RepoKey;
+  isCurrent: boolean;
   author: string;
-  status: NodeStatus;
   createdAt: string;
   summary: string;
   x?: number;
@@ -32,485 +30,79 @@ type GalaxyGraph = {
   links: GalaxyLink[];
 };
 
-type ThemeTokens = {
-  background: string;
-  foreground: string;
-  node: string;
-  card: string;
-  border: string;
-  muted: string;
-  primary: string;
-  primaryForeground: string;
-  repoColors: Record<RepoKey, string>;
+const THEME = {
+  background: "#050604",
+  foreground: "#F7F7F2",
+  node: "#F5F6F0",
+  card: "#11130D",
+  border: "rgba(245,246,240,0.14)",
+  muted: "#A4A89A",
+  primary: "#F5F6F0",
+  primaryForeground: "#050604",
+  accentCurrent: "#5865F2",
+  accentOther: "#A9ACA3",
 };
 
-const STATUS_LABEL: Record<NodeStatus, string> = {
-  working: "작업 중",
-  merged: "머지 완료",
-};
+/** 실제 프로젝트의 브랜치 그래프(GET /changes/branches/graph)를 시각화용 그래프 구조로 변환한다. */
+function buildGalaxyGraph(data: ProjectGitBranchGraph, projectName: string): GalaxyGraph {
+  const nodes: GalaxyNode[] = [];
+  const links: GalaxyLink[] = [];
+  const nodeIds = new Set<string>();
 
-const STATUS_SUMMARY = [
-  { label: "Working", status: "working" as const },
-  { label: "Merged", status: "merged" as const },
-];
+  const rootId = "project-root";
+  nodes.push({
+    id: rootId,
+    name: projectName,
+    level: "project",
+    isCurrent: true,
+    author: "",
+    createdAt: "",
+    summary: `현재 브랜치: ${data.currentBranch ?? "—"}`,
+  });
+  nodeIds.add(rootId);
 
-const synaipseGalaxyData: GalaxyGraph = {
-  nodes: [
-    {
-      id: "project-synaipse",
-      name: "SynAIpse",
-      level: "project",
-      repo: "project",
-      author: "WE-AI-Project",
-      status: "merged",
-      createdAt: "2026-03-28",
-      summary: "GitHub organization 기준 프로젝트 중심점",
-      x: 0,
-      y: 0,
-    },
-    {
-      id: "repo-client",
-      name: "we-ai-client",
-      level: "repo",
-      repo: "client",
-      author: "Frontend Team",
-      status: "working",
-      createdAt: "2026-03-30",
-      summary: "React/Vite 프론트엔드 레포",
-      x: -150,
-      y: -40,
-    },
-    {
-      id: "repo-server",
-      name: "we-ai-server",
-      level: "repo",
-      repo: "server",
-      author: "Backend Team",
-      status: "working",
-      createdAt: "2026-03-28",
-      summary: "Spring Boot 백엔드와 배포/AI API 레포",
-      x: 150,
-      y: 40,
-    },
+  data.branches.forEach((branch) => {
+    const branchId = `branch-${branch.name}`;
+    nodes.push({
+      id: branchId,
+      name: branch.name,
+      level: "branch",
+      isCurrent: branch.current,
+      author: "",
+      createdAt: "",
+      summary: branch.lastCommitMessage ?? "커밋 없음",
+    });
+    nodeIds.add(branchId);
+    links.push({ source: rootId, target: branchId, distance: 110 });
 
-    {
-      id: "client-main",
-      name: "main",
-      level: "branch",
-      repo: "client",
-      author: "kimminhyeok",
-      status: "merged",
-      createdAt: "2026-07-19",
-      summary: "09223af · npm 취약성 문제 수정",
-    },
-    {
-      id: "client-mgjAPI",
-      name: "mgjAPI",
-      level: "branch",
-      repo: "client",
-      author: "alsrudwns",
-      status: "working",
-      createdAt: "2026-07-19",
-      summary: ".env.local-backend 파일 추가, package 설정 수정",
-    },
-    {
-      id: "client-ProjectAPI",
-      name: "ProjectAPI",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-07-17",
-      summary: "프로젝트 API 연동 브랜치",
-    },
-    {
-      id: "client-NewPage",
-      name: "NewPage",
-      level: "branch",
-      repo: "client",
-      author: "alsrudwns",
-      status: "working",
-      createdAt: "2026-06-15",
-      summary: "스켈레톤 수정, 로그인 창 및 팝업창 수정",
-    },
-    {
-      id: "client-SkeletonUI",
-      name: "SkeletonUI",
-      level: "branch",
-      repo: "client",
-      author: "alsrudwns",
-      status: "working",
-      createdAt: "2026-06-14",
-      summary: "스크롤바 전체 제거, 분할 화면 수정, 캘린더 수정",
-    },
-    {
-      id: "client-Calendar",
-      name: "Calendar",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-06-13",
-      summary: "CalendarCard 작업",
-    },
-    {
-      id: "client-choice",
-      name: "choice",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-06-12",
-      summary: "CodePartModify, multi-choice 흐름",
-    },
-    {
-      id: "client-projectName",
-      name: "projectName",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-06-11",
-      summary: "SystemMenu 작업",
-    },
-    {
-      id: "client-sideBarSplit",
-      name: "sideBarSplit",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-05-19",
-      summary: "사이드바 분할 화면",
-    },
-    {
-      id: "client-headerBar",
-      name: "headerBar",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-05-18",
-      summary: "상단 헤더바 UI 작업",
-    },
-    {
-      id: "client-pwConstraint",
-      name: "pwConstraint",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-05-18",
-      summary: "비밀번호 제약 조건 UI",
-    },
-    {
-      id: "client-signupApi",
-      name: "signupApi",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-05-17",
-      summary: "회원가입 API 병합 브랜치",
-    },
-    {
-      id: "client-Profile",
-      name: "Profile",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-04-13",
-      summary: "TeamProfile 화면",
-    },
-    {
-      id: "client-mgj",
-      name: "mgj",
-      level: "branch",
-      repo: "client",
-      author: "alsrudwns",
-      status: "working",
-      createdAt: "2026-04-13",
-      summary: "로그아웃, 채팅 추가 기능 화면",
-    },
-    {
-      id: "client-Login",
-      name: "Login",
-      level: "branch",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "working",
-      createdAt: "2026-03-30",
-      summary: "login upupdate",
-    },
-    {
-      id: "client-Signin",
-      name: "Signin",
-      level: "branch",
-      repo: "client",
-      author: "alsrudwns",
-      status: "working",
-      createdAt: "2026-03-30",
-      summary: "회원가입 페이지 수정본",
-    },
+    if (branch.lastCommitHash) {
+      links.push({ source: branchId, target: branch.lastCommitHash, distance: 40 });
+    }
+  });
 
-    {
-      id: "server-main",
-      name: "main",
-      level: "branch",
-      repo: "server",
-      author: "yongh465",
-      status: "merged",
-      createdAt: "2026-07-20",
-      summary: "5fb6f45 · 라즈베리파이 자동 배포 워크플로우",
-    },
-    {
-      id: "server-notification",
-      name: "notification",
-      level: "branch",
-      repo: "server",
-      author: "kimminhyeok",
-      status: "working",
-      createdAt: "2026-07-19",
-      summary: "내 알림 목록 조회, 읽음 처리, 전체 읽음, 삭제 API",
-    },
-    {
-      id: "server-daily",
-      name: "daily",
-      level: "branch",
-      repo: "server",
-      author: "kimminhyeok",
-      status: "working",
-      createdAt: "2026-07-19",
-      summary: "프로젝트 나가기, 멤버 추방, 초대 코드 재발급, 보관, 삭제",
-    },
-    {
-      id: "server-profile",
-      name: "profile",
-      level: "branch",
-      repo: "server",
-      author: "kimminhyeok",
-      status: "working",
-      createdAt: "2026-07-12",
-      summary: "프로필 API 수정",
-    },
-    {
-      id: "server-commits",
-      name: "commits",
-      level: "branch",
-      repo: "server",
-      author: "kimminhyeok",
-      status: "working",
-      createdAt: "2026-06-11",
-      summary: "커밋 조회 API 4개 구현",
-    },
-    {
-      id: "server-AI",
-      name: "AI",
-      level: "branch",
-      repo: "server",
-      author: "where-is-the-error",
-      status: "working",
-      createdAt: "2026-05-18",
-      summary: "AI 기본 폴더와 설정",
-    },
-    {
-      id: "server-projectCreate",
-      name: "feature-WEAI-projectCreate",
-      level: "branch",
-      repo: "server",
-      author: "kimminhyeok",
-      status: "working",
-      createdAt: "2026-05-03",
-      summary: "프로젝트 생성, 내 프로젝트 목록, 초대 코드 참여 API",
-    },
-    {
-      id: "server-socialLogin",
-      name: "social-login-and-Signin",
-      level: "branch",
-      repo: "server",
-      author: "김민혁",
-      status: "working",
-      createdAt: "2026-04-12",
-      summary: "소셜 로그인 3개 API 구현",
-    },
-
-    {
-      id: "commit-client-login-merge",
-      name: "dfeb27e",
+  data.nodes.forEach((commit) => {
+    nodes.push({
+      id: commit.commitHash,
+      name: commit.shortCommitHash,
       level: "commit",
-      repo: "client",
-      author: "alsrudwns",
-      status: "merged",
-      createdAt: "2026-07-11",
-      summary: "LoginScreen 충돌 해결 및 로그인 API 병합",
-    },
-    {
-      id: "commit-client-ai-ui",
-      name: "e39c1a5",
-      level: "commit",
-      repo: "client",
-      author: "where-is-the-error",
-      status: "merged",
-      createdAt: "2026-06-29",
-      summary: "Remove simulated loading & add AI agent features",
-    },
-    {
-      id: "commit-client-local-stack",
-      name: "43f2811",
-      level: "commit",
-      repo: "client",
-      author: "where-is-the-error",
-      status: "merged",
-      createdAt: "2026-06-15",
-      summary: "Add local project stack detection",
-    },
-    {
-      id: "commit-client-dashboard",
-      name: "1df7593",
-      level: "commit",
-      repo: "client",
-      author: "JiHyeon-9",
-      status: "merged",
-      createdAt: "2026-06-14",
-      summary: "DashboardApi",
-    },
-    {
-      id: "commit-server-rag",
-      name: "59db6ee",
-      level: "commit",
-      repo: "server",
-      author: "where-is-the-error",
-      status: "merged",
-      createdAt: "2026-06-13",
-      summary: "RAG-backed AI features and controllers",
-    },
-    {
-      id: "commit-server-ai-health",
-      name: "74c296a",
-      level: "commit",
-      repo: "server",
-      author: "where-is-the-error",
-      status: "merged",
-      createdAt: "2026-06-15",
-      summary: "AI health checks and project-aware automation",
-    },
-    {
-      id: "commit-server-notification",
-      name: "7cc3251",
-      level: "commit",
-      repo: "server",
-      author: "kimminhyeok",
-      status: "merged",
-      createdAt: "2026-07-19",
-      summary: "알림 API 구현",
-    },
-    {
-      id: "commit-server-daily",
-      name: "2254999",
-      level: "commit",
-      repo: "server",
-      author: "kimminhyeok",
-      status: "merged",
-      createdAt: "2026-07-19",
-      summary: "프로젝트 관리 API 구현",
-    },
-    {
-      id: "commit-server-deploy",
-      name: "5fb6f45",
-      level: "commit",
-      repo: "server",
-      author: "yongh465",
-      status: "merged",
-      createdAt: "2026-07-20",
-      summary: "라즈베리파이 자동 배포 워크플로우",
-    },
-  ],
-  links: [
-    { source: "project-synaipse", target: "repo-client", distance: 145 },
-    { source: "project-synaipse", target: "repo-server", distance: 145 },
+      isCurrent: commit.branchNames.includes(data.currentBranch ?? ""),
+      author: commit.authorName,
+      createdAt: commit.committedAt,
+      summary: commit.message,
+    });
+    nodeIds.add(commit.commitHash);
+  });
 
-    { source: "repo-client", target: "client-main", distance: 92 },
-    { source: "repo-client", target: "client-mgjAPI", distance: 112 },
-    { source: "repo-client", target: "client-ProjectAPI", distance: 112 },
-    { source: "repo-client", target: "client-NewPage", distance: 112 },
-    { source: "repo-client", target: "client-SkeletonUI", distance: 112 },
-    { source: "repo-client", target: "client-Calendar", distance: 112 },
-    { source: "repo-client", target: "client-choice", distance: 112 },
-    { source: "repo-client", target: "client-projectName", distance: 112 },
-    { source: "repo-client", target: "client-sideBarSplit", distance: 112 },
-    { source: "repo-client", target: "client-headerBar", distance: 112 },
-    { source: "repo-client", target: "client-pwConstraint", distance: 112 },
-    { source: "repo-client", target: "client-signupApi", distance: 112 },
-    { source: "repo-client", target: "client-Profile", distance: 112 },
-    { source: "repo-client", target: "client-mgj", distance: 112 },
-    { source: "repo-client", target: "client-Login", distance: 112 },
-    { source: "repo-client", target: "client-Signin", distance: 112 },
+  data.edges.forEach((edge) => {
+    if (nodeIds.has(edge.from) && nodeIds.has(edge.to)) {
+      links.push({ source: edge.from, target: edge.to, distance: 26 });
+    }
+  });
 
-    { source: "repo-server", target: "server-main", distance: 92 },
-    { source: "repo-server", target: "server-notification", distance: 112 },
-    { source: "repo-server", target: "server-daily", distance: 112 },
-    { source: "repo-server", target: "server-profile", distance: 112 },
-    { source: "repo-server", target: "server-commits", distance: 112 },
-    { source: "repo-server", target: "server-AI", distance: 112 },
-    { source: "repo-server", target: "server-projectCreate", distance: 112 },
-    { source: "repo-server", target: "server-socialLogin", distance: 112 },
+  // branch -> lastCommitHash 링크 중, 해당 커밋이 nodes에 없는 경우(maxCount로 잘린 경우) 제거
+  const validLinks = links.filter((l) => nodeIds.has(typeof l.source === "string" ? l.source : l.source.id) && nodeIds.has(typeof l.target === "string" ? l.target : l.target.id));
 
-    { source: "client-mgjAPI", target: "commit-client-login-merge", distance: 34 },
-    { source: "client-main", target: "commit-client-ai-ui", distance: 30 },
-    { source: "client-NewPage", target: "commit-client-local-stack", distance: 30 },
-    { source: "client-main", target: "commit-client-dashboard", distance: 30 },
-    { source: "server-AI", target: "commit-server-rag", distance: 30 },
-    { source: "server-AI", target: "commit-server-ai-health", distance: 30 },
-    { source: "server-notification", target: "commit-server-notification", distance: 34 },
-    { source: "server-daily", target: "commit-server-daily", distance: 34 },
-    { source: "server-main", target: "commit-server-deploy", distance: 28 },
-  ],
-};
-
-function useThemeTokens(): ThemeTokens {
-  const [tokens, setTokens] = useState<ThemeTokens>(() => ({
-    background: "#050604",
-    foreground: "#F7F7F2",
-    node: "#F5F6F0",
-    card: "#11130D",
-    border: "rgba(245,246,240,0.14)",
-    muted: "#A4A89A",
-    primary: "#F5F6F0",
-    primaryForeground: "#050604",
-    repoColors: {
-      project: "#F5F6F0",
-      client: "#D6D8D1",
-      server: "#A9ACA3",
-    },
-  }));
-
-  useEffect(() => {
-    const readTokens = () => {
-      setTokens({
-        background: "#050604",
-        foreground: "#F7F7F2",
-        node: "#F5F6F0",
-        card: "#11130D",
-        border: "rgba(245,246,240,0.14)",
-        muted: "#A4A89A",
-        primary: "#F5F6F0",
-        primaryForeground: "#050604",
-        repoColors: {
-          project: "#F5F6F0",
-          client: "#D6D8D1",
-          server: "#A9ACA3",
-        },
-      });
-    };
-
-    readTokens();
-    const observer = new MutationObserver(readTokens);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
-    return () => observer.disconnect();
-  }, []);
-
-  return tokens;
+  return { nodes, links: validLinks };
 }
 
 function useElementSize<T extends HTMLElement>() {
@@ -534,59 +126,29 @@ function useElementSize<T extends HTMLElement>() {
   return { ref, size };
 }
 
-function daysSince(date: string) {
-  const created = new Date(`${date}T00:00:00`);
-  const diff = Date.now() - created.getTime();
-  return Math.max(0, Math.floor(diff / 86_400_000));
-}
-
 function nodeRadius(node: GalaxyNode) {
   if (node.level === "project") return 17;
-  if (node.level === "repo") return 13;
-  if (node.level === "branch") return node.status === "merged" ? 8 : 9;
-
-  const age = daysSince(node.createdAt);
-  if (node.status === "merged" && age >= 45) return 3.5;
-  if (node.status === "merged" && age >= 20) return 4.5;
-  return 5.5;
+  if (node.level === "branch") return node.isCurrent ? 10 : 8;
+  return node.isCurrent ? 5.5 : 4;
 }
 
 function getNodeId(node: string | GalaxyNode) {
   return typeof node === "string" ? node : node.id;
 }
 
-function staggeredLinkDistance(link: GalaxyLink) {
-  const targetId = getNodeId(link.target);
-  const target =
-    typeof link.target === "string"
-      ? synaipseGalaxyData.nodes.find((node) => node.id === targetId)
-      : link.target;
-
-  if (target?.level !== "branch") return link.distance ?? 62;
-
-  const seed = targetId.split("").reduce((sum, character) => sum + character.charCodeAt(0), 0);
-  return 108 + (seed % 5) * 30;
-}
-
 function nodeLabel(node: GalaxyNode) {
-  return `${node.name}\n${node.author} · ${STATUS_LABEL[node.status]}`;
+  return node.level === "commit"
+    ? `${node.name}\n${node.author}`
+    : `${node.name}${node.isCurrent ? " (current)" : ""}`;
 }
 
 function levelLabel(level: NodeLevel) {
-  if (level === "project") return "Project";
-  if (level === "repo") return "GitHub Repo";
+  if (level === "project") return "Repository";
   if (level === "branch") return "Branch";
   return "Commit";
 }
 
-function repoLabel(repo: RepoKey) {
-  if (repo === "client") return "we-ai-client";
-  if (repo === "server") return "we-ai-server";
-  return "SynAIpse";
-}
-
-export function SynAIpseGalaxyPage() {
-  const theme = useThemeTokens();
+export function SynAIpseGalaxyPage({ projectId, projectName = "Repository" }: { projectId: number; projectName?: string }) {
   const { ref: containerRef, size } = useElementSize<HTMLDivElement>();
   const graphRef = useRef<any>(null);
   const fitTimerRef = useRef<number | null>(null);
@@ -594,29 +156,39 @@ export function SynAIpseGalaxyPage() {
   const ignoreZoomUntilRef = useRef(0);
   const [selected, setSelected] = useState<GalaxyNode | null>(null);
 
-  const progress = useMemo(() => {
-    const branches = synaipseGalaxyData.nodes.filter((node) => node.level === "branch");
-    const merged = branches.filter((node) => node.status === "merged").length;
-    return { merged, total: branches.length, working: branches.length - merged };
-  }, []);
+  const [rawData, setRawData] = useState<ProjectGitBranchGraph | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const repoOverview = useMemo(() => ({
-    client: synaipseGalaxyData.nodes.filter((node) => node.level === "branch" && node.repo === "client").length,
-    server: synaipseGalaxyData.nodes.filter((node) => node.level === "branch" && node.repo === "server").length,
-    commits: synaipseGalaxyData.nodes.filter((node) => node.level === "commit").length,
-  }), []);
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    fetchProjectBranchGraph(projectId, { maxCount: 120 })
+      .then((data) => { if (!cancelled) setRawData(data); })
+      .catch((err: any) => { if (!cancelled) setError(err?.message || "브랜치/커밋 그래프를 불러오지 못했습니다."); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId]);
 
-  const completionRate = progress.total ? Math.round((progress.merged / progress.total) * 100) : 0;
+  const graphData = useMemo<GalaxyGraph>(
+    () => (rawData ? buildGalaxyGraph(rawData, projectName) : { nodes: [], links: [] }),
+    [rawData, projectName]
+  );
+
+  const branchCount = rawData?.branches.length ?? 0;
+  const commitCount = rawData?.nodes.length ?? 0;
 
   useEffect(() => {
     if (!graphRef.current) return;
 
     graphRef.current.d3Force("charge")?.strength(-560);
     graphRef.current.d3Force("center")?.strength(0.018);
-    graphRef.current.d3Force("link")?.distance(staggeredLinkDistance);
+    graphRef.current.d3Force("link")?.distance((l: GalaxyLink) => l.distance ?? 60);
     graphRef.current.d3Force("collision")?.radius((node: GalaxyNode) => nodeRadius(node) + 30);
     graphRef.current.d3ReheatSimulation();
-  }, []);
+  }, [graphData]);
 
   useEffect(() => {
     return () => {
@@ -641,7 +213,7 @@ export function SynAIpseGalaxyPage() {
   const handleNodeClick = (node: GalaxyNode) => {
     setSelected(node);
     ignoreZoomUntilRef.current = Date.now() + 800;
-    const zoom = node.level === "project" ? 1.7 : node.level === "repo" ? 2.15 : node.level === "branch" ? 2.75 : 3.2;
+    const zoom = node.level === "project" ? 1.7 : node.level === "branch" ? 2.4 : 3.0;
     graphRef.current?.centerAt(node.x ?? 0, node.y ?? 0, 520);
     graphRef.current?.zoom(zoom, 520);
     if (fitTimerRef.current !== null) {
@@ -650,11 +222,7 @@ export function SynAIpseGalaxyPage() {
     }
   };
 
-  const paintNodePointerArea = (
-    node: GalaxyNode,
-    color: string,
-    ctx: CanvasRenderingContext2D,
-  ) => {
+  const paintNodePointerArea = (node: GalaxyNode, color: string, ctx: CanvasRenderingContext2D) => {
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(node.x ?? 0, node.y ?? 0, Math.max(16, nodeRadius(node) + 8), 0, Math.PI * 2);
@@ -663,8 +231,8 @@ export function SynAIpseGalaxyPage() {
 
   const renderNode = (node: GalaxyNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
     const radius = nodeRadius(node);
-    const color = theme.node;
-    const accent = theme.repoColors[node.repo];
+    const color = THEME.node;
+    const accent = node.isCurrent ? THEME.accentCurrent : THEME.accentOther;
     const isSelected = selected?.id === node.id;
     const isDimmed = Boolean(selected && !isSelected);
     const opacity = isDimmed ? 0.14 : 1;
@@ -686,31 +254,31 @@ export function SynAIpseGalaxyPage() {
 
     ctx.beginPath();
     ctx.arc(x, y, displayRadius, 0, Math.PI * 2);
-    ctx.lineWidth = node.level === "project" ? 3.2 : node.level === "repo" ? 2.7 : 2.2;
+    ctx.lineWidth = node.level === "project" ? 3.2 : node.level === "branch" ? 2.7 : 2.2;
     ctx.strokeStyle = color;
 
-    if (node.status === "working") {
-      ctx.stroke();
-    } else {
+    if (node.isCurrent || node.level === "project") {
       ctx.fillStyle = color;
       ctx.fill();
+      ctx.stroke();
+    } else {
       ctx.stroke();
     }
 
     if (node.level === "project") {
       ctx.beginPath();
       ctx.arc(x, y, displayRadius - 5, 0, Math.PI * 2);
-      ctx.fillStyle = theme.background;
+      ctx.fillStyle = THEME.background;
       ctx.globalAlpha = opacity * 0.92;
       ctx.fill();
     }
 
     if (!isDimmed) {
       const fontSize = Math.max(8, node.level === "commit" ? 9 / globalScale : 11 / globalScale);
-      ctx.font = `${node.level === "project" || node.level === "repo" ? 700 : 600} ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.font = `${node.level === "project" || node.level === "branch" ? 700 : 600} ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillStyle = theme.foreground;
+      ctx.fillStyle = THEME.foreground;
       ctx.globalAlpha = node.level === "commit" ? 0.68 : 0.9;
       ctx.fillText(node.name, x, y + displayRadius + 5);
     }
@@ -728,61 +296,37 @@ export function SynAIpseGalaxyPage() {
 
     ctx.save();
     ctx.globalAlpha = isDimmed ? 0.09 : isSelectedLine ? 0.7 : 0.4;
-    ctx.strokeStyle = target.level === "repo" ? "#F5F6F0" : theme.repoColors[target.repo];
-    ctx.lineWidth = isSelectedLine ? 1.8 : target.level === "repo" ? 1.4 : 1;
+    ctx.strokeStyle = target.isCurrent ? THEME.accentCurrent : THEME.accentOther;
+    ctx.lineWidth = isSelectedLine ? 1.8 : target.level === "branch" ? 1.4 : 1;
     ctx.beginPath();
-    const sourceX = source.x ?? 0;
-    const sourceY = source.y ?? 0;
-    const targetX = target.x ?? 0;
-    const targetY = target.y ?? 0;
-    ctx.moveTo(sourceX, sourceY);
-    ctx.lineTo(targetX, targetY);
+    ctx.moveTo(source.x ?? 0, source.y ?? 0);
+    ctx.lineTo(target.x ?? 0, target.y ?? 0);
     ctx.stroke();
     ctx.restore();
   };
 
   return (
-    <div
-      className="relative flex size-full min-h-0 flex-col overflow-hidden"
-      style={{ background: theme.background, color: theme.foreground }}
-    >
-      <div
-        className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3"
-        style={{ borderColor: theme.border, background: "rgba(7, 8, 6, 0.96)" }}
-      >
+    <div className="relative flex size-full min-h-0 flex-col overflow-hidden" style={{ background: THEME.background, color: THEME.foreground }}>
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3" style={{ borderColor: THEME.border, background: "rgba(7, 8, 6, 0.96)" }}>
         <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-            style={{ background: theme.primary, color: theme.primaryForeground }}
-          >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: THEME.primary, color: THEME.primaryForeground }}>
             <Network className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-bold">SynAIpse Galaxy</h1>
-            <p className="truncate text-[11px]" style={{ color: theme.muted }}>
-              Project → GitHub repo → branch → commit
-            </p>
+            <p className="truncate text-[11px]" style={{ color: THEME.muted }}>Repository → branch → commit (실제 git 데이터)</p>
           </div>
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
-          {STATUS_SUMMARY.map((item) => (
-            <div
-              key={item.status}
-              className="flex h-8 items-center gap-2 rounded-md border px-3 text-[11px] font-semibold"
-              style={{ borderColor: theme.border, background: theme.card }}
-            >
-              {item.status === "working" ? <Radio className="h-3.5 w-3.5" /> : <GitMerge className="h-3.5 w-3.5" />}
-              <span>{item.label}</span>
-              <span style={{ color: theme.muted }}>
-                {item.status === "working" ? progress.working : progress.merged}
-              </span>
-            </div>
-          ))}
+          <div className="flex h-8 items-center gap-2 rounded-md border px-3 text-[11px] font-semibold" style={{ borderColor: THEME.border, background: THEME.card }}>
+            <GitBranch className="h-3.5 w-3.5" />
+            <span>{rawData?.currentBranch ?? "—"}</span>
+          </div>
         </div>
       </div>
 
-      <div ref={containerRef} className="relative min-h-0 flex-1" style={{ background: theme.background }}>
+      <div ref={containerRef} className="relative min-h-0 flex-1" style={{ background: THEME.background }}>
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
@@ -792,72 +336,61 @@ export function SynAIpseGalaxyPage() {
             backgroundSize: "48px 48px, 48px 48px, 100% 100%",
           }}
         />
-        <ForceGraph2D
-          ref={graphRef}
-          width={size.width}
-          height={size.height}
-          graphData={synaipseGalaxyData}
-          backgroundColor="rgba(0,0,0,0)"
-          nodeLabel={nodeLabel}
-          nodeRelSize={1}
-          nodeCanvasObject={renderNode}
-          nodePointerAreaPaint={paintNodePointerArea}
-          linkCanvasObject={renderLink}
-          linkDirectionalParticles={(link) => {
-            if (selected) return 0;
-            const target = link.target as GalaxyNode;
-            return target?.status === "working" && target.level === "branch" ? 1 : 0;
-          }}
-          linkDirectionalParticleWidth={1.4}
-          linkDirectionalParticleSpeed={0.004}
-          cooldownTicks={130}
-          onNodeClick={handleNodeClick}
-          onNodeDrag={() => scheduleViewportFit()}
-          onNodeDragEnd={(node) => handleNodeClick(node as GalaxyNode)}
-          onZoom={() => {
-            if (Date.now() >= ignoreZoomUntilRef.current) scheduleViewportFit();
-          }}
-          onEngineStop={() => {
-            if (!hasInitialFitRef.current) {
-              hasInitialFitRef.current = true;
+
+        {error ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className="text-sm" style={{ color: THEME.muted }}>{error}</p>
+          </div>
+        ) : isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin" style={{ color: THEME.primary }} />
+          </div>
+        ) : (
+          <ForceGraph2D
+            ref={graphRef}
+            width={size.width}
+            height={size.height}
+            graphData={graphData as any}
+            backgroundColor="rgba(0,0,0,0)"
+            nodeLabel={nodeLabel as any}
+            nodeRelSize={1}
+            nodeCanvasObject={renderNode as any}
+            nodePointerAreaPaint={paintNodePointerArea as any}
+            linkCanvasObject={renderLink as any}
+            linkDirectionalParticles={(link: any) => {
+              if (selected) return 0;
+              const target = link.target as GalaxyNode;
+              return target?.isCurrent && target.level === "branch" ? 1 : 0;
+            }}
+            linkDirectionalParticleWidth={1.4}
+            linkDirectionalParticleSpeed={0.004}
+            cooldownTicks={130}
+            onNodeClick={handleNodeClick as any}
+            onNodeDrag={() => scheduleViewportFit()}
+            onNodeDragEnd={(node: any) => handleNodeClick(node as GalaxyNode)}
+            onZoom={() => {
+              if (Date.now() >= ignoreZoomUntilRef.current) scheduleViewportFit();
+            }}
+            onEngineStop={() => {
+              if (!hasInitialFitRef.current) {
+                hasInitialFitRef.current = true;
+                fitGraphToViewport(700);
+              }
+            }}
+            onBackgroundClick={() => {
+              setSelected(null);
+              ignoreZoomUntilRef.current = Date.now() + 800;
               fitGraphToViewport(700);
-            }
-          }}
-          onBackgroundClick={() => {
-            setSelected(null);
-            ignoreZoomUntilRef.current = Date.now() + 800;
-            fitGraphToViewport(700);
-          }}
-        />
-
-        {!graphRef.current && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
-          </div>
+            }}
+          />
         )}
 
-        {!selected && (
-          <div className="pointer-events-none absolute bottom-5 left-5 z-20 w-64 rounded-2xl border p-5 backdrop-blur-md" style={{ borderColor: theme.border, background: "rgba(11,12,10,0.86)" }}>
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.muted }}>Branch progress</p>
-                <p className="mt-2 text-2xl font-black">{completionRate}%</p>
-              </div>
-              <p className="text-xs" style={{ color: theme.muted }}>{progress.merged} / {progress.total} merged</p>
-            </div>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
-              <div className="h-full rounded-full bg-white" style={{ width: `${completionRate}%` }} />
-            </div>
-          </div>
-        )}
-
-        {!selected && (
-          <div className="pointer-events-none absolute bottom-5 right-5 z-20 w-56 rounded-2xl border p-5 backdrop-blur-md" style={{ borderColor: theme.border, background: "rgba(11,12,10,0.86)" }}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.muted }}>Repository overview</p>
+        {!selected && !isLoading && !error && (
+          <div className="pointer-events-none absolute bottom-5 right-5 z-20 w-56 rounded-2xl border p-5 backdrop-blur-md" style={{ borderColor: THEME.border, background: "rgba(11,12,10,0.86)" }}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: THEME.muted }}>Repository overview</p>
             <div className="mt-4 space-y-3 text-xs">
-              <div className="flex justify-between"><span style={{ color: theme.muted }}>we-ai-client</span><strong>{repoOverview.client} branches</strong></div>
-              <div className="flex justify-between"><span style={{ color: theme.muted }}>we-ai-server</span><strong>{repoOverview.server} branches</strong></div>
-              <div className="flex justify-between border-t pt-3" style={{ borderColor: theme.border }}><span style={{ color: theme.muted }}>Commits</span><strong>{repoOverview.commits}</strong></div>
+              <div className="flex justify-between"><span style={{ color: THEME.muted }}>Branches</span><strong>{branchCount}</strong></div>
+              <div className="flex justify-between border-t pt-3" style={{ borderColor: THEME.border }}><span style={{ color: THEME.muted }}>Commits shown</span><strong>{commitCount}</strong></div>
             </div>
           </div>
         )}
@@ -866,23 +399,20 @@ export function SynAIpseGalaxyPage() {
           <div
             data-testid="galaxy-bottom-detail"
             className="pointer-events-none absolute bottom-4 left-4 right-4 z-30 min-h-24 rounded-2xl border px-6 py-5 shadow-xl backdrop-blur-md md:right-auto md:w-[min(720px,calc(100%-2rem))]"
-            style={{ background: "rgba(11,12,10,0.94)", borderColor: theme.repoColors[selected.repo], color: theme.foreground }}
+            style={{ background: "rgba(11,12,10,0.94)", borderColor: selected.isCurrent ? THEME.accentCurrent : THEME.accentOther, color: THEME.foreground }}
           >
             <div className="flex items-center gap-4">
-              <div className="h-4 w-4 shrink-0 rounded-full" style={{ background: theme.repoColors[selected.repo] }} />
+              <div className="h-4 w-4 shrink-0 rounded-full" style={{ background: selected.isCurrent ? THEME.accentCurrent : THEME.accentOther }} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-bold">{selected.name}</p>
-                <p className="mt-1 truncate text-xs" style={{ color: theme.muted }}>
-                  {selected.summary}
-                </p>
+                <p className="mt-1 truncate text-xs" style={{ color: THEME.muted }}>{selected.summary}</p>
               </div>
-              <div className="hidden shrink-0 text-right sm:block">
-                <p className="text-xs font-semibold">{selected.author}</p>
-                <p className="mt-1 text-[11px]" style={{ color: theme.muted }}>{selected.createdAt}</p>
-              </div>
-              <span className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold" style={{ borderColor: theme.repoColors[selected.repo] }}>
-                {STATUS_LABEL[selected.status]}
-              </span>
+              {selected.author && (
+                <div className="hidden shrink-0 text-right sm:block">
+                  <p className="text-xs font-semibold">{selected.author}</p>
+                  {selected.createdAt && <p className="mt-1 text-[11px]" style={{ color: THEME.muted }}>{new Date(selected.createdAt).toLocaleString("ko-KR")}</p>}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -891,31 +421,31 @@ export function SynAIpseGalaxyPage() {
           <aside
             data-testid="galaxy-side-detail"
             className="absolute right-4 top-4 z-40 w-[min(320px,calc(100%-2rem))] rounded-2xl border p-6 shadow-2xl backdrop-blur-md"
-            style={{ background: "rgba(11,12,10,0.96)", borderColor: theme.border, color: theme.foreground }}
+            style={{ background: "rgba(11,12,10,0.96)", borderColor: THEME.border, color: THEME.foreground }}
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.16em]" style={{ color: theme.muted }}>Selected node</p>
+                <p className="text-[11px] uppercase tracking-[0.16em]" style={{ color: THEME.muted }}>Selected node</p>
                 <h2 className="mt-2 break-words text-lg font-bold">{selected.name}</h2>
               </div>
-              <button
-                type="button"
-                className="rounded-lg border px-3 py-1.5 text-xs"
-                style={{ borderColor: theme.border, color: theme.muted }}
-                onClick={() => setSelected(null)}
-              >
+              <button type="button" className="rounded-lg border px-3 py-1.5 text-xs" style={{ borderColor: THEME.border, color: THEME.muted }} onClick={() => setSelected(null)}>
                 닫기
               </button>
             </div>
             <dl className="space-y-3 text-sm">
-              <div className="flex justify-between gap-3"><dt style={{ color: theme.muted }}>레포</dt><dd className="max-w-[180px] truncate font-semibold">{repoLabel(selected.repo)}</dd></div>
-              <div className="flex justify-between gap-3"><dt style={{ color: theme.muted }}>종류</dt><dd className="font-semibold">{levelLabel(selected.level)}</dd></div>
-              <div className="flex justify-between gap-3"><dt style={{ color: theme.muted }}>상태</dt><dd className="font-semibold">{STATUS_LABEL[selected.status]}</dd></div>
-              <div className="flex justify-between gap-3"><dt style={{ color: theme.muted }}>작업자</dt><dd className="max-w-[180px] truncate font-semibold">{selected.author}</dd></div>
-              <div className="flex justify-between gap-3"><dt style={{ color: theme.muted }}>생성일</dt><dd className="font-semibold">{selected.createdAt}</dd></div>
-              <div className="flex justify-between gap-3"><dt style={{ color: theme.muted }}>노드 ID</dt><dd className="max-w-[180px] truncate font-mono text-xs font-semibold">{selected.id}</dd></div>
+              <div className="flex justify-between gap-3"><dt style={{ color: THEME.muted }}>종류</dt><dd className="font-semibold">{levelLabel(selected.level)}</dd></div>
+              {selected.level !== "project" && (
+                <div className="flex justify-between gap-3"><dt style={{ color: THEME.muted }}>현재 브랜치 포함</dt><dd className="font-semibold">{selected.isCurrent ? "예" : "아니오"}</dd></div>
+              )}
+              {selected.author && (
+                <div className="flex justify-between gap-3"><dt style={{ color: THEME.muted }}>작성자</dt><dd className="max-w-[180px] truncate font-semibold">{selected.author}</dd></div>
+              )}
+              {selected.createdAt && (
+                <div className="flex justify-between gap-3"><dt style={{ color: THEME.muted }}>커밋 시각</dt><dd className="font-semibold">{new Date(selected.createdAt).toLocaleString("ko-KR")}</dd></div>
+              )}
+              <div className="flex justify-between gap-3"><dt style={{ color: THEME.muted }}>노드 ID</dt><dd className="max-w-[180px] truncate font-mono text-xs font-semibold">{selected.id}</dd></div>
             </dl>
-            <p className="mt-6 border-t pt-4 text-sm leading-relaxed" style={{ borderColor: theme.border, color: theme.muted }}>
+            <p className="mt-6 border-t pt-4 text-sm leading-relaxed" style={{ borderColor: THEME.border, color: THEME.muted }}>
               {selected.summary}
             </p>
           </aside>
