@@ -470,7 +470,7 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
             <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>{doc.title}</p>
             <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{formatDate(doc.createdAt)} · {doc.messages.length}개 메시지</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/[0.06]">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/6">
             <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
           </button>
         </div>
@@ -1086,7 +1086,7 @@ export function ChatPage({
                               }
                             }}
                             className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${isExists
-                              ? "opacity-50 cursor-not-allowed bg-black/[0.02]"
+                              ? "opacity-50 cursor-not-allowed bg-black/2"
                               : "cursor-pointer hover:border-black/20"
                               }`}
                             style={{
@@ -1367,7 +1367,7 @@ export function ChatPage({
 
                     {/* 마우스 호버 시 전체 팀원 목록 팝업창 */}
                     {displayMembers.length > 0 && (
-                      <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 p-3 bg-white rounded-xl shadow-xl border border-black/10 z-50 min-w-[150px]">
+                      <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 p-3 bg-white rounded-xl shadow-xl border border-black/10 z-50 min-w-37.5">
                         <div className="text-[10px] font-bold pb-1.5 border-b border-black/5 text-gray-500 flex items-center justify-between">
                           <span>전체 팀원 목록</span>
                           <span className="text-[9px] font-normal text-gray-400">{displayMembers.length}명</span>
@@ -1453,7 +1453,7 @@ export function ChatPage({
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isLoadingMessages}
-                    className="p-1.5 rounded-lg hover:bg-black/[0.05] disabled:opacity-50"
+                    className="p-1.5 rounded-lg hover:bg-black/5 disabled:opacity-50"
                   >
                     <Paperclip className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
                   </button>

@@ -153,7 +153,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="w-full max-w-[1600px] mx-auto space-y-4">
+        <div className="w-full max-w-400 mx-auto space-y-4">
 
           {/* ── 헤더 + 기간 선택 ── */}
           <div className="flex items-center justify-between">
@@ -171,7 +171,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="w-[52px] h-6 rounded-lg mx-0.5" />
+                  <Skeleton key={i} className="w-13 h-6 rounded-lg mx-0.5" />
                 ))
               ) : (
                 RANGES.map(r => (
@@ -233,7 +233,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
             {isLoading ? (
               <>
                 <Skeleton className="w-64 h-3.5 mb-4" />
-                <Skeleton className="w-full h-[180px] rounded-xl" />
+                <Skeleton className="w-full h-45 rounded-xl" />
               </>
             ) : (
               <>
@@ -258,7 +258,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
             {isLoading ? (
               <>
                 <Skeleton className="w-40 h-3.5 mb-4" />
-                <Skeleton className="w-full h-[150px] rounded-xl" />
+                <Skeleton className="w-full h-37.5 rounded-xl" />
               </>
             ) : (
               <>
