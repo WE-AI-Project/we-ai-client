@@ -17,7 +17,6 @@ import {
   createProjectSchedule,
   updateProjectSchedule,
   deleteProjectSchedule,
-  updateProjectScheduleStatus,
   type ProjectSchedule,
   type ProjectDepartment,
   type ProjectSchedulePriority,

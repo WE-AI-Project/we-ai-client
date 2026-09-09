@@ -61,7 +61,7 @@ export type AuthSession = {
 };
 
 export type VerificationCodeDispatchResponse = {
-  purpose: "EMAIL_LOGIN";
+  purpose: "EMAIL_LOGIN" | "SIGNUP";
   deliveryChannel: VerificationDeliveryChannel;
   deliveryTarget: string;
   deliveryMode: string;
@@ -911,6 +911,15 @@ export type EmailCodeLoginPayload = {
   verificationCode: string;
 };
 
+export type SignupVerificationCodeSendPayload = {
+  email: string;
+};
+
+export type SignupVerificationCodeVerifyPayload = {
+  email: string;
+  verificationCode: string;
+};
+
 type ApiRequestInit = Omit<RequestInit, "body"> & {
   body?: BodyInit | FormData | URLSearchParams | Record<string, unknown> | unknown[] | null;
 };
@@ -1183,6 +1192,32 @@ export async function loginWithEmailCode(payload: EmailCodeLoginPayload): Promis
 
   saveSession(session);
   return session;
+}
+
+export async function sendSignupVerificationCode(
+  payload: SignupVerificationCodeSendPayload
+): Promise<VerificationCodeDispatchResponse> {
+  return request<VerificationCodeDispatchResponse>(
+    "/api/v1/auth/signup/verification-code",
+    {
+      method: "POST",
+      body: payload,
+    },
+    { auth: false, retryOnAuthFailure: false }
+  );
+}
+
+export async function verifySignupVerificationCode(
+  payload: SignupVerificationCodeVerifyPayload
+): Promise<void> {
+  await request<void>(
+    "/api/v1/auth/signup/verify",
+    {
+      method: "POST",
+      body: payload,
+    },
+    { auth: false, retryOnAuthFailure: false }
+  );
 }
 
 export async function fetchSocialLoginUrl(
@@ -1556,5 +1591,149 @@ export async function executeBuildTask(
     body: { taskName },
   });
 }
+
+// ── Git Changes & Staging API ──
+export type ChangedFileItem = {
+  filePath: string;
+  fileName: string;
+  extension: string;
+  changeType: string;
+  staged: boolean;
+  unstaged: boolean;
+  stagedStatus: string;
+  unstagedStatus: string;
+  displayStatus: string;
+};
+
+export type ProjectChangedFileList = {
+  projectId: number;
+  branchName: string;
+  totalChangedCount: number;
+  stagedCount: number;
+  unstagedCount: number;
+  untrackedCount: number;
+  files: ChangedFileItem[];
+};
+
+export type ProjectGitFileDiff = {
+  projectId: number;
+  filePath: string;
+  fileName: string;
+  extension: string;
+  staged: boolean;
+  changeType: string;
+  additions: number;
+  deletions: number;
+  diffContent: string;
+};
+
+export type ProjectGitCommitCreated = {
+  projectId: number;
+  commitHash: string;
+  shortCommitHash: string;
+  branchName: string;
+  message: string;
+  committedFileCount: number;
+  committedFiles: string[];
+  createdAt: string;
+};
+
+export type ProjectGitChangeResult = {
+  projectId: number;
+  stagedFileCount: number;
+  unstagedFileCount: number;
+  stagedAll?: boolean;
+  unstagedAll?: boolean;
+  filePaths?: string[];
+  stagedFiles: Array<{ path: string; status: string; staged: boolean; unstaged: boolean }>;
+  unstagedFiles: Array<{ path: string; status: string; staged: boolean; unstaged: boolean }>;
+};
+
+export async function fetchProjectChangedFiles(projectId: number | string): Promise<ProjectChangedFileList> {
+  return request<ProjectChangedFileList>(`/api/v1/projects/${projectId}/changes/files`, { method: "GET" });
+}
+
+export async function fetchProjectChangedFileDiff(
+  projectId: number | string,
+  filePath?: string,
+  staged?: boolean
+): Promise<ProjectGitFileDiff> {
+  const params = new URLSearchParams();
+  if (filePath) params.set("filePath", filePath);
+  if (staged !== undefined) params.set("staged", String(staged));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return request<ProjectGitFileDiff>(`/api/v1/projects/${projectId}/changes/diff${query}`, { method: "GET" });
+}
+
+export async function stageProjectFiles(
+  projectId: number | string,
+  filePaths: string[]
+): Promise<ProjectGitChangeResult> {
+  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/stage`, {
+    method: "POST",
+    body: { filePaths },
+  });
+}
+
+export async function unstageProjectFiles(
+  projectId: number | string,
+  filePaths: string[]
+): Promise<ProjectGitChangeResult> {
+  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/unstage`, {
+    method: "POST",
+    body: { filePaths },
+  });
+}
+
+export async function stageAllProjectFiles(projectId: number | string): Promise<ProjectGitChangeResult> {
+  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/stage-all`, { method: "POST" });
+}
+
+export async function unstageAllProjectFiles(projectId: number | string): Promise<ProjectGitChangeResult> {
+  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/unstage-all`, { method: "POST" });
+}
+
+export async function createProjectCommit(
+  projectId: number | string,
+  message: string,
+  description?: string
+): Promise<ProjectGitCommitCreated> {
+  return request<ProjectGitCommitCreated>(`/api/v1/projects/${projectId}/changes/commit`, {
+    method: "POST",
+    body: { message, description },
+  });
+}
+
+export type ConventionIssue = {
+  target: string;
+  code: string;
+  message: string;
+};
+
+export type ProjectGitCommitConventionCheck = {
+  valid: boolean;
+  type?: string;
+  scope?: string;
+  subject?: string;
+  normalizedMessage?: string;
+  errors: ConventionIssue[];
+  warnings: ConventionIssue[];
+  suggestions: string[];
+};
+
+export async function checkProjectCommitConvention(
+  projectId: number | string,
+  message: string,
+  description?: string
+): Promise<ProjectGitCommitConventionCheck> {
+  return request<ProjectGitCommitConventionCheck>(
+    `/api/v1/projects/${projectId}/changes/commit-convention/check`,
+    {
+      method: "POST",
+      body: { message, description },
+    }
+  );
+}
+
 
 

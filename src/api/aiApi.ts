@@ -1,5 +1,4 @@
 import { ApiError, request } from "../app/lib/api";
-import type { CommitFile } from "../app/components/commitData";
 import { callCustomEndpointIfEnabled } from "../app/lib/customEndpoint";
 
 export type DebateTurn = {

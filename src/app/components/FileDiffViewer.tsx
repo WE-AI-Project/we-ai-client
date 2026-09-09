@@ -1,5 +1,5 @@
 import { X, Plus, Minus, ShieldAlert } from "lucide-react";
-import type { CommitFile, DiffLine } from "./commitData";
+import type { DiffLine } from "./commitData";
 import { isSecurityRiskFile } from "./commitData";
 
 import {

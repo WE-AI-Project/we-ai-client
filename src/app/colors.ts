@@ -1,15 +1,17 @@
 // ============================================================
 // WE&AI Project Office — 중앙 색상 관리 파일
-// 팔레트: 올리브 다크 사이드바 + 화이트 콘텐츠 (단색 기반)
+// 팔레트: 다크 네이비 사이드바 + 인디고·핑크 액센트 (다크 전용, 단색 기반)
+// ※ 상수명(OLIVE_DARK/SAGE/BEIGE/CREAM 등)은 구 올리브·베이지 팔레트의
+//   잔재이며 값만 신규 팔레트로 교체되었다. 대규모 rename은 별도 작업으로 남겨둠.
 // ============================================================
 
 // ── 베이스 팔레트 ──────────────────────────────────────────
-export const SIDEBAR_DEEP  = "#0A0D3A";   // 사이드바/타이틀바 — 초극다크 올리브
-export const OLIVE_DARK    = "#5865F2";   // 다크 올리브 (메인 액센트)
-export const SAGE          = "#35ED7E";   // 세이지 그린 (서브 액센트)
-export const BEIGE         = "#1E2353";   // 워밍 베이지
-export const CREAM         = "#0A0D3A";   // 크림 (서브 배경)
-export const BRIGHT_BEIGE  = "#23272A";   // 아주 밝은 베이지
+export const SIDEBAR_DEEP  = "#0A0D3A";   // 사이드바/타이틀바 — 다크 네이비
+export const OLIVE_DARK    = "#5865F2";   // 인디고 (메인 액센트) — 상수명은 legacy
+export const SAGE          = "#35ED7E";   // 그린 (서브 액센트) — 상수명은 legacy
+export const BEIGE         = "#1E2353";   // 다크 네이비 패널톤 — 상수명은 legacy
+export const CREAM         = "#0A0D3A";   // 다크 네이비 서브 배경 — 상수명은 legacy
+export const BRIGHT_BEIGE  = "#23272A";   // 다크 차콜 카드 배경 — 상수명은 legacy
 
 // ── 텍스트 (콘텐츠 영역 밝은 배경용) ─────────────────────
 export const TEXT_PRIMARY   = "#1B1F3A";   // 밝은 콘텐츠 영역의 기본 텍스트
@@ -27,7 +29,7 @@ export const SIDEBAR_TEXT_LABEL  = "rgba(255,255,255,0.28)";
 export const SIDEBAR_TEXT_MUTED  = "rgba(255,255,255,0.18)";
 
 // ── 서피스 / 배경 ─────────────────────────────────────────
-export const OUTER_BG       = "#000000";   // 최외부 래퍼 배경 (극다크 올리브)
+export const OUTER_BG       = "#000000";   // 최외부 래퍼 배경 (순검정)
 export const SIDEBAR_BG     = "#0A0D3A";   // 사이드바 배경
 export const TITLEBAR_BG    = "#0A0D3A";   // 타이틀바 배경
 export const CONTENT_BG     = "#0A0D3A";   // 메인 콘텐츠 배경
@@ -53,6 +55,10 @@ export const ACCENT_SAGE    = "#35ED7E";
 export const ACCENT_MID     = "#EC48BD";
 export const ACCENT_BG      = "rgba(88,101,242,0.16)";
 export const ACCENT_BORDER  = "rgba(88,101,242,0.45)";
+export const ACCENT_BG_10   = "rgba(88,101,242,0.10)";  // 옅은 액센트 배경 (배지 등)
+export const ACCENT_BG_08   = "rgba(88,101,242,0.08)";  // 더 옅은 액센트 배경
+export const ACCENT_BG_04   = "rgba(88,101,242,0.04)";  // 비활성 버튼 배경
+export const ACCENT_TRACK   = "rgba(88,101,242,0.20)";  // 스피너 트랙 색상
 
 // ── UI 상태 색상 (범용 시맨틱 컬러) ──────────────────────
 export const UI_GREEN       = "#35ED7E";   // 성공/활성/러닝
@@ -71,24 +77,26 @@ export const UI_BLUE        = "#3b82f6";   // 블루 (TypeScript 등)
 export const UI_PINK        = "#EC48BD";   // 핑크 (CSS 등)
 
 // ── UI 상태 배경 ──────────────────────────────────────────
-export const UI_GREEN_BG    = "rgba(16,185,129,0.10)";
-export const UI_GREEN_BG7   = "rgba(16,185,129,0.07)";
-export const UI_GREEN_BG8   = "rgba(16,185,129,0.08)";
-export const UI_RED_BG      = "rgba(239,68,68,0.10)";
+// ※ 아래 rgba 값은 반드시 위 UI_* 솔리드 색상과 같은 RGB를 사용한다.
+//   (팔레트 교체 시 여기 색만 따로 남아 어긋나는 사고가 있었음 — 값 변경 시 함께 갱신)
+export const UI_GREEN_BG    = "rgba(53,237,126,0.10)";  // UI_GREEN(#35ED7E)
+export const UI_GREEN_BG7   = "rgba(53,237,126,0.07)";
+export const UI_GREEN_BG8   = "rgba(53,237,126,0.08)";
+export const UI_RED_BG      = "rgba(239,68,68,0.10)";   // UI_RED(#ef4444)
 export const UI_RED_BG7     = "rgba(239,68,68,0.07)";
 export const UI_RED_BG8     = "rgba(239,68,68,0.08)";
-export const UI_AMBER_BG    = "rgba(245,158,11,0.10)";
+export const UI_AMBER_BG    = "rgba(245,158,11,0.10)";  // UI_AMBER(#f59e0b)
 export const UI_AMBER_BG7   = "rgba(245,158,11,0.07)";
 export const UI_AMBER_BG8   = "rgba(245,158,11,0.08)";
-export const UI_VIOLET_BG   = "rgba(139,92,246,0.10)";
-export const UI_VIOLET_BG7  = "rgba(139,92,246,0.07)";
-export const UI_VIOLET_BG8  = "rgba(139,92,246,0.08)";
-export const UI_INDIGO_BG   = "rgba(99,91,255,0.10)";
+export const UI_VIOLET_BG   = "rgba(236,72,189,0.10)";  // UI_VIOLET(#EC48BD)
+export const UI_VIOLET_BG7  = "rgba(236,72,189,0.07)";
+export const UI_VIOLET_BG8  = "rgba(236,72,189,0.08)";
+export const UI_INDIGO_BG   = "rgba(88,101,242,0.10)";  // UI_INDIGO(#5865F2)
 export const UI_GRAY_BG     = "rgba(107,114,128,0.10)";
 export const UI_GRAY_BG8    = "rgba(107,114,128,0.08)";
-export const UI_CYAN_BG     = "rgba(6,182,212,0.10)";
+export const UI_CYAN_BG     = "rgba(0,176,244,0.10)";   // UI_CYAN(#00B0F4)
 export const UI_BLUE_BG     = "rgba(59,130,246,0.10)";
-export const UI_PINK_BG     = "rgba(236,72,153,0.08)";
+export const UI_PINK_BG     = "rgba(236,72,189,0.08)";  // UI_PINK(#EC48BD)
 
 // ── 터미널/코드 UI (GitHub Dark 테마) ───────────────────
 export const TERM_BG        = "#0d1117";   // 터미널 배경
@@ -121,8 +129,11 @@ export const TRAFFIC_GREEN  = "#28ca41";
 
 // ── 버튼/서피스 ────────────────────────────────────────────
 export const BTN_DARK       = "#1c1c1e";   // 다크 버튼 배경
-export const CTA_BG         = "#2A2C10";   // CTA 올리브 다크
-export const OLIVE_DARK_BG  = "#212308";   // 올리브 다크 배경
+// TODO: 아래 두 값은 구 올리브 팔레트 원본 hex가 그대로 남아있음(신규 네이비/인디고 팔레트로 미이관).
+// 사용처(WeAIDashboard.tsx 등)가 여전히 라이트 배경 전제로 짜여 있어, 값만 바꾸면 그 화면들이 깨진다.
+// 값 교체는 해당 사용처 전체를 다크 배경으로 맞추는 별도 작업으로 처리할 것.
+export const CTA_BG         = "#2A2C10";   // CTA 배경 — legacy 올리브 hex, 미이관
+export const OLIVE_DARK_BG  = "#212308";   // 배경 — legacy 올리브 hex, 미이관
 
 // ── 그라디언트 ─────────────────────────────────────────────
 /** 페이지 헤더 — 파스텔 레인보우 */
@@ -132,6 +143,8 @@ export const GRADIENT_HEADER_SM2  = "linear-gradient(135deg, #0A0D3A, #5865F2, #
 export const GRADIENT_HEADER_SM3  = "linear-gradient(135deg, #1E2353, #5865F2, #EC48BD)";
 /** 인디고 그라디언트 (CTA 버튼 등) */
 export const GRADIENT_INDIGO      = "linear-gradient(135deg, #5865F2, #EC48BD)";
+/** 프로젝트 헤더 배너 그라디언트 (ProjectSettingsPage/SkeletonLoader 공용) */
+export const GRADIENT_HEADER_BANNER = "linear-gradient(135deg, #0A0D3A 0%, #1E2353 45%, #5865F2 74%, #EC48BD 118%)";
 /** 인디고 세로 레인보우 보더 */
 export const GRADIENT_RAINBOW_BORDER = "linear-gradient(180deg, #635bff 0%, #8b5cf6 45%, #ec4899 80%, #fbbf24 100%) 1";
 export const GRADIENT_RAINBOW_BORDER2 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 40%, #ec4899 80%, #fbbf24 100%) 1";
@@ -139,11 +152,11 @@ export const GRADIENT_RAINBOW_BORDER3 = "linear-gradient(180deg, #635bff 0%, #8b
 
 /** 페이지 콘텐츠 배경 — 화이트 */
 export const GRADIENT_PAGE = "#0A0D3A";
-/** 사이드바 배경 — 초극다크 올리브 단색 */
+/** 사이드바 배경 — 다크 네이비 단색 */
 export const GRADIENT_SIDEBAR = "#0A0D3A";
-/** 외부 래퍼 배경 — 극다크 올리브 단색 */
+/** 외부 래퍼 배경 — 순검정 단색 */
 export const GRADIENT_OUTER = "#000000";
-/** 로고/아이콘 배경 — 세이지 단색 */
+/** 로고/아이콘 배경 — 인디고 단색 */
 export const GRADIENT_LOGO = "#5865F2";
 /** 활성 항목 배경 (사이드바) — 화이트 틴트 */
 export const GRADIENT_ACTIVE = "rgba(88,101,242,0.28)";
@@ -153,12 +166,13 @@ export const GRADIENT_ACTIVE_LIGHT = "rgba(88,101,242,0.30)";
 export const GRADIENT_ORB_1 = "transparent";
 export const GRADIENT_ORB_2 = "transparent";
 export const GRADIENT_ORB_3 = "transparent";
-/** 카드 배경 — 화이트 단색 */
+/** 카드 배경 — 다크 차콜 단색 */
 export const GRADIENT_CARD = "#23272A";
-/** 헤더 배너 배경 — 연한 크림 단색 */
+/** 헤더 배너 배경 — 다크 네이비 패널톤 단색 */
 export const GRADIENT_BANNER = "#1E2353";
 
-// ── 상태 색상 (올리브 테마) ──────────────────────────────
+// ── 상태 색상 ─────────────────────────────────────────────
+// STATUS_ERROR(#B85450)만 legacy 올리브 팔레트의 브라운레드가 그대로 남아있음
 export const STATUS_RUNNING = "#35ED7E";
 export const STATUS_IDLE    = "#B5B9DE";
 export const STATUS_ERROR   = "#B85450";
@@ -166,24 +180,28 @@ export const STATUS_SUCCESS = "#35ED7E";
 export const STATUS_WARNING = "#00B0F4";
 export const STATUS_STOPPED = "#8F95C6";
 
-// ── 코드 / 터미널 영역 (올리브 테마) ────────────────────
+// ── 코드 / 터미널 영역 ────────────────────────────────────
+// TODO: 아래 4개는 legacy 올리브 팔레트 hex가 그대로 남아있음(신규 팔레트로 미이관).
+// 코드/터미널 UI는 대신 TERM_*(GitHub Dark 팔레트, 아래) 사용을 권장.
 export const CODE_BG     = "#0E1003";
 export const CODE_BG_MID = "#131507";
 export const CODE_FG     = "#D4CC9E";
 export const CODE_MUTED  = "#9A9B72";
 
 // ── 로그인 화면 전용 ──────────────────────────────────────
-export const LOGIN_MUTED       = "#B5B9DE";   // 뮤트 올리브 텍스트
+export const LOGIN_MUTED       = "#B5B9DE";   // 뮤트 텍스트 (인디고 계열)
 export const LOGIN_ICON_MUTED  = "#8F95C6";   // 뮤트 아이콘
 export const LOGIN_CHECKBOX    = "#8F95C6";   // 체크박스 비활성
 export const LOGIN_CHEVRON     = "#B5B9DE";   // 화살표 색
-export const LOGIN_OLIVE_TEXT  = "#D9DCFF";   // 올리브 텍스트
+export const LOGIN_OLIVE_TEXT  = "#D9DCFF";   // 밝은 인디고 텍스트 (상수명은 legacy)
 export const LOGIN_DISABLED_BG = "#1E2353";   // 비활성 버튼 배경
 export const LOGIN_DISABLED_BG2 = "#23272A";  // 비활성 배경2
 export const LOGIN_SHADOW_1    = "#13184A";   // 카드 그림자1
 export const LOGIN_SHADOW_2    = "#0A0D3A";   // 카드 그림자2
 
 // ── 파일 타입 색상 ────────────────────────────────────────
+// TODO: 라이트 배경 전제의 legacy 올리브 hex가 그대로 남아있음(신규 팔레트로 미이관).
+// FILE_COLORS_DARK(신규 팔레트 적용 완료)로 통합하는 것을 고려할 것.
 export const FILE_COLORS: Record<string, { bg: string; color: string }> = {
   java:   { bg: "rgba(192,152,64,0.10)",  color: "#C09840" },
   gradle: { bg: "rgba(65,67,27,0.08)",    color: "#41431B" },
@@ -211,12 +229,14 @@ export const FILE_COLORS_DARK: Record<string, { bg: string; color: string }> = {
   link:   { bg: UI_VIOLET_BG8,           color: UI_VIOLET },
 };
 
-// ── 올리브 변경 상태 색상 ─────────────────────────────────
+// ── 변경 상태 색상 ────────────────────────────────────────
+// TODO: legacy 올리브 hex가 그대로 남아있음(신규 팔레트로 미이관).
 export const CHANGE_MODIFIED = { color: "#C09840", label: "M", bg: "rgba(192,152,64,0.10)" };
 export const CHANGE_ADDED   = { color: "#5A8A4A", label: "A", bg: "rgba(90,138,74,0.10)" };
 export const CHANGE_DELETED = { color: "#B85450", label: "D", bg: "rgba(184,84,80,0.10)" };
 
 // ── 브랜치 색상 팔레트 ────────────────────────────────────
+// TODO: legacy 올리브 hex가 그대로 남아있음(신규 팔레트로 미이관).
 export const BRANCH_COLORS = [
   "#AEB784", "#5A8A4A", "#C09840", "#D4CC9E", "#6B7A50", "#B87850",
 ];
@@ -228,8 +248,8 @@ export const CHART_3 = "#EC48BD";
 export const CHART_4 = "#00B0F4";
 export const CHART_5 = "#F59E0B";
 
-// ── 빌드 올리브 배경 ──────────────────────────────────────
-export const BUILD_OLIVE_BG = "#0A0D3A";
+// ── 빌드 페이지 배경 ──────────────────────────────────────
+export const BUILD_OLIVE_BG = "#0A0D3A";   // 다크 네이비 (상수명은 legacy)
 
 // ── 언어 색상 (GitHub 언어 기반) ──────────────────────────
 export const LANG_GRADLE = "#02A0FF";

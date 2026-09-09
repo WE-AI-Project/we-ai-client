@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ComponentType, CSSProperties } from "react";
 import {
   CalendarDays,
@@ -15,11 +15,8 @@ import {
   Users,
   Plus,
   Edit2,
-  Check,
   X,
-  Clock,
   AlertCircle,
-  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -29,6 +26,8 @@ import {
   BORDER,
   BORDER_SUBTLE,
   GRADIENT_PAGE,
+  GRADIENT_HEADER_BANNER,
+  SAGE,
   STATUS_ERROR,
   TEXT_LABEL,
   TEXT_PRIMARY,
@@ -43,8 +42,6 @@ import {
   ProjectSchedule,
   ProjectScheduleStatus,
   ProjectSchedulePriority,
-  ProjectScheduleCreatePayload,
-  ProjectScheduleUpdatePayload,
   ProjectStatus,
   ProjectTechStack,
   ProjectTechStackCategory,
@@ -915,7 +912,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
         <section
           className="relative overflow-hidden rounded-2xl border px-6 py-6"
           style={{
-            background: "linear-gradient(135deg, #0A0D3A 0%, #1E2353 45%, #5865F2 74%, #EC48BD 118%)",
+            background: GRADIENT_HEADER_BANNER,
             borderColor: "rgba(255,255,255,0.10)",
             boxShadow: "0 18px 42px rgba(88,101,242,0.28)",
           }}
@@ -927,7 +924,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4" style={{ color: "#35ED7E" }} />
+                <Settings className="h-4 w-4" style={{ color: SAGE }} />
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.50)" }}>
                   Project Settings
                 </p>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Settings, User, Bell, Monitor, Palette, Shield, Save, ChevronRight } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT, ACCENT_SAGE,
+  ACCENT_MID, ACCENT_BG_10, ACCENT_BORDER, UI_AMBER, UI_RED,
   CONTENT_BG,
 } from "../colors";
 
@@ -310,9 +311,9 @@ export function SettingsPage() {
                         onClick={() => setTheme(t)}
                         className="flex-1 py-2.5 rounded-xl text-xs font-semibold capitalize transition-all"
                         style={{
-                          background: theme === t ? "rgba(112,130,56,0.10)" : "rgba(0,0,0,0.04)",
+                          background: theme === t ? ACCENT_BG_10 : "rgba(0,0,0,0.04)",
                           color: theme === t ? ACCENT : TEXT_SECONDARY,
-                          border: theme === t ? "1px solid rgba(112,130,56,0.25)" : `1px solid ${BORDER}`,
+                          border: theme === t ? `1px solid ${ACCENT_BORDER}` : `1px solid ${BORDER}`,
                         }}
                       >
                         {t === "light" ? "Light" : t === "dark" ? "Dark" : "System"}
@@ -320,13 +321,13 @@ export function SettingsPage() {
                     ))}
                   </div>
                 </div>
-                <SettingRow label="Color Theme" sub="앱 강조 색상 (현재: Olive)">
+                <SettingRow label="Color Theme" sub="앱 강조 색상 (현재: Indigo)">
                   <div className="flex items-center gap-1.5">
-                    {["#708238", "#A67B5B", "#10b981", "#f59e0b", "#ef4444"].map(c => (
+                    {[ACCENT, ACCENT_MID, ACCENT_SAGE, UI_AMBER, UI_RED].map(c => (
                       <div
                         key={c}
                         className="w-5 h-5 rounded-full cursor-pointer transition-all hover:scale-110"
-                        style={{ background: c, outline: c === "#708238" ? `2px solid ${c}` : "none", outlineOffset: 1 }}
+                        style={{ background: c, outline: c === ACCENT ? `2px solid ${c}` : "none", outlineOffset: 1 }}
                       />
                     ))}
                   </div>

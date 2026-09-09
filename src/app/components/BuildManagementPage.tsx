@@ -3,7 +3,12 @@ import { Hammer, Play, CheckCircle2, XCircle, Clock, RotateCw, Circle, RefreshCw
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER,
+  ACCENT, ACCENT_BG, ACCENT_BG_10, ACCENT_BG_08, ACCENT_BG_04, ACCENT_BORDER, ACCENT_TRACK,
+  CONTENT_BG, TABLE_BG, TABLE_HEADER_BG,
+  UI_GRAY, UI_GRAY_BG, UI_GRAY_BG8, UI_GREEN, UI_GREEN_BG, UI_GREEN_BG8,
+  UI_RED, UI_RED_BG, UI_AMBER, UI_AMBER_BG8,
+  TERM_BG, TERM_HEADER, TERM_MUTED, TERM_TEXT, TERM_RED2, TERM_GREEN, TERM_BLUE2,
+  TRAFFIC_RED, TRAFFIC_YELLOW, TRAFFIC_GREEN,
 } from "../colors";
 import {
   BuildTaskItem,
@@ -35,20 +40,20 @@ const DEFAULT_GRADLE_TASKS: GradleTaskView[] = [
 ];
 
 const STATUS_META: Record<TaskStatus, { color: string; bg: string; icon: any; label: string }> = {
-  idle:    { color: "#9A9B72", bg: "rgba(154,155,114,0.10)", icon: Circle,       label: "Idle"    },
-  running: { color: ACCENT,   bg: "rgba(112,130,56,0.10)",    icon: RotateCw,     label: "Running" },
-  success: { color: "#5A8A4A", bg: "rgba(90,138,74,0.10)",  icon: CheckCircle2, label: "Success" },
-  failed:  { color: "#B85450", bg: "rgba(184,84,80,0.10)",  icon: XCircle,      label: "Failed"  },
+  idle:    { color: UI_GRAY,  bg: UI_GRAY_BG,  icon: Circle,       label: "Idle"    },
+  running: { color: ACCENT,   bg: ACCENT_BG_10, icon: RotateCw,     label: "Running" },
+  success: { color: UI_GREEN, bg: UI_GREEN_BG, icon: CheckCircle2, label: "Success" },
+  failed:  { color: UI_RED,   bg: UI_RED_BG,   icon: XCircle,      label: "Failed"  },
 };
 
 const GROUP_COLOR: Record<string, { color: string; bg: string }> = {
-  application:  { color: ACCENT,    bg: "rgba(112,130,56,0.08)"    },
-  run:          { color: ACCENT,    bg: "rgba(112,130,56,0.08)"    },
-  build:        { color: "#5A8A4A", bg: "rgba(90,138,74,0.08)"   },
-  verification: { color: "#C09840", bg: "rgba(192,152,64,0.08)"  },
-  test:         { color: "#C09840", bg: "rgba(192,152,64,0.08)"  },
-  help:         { color: "#888A62", bg: "rgba(136,138,98,0.08)"  },
-  info:         { color: "#888A62", bg: "rgba(136,138,98,0.08)"  },
+  application:  { color: ACCENT,    bg: ACCENT_BG_08 },
+  run:          { color: ACCENT,    bg: ACCENT_BG_08 },
+  build:        { color: UI_GREEN,  bg: UI_GREEN_BG8 },
+  verification: { color: UI_AMBER,  bg: UI_AMBER_BG8 },
+  test:         { color: UI_AMBER,  bg: UI_AMBER_BG8 },
+  help:         { color: UI_GRAY,   bg: UI_GRAY_BG8  },
+  info:         { color: UI_GRAY,   bg: UI_GRAY_BG8  },
 };
 
 interface BuildManagementPageProps {
@@ -199,7 +204,7 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
   const failedCount = tasks.filter((t) => t.lastStatus === "failed").length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#FFFFFF" }}>
+    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: CONTENT_BG }}>
       <div className="flex-1 overflow-y-auto p-5">
         <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
@@ -207,7 +212,7 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <Hammer className="w-4 h-4" style={{ color: "#f59e0b" }} />
+                <Hammer className="w-4 h-4" style={{ color: UI_AMBER }} />
                 <h1 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>Build Management</h1>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-600">
                   {buildTool}
@@ -220,10 +225,10 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
             </div>
             {/* 요약 배지 */}
             <div className="flex items-center gap-2 text-[11px]">
-              <span className="px-2 py-1 rounded-lg font-semibold" style={{ background: "rgba(16,185,129,0.10)", color: "#10b981" }}>
+              <span className="px-2 py-1 rounded-lg font-semibold" style={{ background: UI_GREEN_BG, color: UI_GREEN }}>
                 {successCount} passed
               </span>
-              <span className="px-2 py-1 rounded-lg font-semibold" style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444" }}>
+              <span className="px-2 py-1 rounded-lg font-semibold" style={{ background: UI_RED_BG, color: UI_RED }}>
                 {failedCount} failed
               </span>
             </div>
@@ -232,7 +237,7 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
           {/* ── 진행 바 (태스크 실행 중) ── */}
           {runningTask && (
             <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
-              <div className="w-4 h-4 border-2 rounded-full animate-spin shrink-0" style={{ borderColor: "rgba(112,130,56,0.20)", borderTopColor: ACCENT }} />
+              <div className="w-4 h-4 border-2 rounded-full animate-spin shrink-0" style={{ borderColor: ACCENT_TRACK, borderTopColor: ACCENT }} />
               <div className="flex-1">
                 <p className="text-[11px] font-semibold" style={{ color: ACCENT }}>
                   실제 프로세스 실행 중: <span className="font-mono">{tasks.find((t) => t.id === runningTask)?.command}</span>
@@ -248,11 +253,11 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
           )}
 
           {/* ── 태스크 목록 ── */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: "#FAFAF8", border: `1px solid ${BORDER}` }}>
+          <div className="rounded-2xl overflow-hidden" style={{ background: TABLE_BG, border: `1px solid ${BORDER}` }}>
             {/* 헤더 */}
             <div
               className="grid px-4 py-2.5 text-[10px] font-semibold"
-              style={{ gridTemplateColumns: "1fr 80px 100px 90px 80px", borderBottom: `1px solid ${BORDER}`, background: "#F2F1EE", color: TEXT_LABEL }}
+              style={{ gridTemplateColumns: "1fr 80px 100px 90px 80px", borderBottom: `1px solid ${BORDER}`, background: TABLE_HEADER_BG, color: TEXT_LABEL }}
             >
               <span>Task</span>
               <span>Group</span>
@@ -271,7 +276,7 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
                 <div
                   key={task.id}
                   onClick={() => setLogTask(isActive ? null : task.id)}
-                  className="grid px-4 py-3 items-center cursor-pointer transition-colors hover:bg-black/[0.02]"
+                  className="grid px-4 py-3 items-center cursor-pointer transition-colors hover:bg-white/[0.03]"
                   style={{
                     gridTemplateColumns: "1fr 80px 100px 90px 80px",
                     borderBottom: i < tasks.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
@@ -312,7 +317,7 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
                       style={{
                         background: runningTask
-                          ? "rgba(112,130,56,0.04)"
+                          ? ACCENT_BG_04
                           : ACCENT_BG,
                         color: runningTask ? TEXT_TERTIARY : ACCENT,
                         cursor: runningTask ? "not-allowed" : "pointer",
@@ -329,13 +334,13 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
 
           {/* ── 빌드 로그 패널 ── */}
           {logTask && (
-            <div className="rounded-2xl overflow-hidden" style={{ background: "#1E1F0A", border: `1px solid rgba(255,255,255,0.06)` }}>
+            <div className="rounded-2xl overflow-hidden" style={{ background: TERM_BG, border: `1px solid rgba(255,255,255,0.06)` }}>
               {/* 헤더 */}
-              <div className="flex items-center gap-2 px-4 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#2A2C10" }}>
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#ff5f57" }} />
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#ffbd2e" }} />
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#28ca41" }} />
-                <span className="ml-2 text-[10px] font-mono" style={{ color: "#8b949e" }}>
+              <div className="flex items-center gap-2 px-4 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: TERM_HEADER }}>
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: TRAFFIC_RED }} />
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: TRAFFIC_YELLOW }} />
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: TRAFFIC_GREEN }} />
+                <span className="ml-2 text-[10px] font-mono" style={{ color: TERM_MUTED }}>
                   {logTaskData?.command || `./gradlew.bat ${logTask}`}
                 </span>
                 {isRunningCurrent && (
@@ -358,19 +363,19 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
               <div
                 ref={logRef}
                 className="p-4 font-mono text-[10px] leading-relaxed overflow-y-auto select-text"
-                style={{ maxHeight: 260, color: "#c9d1d9" }}
+                style={{ maxHeight: 260, color: TERM_TEXT }}
               >
                 {isRunningCurrent ? (
                   <div className="space-y-1">
                     <p className="animate-pulse" style={{ color: ACCENT }}>
                       Executing task: {logTaskData?.name}... Please wait while Gradle compiles and executes.
                     </p>
-                    <p style={{ color: "#8b949e" }}>
+                    <p style={{ color: TERM_MUTED }}>
                       Elapsed: {elapsedSec} seconds
                     </p>
                   </div>
                 ) : currentLogs.length === 0 ? (
-                  <p style={{ color: "#8b949e" }}>
+                  <p style={{ color: TERM_MUTED }}>
                     아직 실행된 로그가 없습니다. [Run] 버튼을 눌러 실제 빌드 태스크를 실행하세요.
                   </p>
                 ) : (
@@ -378,7 +383,7 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
                     const isFail = line.includes("FAILED") || line.includes("FAILURE") || line.includes("ERROR") || line.startsWith("[ERROR]");
                     const isSuccess = line.includes("SUCCESSFUL") || line.includes("PASSED") || line.includes("BUILD SUCCESS");
                     const isTask = line.startsWith("> Task");
-                    const color = isFail ? "#f97583" : isSuccess ? "#7ee787" : isTask ? "#79c0ff" : "#c9d1d9";
+                    const color = isFail ? TERM_RED2 : isSuccess ? TERM_GREEN : isTask ? TERM_BLUE2 : TERM_TEXT;
                     return (
                       <p key={i} style={{ color }} className="whitespace-pre-wrap break-all">
                         {line || "\u00a0"}

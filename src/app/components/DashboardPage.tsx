@@ -22,7 +22,6 @@ import {
   Clock,
   X,
   ChevronRight,
-  UserCheck,
 } from "lucide-react";
 import {
   LineChart,
@@ -36,7 +35,6 @@ import {
 import {
   ACCENT,
   ACCENT_BG,
-  ACCENT_BORDER,
   BORDER,
   BORDER_SUBTLE,
   GRADIENT_PAGE,

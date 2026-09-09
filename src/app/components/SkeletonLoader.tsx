@@ -1,4 +1,4 @@
-import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM } from "../colors";
+import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM, GRADIENT_HEADER_BANNER } from "../colors";
 
 const SKELETON_BG = "rgba(88,101,242,0.12)";
 const SKELETON_SHIMMER = "rgba(88,101,242,0.20)";
@@ -146,7 +146,7 @@ export function ProjectSettingsSkeleton() {
         <section
           className="relative overflow-hidden rounded-[28px] border px-6 py-6"
           style={{
-            background: "linear-gradient(135deg, #0A0D3A 0%, #1E2353 45%, #5865F2 74%, #EC48BD 118%)",
+            background: GRADIENT_HEADER_BANNER,
             borderColor: "rgba(255,255,255,0.10)",
             boxShadow: "0 18px 42px rgba(88,101,242,0.28)",
           }}

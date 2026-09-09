@@ -525,7 +525,7 @@ export function ChatPage({
   projectId = 0,
   currentUserId,
   onDocsUpdate,
-  onUnreadUpdate,
+  onUnreadUpdate: _onUnreadUpdate,
 }: {
   projectId?: number | null;
   currentUserId?: number;
@@ -560,7 +560,7 @@ export function ChatPage({
 
   const [isMeeting, setIsMeeting] = useState(false);
   const [activeMeetingId, setActiveMeetingId] = useState<number | null>(null);
-  const [meetingStart, setMeetingStart] = useState<Date | null>(null);
+  const [, setMeetingStart] = useState<Date | null>(null);
   const [meetingMsgs, setMeetingMsgs] = useState<ChatMessage[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [savingDoc, setSavingDoc] = useState(false);

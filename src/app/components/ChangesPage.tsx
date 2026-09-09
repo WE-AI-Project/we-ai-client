@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import {
   GitCommit,
   GitBranch,
@@ -22,9 +23,14 @@ import { AICommitGenerator } from "./AICommitGenerator";
 import { ConventionGuardModal } from "./ConventionGuardModal";
 
 import {
-  fetchProjectCommits,
-  fetchProjectCommitFiles,
-  fetchProjectCommitFileDiff,
+  fetchProjectChangedFiles,
+  fetchProjectChangedFileDiff,
+  stageProjectFiles,
+  unstageProjectFiles,
+  stageAllProjectFiles,
+  unstageAllProjectFiles,
+  createProjectCommit,
+  loadSession,
   ProjectRepositoryType,
 } from "../lib/api";
 
@@ -719,6 +725,36 @@ function FileRow({
   );
 }
 
+function parseUnifiedDiff(rawDiff: string) {
+  if (!rawDiff) return [];
+  const lines = rawDiff.split("\n");
+  let oldLine = 1;
+  let newLine = 1;
+
+  return lines.map((line) => {
+    if (line.startsWith("@@")) {
+      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        oldLine = parseInt(match[1], 10);
+        newLine = parseInt(match[2], 10);
+      }
+      return { type: "hunk" as const, content: line };
+    }
+    if (line.startsWith("+")) {
+      return { type: "added" as const, newNum: newLine++, content: line.slice(1) };
+    }
+    if (line.startsWith("-")) {
+      return { type: "removed" as const, oldNum: oldLine++, content: line.slice(1) };
+    }
+    return {
+      type: "context" as const,
+      oldNum: oldLine++,
+      newNum: newLine++,
+      content: line.startsWith(" ") ? line.slice(1) : line,
+    };
+  });
+}
+
 export function ChangesPage({
   projectId = 0,
   onNavigateQA,
@@ -727,7 +763,9 @@ export function ChangesPage({
   onNavigateQA?: () => void;
 }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
   const [repoType, setRepoType] = useState<ProjectRepositoryType>("BACKEND");
+  const [currentBranch, setCurrentBranch] = useState<string>("main");
 
   // 변경된 파일 목록 & 캐시
   const [changedFiles, setChangedFiles] = useState<CommitFile[]>(WEAI_BACKEND_FILES);
@@ -747,81 +785,125 @@ export function ChangesPage({
   // 컨벤션 가드
   const [showConvention, setShowConvention] = useState(false);
 
-  // 🌟 API 호출 및 WE-AI-Project 기본 데이터 동기화
-  useEffect(() => {
-    async function loadCommitData() {
-      setIsLoading(true);
-      const defaultCatalog = repoType === "BACKEND" ? WEAI_BACKEND_FILES : WEAI_FRONTEND_FILES;
+  // 🌟 실제 Git 변경 파일 목록 조회 및 기본 데이터 동기화
+  const loadCommitData = useCallback(async () => {
+    setIsLoading(true);
+    const defaultCatalog = repoType === "BACKEND" ? WEAI_BACKEND_FILES : WEAI_FRONTEND_FILES;
 
-      if (!projectId) {
-        setChangedFiles(defaultCatalog);
-        setStaged(new Set(defaultCatalog.map((f) => f.id)));
-        setSelectedFile(defaultCatalog[0] ?? null);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const commitData = await fetchProjectCommits(projectId, repoType, 1).catch(() => null);
-
-        if (commitData && commitData.commits && commitData.commits.length > 0) {
-          const hash = commitData.commits[0].commitHash;
-          const filesData = await fetchProjectCommitFiles(projectId, repoType, hash).catch(() => null);
-
-          if (filesData && filesData.files && filesData.files.length > 0) {
-            const mappedFiles: CommitFile[] = filesData.files.map((f) => ({
-              id: f.path,
-              name: f.fileName,
-              path: f.path,
-              ext: f.extension || (f.fileName.includes(".") ? f.fileName.split(".").pop() ?? "" : ""),
-              status: f.status.toLowerCase() as any,
-              additions: f.additions,
-              deletions: f.deletions,
-              diff: [],
-            }));
-
-            // 첫 번째 파일의 diff 미리 로드
-            if (mappedFiles.length > 0) {
-              const diffRes = await fetchProjectCommitFileDiff(projectId, repoType, hash, mappedFiles[0].path).catch(() => null);
-              if (diffRes && diffRes.diff) {
-                // diff 파싱
-                const lines = diffRes.diff.split("\n").map((content) => {
-                  if (content.startsWith("@@")) return { type: "hunk" as const, content };
-                  if (content.startsWith("+")) return { type: "added" as const, content: content.slice(1) };
-                  if (content.startsWith("-")) return { type: "removed" as const, content: content.slice(1) };
-                  return { type: "context" as const, content: content.slice(1) };
-                });
-                mappedFiles[0].diff = lines;
-              }
-            }
-
-            setChangedFiles(mappedFiles);
-            setStaged(new Set(mappedFiles.map((f) => f.id)));
-            setSelectedFile(mappedFiles[0] ?? null);
-            setIsLoading(false);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn("API 파일 조회 실패 - WE-AI 기본 카탈로그 사용", e);
-      }
-
-      // API에 커밋이 없거나 조회 실패 시 WE-AI 프로젝트 카탈로그 자동 사용
+    if (!projectId) {
       setChangedFiles(defaultCatalog);
       setStaged(new Set(defaultCatalog.map((f) => f.id)));
       setSelectedFile(defaultCatalog[0] ?? null);
       setIsLoading(false);
+      return;
     }
 
-    void loadCommitData();
+    try {
+      // 1. 실제 백엔드 Git 변경 파일 목록 조회 (/changes/files)
+      const changeRes = await fetchProjectChangedFiles(projectId).catch(() => null);
+
+      if (changeRes && Array.isArray(changeRes.files)) {
+        setCurrentBranch(changeRes.branchName || "main");
+
+        if (changeRes.files.length === 0) {
+          // Working tree가 깨끗한 경우
+          setChangedFiles([]);
+          setStaged(new Set());
+          setSelectedFile(null);
+          setIsLoading(false);
+          return;
+        }
+
+        const mappedFiles: CommitFile[] = changeRes.files.map((f) => ({
+          id: f.filePath,
+          name: f.fileName,
+          path: f.filePath,
+          ext: f.extension || (f.fileName.includes(".") ? f.fileName.split(".").pop() ?? "" : ""),
+          status: (f.changeType || "MODIFIED").toLowerCase() as any,
+          additions: 0,
+          deletions: 0,
+          diff: [],
+        }));
+
+        const stagedSet = new Set(changeRes.files.filter((f) => f.staged).map((f) => f.filePath));
+        setChangedFiles(mappedFiles);
+        setStaged(stagedSet);
+
+        // 첫 번째 파일의 diff 비동기 조회
+        if (mappedFiles[0]) {
+          const isFirstStaged = stagedSet.has(mappedFiles[0].id);
+          const diffRes = await fetchProjectChangedFileDiff(projectId, mappedFiles[0].path, isFirstStaged).catch(() => null);
+          if (diffRes && diffRes.diffContent) {
+            mappedFiles[0].diff = parseUnifiedDiff(diffRes.diffContent);
+            mappedFiles[0].additions = Number(diffRes.additions) || 0;
+            mappedFiles[0].deletions = Number(diffRes.deletions) || 0;
+          }
+          setSelectedFile(mappedFiles[0]);
+        }
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.warn("실제 Git 변경 파일 조회 실패 - 기본 카탈로그로 폴백합니다.", e);
+    }
+
+    // API 실패 시 기본 카탈로그로 안전 폴백
+    setChangedFiles(defaultCatalog);
+    setStaged(new Set(defaultCatalog.map((f) => f.id)));
+    setSelectedFile(defaultCatalog[0] ?? null);
+    setIsLoading(false);
   }, [projectId, repoType]);
+
+  useEffect(() => {
+    void loadCommitData();
+  }, [loadCommitData]);
+
+  // 파일 선택 시 diff 로드
+  const handleSelectFile = async (file: CommitFile) => {
+    setSelectedFile(file);
+    if (!projectId || (file.diff && file.diff.length > 0)) {
+      return;
+    }
+    try {
+      const isFileStaged = staged.has(file.id);
+      const diffRes = await fetchProjectChangedFileDiff(projectId, file.path, isFileStaged);
+      if (diffRes && diffRes.diffContent) {
+        const parsed = parseUnifiedDiff(diffRes.diffContent);
+        const updated = {
+          ...file,
+          diff: parsed,
+          additions: Number(diffRes.additions) || 0,
+          deletions: Number(diffRes.deletions) || 0,
+        };
+        setSelectedFile(updated);
+        setChangedFiles((prev) => prev.map((f) => (f.id === file.id ? updated : f)));
+      }
+    } catch (err) {
+      console.warn("파일 Diff 조회 실패", err);
+    }
+  };
 
   const stagedFiles = changedFiles.filter((f) => staged.has(f.id));
   const unstagedFiles = changedFiles.filter((f) => !staged.has(f.id));
   const stagedCount = staged.size;
 
-  const toggleStage = (e: React.MouseEvent, id: string) => {
+  const toggleStage = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    const isCurrentlyStaged = staged.has(id);
+
+    if (projectId) {
+      try {
+        if (isCurrentlyStaged) {
+          await unstageProjectFiles(projectId, [id]);
+        } else {
+          await stageProjectFiles(projectId, [id]);
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "스테이징 상태 변경에 실패했습니다.");
+        return;
+      }
+    }
+
     setStaged((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -829,8 +911,29 @@ export function ChangesPage({
     });
   };
 
-  const stageAll = () => setStaged(new Set(changedFiles.map((f) => f.id)));
-  const unstageAll = () => setStaged(new Set());
+  const stageAll = async () => {
+    if (projectId) {
+      try {
+        await stageAllProjectFiles(projectId);
+      } catch (err: any) {
+        toast.error(err?.message || "전체 스테이징에 실패했습니다.");
+        return;
+      }
+    }
+    setStaged(new Set(changedFiles.map((f) => f.id)));
+  };
+
+  const unstageAll = async () => {
+    if (projectId) {
+      try {
+        await unstageAllProjectFiles(projectId);
+      } catch (err: any) {
+        toast.error(err?.message || "전체 언스테이징에 실패했습니다.");
+        return;
+      }
+    }
+    setStaged(new Set());
+  };
 
   const handleCommitClick = () => {
     if (!stagedCount || !message.trim()) return;
@@ -848,27 +951,55 @@ export function ChangesPage({
 
   const handleQAYes = () => {
     setShowQA(false);
+    const session = loadSession();
+    const currentUserName = session?.username || "Developer";
+
     setPendingQA({
       message: message.trim(),
-      author: "시연용 마스터",
-      branch: "main",
+      author: currentUserName,
+      branch: currentBranch,
       files: stagedFiles.map((f) => f.name),
-      hash: Math.random().toString(36).slice(2, 9).toUpperCase(),
+      hash: "PENDING",
       time: new Date().toISOString(),
       diffFiles: stagedFiles,
     });
     onNavigateQA?.();
   };
 
-  const doCommit = () => {
+  const doCommit = async () => {
     const msg = message.trim();
-    setHistory((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
-    setDoneMsg(msg);
-    setMessage("");
-    setStaged(new Set());
-    setSelectedFile(null);
-    setShowQA(false);
-    setShowDone(true);
+    if (!msg) return;
+
+    if (projectId) {
+      setIsCommitting(true);
+      try {
+        const commitRes = await createProjectCommit(projectId, msg);
+        const shortHash = commitRes.shortCommitHash || commitRes.commitHash.slice(0, 7);
+        setHistory((prev) => [`[${new Date().toLocaleTimeString()}] ${shortHash} - ${msg}`, ...prev.slice(0, 4)]);
+        setDoneMsg(`[${shortHash}] ${msg}`);
+        setMessage("");
+        setStaged(new Set());
+        setSelectedFile(null);
+        setShowQA(false);
+        setShowDone(true);
+        toast.success(`커밋이 성공적으로 생성되었습니다 (${shortHash})`);
+        void loadCommitData();
+        return;
+      } catch (err: any) {
+        toast.error(err?.message || "커밋 생성에 실패했습니다.");
+      } finally {
+        setIsCommitting(false);
+      }
+    } else {
+      // 로컬 Mock 모드
+      setHistory((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
+      setDoneMsg(msg);
+      setMessage("");
+      setStaged(new Set());
+      setSelectedFile(null);
+      setShowQA(false);
+      setShowDone(true);
+    }
   };
 
   const totalAdd = changedFiles.reduce((s, f) => s + f.additions, 0);
@@ -1015,7 +1146,7 @@ export function ChangesPage({
                         staged={true}
                         selected={selectedFile?.id === file.id}
                         onToggle={(e) => toggleStage(e, file.id)}
-                        onSelect={() => setSelectedFile(file)}
+                        onSelect={() => void handleSelectFile(file)}
                       />
                     ))
                   ) : stagedOpen && stagedFiles.length === 0 ? (
@@ -1077,7 +1208,7 @@ export function ChangesPage({
                         staged={false}
                         selected={selectedFile?.id === file.id}
                         onToggle={(e) => toggleStage(e, file.id)}
-                        onSelect={() => setSelectedFile(file)}
+                        onSelect={() => void handleSelectFile(file)}
                       />
                     ))
                   ) : unstagedOpen && unstagedFiles.length === 0 ? (
@@ -1089,11 +1220,11 @@ export function ChangesPage({
                   ) : null}
                 </div>
 
-                {/* 최근 커밋 히스토리 */}
-                {!isLoading && history.length > 0 && (
-                  <div className="px-3 pt-3 pb-2" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-2" style={{ color: TEXT_LABEL }}>
-                      Recent Commits
+                {/* 커밋 히스토리 (최근 5개) */}
+                {history.length > 0 && (
+                  <div className="p-3 border-t border-black/5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: TEXT_TERTIARY }}>
+                      Recent Local Commits
                     </p>
                     <div className="space-y-1.5">
                       {history.map((h, i) => (
@@ -1125,16 +1256,16 @@ export function ChangesPage({
                         style={{ background: ACCENT_BG }}
                       >
                         <span className="text-[8px] font-bold" style={{ color: ACCENT }}>
-                          시
+                          {(loadSession()?.username || "D").charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
-                        시연용 마스터
+                        {loadSession()?.username || "Developer"}
                       </span>
                       <div className="flex items-center gap-1 ml-auto">
                         <GitBranch className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
                         <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>
-                          main
+                          {currentBranch}
                         </span>
                       </div>
                     </div>
@@ -1185,21 +1316,21 @@ export function ChangesPage({
 
                     <button
                       onClick={handleCommitClick}
-                      disabled={!stagedCount || !message.trim()}
+                      disabled={!stagedCount || !message.trim() || isCommitting}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold transition-all"
                       style={{
                         background:
-                          stagedCount > 0 && message.trim()
+                          stagedCount > 0 && message.trim() && !isCommitting
                             ? ACCENT
                             : "rgba(0,0,0,0.07)",
-                        color: stagedCount > 0 && message.trim() ? "#FFFFFF" : TEXT_TERTIARY,
+                        color: stagedCount > 0 && message.trim() && !isCommitting ? "#FFFFFF" : TEXT_TERTIARY,
                         boxShadow:
-                          stagedCount > 0 && message.trim() ? "0 4px 16px rgba(37,99,235,0.24)" : "none",
-                        cursor: stagedCount > 0 && message.trim() ? "pointer" : "not-allowed",
+                          stagedCount > 0 && message.trim() && !isCommitting ? "0 4px 16px rgba(37,99,235,0.24)" : "none",
+                        cursor: stagedCount > 0 && message.trim() && !isCommitting ? "pointer" : "not-allowed",
                       }}
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      Commit &amp; Push to main
+                      {isCommitting ? "커밋 생성 중..." : `Commit & Push to ${currentBranch}`}
                     </button>
                   </>
                 )}

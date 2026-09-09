@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   FolderGit2,
   Home,
@@ -11,8 +11,6 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  ChevronDown,
   Hash,
   GitPullRequest,
   MessageCircle,
@@ -80,7 +78,6 @@ const SIDEBAR_COLLAPSED = 52;
 const SIDEBAR_MIN = 44;
 const SIDEBAR_MAX = 340;
 const COLLAPSE_THRESHOLD = 100;
-const TITLEBAR_DEFAULT = 38;
 
 function genProjectCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -262,20 +259,14 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [joinExiting, setJoinExiting] = useState(false);
   const [sidebarProfile, setSidebarProfile] = useState(() => loadProfile());
-  const [docCount, setDocCount] = useState(0);
+  const [, setDocCount] = useState(0);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [showStandup, setShowStandup] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
   const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
-  const [showTitleBar, setShowTitleBar] = useState(true);
   const [showSystemMenu, setShowSystemMenu] = useState(false);
   const systemMenuRef = useRef<HTMLDivElement>(null);
-
-  const [titleBarHeight, setTitleBarHeight] = useState<number>(TITLEBAR_DEFAULT);
-  const isHeaderDragging = useRef(false);
-  const dragHeaderStartY = useRef(0);
-  const dragHeaderStartH = useRef(TITLEBAR_DEFAULT);
 
   useEffect(() => {
     if (!showSystemMenu) return;
@@ -504,29 +495,12 @@ export default function App() {
     document.body.style.userSelect = "none";
   }, []);
 
-  const onHeaderResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isHeaderDragging.current = true;
-    dragHeaderStartY.current = e.clientY;
-    dragHeaderStartH.current = showTitleBar ? titleBarHeight : 0;
-    document.body.style.cursor = "row-resize";
-    document.body.style.userSelect = "none";
-  }, [titleBarHeight, showTitleBar]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (isDragging.current) {
         const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragStartW.current + e.clientX - dragStartX.current));
         setSidebarWidth(next);
-      }
-      if (isHeaderDragging.current) {
-        const next = Math.max(0, Math.min(TITLEBAR_DEFAULT, dragHeaderStartH.current + e.clientY - dragHeaderStartY.current));
-        setTitleBarHeight(next);
-        if (next === 0) {
-          setShowTitleBar(false);
-        } else {
-          setShowTitleBar(true);
-        }
       }
       if (isSplitDragging.current && splitContainerRef.current) {
         const rect = splitContainerRef.current.getBoundingClientRect();
@@ -541,7 +515,6 @@ export default function App() {
         isDragging.current = false;
         setSidebarWidth(w => w < COLLAPSE_THRESHOLD ? SIDEBAR_COLLAPSED : w);
       }
-      if (isHeaderDragging.current) isHeaderDragging.current = false;
       if (isSplitDragging.current) isSplitDragging.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
