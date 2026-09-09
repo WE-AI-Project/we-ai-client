@@ -58,10 +58,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      // Fixed, non-default port so the Electron dev wrapper (electron:dev
-      // script + electron/main.cjs) always knows where to point loadURL(),
-      // instead of silently drifting to the next free port when something
-      // else (another project's dev server, etc.) already holds 5173.
+      // Explicit IPv4 binding so Chromium in Electron always connects cleanly on Windows
+      host: "127.0.0.1",
       port: 5183,
       strictPort: true,
       proxy: {

@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 
 const isDev = !app.isPackaged;
 // Set via the `electron:dev` script once the Vite dev server is up (see package.json).
-const devServerUrl = process.env.VITE_DEV_SERVER_URL || "http://localhost:5183";
+const devServerUrl = process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5183";
 
 let mainWindow = null;
 
@@ -25,6 +25,14 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL(devServerUrl);
+    mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+      console.warn(`[Electron] Failed to load ${devServerUrl} (${errorCode}: ${errorDescription}). Retrying in 1s...`);
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL(devServerUrl);
+        }
+      }, 1000);
+    });
     mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
     mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
