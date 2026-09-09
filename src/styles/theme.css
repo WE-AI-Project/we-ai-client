@@ -2,111 +2,109 @@
 
 /* ============================================================
    WE&AI Project Office — CSS 테마 변수
-   팔레트: Sidebar/Wrapper(#131507) · Primary Olive(#708238)
-           Secondary Brown(#A67B5B) · Surface(#F5EFE6)
-           Background Base(#F8F5F2) · Text Base(#1F1F1F)
-   (가이드라인.md 2026-09-02 개정 기준)
+   팔레트: 사이드바(#131507) · 올리브(#41431B) · 세이지(#AEB784)
+           베이지(#E3DBBB) · 크림(#F8F3E1) · 밝은베이지(#FEFCF5)
    ============================================================ */
 :root {
   --font-size: 16px;
 
   /* ── 기본 서피스 ── */
-  --background: #F8F5F2;           /* Background Base — 따뜻한 페이퍼 톤 */
-  --foreground: #1F1F1F;           /* Text Base */
+  --background: #0A0D3A;           /* 차분한 쿨 그레이 */
+  --foreground: #FFFFFF;
 
   /* ── 카드 / 팝오버 ── */
-  --card: #FAF7F1;
-  --card-foreground: #1F1F1F;
-  --popover: #FDFBF7;
-  --popover-foreground: #1F1F1F;
+  --card: #23272A;
+  --card-foreground: #FFFFFF;
+  --popover: #1E2353;
+  --popover-foreground: #FFFFFF;
 
   /* ── 기본 / 보조 ── */
-  --primary: #708238;              /* Primary Accent — Olive */
-  --primary-foreground: #F8F5F2;   /* Inverse Text (Background Base) */
-  --secondary: #EFE6D5;
-  --secondary-foreground: #2A2A2A;
+  --primary: #5865F2;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1E2353;
+  --secondary-foreground: #FFFFFF;
 
   /* ── 뮤트 / 액센트 ── */
-  --muted: #EFE6D5;
-  --muted-foreground: #6B6B6B;
-  --accent: #EAE1D0;
-  --accent-foreground: #2A2A2A;
+  --muted: #1E2353;
+  --muted-foreground: #B5B9DE;
+  --accent: #EC48BD;
+  --accent-foreground: #FFFFFF;
 
   /* ── 디스트럭티브 ── */
   --destructive: #B85450;
   --destructive-foreground: #FFFFFF;
 
   /* ── 보더 / 인풋 ── */
-  --border: rgba(31, 31, 31, 0.12);
-  --input: transparent;
-  --input-background: #F5EFE6;
-  --switch-background: #C7BDA8;
+  --border: rgba(255, 255, 255, 0.14);
+  --input: rgba(88, 101, 242, 0.18);
+  --input-background: #1E2353;
+  --switch-background: #5865F2;
 
   /* ── 폰트 웨이트 ── */
   --font-weight-medium: 500;
   --font-weight-normal: 400;
 
   /* ── 링 ── */
-  --ring: rgba(112, 130, 56, 0.35);
+  --ring: rgba(88, 101, 242, 0.60);
 
   /* ── 차트 ── */
-  --chart-1: #708238;
-  --chart-2: #A67B5B;
-  --chart-3: #C09840;
-  --chart-4: #5A8A4A;
-  --chart-5: #B87850;
+  --chart-1: #5865F2;
+  --chart-2: #35ED7E;
+  --chart-3: #EC48BD;
+  --chart-4: #00B0F4;
+  --chart-5: #F59E0B;
 
   /* ── 라디우스 ── */
   --radius: 0.625rem;
 
-  /* ── 사이드바 (Sidebar/Wrapper — #131507, 유일한 다크 앵커) ── */
-  --sidebar: #131507;
-  --sidebar-foreground: #F8F5F2;         /* Inverse Text (Background Base) */
-  --sidebar-primary: #A67B5B;            /* Secondary — Brown */
-  --sidebar-primary-foreground: #131507;
-  --sidebar-accent: rgba(166, 123, 91, 0.15);
-  --sidebar-accent-foreground: #F8F5F2;
-  --sidebar-border: rgba(166, 123, 91, 0.08);
-  --sidebar-ring: rgba(166, 123, 91, 0.30);
+  /* ── 사이드바 (초극다크 올리브 — #131507 기반) ── */
+  --sidebar: #0A0D3A;
+  --sidebar-foreground: #FFFFFF;         /* 크림-올리브 (어두운 배경 텍스트) */
+  --sidebar-primary: #5865F2;            /* 세이지 그린 */
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(88, 101, 242, 0.22);
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --sidebar-ring: rgba(88, 101, 242, 0.60);
 }
 
 .dark {
-  --background: #1A1B12;
-  --foreground: #F0E9DC;
-  --card: #232419;
-  --card-foreground: #F0E9DC;
-  --popover: #1A1B12;
-  --popover-foreground: #F0E9DC;
-  --primary: #A67B5B;
-  --primary-foreground: #131507;
-  --secondary: #2C2D1E;
-  --secondary-foreground: #F0E9DC;
-  --muted: #2C2D1E;
-  --muted-foreground: #9A9B72;
-  --accent: #2C2D1E;
-  --accent-foreground: #F0E9DC;
+  --background: #0A0D3A;
+  --foreground: #FFFFFF;
+  --card: #23272A;
+  --card-foreground: #FFFFFF;
+  --popover: #1E2353;
+  --popover-foreground: #FFFFFF;
+  --primary: #5865F2;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1E2353;
+  --secondary-foreground: #FFFFFF;
+  --muted: #1E2353;
+  --muted-foreground: #B5B9DE;
+  --accent: #EC48BD;
+  --accent-foreground: #FFFFFF;
   --destructive: #B85450;
-  --destructive-foreground: #F0E9DC;
-  --border: rgba(166, 123, 91, 0.18);
-  --input: rgba(166, 123, 91, 0.12);
-  --ring: rgba(166, 123, 91, 0.35);
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(255, 255, 255, 0.14);
+  --input: rgba(88, 101, 242, 0.18);
+  --ring: rgba(88, 101, 242, 0.60);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: #A67B5B;
-  --chart-2: #708238;
-  --chart-3: #C09840;
-  --chart-4: #5A8A4A;
-  --chart-5: #B87850;
+  --chart-1: #5865F2;
+  --chart-2: #35ED7E;
+  --chart-3: #EC48BD;
+  --chart-4: #00B0F4;
+  --chart-5: #F59E0B;
 
   /* ── 다크모드 사이드바 ── */
-  --sidebar: #0C0E02;
-  --sidebar-foreground: #E8DEC8;
-  --sidebar-primary: #A67B5B;
-  --sidebar-primary-foreground: #0C0E02;
-  --sidebar-accent: rgba(166, 123, 91, 0.12);
-  --sidebar-accent-foreground: #E8DEC8;
-  --sidebar-border: rgba(166, 123, 91, 0.10);
-  --sidebar-ring: rgba(166, 123, 91, 0.30);
+  --sidebar: #0A0D3A;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #5865F2;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(88, 101, 242, 0.22);
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --sidebar-ring: rgba(88, 101, 242, 0.60);
 }
 
 @theme inline {
@@ -157,7 +155,6 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif;
   }
 
   /**
@@ -211,21 +208,3 @@
     line-height: 1.5;
   }
 }
-
-/* ============================================================
-   Fluent 2 Design System Spacing & Typography Utilities
-   (D:\SynAIpse\we-ai-client\design.md)
-   ============================================================ */
-.fluent-title-1 { font-size: 32px; line-height: 40px; font-weight: 600; }
-.fluent-title-2 { font-size: 24px; line-height: 32px; font-weight: 600; }
-.fluent-title-3 { font-size: 20px; line-height: 28px; font-weight: 600; }
-.fluent-body-strong { font-size: 14px; line-height: 20px; font-weight: 600; }
-.fluent-body { font-size: 14px; line-height: 20px; font-weight: 400; }
-.fluent-caption-1 { font-size: 12px; line-height: 16px; font-weight: 400; }
-.fluent-caption-2 { font-size: 10px; line-height: 14px; font-weight: 400; }
-
-.fluent-radius-small { border-radius: 4px; }
-.fluent-radius-medium { border-radius: 8px; }
-.fluent-radius-large { border-radius: 12px; }
-.fluent-radius-full { border-radius: 9999px; }
-

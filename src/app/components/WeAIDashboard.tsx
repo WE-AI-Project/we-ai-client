@@ -22,8 +22,9 @@ import {
   UI_VIOLET, UI_VIOLET_BG7,
   UI_INDIGO, UI_INDIGO_BG,
   UI_GRAY, UI_GRAY_LIGHT, UI_GRAY_BG, UI_GRAY_BG8,
-  GRADIENT_HEADER_SM2,
-  PANEL_BG, CONTENT_BG,
+  TERM_BG, TERM_TEXT, TERM_MUTED, TERM_DIMMER, TERM_GREEN,
+  GRADIENT_HEADER, GRADIENT_HEADER_SM2, GRADIENT_HEADER_SM3,
+  GRADIENT_INDIGO, BTN_DARK, PANEL_BG, CONTENT_BG, TEXT_ON_DARK,
   LANG_GRADLE, LANG_JAVA, LANG_YML,
 } from "../colors";
 
@@ -302,7 +303,7 @@ function ProjectEntry({ onJoin, isLoading }: { onJoin: (project: typeof PROJECTS
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search projects..."
                     className="w-full pl-7 pr-3 py-2 text-xs rounded-lg outline-none"
-                    style={{ background: PANEL_BG, border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                    style={{ background: PANEL_BG, border: `1px solid ${BORDER}`, color: TEXT_ON_DARK }}
                   />
                 </div>
                 <button

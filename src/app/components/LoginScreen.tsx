@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import {
   OLIVE_DARK,
   SAGE,
-  TEXT_PRIMARY,
   STATUS_ERROR,
   STATUS_SUCCESS,
   LOGIN_MUTED,
@@ -16,9 +15,13 @@ import {
   LOGIN_SHADOW_1,
   LOGIN_SHADOW_2,
   INPUT_BG,
-  TEXT_LABEL,
-  TEXT_SECONDARY,
   SIDEBAR_DEEP,
+  CONTENT_BG,
+  CARD_BG,
+  PANEL_BG,
+  ACCENT_BG,
+  ACCENT_BORDER,
+  BORDER,
 } from "../colors";
 import {
   FolderGit2,
@@ -70,6 +73,11 @@ const THICK_SHADOW = [
   "0 12px 28px rgba(0,0,0,0.12)",
   "0 32px 64px rgba(0,0,0,0.14)",
 ].join(", ");
+
+const TEXT_PRIMARY = "#FFFFFF";
+const TEXT_SECONDARY = "#D9DCFF";
+const TEXT_TERTIARY = "#B5B9DE";
+const TEXT_LABEL = "#8F95C6";
 
 type CardMode = "login" | "signup" | "email-code" | "password-find";
 type FeedbackTone = "success" | "error" | "info";
@@ -234,7 +242,7 @@ function OtpInput({
             fontSize: 20,
             background: digit ? "#FFFFFF" : INPUT_BG,
             border: `2px solid ${digit ? OLIVE_DARK : "rgba(0,0,0,0.08)"}`,
-            color: TEXT_PRIMARY,
+            color: digit ? "#1B1F3A" : TEXT_PRIMARY,
             transition: "all 0.15s",
             boxShadow: digit ? "0 2px 8px rgba(112,130,56,0.12)" : "none",
           }}
@@ -302,7 +310,7 @@ function Field({
           placeholder={placeholder}
           disabled={disabled}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-          style={{ color: TEXT_PRIMARY }}
+          style={{ color: focused ? "#1B1F3A" : TEXT_PRIMARY }}
         />
         {right}
       </div>
@@ -1517,8 +1525,9 @@ export function LoginScreen({ onAuthenticated }: Props) {
 
   return (
     <div
-      className="relative flex size-full items-center justify-center overflow-hidden bg-[#F8F5F2]"
+      className="relative flex size-full items-center justify-center overflow-hidden"
       style={{
+        background: CONTENT_BG,
         opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.42s ease" : "none",
       }}
@@ -1556,7 +1565,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           </div>
 
           <h1 className="mb-4 text-center text-[44px] font-bold leading-tight tracking-tight sm:text-[52px]">
-            <span style={{ color: "#1A1C06" }}>Welcome to</span>
+            <span style={{ color: TEXT_PRIMARY }}>Welcome to</span>
             <br />
             <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
           </h1>
@@ -1572,7 +1581,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
               <span
                 key={tag}
                 className="rounded-full px-3 py-1.5 text-[11px] font-medium"
-                style={{ background: "rgba(112,130,56,0.07)", color: OLIVE_DARK, border: "1px solid rgba(112,130,56,0.12)" }}
+                style={{ background: ACCENT_BG, color: TEXT_SECONDARY, border: `1px solid ${ACCENT_BORDER}` }}
               >
                 {tag}
               </span>
@@ -1644,7 +1653,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
       {cardOpen && (
         <div
           className="absolute inset-0 z-20"
-          style={{ background: "rgba(15,17,5,0.50)" }}
+          style={{ background: "rgba(10,13,58,0.72)" }}
           onClick={() => setCardOpen(false)}
         />
       )}
@@ -1668,17 +1677,17 @@ export function LoginScreen({ onAuthenticated }: Props) {
           type="button"
           onClick={() => setCardOpen(false)}
           className="absolute -right-3 -top-3 z-50 flex h-8 w-8 items-center justify-center rounded-full"
-          style={{ background: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.14)", color: TEXT_LABEL }}
+          style={{ background: PANEL_BG, boxShadow: "0 2px 12px rgba(0,0,0,0.32)", color: TEXT_TERTIARY }}
         >
           <X className="h-4 w-4" />
         </button>
 
         <div
           style={{
-            background: "#FFFFFF",
+            background: CARD_BG,
             borderRadius: 20,
             boxShadow: THICK_SHADOW,
-            border: "1px solid rgba(0,0,0,0.05)",
+            border: `1px solid ${BORDER}`,
             overflow: "hidden",
             height: cardHeight != null ? cardHeight + 3 : "auto",
             transition: "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
