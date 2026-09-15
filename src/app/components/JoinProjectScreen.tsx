@@ -38,9 +38,12 @@ import {
   ACCENT_BG,
   ACCENT_BORDER,
   BORDER,
+  LOGIN_BG,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_MUTED,
   UI_RED,
 } from "../colors";
 import {
@@ -1096,7 +1099,7 @@ export function JoinProjectScreen({
 
       {modal === "create" && <CreateProjectModal onClose={() => setModal("none")} onCreate={handleCreate} />}
 
-      <div className="relative flex size-full items-center justify-center overflow-hidden" style={{ background: "#F8F5F2" }}>
+      <div className="relative flex size-full items-center justify-center overflow-hidden" style={{ background: LOGIN_BG }}>
         <div className="absolute right-6 top-6 z-20 flex items-center gap-2">
           {currentUser && (
             <div
@@ -1122,18 +1125,18 @@ export function JoinProjectScreen({
           <div className="text-center">
             <div
               className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-              style={{ background: "#708238", boxShadow: "0 8px 24px rgba(112,130,56,0.25)" }}
+              style={{ background: ACCENT, boxShadow: "0 8px 24px rgba(88,101,242,0.30)" }}
             >
               <Bot className="h-7 w-7" style={{ color: "white" }} />
             </div>
-            <h1 className="mb-1.5 text-xl font-bold" style={{ color: TEXT_PRIMARY }}>
+            <h1 className="mb-1.5 text-xl font-bold" style={{ color: TEXT_ON_DARK }}>
               Welcome to SynAIpse Office
             </h1>
-            <p className="text-xs" style={{ color: TEXT_SECONDARY }}>
+            <p className="text-xs" style={{ color: TEXT_ON_DARK_MUTED }}>
               Intelligent Multi-Agent Project Office
             </p>
             {currentUser && (
-              <p className="mt-2 text-[11px]" style={{ color: TEXT_TERTIARY }}>
+              <p className="mt-2 text-[11px]" style={{ color: TEXT_ON_DARK_MUTED }}>
                 {currentUser.name}님, 프로젝트를 선택하거나 새로 만들어보세요.
               </p>
             )}
@@ -1146,15 +1149,15 @@ export function JoinProjectScreen({
               className="group flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left"
               style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.boxShadow = "0 6px 20px rgba(112,130,56,0.14)";
-                event.currentTarget.style.border = "1px solid rgba(112,130,56,0.18)";
+                event.currentTarget.style.boxShadow = "0 6px 20px rgba(88,101,242,0.22)";
+                event.currentTarget.style.border = `1px solid ${ACCENT_BORDER}`;
               }}
               onMouseLeave={(event) => {
                 event.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
                 event.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)";
               }}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(112,130,56,0.08)" }}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: ACCENT_BG }}>
                 <Play className="h-5 w-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
@@ -1174,15 +1177,15 @@ export function JoinProjectScreen({
               className="group flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left"
               style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.boxShadow = "0 6px 20px rgba(112,130,56,0.14)";
-                event.currentTarget.style.border = "1px solid rgba(112,130,56,0.18)";
+                event.currentTarget.style.boxShadow = "0 6px 20px rgba(88,101,242,0.22)";
+                event.currentTarget.style.border = `1px solid ${ACCENT_BORDER}`;
               }}
               onMouseLeave={(event) => {
                 event.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
                 event.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)";
               }}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(166,123,91,0.15)" }}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(236,72,189,0.16)" }}>
                 <Plus className="h-5 w-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
@@ -1201,7 +1204,7 @@ export function JoinProjectScreen({
               style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
             >
               <div className="mb-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(112,130,56,0.06)" }}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: ACCENT_BG }}>
                   <Hash className="h-5 w-5" style={{ color: ACCENT }} />
                 </div>
                 <div>
@@ -1248,7 +1251,7 @@ export function JoinProjectScreen({
                       disabled={codeInput.length !== 8}
                       className="shrink-0 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all"
                       style={{
-                        background: codeInput.length === 8 ? "#708238" : "rgba(0,0,0,0.07)",
+                        background: codeInput.length === 8 ? ACCENT : "rgba(0,0,0,0.07)",
                         color: codeInput.length === 8 ? "white" : TEXT_TERTIARY,
                       }}
                     >
@@ -1320,7 +1323,7 @@ export function JoinProjectScreen({
                       onClick={() => void handleCodeJoin()}
                       disabled={codeJoining}
                       className="flex-1 rounded-xl py-2 text-xs font-semibold"
-                      style={{ background: "#708238", color: "white" }}
+                      style={{ background: ACCENT, color: "white" }}
                     >
                       {codeJoining ? "참여 중..." : "참여하기"}
                     </button>
@@ -1341,10 +1344,10 @@ export function JoinProjectScreen({
               </div>
             )}
 
-            <div className="rounded-xl px-4 py-3 text-[10px]" style={{ background: "rgba(112,130,56,0.04)", border: "1px solid rgba(112,130,56,0.08)" }}>
+            <div className="rounded-xl px-4 py-3 text-[10px]" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: ACCENT }} />
-                <span style={{ color: TEXT_SECONDARY }}>
+                <span style={{ color: TEXT_ON_DARK_MUTED }}>
                   내 프로젝트 {sortedProjects.length}개가 실제 서버 데이터로 연결되어 있습니다.
                 </span>
               </div>

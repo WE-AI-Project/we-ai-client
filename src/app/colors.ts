@@ -9,9 +9,9 @@
 export const SIDEBAR_DEEP  = "#0A0D3A";   // 사이드바/타이틀바 — 다크 네이비
 export const OLIVE_DARK    = "#5865F2";   // 인디고 (메인 액센트) — 상수명은 legacy
 export const SAGE          = "#35ED7E";   // 그린 (서브 액센트) — 상수명은 legacy
-export const BEIGE         = "#1E2353";   // 다크 네이비 패널톤 — 상수명은 legacy
-export const CREAM         = "#0A0D3A";   // 다크 네이비 서브 배경 — 상수명은 legacy
-export const BRIGHT_BEIGE  = "#23272A";   // 다크 차콜 카드 배경 — 상수명은 legacy
+export const BEIGE         = "#F3F4FF";   // 밝은 보조 표면 — 상수명은 legacy
+export const CREAM         = "#FFFFFF";   // 기본 카드 표면 — 상수명은 legacy
+export const BRIGHT_BEIGE  = "#F7F8FF";   // 밝은 서브 카드 표면 — 상수명은 legacy
 
 // ── 텍스트 (콘텐츠 영역 밝은 배경용) ─────────────────────
 export const TEXT_PRIMARY   = "#1B1F3A";   // 밝은 콘텐츠 영역의 기본 텍스트
@@ -33,16 +33,16 @@ export const OUTER_BG       = "#000000";   // 최외부 래퍼 배경 (순검정
 export const SIDEBAR_BG     = "#0A0D3A";   // 사이드바 배경
 export const TITLEBAR_BG    = "#0A0D3A";   // 타이틀바 배경
 export const CONTENT_BG     = "#0A0D3A";   // 메인 콘텐츠 배경
-export const PANEL_BG       = "#1E2353";   // 패널 배경
-export const CARD_BG        = "#23272A";   // 카드 배경
-export const INPUT_BG       = "#1E2353";   // 인풋 배경
-export const TABLE_HEADER_BG = "#1E2353";  // 테이블 헤더 배경
-export const TABLE_BG       = "#23272A";   // 테이블 배경
+export const PANEL_BG       = "#FFFFFF";   // 패널 배경
+export const CARD_BG        = "#FFFFFF";   // 카드 배경
+export const INPUT_BG       = "#F7F8FF";   // 인풋 배경
+export const TABLE_HEADER_BG = "#F3F4FF";  // 테이블 헤더 배경
+export const TABLE_BG       = "#FFFFFF";   // 테이블 배경
 export const LOGIN_BG       = "#0A0D3A";   // 로그인/프로젝트 선택 배경
 
 // ── 보더 ──────────────────────────────────────────────────
-export const BORDER         = "rgba(255,255,255,0.14)";
-export const BORDER_SUBTLE  = "rgba(255,255,255,0.08)";
+export const BORDER         = "rgba(27,31,58,0.14)";
+export const BORDER_SUBTLE  = "rgba(27,31,58,0.08)";
 export const SIDEBAR_BORDER = "rgba(255,255,255,0.08)";
 
 // ── 인터랙션 (사이드바 어두운 배경 기준) ──────────────────

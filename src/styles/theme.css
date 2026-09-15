@@ -15,34 +15,34 @@
 
   /* ── 기본 서피스 ── */
   --background: #0A0D3A;           /* 차분한 쿨 그레이 */
-  --foreground: #FFFFFF;
+  --foreground: #1B1F3A;
 
   /* ── 카드 / 팝오버 ── */
-  --card: #23272A;
-  --card-foreground: #FFFFFF;
-  --popover: #1E2353;
-  --popover-foreground: #FFFFFF;
+  --card: #FFFFFF;
+  --card-foreground: #1B1F3A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1B1F3A;
 
   /* ── 기본 / 보조 ── */
   --primary: #5865F2;
   --primary-foreground: #FFFFFF;
-  --secondary: #1E2353;
-  --secondary-foreground: #FFFFFF;
+  --secondary: #F3F4FF;
+  --secondary-foreground: #1B1F3A;
 
   /* ── 뮤트 / 액센트 ── */
-  --muted: #1E2353;
-  --muted-foreground: #B5B9DE;
-  --accent: #EC48BD;
-  --accent-foreground: #FFFFFF;
+  --muted: #F3F4FF;
+  --muted-foreground: #656B91;
+  --accent: rgba(88, 101, 242, 0.16);
+  --accent-foreground: #1B1F3A;
 
   /* ── 디스트럭티브 ── */
   --destructive: #B85450;
   --destructive-foreground: #FFFFFF;
 
   /* ── 보더 / 인풋 ── */
-  --border: rgba(255, 255, 255, 0.14);
-  --input: rgba(88, 101, 242, 0.18);
-  --input-background: #1E2353;
+  --border: rgba(27, 31, 58, 0.14);
+  --input: rgba(27, 31, 58, 0.12);
+  --input-background: #F7F8FF;
   --switch-background: #5865F2;
 
   /* ── 폰트 웨이트 ── */
@@ -75,23 +75,23 @@
 .dark {
   /* index.html의 <html class="dark">에 의해 항상 적용됨 — :root와 값을 의도적으로 동일하게 유지 */
   --background: #0A0D3A;
-  --foreground: #FFFFFF;
-  --card: #23272A;
-  --card-foreground: #FFFFFF;
-  --popover: #1E2353;
-  --popover-foreground: #FFFFFF;
+  --foreground: #1B1F3A;
+  --card: #FFFFFF;
+  --card-foreground: #1B1F3A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1B1F3A;
   --primary: #5865F2;
   --primary-foreground: #FFFFFF;
-  --secondary: #1E2353;
-  --secondary-foreground: #FFFFFF;
-  --muted: #1E2353;
-  --muted-foreground: #B5B9DE;
-  --accent: #EC48BD;
-  --accent-foreground: #FFFFFF;
+  --secondary: #F3F4FF;
+  --secondary-foreground: #1B1F3A;
+  --muted: #F3F4FF;
+  --muted-foreground: #656B91;
+  --accent: rgba(88, 101, 242, 0.16);
+  --accent-foreground: #1B1F3A;
   --destructive: #B85450;
   --destructive-foreground: #FFFFFF;
-  --border: rgba(255, 255, 255, 0.14);
-  --input: rgba(88, 101, 242, 0.18);
+  --border: rgba(27, 31, 58, 0.14);
+  --input: rgba(27, 31, 58, 0.12);
   --ring: rgba(88, 101, 242, 0.60);
   --font-weight-medium: 500;
   --font-weight-normal: 400;

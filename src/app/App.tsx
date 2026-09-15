@@ -755,13 +755,12 @@ export default function App() {
     activeTab: NavId,
     setActiveTab: (id: NavId) => void
   ) => {
-    const isFocused = activePanel === panelType;
-    const shouldShowTabs = true; // 상단 탭은 항상 유지되어 다른 탭을 열어도 꺼지지 않음
+    const shouldShowTabs = leftTabs.length + rightTabs.length > 1;
 
     return (
       <div
         className="size-full flex flex-col overflow-hidden transition-colors duration-200"
-        style={{ background: TERM_BG, border: isFocused ? "1px solid #A67B5B" : "1px solid transparent" }}
+        style={{ background: TERM_BG }}
         onClickCapture={() => setActivePanel(panelType)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={() => handleTabDrop(panelType)}
@@ -879,8 +878,11 @@ export default function App() {
         {isSplit && (
           <div
             onMouseDown={onSplitResizeMouseDown}
-            className="absolute top-0 bottom-0 w-2 hover:bg-[#A67B5B]/60 cursor-col-resize z-30 transition-colors"
-            style={{ left: `calc(${splitPercent}% - 4px)` }}
+            className="absolute top-0 bottom-0 w-2 hover:bg-[#5865F2]/60 cursor-col-resize z-30 transition-colors"
+            style={{
+              left: `calc(${splitPercent}% - 4px)`,
+              background: "linear-gradient(90deg, transparent 45%, rgba(255,255,255,0.16) 45%, rgba(255,255,255,0.16) 55%, transparent 55%)",
+            }}
             title="드래그하여 크기 조절"
           />
         )}

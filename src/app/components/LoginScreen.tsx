@@ -18,7 +18,7 @@ import {
   TEXT_PRIMARY,
   INPUT_BG,
   SIDEBAR_DEEP,
-  CONTENT_BG,
+  LOGIN_BG,
   CARD_BG,
   PANEL_BG,
   ACCENT_BG,
@@ -230,7 +230,7 @@ function OtpInput({
             fontSize: 20,
             background: digit ? "#FFFFFF" : INPUT_BG,
             border: `2px solid ${digit ? OLIVE_DARK : "rgba(0,0,0,0.08)"}`,
-            color: digit ? TEXT_PRIMARY : TEXT_ON_DARK,
+            color: TEXT_PRIMARY,
             transition: "all 0.15s",
             boxShadow: digit ? "0 2px 8px rgba(112,130,56,0.12)" : "none",
           }}
@@ -298,7 +298,7 @@ function Field({
           placeholder={placeholder}
           disabled={disabled}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-          style={{ color: focused ? TEXT_PRIMARY : TEXT_ON_DARK }}
+          style={{ color: TEXT_PRIMARY }}
         />
         {right}
       </div>
@@ -518,7 +518,7 @@ function LoginForm({
           <FolderGit2 className="h-5 w-5" style={{ color: "white" }} />
         </div>
         <div>
-          <h2 className="text-base font-bold" style={{ color: TEXT_ON_DARK }}>
+          <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
             로그인
           </h2>
           <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
@@ -857,7 +857,7 @@ function SignupForm({
               <User className="h-5 w-5" style={{ color: "white" }} />
             </div>
             <div>
-              <h2 className="text-base font-bold" style={{ color: TEXT_ON_DARK }}>
+              <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
                 회원가입
               </h2>
               <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
@@ -884,7 +884,7 @@ function SignupForm({
                 {socialProvider === "google" && <GoogleIcon size={14} />}
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>
+                <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
                   {SOCIAL_LABELS[socialProvider]} 이메일로 가입
                 </p>
                 <p className="truncate text-[9px]" style={{ color: LOGIN_MUTED }}>
@@ -931,7 +931,7 @@ function SignupForm({
                 placeholder="your@email.com"
                 disabled={!!socialProvider || otpSent}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                style={{ color: TEXT_ON_DARK, opacity: socialProvider || otpSent ? 0.75 : 1 }}
+                style={{ color: TEXT_PRIMARY, opacity: socialProvider || otpSent ? 0.75 : 1 }}
               />
               {verified ? (
                 <span
@@ -987,7 +987,7 @@ function SignupForm({
                 >
                   <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: OLIVE_DARK }} />
                   <div>
-                    <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>
+                    <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
                       인증코드를 발송했습니다
                     </p>
                     <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
@@ -1078,7 +1078,7 @@ function SignupForm({
                   <Square className="h-4 w-4" style={{ color: LOGIN_CHECKBOX }} />
                 )}
               </button>
-              <span className="text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }}>
+              <span className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
                 전체 동의
               </span>
             </div>
@@ -1227,7 +1227,7 @@ function EmailCodeLoginForm({
           <KeyRound className="h-5 w-5" style={{ color: "white" }} />
         </div>
         <div>
-          <h2 className="text-base font-bold" style={{ color: TEXT_ON_DARK }}>
+          <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
             이메일 코드 로그인
           </h2>
           <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
@@ -1268,7 +1268,7 @@ function EmailCodeLoginForm({
           className="rounded-xl px-3.5 py-3"
           style={{ background: "rgba(112,130,56,0.04)", border: "1px solid rgba(112,130,56,0.10)" }}
         >
-          <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>
+          <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
             인증코드를 보냈습니다
           </p>
           <p className="mt-1 text-[9px]" style={{ color: LOGIN_MUTED }}>
@@ -1376,7 +1376,7 @@ function PasswordFindForm({
           <KeyRound className="h-5 w-5" style={{ color: "white" }} />
         </div>
         <div>
-          <h2 className="text-base font-bold" style={{ color: TEXT_ON_DARK }}>
+          <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
             비밀번호 찾기
           </h2>
           <p className="text-[11px]" style={{ color: LOGIN_MUTED }}>
@@ -1411,7 +1411,7 @@ function PasswordFindForm({
           className="rounded-xl px-3.5 py-3"
           style={{ background: "rgba(90,138,74,0.08)", border: "1px solid rgba(90,138,74,0.18)" }}
         >
-          <p className="text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }}>
+          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
             임시 비밀번호를 발급했습니다.
           </p>
           <p className="mt-1 text-[10px]" style={{ color: LOGIN_MUTED }}>
@@ -1526,7 +1526,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
     <div
       className="relative flex size-full items-center justify-center overflow-hidden"
       style={{
-        background: CONTENT_BG,
+        background: LOGIN_BG,
         opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.42s ease" : "none",
       }}
