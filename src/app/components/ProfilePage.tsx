@@ -192,25 +192,34 @@ export function ProfilePage({ projectId }: { projectId?: number | string | null 
         const summary = summaryRes.status === "fulfilled" ? summaryRes.value : null;
         const activities = activitiesRes.status === "fulfilled" && Array.isArray(activitiesRes.value) ? activitiesRes.value : [];
 
+        if (userRes.status === "rejected") {
+          console.error("현재 사용자 정보를 불러오지 못했습니다:", userRes.reason);
+          if (!cached) toast.error("프로필 정보를 불러오지 못했습니다.");
+        }
+        if (summaryRes.status === "rejected") {
+          console.error("활동 요약을 불러오지 못했습니다:", summaryRes.reason);
+        }
+        if (activitiesRes.status === "rejected") {
+          console.error("최근 활동을 불러오지 못했습니다:", activitiesRes.reason);
+        }
+
         setProfile({
-          displayName: sessionUser?.name || cached?.displayName || "병권",
-          role: sessionUser?.role || cached?.role || "Backend Lead",
-          email: sessionUser?.email || cached?.email || "user@synaipse.io",
-          location: cached?.location || "Seoul, Korea",
-          bio: cached?.bio || "SynAIpse Intelligent Multi-Agent Developer",
+          displayName: sessionUser?.name || cached?.displayName || "",
+          role: sessionUser?.role || cached?.role || "",
+          email: sessionUser?.email || cached?.email || "",
+          location: cached?.location || "",
+          bio: cached?.bio || "",
           avatarColor: cached?.avatarColor || "olive",
           techStack: cached?.techStack || [],
         });
 
-        setActivitySummary(summary || {
-          totalTasks: 18,
-          completedTasks: 14,
-          recentCommitsCount: 16,
-          lastActivityDate: null,
-        });
+        // summary/activities는 API가 실패하면 null/빈 배열 그대로 둔다 — 화면은 이미
+        // activitySummary?.xxx ?? 0 및 "최근 활동 내역이 없습니다" 빈 상태를 처리한다.
+        setActivitySummary(summary);
         setRecentActivities(activities);
       } catch (e) {
-        console.warn("프로필 데이터 fallback 적용:", e);
+        console.error("프로필 데이터를 불러오는 중 오류가 발생했습니다:", e);
+        toast.error("프로필 데이터를 불러오지 못했습니다.");
       } finally {
         setIsLoading(false);
       }

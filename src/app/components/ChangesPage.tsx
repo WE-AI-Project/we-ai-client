@@ -82,405 +82,6 @@ const STATUS_META: Record<string, { color: string; label: string; bg: string }> 
   DELETED: { color: "#B85450", label: "D", bg: "rgba(184,84,80,0.10)" },
 };
 
-// ══════════════════════════════════════════════════════════
-// WE-AI-Project 레포지토리 기본 변경 파일 및 Diff 데이터
-// (https://github.com/WE-AI-Project/we-ai-server & we-ai-client)
-// ══════════════════════════════════════════════════════════
-
-const WEAI_BACKEND_FILES: CommitFile[] = [
-  {
-    id: "be-1",
-    name: "MultiAgentController.java",
-    path: "src/main/java/com/weai/controller/MultiAgentController.java",
-    ext: "java",
-    status: "modified",
-    additions: 12,
-    deletions: 3,
-    diff: [
-      { type: "hunk", content: "@@ -1,6 +1,9 @@ package com.weai.controller;" },
-      { type: "context", oldNum: 1, newNum: 1, content: "package com.weai.controller;" },
-      { type: "context", oldNum: 2, newNum: 2, content: "" },
-      { type: "removed", oldNum: 3, content: "import java.util.ArrayList;" },
-      { type: "removed", oldNum: 4, content: "import java.util.List;" },
-      { type: "added", newNum: 3, content: "import java.util.List;" },
-      { type: "added", newNum: 4, content: "import java.util.concurrent.ConcurrentHashMap;" },
-      { type: "added", newNum: 5, content: "import java.util.Comparator;" },
-      { type: "context", oldNum: 5, newNum: 6, content: "import org.springframework.web.bind.annotation.*;" },
-      { type: "hunk", content: "@@ -14,10 +17,18 @@ public class MultiAgentController {" },
-      { type: "removed", oldNum: 14, content: "    private final List<Agent> agents = new ArrayList<>();" },
-      { type: "added", newNum: 17, content: "    private final ConcurrentHashMap<String, Agent> agentRegistry;" },
-      { type: "added", newNum: 18, content: "    private final AgentScheduler scheduler;" },
-      { type: "added", newNum: 19, content: "" },
-      { type: "added", newNum: 20, content: "    @Autowired" },
-      { type: "added", newNum: 21, content: "    public MultiAgentController(AgentScheduler scheduler) {" },
-      { type: "added", newNum: 22, content: "        this.agentRegistry = new ConcurrentHashMap<>();" },
-      { type: "added", newNum: 23, content: "        this.scheduler = scheduler;" },
-      { type: "added", newNum: 24, content: "    }" },
-      { type: "hunk", content: "@@ -28,5 +39,9 @@ public class MultiAgentController {" },
-      { type: "context", oldNum: 28, newNum: 39, content: "    @GetMapping(\"/status\")" },
-      { type: "context", oldNum: 29, newNum: 40, content: "    public ResponseEntity<List<AgentStatus>> getStatus() {" },
-      { type: "removed", oldNum: 30, content: "        return ResponseEntity.ok(agents.stream().map(Agent::getStatus).toList());" },
-      { type: "added", newNum: 41, content: "        return ResponseEntity.ok(" },
-      { type: "added", newNum: 42, content: "            agentRegistry.values().stream()" },
-      { type: "added", newNum: 43, content: "                .map(Agent::getStatus)" },
-      { type: "added", newNum: 44, content: "                .sorted(Comparator.comparing(AgentStatus::getName))" },
-      { type: "added", newNum: 45, content: "                .collect(Collectors.toList())" },
-      { type: "added", newNum: 46, content: "        );" },
-      { type: "context", oldNum: 31, newNum: 47, content: "    }" },
-    ],
-  },
-  {
-    id: "be-2",
-    name: "DataSyncAgent.java",
-    path: "src/main/java/com/weai/agent/DataSyncAgent.java",
-    ext: "java",
-    status: "added",
-    additions: 31,
-    deletions: 0,
-    diff: [
-      { type: "hunk", content: "@@ -0,0 +1,31 @@" },
-      { type: "added", newNum: 1, content: "package com.weai.agent;" },
-      { type: "added", newNum: 2, content: "" },
-      { type: "added", newNum: 3, content: "import lombok.extern.slf4j.Slf4j;" },
-      { type: "added", newNum: 4, content: "import org.springframework.stereotype.Component;" },
-      { type: "added", newNum: 5, content: "import org.springframework.web.client.RestTemplate;" },
-      { type: "added", newNum: 6, content: "" },
-      { type: "added", newNum: 7, content: "@Component" },
-      { type: "added", newNum: 8, content: "@Slf4j" },
-      { type: "added", newNum: 9, content: "public class DataSyncAgent implements Agent {" },
-      { type: "added", newNum: 10, content: "    private static final String AGENT_ID = \"AGT-01\";" },
-      { type: "added", newNum: 11, content: "    private final RestTemplate restTemplate;" },
-      { type: "added", newNum: 12, content: "" },
-      { type: "added", newNum: 13, content: "    public DataSyncAgent(RestTemplate restTemplate) {" },
-      { type: "added", newNum: 14, content: "        this.restTemplate = restTemplate;" },
-      { type: "added", newNum: 15, content: "    }" },
-      { type: "added", newNum: 16, content: "" },
-      { type: "added", newNum: 17, content: "    @Override" },
-      { type: "added", newNum: 18, content: "    public AgentStatus getStatus() {" },
-      { type: "added", newNum: 19, content: "        return AgentStatus.builder()" },
-      { type: "added", newNum: 20, content: "            .id(AGENT_ID).name(\"DataSync Alpha\").status(\"running\").build();" },
-      { type: "added", newNum: 21, content: "    }" },
-      { type: "added", newNum: 22, content: "" },
-      { type: "added", newNum: 23, content: "    public void syncData(String endpoint) {" },
-      { type: "added", newNum: 24, content: "        log.info(\"DataSync: Fetching from {}\", endpoint);" },
-      { type: "added", newNum: 25, content: "        var res = restTemplate.getForEntity(endpoint, DataResponse.class);" },
-      { type: "added", newNum: 26, content: "        if (res.getStatusCode().is2xxSuccessful()) {" },
-      { type: "added", newNum: 27, content: "            log.info(\"DataSync: {} records synced\", res.getBody().getCount());" },
-      { type: "added", newNum: 28, content: "        }" },
-      { type: "added", newNum: 29, content: "    }" },
-      { type: "added", newNum: 30, content: "}" },
-    ],
-  },
-  {
-    id: "be-3",
-    name: "AgentScheduler.java",
-    path: "src/main/java/com/weai/scheduler/AgentScheduler.java",
-    ext: "java",
-    status: "modified",
-    additions: 18,
-    deletions: 4,
-    diff: [
-      { type: "hunk", content: "@@ -12,8 +12,18 @@ public class AgentScheduler {" },
-      { type: "context", oldNum: 12, newNum: 12, content: "    private final ScheduledExecutorService executor;" },
-      { type: "context", oldNum: 13, newNum: 13, content: "    private final BlockingQueue<AgentTask> taskQueue;" },
-      { type: "removed", oldNum: 14, content: "    public void dispatch(AgentTask task) {" },
-      { type: "removed", oldNum: 15, content: "        taskQueue.offer(task);" },
-      { type: "removed", oldNum: 16, content: "    }" },
-      { type: "added", newNum: 14, content: "    public boolean dispatch(AgentTask task) {" },
-      { type: "added", newNum: 15, content: "        if (task == null || task.isExpired()) return false;" },
-      { type: "added", newNum: 16, content: "        boolean accepted = taskQueue.offer(task);" },
-      { type: "added", newNum: 17, content: "        if (accepted) {" },
-      { type: "added", newNum: 18, content: "            log.debug(\"Task [{}] queued. Queue size: {}\", task.getId(), taskQueue.size());" },
-      { type: "added", newNum: 19, content: "            triggerWorker();" },
-      { type: "added", newNum: 20, content: "        }" },
-      { type: "added", newNum: 21, content: "        return accepted;" },
-      { type: "added", newNum: 22, content: "    }" },
-    ],
-  },
-  {
-    id: "be-4",
-    name: "application-dev.yml",
-    path: "src/main/resources/application-dev.yml",
-    ext: "yml",
-    status: "modified",
-    additions: 8,
-    deletions: 1,
-    diff: [
-      { type: "hunk", content: "@@ -1,12 +1,18 @@ spring:" },
-      { type: "context", oldNum: 1, newNum: 1, content: "spring:" },
-      { type: "context", oldNum: 2, newNum: 2, content: "  profiles:" },
-      { type: "context", oldNum: 3, newNum: 3, content: "    active: dev" },
-      { type: "hunk", content: "@@ -8,6 +8,14 @@ spring.datasource:" },
-      { type: "context", oldNum: 8, newNum: 8, content: "spring.datasource:" },
-      { type: "removed", oldNum: 9, content: "  url: jdbc:h2:mem:testdb" },
-      { type: "added", newNum: 9, content: "  url: jdbc:h2:mem:weaidb;DB_CLOSE_DELAY=-1" },
-      { type: "context", oldNum: 10, newNum: 10, content: "  username: sa" },
-      { type: "context", oldNum: 11, newNum: 11, content: "  password:" },
-      { type: "added", newNum: 12, content: "" },
-      { type: "added", newNum: 13, content: "weai:" },
-      { type: "added", newNum: 14, content: "  agents:" },
-      { type: "added", newNum: 15, content: "    max-threads: 6" },
-      { type: "added", newNum: 16, content: "    retry-delay-ms: 5000" },
-      { type: "added", newNum: 17, content: "  logging:" },
-      { type: "added", newNum: 18, content: "    agent-events: true" },
-    ],
-  },
-  {
-    id: "be-5",
-    name: "build.gradle",
-    path: "build.gradle",
-    ext: "gradle",
-    status: "modified",
-    additions: 5,
-    deletions: 2,
-    diff: [
-      { type: "hunk", content: "@@ -12,8 +12,12 @@ dependencies {" },
-      { type: "context", oldNum: 12, newNum: 12, content: "    implementation 'org.springframework.boot:spring-boot-starter-web'" },
-      { type: "context", oldNum: 13, newNum: 13, content: "    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'" },
-      { type: "removed", oldNum: 14, content: "    implementation 'org.springframework.boot:spring-boot-starter-test'" },
-      { type: "added", newNum: 14, content: "    implementation 'org.springframework.boot:spring-boot-starter-actuator'" },
-      { type: "added", newNum: 15, content: "    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'" },
-      { type: "added", newNum: 16, content: "    implementation 'org.springframework.ai:spring-ai-core:0.8.1'" },
-      { type: "context", oldNum: 15, newNum: 17, content: "    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'" },
-      { type: "removed", oldNum: 16, content: "    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'" },
-      { type: "added", newNum: 18, content: "    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.0'" },
-    ],
-  },
-  {
-    id: "be-6",
-    name: "settings.gradle",
-    path: "settings.gradle",
-    ext: "gradle",
-    status: "modified",
-    additions: 4,
-    deletions: 2,
-    diff: [
-      { type: "hunk", content: "@@ -1,8 +1,10 @@" },
-      { type: "removed", oldNum: 1, content: "rootProject.name = 'weai'" },
-      { type: "added", newNum: 1, content: "rootProject.name = 'weai-backend'" },
-      { type: "context", oldNum: 2, newNum: 2, content: "" },
-      { type: "context", oldNum: 3, newNum: 3, content: "pluginManagement {" },
-      { type: "context", oldNum: 4, newNum: 4, content: "    repositories {" },
-      { type: "added", newNum: 5, content: "        mavenLocal()" },
-      { type: "context", oldNum: 5, newNum: 6, content: "        gradlePluginPortal()" },
-      { type: "context", oldNum: 6, newNum: 7, content: "        mavenCentral()" },
-    ],
-  },
-  {
-    id: "be-7",
-    name: ".env.dev",
-    path: ".env.dev",
-    ext: "env",
-    status: "deleted",
-    additions: 0,
-    deletions: 6,
-    diff: [
-      { type: "hunk", content: "@@ -1,6 +0,0 @@" },
-      { type: "removed", oldNum: 1, content: "DB_USER=sa" },
-      { type: "removed", oldNum: 2, content: "DB_PASS=secret" },
-      { type: "removed", oldNum: 3, content: "JWT_SECRET=weai-dev-secret-key-12345" },
-      { type: "removed", oldNum: 4, content: "AGENT_PORT=8081" },
-      { type: "removed", oldNum: 5, content: "AI_MODEL=gpt-4o-mini" },
-      { type: "removed", oldNum: 6, content: "SPRING_PROFILES_ACTIVE=dev" },
-    ],
-  },
-];
-
-const WEAI_FRONTEND_FILES: CommitFile[] = [
-  {
-    id: "fe-1",
-    name: "App.tsx",
-    path: "src/app/App.tsx",
-    ext: "tsx",
-    status: "modified",
-    additions: 32,
-    deletions: 8,
-    diff: [
-      { type: "hunk", content: "@@ -670,6 +670,12 @@ export default function App() {" },
-      { type: "context", oldNum: 670, newNum: 670, content: "      case 'Changes': return <ChangesPage projectId={projectId} />;" },
-      { type: "context", oldNum: 671, newNum: 671, content: "      case 'Commits': return <CommitDiffPage projectId={projectId} />;" },
-      { type: "added", newNum: 672, content: "      case 'Calendar': return <CalendarPage />;" },
-      { type: "added", newNum: 673, content: "      case 'Galaxy': return <SynAIpseGalaxyPage />;" },
-      { type: "context", oldNum: 672, newNum: 674, content: "      case 'Chat': return <ChatPage projectId={projectId} />;" },
-      { type: "hunk", content: "@@ -710,8 +716,16 @@ export default function App() {" },
-      { type: "removed", oldNum: 710, content: "        <div className='sidebar-legacy'>" },
-      { type: "added", newNum: 717, content: "        <div className='sidebar-split-container'>" },
-      { type: "added", newNum: 718, content: "          <SplitTabsHeader activeTab={activeTab} onSelect={setActiveTab} />" },
-    ],
-  },
-  {
-    id: "fe-2",
-    name: "CommitDiffPage.tsx",
-    path: "src/app/components/CommitDiffPage.tsx",
-    ext: "tsx",
-    status: "modified",
-    additions: 45,
-    deletions: 12,
-    diff: [
-      { type: "hunk", content: "@@ -35,12 +35,28 @@ export function CommitDiffPage() {" },
-      { type: "removed", oldNum: 35, content: "  const [mode, setMode] = useState<'backend'|'frontend'|'split'>('split');" },
-      { type: "added", newNum: 35, content: "  const [isSplit, setIsSplit] = useState<boolean>(false);" },
-      { type: "added", newNum: 36, content: "  const [activeParts, setActiveParts] = useState<string[]>(['BACKEND', 'FRONTEND']);" },
-      { type: "added", newNum: 37, content: "  const [selectedPart, setSelectedPart] = useState<string>('BACKEND');" },
-      { type: "hunk", content: "@@ -720,10 +736,22 @@ export function CommitDiffPage() {" },
-      { type: "added", newNum: 736, content: "        {/* Split View Toggle Switch */}" },
-      { type: "added", newNum: 737, content: "        <button onClick={() => setIsSplit(!isSplit)} className='split-toggle'>" },
-      { type: "added", newNum: 738, content: "          <Columns2 className='w-3.5 h-3.5' />" },
-      { type: "added", newNum: 739, content: "          <span>Split View</span>" },
-      { type: "added", newNum: 740, content: "        </button>" },
-    ],
-  },
-  {
-    id: "fe-3",
-    name: "AgentCard.tsx",
-    path: "src/app/components/AgentCard.tsx",
-    ext: "tsx",
-    status: "modified",
-    additions: 14,
-    deletions: 3,
-    diff: [
-      { type: "hunk", content: "@@ -1,5 +1,7 @@ import React from 'react';" },
-      { type: "removed", oldNum: 1, content: "import React from 'react';" },
-      { type: "added", newNum: 1, content: "import { useState, useCallback } from 'react';" },
-      { type: "added", newNum: 2, content: "import { motion } from 'motion/react';" },
-      { type: "context", oldNum: 2, newNum: 3, content: "import { Bot, Cpu } from 'lucide-react';" },
-      { type: "hunk", content: "@@ -8,8 +10,16 @@ export function AgentCard({ agent, onToggle }) {" },
-      { type: "context", oldNum: 8, newNum: 10, content: "export function AgentCard({ agent, onToggle }) {" },
-      { type: "removed", oldNum: 9, content: "  return (" },
-      { type: "added", newNum: 11, content: "  const [expanded, setExpanded] = useState(false);" },
-      { type: "added", newNum: 12, content: "" },
-      { type: "added", newNum: 13, content: "  const handleToggle = useCallback(() => {" },
-      { type: "added", newNum: 14, content: "    onToggle(agent.id);" },
-      { type: "added", newNum: 15, content: "  }, [agent.id, onToggle]);" },
-      { type: "added", newNum: 16, content: "" },
-      { type: "added", newNum: 17, content: "  return (" },
-      { type: "added", newNum: 18, content: "    <motion.div" },
-      { type: "added", newNum: 19, content: "      layout" },
-      { type: "added", newNum: 20, content: "      onClick={() => setExpanded(e => !e)}" },
-      { type: "added", newNum: 21, content: "    >" },
-      { type: "context", oldNum: 10, newNum: 22, content: "      <div className=\"agent-header\">" },
-      { type: "context", oldNum: 11, newNum: 23, content: "        <Bot className=\"w-4 h-4\" />" },
-      { type: "removed", oldNum: 12, content: "        <span>{agent.name}</span>" },
-      { type: "added", newNum: 24, content: "        <span className=\"font-semibold\">{agent.name}</span>" },
-    ],
-  },
-  {
-    id: "fe-4",
-    name: "useAgents.ts",
-    path: "src/app/hooks/useAgents.ts",
-    ext: "ts",
-    status: "added",
-    additions: 23,
-    deletions: 0,
-    diff: [
-      { type: "hunk", content: "@@ -0,0 +1,23 @@" },
-      { type: "added", newNum: 1, content: "import { useState, useEffect, useRef } from 'react';" },
-      { type: "added", newNum: 2, content: "" },
-      { type: "added", newNum: 3, content: "type AgentStatus = 'running' | 'idle' | 'error' | 'stopped';" },
-      { type: "added", newNum: 4, content: "" },
-      { type: "added", newNum: 5, content: "export function useAgents(projectId: string) {" },
-      { type: "added", newNum: 6, content: "  const [agents, setAgents] = useState([]);" },
-      { type: "added", newNum: 7, content: "  const [loading, setLoading] = useState(true);" },
-      { type: "added", newNum: 8, content: "  const pollingRef = useRef<NodeJS.Timeout | null>(null);" },
-      { type: "added", newNum: 9, content: "" },
-      { type: "added", newNum: 10, content: "  useEffect(() => {" },
-      { type: "added", newNum: 11, content: "    fetchAgents();" },
-      { type: "added", newNum: 12, content: "    pollingRef.current = setInterval(fetchAgents, 3000);" },
-      { type: "added", newNum: 13, content: "    return () => clearInterval(pollingRef.current!);" },
-      { type: "added", newNum: 14, content: "  }, [projectId]);" },
-      { type: "added", newNum: 15, content: "" },
-      { type: "added", newNum: 16, content: "  async function fetchAgents() {" },
-      { type: "added", newNum: 17, content: "    const res = await fetch(`/api/agents/status?project=${projectId}`);" },
-      { type: "added", newNum: 18, content: "    setAgents(await res.json());" },
-      { type: "added", newNum: 19, content: "    setLoading(false);" },
-      { type: "added", newNum: 20, content: "  }" },
-      { type: "added", newNum: 21, content: "" },
-      { type: "added", newNum: 22, content: "  return { agents, loading };" },
-      { type: "added", newNum: 23, content: "}" },
-    ],
-  },
-  {
-    id: "fe-5",
-    name: "apiClient.ts",
-    path: "src/app/api/apiClient.ts",
-    ext: "ts",
-    status: "modified",
-    additions: 11,
-    deletions: 3,
-    diff: [
-      { type: "hunk", content: "@@ -3,7 +3,14 @@ const BASE_URL = '/api';" },
-      { type: "context", oldNum: 3, newNum: 3, content: "const BASE_URL = '/api';" },
-      { type: "removed", oldNum: 4, content: "export async function fetchAgents() {" },
-      { type: "removed", oldNum: 5, content: "  return fetch(`${BASE_URL}/agents`).then(r => r.json());" },
-      { type: "removed", oldNum: 6, content: "}" },
-      { type: "added", newNum: 4, content: "const DEFAULT_HEADERS = {" },
-      { type: "added", newNum: 5, content: "  'Content-Type': 'application/json'," },
-      { type: "added", newNum: 6, content: "  'X-Client': 'weai-dashboard/1.0'," },
-      { type: "added", newNum: 7, content: "};" },
-      { type: "added", newNum: 8, content: "" },
-      { type: "added", newNum: 9, content: "export async function fetchAgents(projectId: string) {" },
-      { type: "added", newNum: 10, content: "  const res = await fetch(`${BASE_URL}/agents/status?project=${projectId}`, {" },
-      { type: "added", newNum: 11, content: "    headers: DEFAULT_HEADERS," },
-      { type: "added", newNum: 12, content: "  });" },
-      { type: "added", newNum: 13, content: "  if (!res.ok) throw new Error(`HTTP ${res.status}`);" },
-      { type: "added", newNum: 14, content: "  return res.json();" },
-      { type: "added", newNum: 15, content: "}" },
-    ],
-  },
-  {
-    id: "fe-6",
-    name: "vite.config.ts",
-    path: "vite.config.ts",
-    ext: "ts",
-    status: "modified",
-    additions: 9,
-    deletions: 2,
-    diff: [
-      { type: "hunk", content: "@@ -185,6 +185,13 @@ export default defineConfig(({ mode }) => {" },
-      { type: "context", oldNum: 185, newNum: 185, content: "    server: {" },
-      { type: "context", oldNum: 186, newNum: 186, content: "      proxy: {" },
-      { type: "removed", oldNum: 187, content: "        '/api': 'http://localhost:8080'," },
-      { type: "added", newNum: 187, content: "        '/api': {" },
-      { type: "added", newNum: 188, content: "          target: proxyTarget," },
-      { type: "added", newNum: 189, content: "          changeOrigin: true," },
-      { type: "added", newNum: 190, content: "        }," },
-      { type: "context", oldNum: 188, newNum: 191, content: "      }," },
-      { type: "context", oldNum: 189, newNum: 192, content: "    }," },
-    ],
-  },
-  {
-    id: "fe-7",
-    name: "package.json",
-    path: "package.json",
-    ext: "json",
-    status: "modified",
-    additions: 4,
-    deletions: 1,
-    diff: [
-      { type: "hunk", content: "@@ -10,7 +10,10 @@" },
-      { type: "context", oldNum: 10, newNum: 10, content: "    \"dev\": \"vite\"," },
-      { type: "removed", oldNum: 11, content: "    \"dev:preview\": \"vite --mode preview\"" },
-      { type: "context", oldNum: 12, newNum: 13, content: "  }," },
-    ],
-  },
-  {
-    id: "fe-8",
-    name: ".env.production",
-    path: ".env.production",
-    ext: "env",
-    status: "modified",
-    additions: 4,
-    deletions: 1,
-    diff: [
-      { type: "hunk", content: "@@ -1,3 +1,6 @@" },
-      { type: "context", oldNum: 1, newNum: 1, content: "VITE_API_BASE_URL=https://api.yhy-server.com" },
-      { type: "removed", oldNum: 2, content: "VITE_OAUTH_CLIENT_SECRET=temp_secret_12345" },
-      { type: "added", newNum: 2, content: "VITE_OAUTH_CLIENT_SECRET=prod_sec_994827103948" },
-      { type: "added", newNum: 3, content: "VITE_JWT_SIGNING_KEY=syn_master_enc_prod_99" },
-      { type: "added", newNum: 4, content: "VITE_ADMIN_ACCESS_TOKEN=eyJhbGciOiJIUzUxMiJ9..." },
-    ],
-  },
-];
 
 // ── QA 확인 모달 ──
 function QAModal({
@@ -774,9 +375,10 @@ export function ChangesPage({
   const [currentBranch, setCurrentBranch] = useState<string>("main");
 
   // 변경된 파일 목록 & 캐시
-  const [changedFiles, setChangedFiles] = useState<CommitFile[]>(WEAI_BACKEND_FILES);
-  const [staged, setStaged] = useState<Set<string>>(() => new Set(WEAI_BACKEND_FILES.map((f) => f.id)));
-  const [selectedFile, setSelectedFile] = useState<CommitFile | null>(() => WEAI_BACKEND_FILES[0] ?? null);
+  const [changedFiles, setChangedFiles] = useState<CommitFile[]>([]);
+  const [staged, setStaged] = useState<Set<string>>(() => new Set());
+  const [selectedFile, setSelectedFile] = useState<CommitFile | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const [message, setMessage] = useState("");
   const [showQA, setShowQA] = useState(false);
@@ -791,73 +393,78 @@ export function ChangesPage({
   // 컨벤션 가드
   const [showConvention, setShowConvention] = useState(false);
 
-  // 🌟 실제 Git 변경 파일 목록 조회 및 기본 데이터 동기화
+  // 🌟 실제 Git 변경 파일 목록 조회
   const loadCommitData = useCallback(async () => {
     setIsLoading(true);
-    const defaultCatalog = repoType === "BACKEND" ? WEAI_BACKEND_FILES : WEAI_FRONTEND_FILES;
+    setLoadError(false);
 
     if (!projectId) {
-      setChangedFiles(defaultCatalog);
-      setStaged(new Set(defaultCatalog.map((f) => f.id)));
-      setSelectedFile(defaultCatalog[0] ?? null);
+      setChangedFiles([]);
+      setStaged(new Set());
+      setSelectedFile(null);
       setIsLoading(false);
       return;
     }
 
     try {
       // 1. 실제 백엔드 Git 변경 파일 목록 조회 (/changes/files)
-      const changeRes = await fetchProjectChangedFiles(projectId).catch(() => null);
+      const changeRes = await fetchProjectChangedFiles(projectId);
 
-      if (changeRes && Array.isArray(changeRes.files)) {
-        setCurrentBranch(changeRes.branchName || "main");
+      if (!changeRes || !Array.isArray(changeRes.files)) {
+        throw new Error("변경된 파일 목록 응답이 비정상입니다.");
+      }
 
-        if (changeRes.files.length === 0) {
-          // Working tree가 깨끗한 경우
-          setChangedFiles([]);
-          setStaged(new Set());
-          setSelectedFile(null);
-          setIsLoading(false);
-          return;
-        }
+      setCurrentBranch(changeRes.branchName || "main");
 
-        const mappedFiles: CommitFile[] = changeRes.files.map((f) => ({
-          id: f.filePath,
-          name: f.fileName,
-          path: f.filePath,
-          ext: f.extension || (f.fileName.includes(".") ? f.fileName.split(".").pop() ?? "" : ""),
-          status: (f.changeType || "MODIFIED").toLowerCase() as any,
-          additions: 0,
-          deletions: 0,
-          diff: [],
-        }));
+      if (changeRes.files.length === 0) {
+        // Working tree가 깨끗한 경우
+        setChangedFiles([]);
+        setStaged(new Set());
+        setSelectedFile(null);
+        setIsLoading(false);
+        return;
+      }
 
-        const stagedSet = new Set(changeRes.files.filter((f) => f.staged).map((f) => f.filePath));
-        setChangedFiles(mappedFiles);
-        setStaged(stagedSet);
+      const mappedFiles: CommitFile[] = changeRes.files.map((f) => ({
+        id: f.filePath,
+        name: f.fileName,
+        path: f.filePath,
+        ext: f.extension || (f.fileName.includes(".") ? f.fileName.split(".").pop() ?? "" : ""),
+        status: (f.changeType || "MODIFIED").toLowerCase() as any,
+        additions: 0,
+        deletions: 0,
+        diff: [],
+      }));
 
-        // 첫 번째 파일의 diff 비동기 조회
-        if (mappedFiles[0]) {
-          const isFirstStaged = stagedSet.has(mappedFiles[0].id);
-          const diffRes = await fetchProjectChangedFileDiff(projectId, mappedFiles[0].path, isFirstStaged).catch(() => null);
+      const stagedSet = new Set(changeRes.files.filter((f) => f.staged).map((f) => f.filePath));
+      setChangedFiles(mappedFiles);
+      setStaged(stagedSet);
+
+      // 첫 번째 파일의 diff 비동기 조회 (부가 정보라 실패해도 파일 목록 자체는 유지한다)
+      if (mappedFiles[0]) {
+        const isFirstStaged = stagedSet.has(mappedFiles[0].id);
+        try {
+          const diffRes = await fetchProjectChangedFileDiff(projectId, mappedFiles[0].path, isFirstStaged);
           if (diffRes && diffRes.diffContent) {
             mappedFiles[0].diff = parseUnifiedDiff(diffRes.diffContent);
             mappedFiles[0].additions = Number(diffRes.additions) || 0;
             mappedFiles[0].deletions = Number(diffRes.deletions) || 0;
           }
-          setSelectedFile(mappedFiles[0]);
+        } catch (diffError) {
+          console.error("첫 파일의 diff 조회에 실패했습니다:", diffError);
         }
-        setIsLoading(false);
-        return;
+        setSelectedFile(mappedFiles[0]);
       }
+      setIsLoading(false);
     } catch (e) {
-      console.warn("실제 Git 변경 파일 조회 실패 - 기본 카탈로그로 폴백합니다.", e);
+      console.error("실제 Git 변경 파일 조회에 실패했습니다:", e);
+      toast.error("변경된 파일 목록을 불러오지 못했습니다.");
+      setChangedFiles([]);
+      setStaged(new Set());
+      setSelectedFile(null);
+      setLoadError(true);
+      setIsLoading(false);
     }
-
-    // API 실패 시 기본 카탈로그로 안전 폴백
-    setChangedFiles(defaultCatalog);
-    setStaged(new Set(defaultCatalog.map((f) => f.id)));
-    setSelectedFile(defaultCatalog[0] ?? null);
-    setIsLoading(false);
   }, [projectId, repoType]);
 
   useEffect(() => {
@@ -885,7 +492,8 @@ export function ChangesPage({
         setChangedFiles((prev) => prev.map((f) => (f.id === file.id ? updated : f)));
       }
     } catch (err) {
-      console.warn("파일 Diff 조회 실패", err);
+      console.error("파일 Diff 조회에 실패했습니다:", err);
+      toast.error("파일 변경 내용을 불러오지 못했습니다.");
     }
   };
 
@@ -1157,8 +765,8 @@ export function ChangesPage({
                     ))
                   ) : stagedOpen && stagedFiles.length === 0 ? (
                     <div className="px-4 py-3 text-center">
-                      <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
-                        스테이징된 파일 없음
+                      <p className="text-[10px]" style={{ color: loadError ? "#B85450" : TEXT_TERTIARY }}>
+                        {loadError ? "변경된 파일을 불러오지 못했습니다" : "스테이징된 파일 없음"}
                       </p>
                     </div>
                   ) : null}
@@ -1219,8 +827,8 @@ export function ChangesPage({
                     ))
                   ) : unstagedOpen && unstagedFiles.length === 0 ? (
                     <div className="px-4 py-3 text-center">
-                      <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
-                        모든 파일이 스테이징됨
+                      <p className="text-[10px]" style={{ color: loadError ? "#B85450" : TEXT_TERTIARY }}>
+                        {loadError ? "변경된 파일을 불러오지 못했습니다" : "모든 파일이 스테이징됨"}
                       </p>
                     </div>
                   ) : null}

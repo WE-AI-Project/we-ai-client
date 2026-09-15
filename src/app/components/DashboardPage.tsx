@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import StateViewWrapper, { ApiStatus } from './common/StateViewWrapper';
 import {
   Activity,
@@ -191,17 +192,6 @@ const DEPT_STATUS_META: Record<
   },
 };
 
-const FALLBACK_DEPARTMENT_STATUS: DepartmentStatusDetail[] = [
-  { department: "BACKEND", memberCount: 2, scheduleCount: 6, totalScheduleCount: 6, completedScheduleCount: 4, todoCount: 1, inProgressCount: 1, holdCount: 0, progressRate: 67, status: "IN_PROGRESS" },
-  { department: "FRONTEND", memberCount: 2, scheduleCount: 5, totalScheduleCount: 5, completedScheduleCount: 3, todoCount: 1, inProgressCount: 1, holdCount: 0, progressRate: 60, status: "IN_PROGRESS" },
-  { department: "AI", memberCount: 1, scheduleCount: 4, totalScheduleCount: 4, completedScheduleCount: 4, todoCount: 0, inProgressCount: 0, holdCount: 0, progressRate: 100, status: "COMPLETED" },
-  { department: "DEVOPS", memberCount: 1, scheduleCount: 3, totalScheduleCount: 3, completedScheduleCount: 1, todoCount: 1, inProgressCount: 1, holdCount: 0, progressRate: 33, status: "IN_PROGRESS" },
-  { department: "DATABASE", memberCount: 1, scheduleCount: 4, totalScheduleCount: 4, completedScheduleCount: 3, todoCount: 0, inProgressCount: 1, holdCount: 0, progressRate: 75, status: "IN_PROGRESS" },
-  { department: "QA", memberCount: 1, scheduleCount: 3, totalScheduleCount: 3, completedScheduleCount: 1, todoCount: 1, inProgressCount: 1, holdCount: 0, progressRate: 33, status: "IN_PROGRESS" },
-  { department: "DESIGN", memberCount: 1, scheduleCount: 3, totalScheduleCount: 3, completedScheduleCount: 3, todoCount: 0, inProgressCount: 0, holdCount: 0, progressRate: 100, status: "COMPLETED" },
-  { department: "PM", memberCount: 1, scheduleCount: 2, totalScheduleCount: 2, completedScheduleCount: 1, todoCount: 0, inProgressCount: 1, holdCount: 0, progressRate: 50, status: "IN_PROGRESS" },
-];
-
 const DEPARTMENT_LABELS: Record<ProjectDepartment, string> = {
   BACKEND: "Backend",
   FRONTEND: "Frontend",
@@ -334,73 +324,69 @@ export function DashboardPage({ projectId, projectName }: Props) {
         activitiesRes,
         progressRes,
         milestonesRes,
-        deptStatusRes
+        deptStatusRes,
+        mySummaryRes,
+        myActivitiesRes,
       ] = await Promise.allSettled([
         fetchProjectDashboard(projectId),
         fetchProjectActivities(projectId),
         fetchProjectProgress(projectId),
         fetchProjectMilestones(projectId),
         fetchProjectDepartmentStatus(projectId),
+        fetchMyActivitySummary(),
+        fetchMyActivities(),
       ]);
 
-      const nextDashboard = dashboardRes.status === "fulfilled" ? dashboardRes.value : null;
-      const activityList = activitiesRes.status === "fulfilled" ? activitiesRes.value : { activities: [] };
-      const nextProgress = progressRes.status === "fulfilled" ? progressRes.value : null;
-      const milestoneList = milestonesRes.status === "fulfilled" ? milestonesRes.value : { milestones: [] };
-      const deptStatusList = deptStatusRes.status === "fulfilled" ? deptStatusRes.value : { departments: [] };
-
-      // 폴백 대시보드 데이터 보완
-      const finalDashboard: ProjectDashboard = nextDashboard || {
-        projectId,
-        projectName: "SynAIpse Project",
-        projectCode: `PRJ-${projectId}`,
-        status: "ACTIVE",
-        startDate: null,
-        targetDate: new Date(Date.now() + 12 * 86400000).toISOString().slice(0, 10),
-        memberCount: 4,
-        scheduleCount: 18,
-        completedScheduleCount: 12,
-        progressRate: 65,
-        departmentProgress: [],
-        recentSchedules: [],
-      };
-
-      const finalProgress: ProjectProgressStats = nextProgress || {
-        projectId,
-        progressRate: finalDashboard.progressRate,
-        weeklyTrends: [
-          { week: "03-25", progressRate: 25 },
-          { week: "03-27", progressRate: 42 },
-          { week: "03-29", progressRate: 55 },
-          { week: "03-31", progressRate: 65 },
-        ],
-      };
-
-      setDashboard(finalDashboard);
-      setActivities(activityList.activities || []);
-      setProgressStats(finalProgress);
-      setMilestones(milestoneList.milestones || []);
-
-      const validDepts = deptStatusList.departments && deptStatusList.departments.length > 0
-        ? deptStatusList.departments
-        : FALLBACK_DEPARTMENT_STATUS;
-      setDeptStatus(validDepts);
-
-      try {
-        const mySummaryData = await fetchMyActivitySummary();
-        setMySummary(mySummaryData);
-      } catch (summaryError) {
-        setMySummary({
-          totalTasks: 10,
-          completedTasks: 8,
-          recentCommitsCount: 9,
-          lastActivityDate: null,
-        });
+      // 대시보드 본체는 이 화면의 핵심 데이터라 실패하면 가짜 값으로 채우지 않고
+      // 실제 에러 상태(재시도 버튼 포함)를 그대로 보여준다.
+      if (dashboardRes.status === "rejected") {
+        console.error("대시보드 정보를 불러오지 못했습니다:", dashboardRes.reason);
+        setError("대시보드 정보를 불러오지 못했습니다.");
+        setStatus('error');
+        toast.error("대시보드 정보를 불러오지 못했습니다.");
+        return;
       }
 
-      try {
-        const myActivitiesData = await fetchMyActivities();
-        let checkedActivities: any[] = [];
+      setDashboard(dashboardRes.value);
+
+      if (activitiesRes.status === "fulfilled") {
+        setActivities(activitiesRes.value.activities || []);
+      } else {
+        console.error("프로젝트 활동 내역을 불러오지 못했습니다:", activitiesRes.reason);
+        setActivities([]);
+      }
+
+      if (progressRes.status === "fulfilled") {
+        setProgressStats(progressRes.value);
+      } else {
+        console.error("진행률 통계를 불러오지 못했습니다:", progressRes.reason);
+        setProgressStats(null);
+      }
+
+      if (milestonesRes.status === "fulfilled") {
+        setMilestones(milestonesRes.value.milestones || []);
+      } else {
+        console.error("마일스톤 정보를 불러오지 못했습니다:", milestonesRes.reason);
+        setMilestones([]);
+      }
+
+      if (deptStatusRes.status === "fulfilled") {
+        setDeptStatus(deptStatusRes.value.departments || []);
+      } else {
+        console.error("부서별 현황을 불러오지 못했습니다:", deptStatusRes.reason);
+        setDeptStatus([]);
+      }
+
+      if (mySummaryRes.status === "fulfilled") {
+        setMySummary(mySummaryRes.value);
+      } else {
+        console.error("내 활동 요약을 불러오지 못했습니다:", mySummaryRes.reason);
+        setMySummary(null);
+      }
+
+      if (myActivitiesRes.status === "fulfilled") {
+        const myActivitiesData = myActivitiesRes.value;
+        let checkedActivities: MyActivity[] = [];
         if (myActivitiesData) {
           if (Array.isArray(myActivitiesData)) {
             checkedActivities = myActivitiesData;
@@ -409,11 +395,11 @@ export function DashboardPage({ projectId, projectName }: Props) {
           }
         }
         setMyActivities(checkedActivities);
-      } catch (activitiesError) {}
+      } else {
+        console.error("내 최근 활동을 불러오지 못했습니다:", myActivitiesRes.reason);
+        setMyActivities([]);
+      }
 
-      setStatus('success');
-    } catch (loadError) {
-      console.warn("Dashboard gracefully recovered:", loadError);
       setStatus('success');
     } finally {
       setLoading(false);

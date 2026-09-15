@@ -71,7 +71,9 @@ export function loadMessages(): ChatMessage[] {
   try {
     const s = localStorage.getItem(CHAT_KEY);
     if (s) return JSON.parse(s);
-  } catch {}
+  } catch (error) {
+    console.warn("로컬 채팅 메시지 캐시를 불러오지 못했습니다:", error);
+  }
   return INITIAL_MESSAGES.map(m => ({ ...m }));
 }
 

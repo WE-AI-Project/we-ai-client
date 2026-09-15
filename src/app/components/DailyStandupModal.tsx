@@ -11,6 +11,7 @@ import {
   UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG, TERM_GREEN, TERM_RED,
   OLIVE_DARK,
 } from "../colors";
+import { toast } from "sonner";
 import { fetchDailyStandup, updateProjectAccessTime, hideDailyStandupToday } from "../lib/api"; // 실제 API 함수 임포트
 
 // ─────────────────────────────────────────────────────────────
@@ -417,73 +418,6 @@ export function DailyStandupModal({
   const [lastAccessedTime, setLastAccessedTime] = useState<string | null>(null);
 
   const todayStr = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
-const FALLBACK_MEMBERS: StandupMember[] = [
-  {
-    name: "민우",
-    avatar: "M",
-    role: "Backend Lead",
-    part: "Backend",
-    partKo: "백엔드",
-    color: "#60a5fa",
-    bg: "rgba(96,165,250,0.12)",
-    completed: [
-      { text: "Spring Boot JPA 다중 데이터소스 및 커넥션 풀 최적화", files: ["DataSourceConfig.java"] },
-      { text: "JWT 리프레시 토큰 자동 갱신 인터셉터 적용", files: ["JwtAuthFilter.java"] },
-    ],
-    inProgress: [
-      { text: "AI QA 분석 결과 벡터 스토리지 비동기 색인 파이프라인 구축", files: ["AiQaService.java"] },
-    ],
-    blockers: [],
-    relevantToMe: true,
-    relevantReason: "백엔드 API 엔드포인트 수정 사항이 있어 프론트엔드 통신 스펙 동기화가 필요합니다.",
-    relevantAction: "API 변경사항 확인",
-    navigatePage: "Changes",
-    lastAccessedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-  },
-  {
-    name: "지우",
-    avatar: "J",
-    role: "Frontend Lead",
-    part: "Frontend",
-    partKo: "프론트엔드",
-    color: "#34d399",
-    bg: "rgba(52,211,153,0.12)",
-    completed: [
-      { text: "Air-Gapped 로컬 환경 변수 관리자 및 보안 마스킹 구현", files: ["EnvironmentSettingsPage.tsx"] },
-      { text: "보안 위험 파일(env/secret) 자동 탐지 및 붉은색 경고 배너", files: ["ChangesPage.tsx"] },
-    ],
-    inProgress: [
-      { text: "AI 화면 조작 테스트 실시간 뷰어 및 마우스 커서 에뮬레이션", files: ["AIQAPage.tsx"] },
-    ],
-    blockers: [],
-    relevantToMe: true,
-    relevantReason: "환경 변수 및 커밋 변경점 보안 검증 파이프라인이 완료되었습니다.",
-    relevantAction: "Changes 확인",
-    navigatePage: "Changes",
-    lastAccessedAt: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-  },
-  {
-    name: "병권",
-    avatar: "B",
-    role: "QA / Security",
-    part: "QA",
-    partKo: "품질보증",
-    color: "#f472b6",
-    bg: "rgba(244,114,182,0.12)",
-    completed: [
-      { text: "커밋 단위 자동화 회귀 테스트 및 성능 부하 검증", files: ["QaTestSuite.java"] },
-    ],
-    inProgress: [
-      { text: "멀티 에이전트 동시성 데드락 탐지 룰셋 추가", files: ["AgentScheduler.java"] },
-    ],
-    blockers: [],
-    relevantToMe: false,
-    relevantReason: "전체 테스트 파이프라인 98.4% 통과 상태입니다.",
-    relevantAction: "AI QA 확인",
-    navigatePage: "AIQA",
-    lastAccessedAt: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-  },
-];
 
   // 데이터 로드 함수
   const loadStandupData = async () => {
@@ -496,15 +430,12 @@ const FALLBACK_MEMBERS: StandupMember[] = [
         setLastAccessedTime(rawData.lastAccessedAt);
       }
       const dataList = rawData?.members || (Array.isArray(rawData) ? rawData : []);
-      if (dataList && dataList.length > 0) {
-        setMembers(dataList);
-      } else {
-        setMembers(FALLBACK_MEMBERS);
-      }
+      setMembers(Array.isArray(dataList) ? dataList : []);
     } catch (err) {
-      console.warn("Standup data loaded with fallback dataset:", err);
-      setMembers(FALLBACK_MEMBERS);
-      setError(false);
+      console.error("데일리 스탠드업 데이터를 불러오지 못했습니다:", err);
+      setMembers([]);
+      setError(true);
+      toast.error("데일리 스탠드업 데이터를 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }

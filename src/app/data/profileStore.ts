@@ -28,22 +28,15 @@ export const AVATAR_GRADIENTS: Record<string, string> = {
   amber:  "#C09840",
 };
 
+// 실제 사용자 프로필이 아직 한 번도 로드되지 않았을 때(최초 실행, 또는 API 실패 시)
+// 화면이 깨지지 않도록 채우는 빈 틀일 뿐, 특정 인물을 흉내내는 값이 아니어야 한다.
 export const DEFAULT_PROFILE: ProfileData = {
-  displayName: "병권",
-  role:        "Student Developer",
-  email:       "user@example.com",
-  location:    "Seoul, Korea",
-  bio:         "Java/Spring Boot 백엔드 개발자. WE&AI 멀티에이전트 시스템 구축 중.",
-  techStack: [
-    { name: "Java",        slug: "java",        variant: "original" },
-    { name: "Spring",      slug: "spring",      variant: "original" },
-    { name: "Gradle",      slug: "gradle",      variant: "original" },
-    { name: "Git",         slug: "git",         variant: "original" },
-    { name: "Python",      slug: "python",      variant: "original" },
-    { name: "FastAPI",     slug: "fastapi",     variant: "original" },
-    { name: "Docker",      slug: "docker",      variant: "original" },
-    { name: "PostgreSQL",  slug: "postgresql",  variant: "original" },
-  ],
+  displayName: "",
+  role:        "",
+  email:       "",
+  location:    "",
+  bio:         "",
+  techStack:   [],
   avatarColor: "olive",
 };
 
@@ -60,7 +53,9 @@ export function loadProfile(): ProfileData {
       }
       return { ...DEFAULT_PROFILE, ...parsed };
     }
-  } catch {}
+  } catch (error) {
+    console.warn("로컬 프로필 캐시를 불러오지 못했습니다:", error);
+  }
   return { ...DEFAULT_PROFILE };
 }
 

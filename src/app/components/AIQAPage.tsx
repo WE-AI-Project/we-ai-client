@@ -15,7 +15,6 @@ import { BACKEND_COMMITS, FRONTEND_COMMITS, type CommitFile } from "./commitData
 import {
   buildDiffFromCommitFiles,
   runAiQa,
-  generateLocalSemanticQaAnalysis,
   type QaResponse,
 } from "../../api/aiApi";
 import {
@@ -925,9 +924,7 @@ export function AIQAPage({
 
     try {
       const diff = buildDiffFromCommitFiles(filesForQa);
-      const response = projectId && projectId > 0
-        ? await runAiQa({ projectId, diff })
-        : generateLocalSemanticQaAnalysis(diff);
+      const response = await runAiQa({ projectId, diff });
 
       const errors = mapQaResponseToErrors(response, scanTargets);
       if (errors.length > 0) {

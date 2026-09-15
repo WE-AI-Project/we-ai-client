@@ -108,7 +108,9 @@ export function loadSettings(): ProjectSettings {
   try {
     const s = localStorage.getItem(SETTINGS_KEY);
     if (s) return JSON.parse(s);
-  } catch {}
+  } catch (error) {
+    console.warn("로컬 프로젝트 설정 캐시를 불러오지 못했습니다:", error);
+  }
   return JSON.parse(JSON.stringify(INITIAL_SETTINGS));
 }
 

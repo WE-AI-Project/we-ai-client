@@ -62,7 +62,9 @@ function loadWebConfigFromStorage(): CustomEndpointConfig {
   try {
     const raw = localStorage.getItem(WEB_CONFIG_KEY);
     if (raw) return { ...DEFAULT_CONFIG, ...JSON.parse(raw), hasApiKey: webApiKey.length > 0 };
-  } catch {}
+  } catch (error) {
+    console.warn("커스텀 엔드포인트 설정을 불러오지 못했습니다:", error);
+  }
   return { ...DEFAULT_CONFIG };
 }
 

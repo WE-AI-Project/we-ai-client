@@ -35,7 +35,9 @@ export function loadQaHistory(): QaHistoryRecord[] {
   try {
     const raw = localStorage.getItem(QA_HISTORY_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch (error) {
+    console.warn("로컬 QA 실행 이력을 불러오지 못했습니다:", error);
+  }
   return [];
 }
 
@@ -48,10 +50,16 @@ export function recordQaRun(entry: Omit<QaHistoryRecord, "id" | "ranAt">): QaHis
   const history = [record, ...loadQaHistory()].slice(0, MAX_HISTORY);
   try {
     localStorage.setItem(QA_HISTORY_KEY, JSON.stringify(history));
-  } catch {}
+  } catch (error) {
+    console.warn("로컬 QA 실행 이력을 저장하지 못했습니다:", error);
+  }
   return record;
 }
 
 export function clearQaHistory(): void {
-  try { localStorage.removeItem(QA_HISTORY_KEY); } catch {}
+  try {
+    localStorage.removeItem(QA_HISTORY_KEY);
+  } catch (error) {
+    console.warn("로컬 QA 실행 이력을 삭제하지 못했습니다:", error);
+  }
 }
