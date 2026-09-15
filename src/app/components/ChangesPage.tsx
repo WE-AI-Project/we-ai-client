@@ -44,6 +44,12 @@ import {
   ACCENT,
   ACCENT_BG,
   ACCENT_BORDER,
+  TERM_BG,
+  TERM_MUTED,
+  TERM_GREEN,
+  TERM_DIM,
+  UI_RED,
+  UI_RED_DARK,
 } from "../colors";
 
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -605,11 +611,11 @@ function CommittedModal({
           </p>
           <div
             className="text-left px-3 py-2.5 rounded-xl font-mono text-[10px] mb-5"
-            style={{ background: "#0d1117", color: "#7ee787" }}
+            style={{ background: TERM_BG, color: TERM_GREEN }}
           >
             [main a3f9d21] {msg}
             <br />
-            <span style={{ color: "#8b949e" }}>→ remote: origin/main ✓</span>
+            <span style={{ color: TERM_MUTED }}>→ remote: origin/main ✓</span>
           </div>
           <button
             onClick={onClose}
@@ -640,7 +646,7 @@ function FileRow({
 }) {
   const sec = isSecurityRiskFile(file);
   const ec = sec.isRisk
-    ? { bg: "rgba(239,68,68,0.15)", color: "#DC2626" }
+    ? { bg: "rgba(239,68,68,0.15)", color: UI_RED_DARK }
     : (EXT_COLOR[file.ext] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY });
   const sm = STATUS_META[file.status] ?? {
     color: "#C09840",
@@ -674,8 +680,8 @@ function FileRow({
         onClick={onToggle}
         className="w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 cursor-pointer transition-all"
         style={{
-          background: staged ? (sec.isRisk ? "#DC2626" : ACCENT) : "transparent",
-          border: `1.5px solid ${staged ? (sec.isRisk ? "#DC2626" : ACCENT) : (sec.isRisk ? "rgba(239,68,68,0.6)" : "rgba(0,0,0,0.22)")}`,
+          background: staged ? (sec.isRisk ? UI_RED_DARK : ACCENT) : "transparent",
+          border: `1.5px solid ${staged ? (sec.isRisk ? UI_RED_DARK : ACCENT) : (sec.isRisk ? "rgba(239,68,68,0.6)" : "rgba(0,0,0,0.22)")}`,
         }}
       >
         {staged && (
@@ -687,7 +693,7 @@ function FileRow({
       {sec.isRisk ? (
         <span
           className="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0 animate-pulse"
-          style={{ background: "rgba(239,68,68,0.18)", color: "#DC2626", border: "1px solid rgba(239,68,68,0.35)" }}
+          style={{ background: "rgba(239,68,68,0.18)", color: UI_RED_DARK, border: "1px solid rgba(239,68,68,0.35)" }}
           title={sec.reason}
         >
           <ShieldAlert className="w-2.5 h-2.5 shrink-0" />
@@ -702,7 +708,7 @@ function FileRow({
       {/* 파일명 */}
       <span
         className={`flex-1 text-[11px] truncate ${sec.isRisk ? "font-semibold text-red-600 dark:text-red-400" : ""}`}
-        style={{ color: sec.isRisk ? "#DC2626" : (staged ? TEXT_PRIMARY : TEXT_TERTIARY) }}
+        style={{ color: sec.isRisk ? UI_RED_DARK : (staged ? TEXT_PRIMARY : TEXT_TERTIARY) }}
         title={`${file.path}${sec.isRisk ? ` [보안위험: ${sec.reason}]` : ""}`}
       >
         {file.name}
@@ -711,7 +717,7 @@ function FileRow({
       {/* +/- */}
       <div className="flex items-center gap-1 shrink-0 text-[9px]">
         {file.additions > 0 && <span style={{ color: "#10b981" }}>+{file.additions}</span>}
-        {file.deletions > 0 && <span style={{ color: "#ef4444" }}>−{file.deletions}</span>}
+        {file.deletions > 0 && <span style={{ color: UI_RED }}>−{file.deletions}</span>}
       </div>
 
       {/* 상태 */}
@@ -1063,7 +1069,7 @@ export function ChangesPage({
           <span className="text-[10px]" style={{ color: "#10b981" }}>
             +{totalAdd}
           </span>
-          <span className="text-[10px]" style={{ color: "#ef4444" }}>
+          <span className="text-[10px]" style={{ color: UI_RED }}>
             −{totalDel}
           </span>
 
@@ -1299,7 +1305,7 @@ export function ChangesPage({
                       <span className="ml-auto" style={{ color: "#10b981" }}>
                         +{stagedFiles.reduce((s, f) => s + f.additions, 0)}
                       </span>
-                      <span style={{ color: "#ef4444" }}>
+                      <span style={{ color: UI_RED }}>
                         −{stagedFiles.reduce((s, f) => s + f.deletions, 0)}
                       </span>
                     </div>
@@ -1338,7 +1344,7 @@ export function ChangesPage({
             </div>
 
             {/* ── 오른쪽: Diff Viewer ── */}
-            <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#0d1117" }}>
+            <div className="flex-1 flex flex-col overflow-hidden" style={{ background: TERM_BG }}>
               {isLoading ? (
                 <div className="flex-1 p-6 space-y-4">
                   <Skeleton className="h-6 w-1/3 bg-white/10" />
@@ -1360,7 +1366,7 @@ export function ChangesPage({
                     <GitCommit className="w-8 h-8" style={{ color: "#30363d" }} />
                   </div>
                   <div className="text-center">
-                    <p className="text-[13px] font-semibold mb-1" style={{ color: "#6e7681" }}>
+                    <p className="text-[13px] font-semibold mb-1" style={{ color: TERM_DIM }}>
                       파일을 선택하세요
                     </p>
                     <p className="text-[11px]" style={{ color: "#484f58" }}>

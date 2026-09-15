@@ -6,7 +6,7 @@ import {
 import { BarChart2, TrendingUp, GitCommit, CheckSquare, ListTodo } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  CONTENT_BG,
+  CONTENT_BG, BTN_DARK, UI_AMBER,
 } from "../colors";
 import {
   fetchProjectBranchGraph,
@@ -180,7 +180,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
                     onClick={() => setRange(r)}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
-                      background: range === r ? "#1c1c1e" : "transparent",
+                      background: range === r ? BTN_DARK : "transparent",
                       color: range === r ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
                     }}
                   >
@@ -211,7 +211,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
               [
                 { label: "Commits",         value: totalCommits,        color: ACCENT,    bg: "rgba(88,101,242,0.07)",  icon: GitCommit   },
                 { label: "Tasks Done",      value: totalTasksDone,      color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: CheckSquare },
-                { label: "Open Tasks",      value: openTasks,           color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: ListTodo    },
+                { label: "Open Tasks",      value: openTasks,           color: UI_AMBER, bg: "rgba(245,158,11,0.07)", icon: ListTodo    },
                 { label: "Completion Rate", value: `${completionRate}%`, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: TrendingUp },
               ].map(s => {
                 const Icon = s.icon;

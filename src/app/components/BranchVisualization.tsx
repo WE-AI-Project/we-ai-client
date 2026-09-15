@@ -9,13 +9,14 @@ import {
   FileCode,
   Tag,
 } from "lucide-react";
+import { TERM_BG, TERM_HEADER, TERM_TEXT, TERM_MUTED, UI_AMBER } from "../colors";
 
 // ── 브랜치 색상 팔레트 ──
 const BRANCH_PALETTE = [
   "#10b981", // Emerald (main)
   "#38bdf8", // Sky Blue (feat/multi-agent)
   "#a855f7", // Purple (feat/chat-room)
-  "#f59e0b", // Amber (fix/toolchain)
+  UI_AMBER, // Amber (fix/toolchain)
   "#ec4899", // Pink (feat/ai-qa)
   "#06b6d4", // Cyan (feat/split-view)
   "#f43f5e", // Rose (fix/scheduler)
@@ -302,13 +303,13 @@ export function BranchVisualization() {
   const svgWidth = START_X + (maxCol + 1) * COL_WIDTH + 20;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#0d1117" }}>
+    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: TERM_BG }}>
       {/* ── 상단 툴바 ── */}
       <div
         className="flex items-center gap-3 px-5 h-12 shrink-0 select-none"
         style={{
           borderBottom: "1px solid rgba(255,255,255,0.08)",
-          background: "#161b22",
+          background: TERM_HEADER,
         }}
       >
         <div className="flex items-center gap-2">
@@ -338,7 +339,7 @@ export function BranchVisualization() {
             className="px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap"
             style={{
               background: selectedBranch === "all" ? "rgba(255,255,255,0.15)" : "transparent",
-              color: selectedBranch === "all" ? "#ffffff" : "#8b949e",
+              color: selectedBranch === "all" ? "#ffffff" : TERM_MUTED,
             }}
           >
             All Branches ({COMMITS_DATA.length})
@@ -350,7 +351,7 @@ export function BranchVisualization() {
               className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap"
               style={{
                 background: selectedBranch === b.name ? `${b.color}25` : "transparent",
-                color: selectedBranch === b.name ? b.color : "#8b949e",
+                color: selectedBranch === b.name ? b.color : TERM_MUTED,
                 border: selectedBranch === b.name ? `1px solid ${b.color}40` : "1px solid transparent",
               }}
             >
@@ -497,7 +498,7 @@ export function BranchVisualization() {
                       cx={cx}
                       cy={cy}
                       r={isMerge ? 7 : 6}
-                      fill="#0d1117"
+                      fill={TERM_BG}
                       stroke={color}
                       strokeWidth={isMerge ? 3 : 2.5}
                     />
@@ -565,7 +566,7 @@ export function BranchVisualization() {
                   {/* 커밋 메시지 */}
                   <span
                     className="flex-1 min-w-0 text-[12px] font-medium truncate"
-                    style={{ color: isSelected ? "#ffffff" : "#c9d1d9" }}
+                    style={{ color: isSelected ? "#ffffff" : TERM_TEXT }}
                     title={commit.msg}
                   >
                     {commit.msg}
@@ -615,7 +616,7 @@ export function BranchVisualization() {
           className="w-84 shrink-0 flex flex-col overflow-y-auto"
           style={{
             borderLeft: "1px solid rgba(255,255,255,0.08)",
-            background: "#161b22",
+            background: TERM_HEADER,
           }}
         >
           {/* 헤더 */}

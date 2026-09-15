@@ -8,7 +8,7 @@ import {
   BORDER, BORDER_SUBTLE,
   TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG,
+  UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG, TERM_GREEN, TERM_RED,
   OLIVE_DARK,
 } from "../colors";
 import { fetchDailyStandup, updateProjectAccessTime, hideDailyStandupToday } from "../lib/api"; // 실제 API 함수 임포트
@@ -112,7 +112,7 @@ export function formatRelativeAccessTime(dateInput?: string | number | Date | nu
       label: `${mins}분 전 접속`,
       isOnline: isRecent,
       badgeClass: isRecent ? "text-emerald-600 bg-emerald-500/10" : "text-amber-600 bg-amber-500/10",
-      dotColor: isRecent ? "#10b981" : "#f59e0b",
+      dotColor: isRecent ? "#10b981" : UI_AMBER,
     };
   }
   if (diffSec < 86400) {
@@ -645,9 +645,9 @@ const FALLBACK_MEMBERS: StandupMember[] = [
 
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             {[
-              { label: "완료 항목", value: totalCompleted, color: "#7ee787", bg: "rgba(126,231,135,0.12)" },
+              { label: "완료 항목", value: totalCompleted, color: TERM_GREEN, bg: "rgba(126,231,135,0.12)" },
               { label: "진행 중", value: totalInProgress, color: "#D4CC9E", bg: "rgba(212,204,158,0.12)" },
-              { label: "블로커", value: totalBlockers, color: "#ff7b72", bg: "rgba(255,123,114,0.12)" },
+              { label: "블로커", value: totalBlockers, color: TERM_RED, bg: "rgba(255,123,114,0.12)" },
               { label: "관련 항목", value: relevantMembers.length, color: "#A67B5B", bg: "rgba(166,123,91,0.15)" },
             ].map(s => (
               <div key={s.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: s.bg }}>
@@ -656,7 +656,7 @@ const FALLBACK_MEMBERS: StandupMember[] = [
               </div>
             ))}
             <div className="ml-auto flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#7ee787", animation: "_su_pulse 1.8s ease infinite" }} />
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: TERM_GREEN, animation: "_su_pulse 1.8s ease infinite" }} />
               <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.40)" }}>
                 마지막 분석: {lastLoginStr}
               </span>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Settings, User, Bell, Monitor, Palette, Shield, Save, ChevronRight } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT, ACCENT_SAGE,
-  ACCENT_MID, ACCENT_BG_10, ACCENT_BORDER, UI_AMBER, UI_RED,
+  ACCENT_MID, ACCENT_BG_10, ACCENT_BORDER, UI_AMBER, UI_RED, BTN_DARK,
   CONTENT_BG,
 } from "../colors";
 
@@ -125,7 +125,7 @@ export function SettingsPage() {
               <button
                 onClick={handleSave}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
-                style={{ background: saved ? "#10b981" : "#1c1c1e", color: "rgba(255,255,255,0.92)" }}
+                style={{ background: saved ? "#10b981" : BTN_DARK, color: "rgba(255,255,255,0.92)" }}
               >
                 <Save className="w-3 h-3" />
                 {saved ? "Saved!" : "Save changes"}
@@ -188,7 +188,7 @@ export function SettingsPage() {
           </SectionCard>
 
           {/* ── 알림 설정 ── */}
-          <SectionCard icon={Bell} iconColor="#f59e0b" iconBg="rgba(245,158,11,0.10)" title="Notifications">
+          <SectionCard icon={Bell} iconColor={UI_AMBER} iconBg="rgba(245,158,11,0.10)" title="Notifications">
             {isLoading ? (
               <div className="py-2">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -338,7 +338,7 @@ export function SettingsPage() {
           </SectionCard>
 
           {/* ── 보안 섹션 ── */}
-          <SectionCard icon={Shield} iconColor="#ef4444" iconBg="rgba(239,68,68,0.10)" title="Security">
+          <SectionCard icon={Shield} iconColor={UI_RED} iconBg="rgba(239,68,68,0.10)" title="Security">
             {isLoading ? (
               <div className="space-y-2 py-2">
                 {Array.from({ length: 3 }).map((_, i) => (

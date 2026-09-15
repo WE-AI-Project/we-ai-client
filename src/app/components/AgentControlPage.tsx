@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  TERM_BG, TERM_TEXT, TERM_MUTED, TERM_GREEN, UI_RED,
 } from "../colors";
 import {
   loadCustomEndpointConfig,
@@ -478,7 +479,7 @@ export function AgentControlPage() {
                       </div>
                       <div className="rounded-lg px-2 py-1.5" style={{ background: "rgba(0,0,0,0.03)" }}>
                         <p className="text-[8px]" style={{ color: TEXT_LABEL }}>성공률</p>
-                        <p className="text-[11px] font-mono font-semibold" style={{ color: m && m.failureCount > 0 ? "#ef4444" : "#10b981" }}>
+                        <p className="text-[11px] font-mono font-semibold" style={{ color: m && m.failureCount > 0 ? UI_RED : "#10b981" }}>
                           {m && m.totalInvocations > 0 ? `${Math.round((m.successCount / m.totalInvocations) * 100)}%` : "—"}
                         </p>
                       </div>
@@ -525,15 +526,15 @@ export function AgentControlPage() {
               <div
                 ref={logRef}
                 className="p-4 overflow-y-auto font-mono text-[10px] leading-relaxed space-y-1"
-                style={{ maxHeight: 180, background: "#0d1117", color: "#c9d1d9" }}
+                style={{ maxHeight: 180, background: TERM_BG, color: TERM_TEXT }}
               >
                 {invocationsLoading ? (
-                  <p style={{ color: "#8b949e" }}>불러오는 중...</p>
+                  <p style={{ color: TERM_MUTED }}>불러오는 중...</p>
                 ) : invocations.length === 0 ? (
-                  <p style={{ color: "#8b949e" }}>이 에이전트에 대한 실제 호출 이력이 아직 없습니다.</p>
+                  <p style={{ color: TERM_MUTED }}>이 에이전트에 대한 실제 호출 이력이 아직 없습니다.</p>
                 ) : (
                   invocations.map((inv, i) => (
-                    <p key={i} style={{ color: inv.success ? "#7ee787" : "#f97583" }}>
+                    <p key={i} style={{ color: inv.success ? TERM_GREEN : "#f97583" }}>
                       [{new Date(inv.createdAt).toLocaleString("ko-KR")}] project #{inv.projectId} ·{" "}
                       {inv.success ? `OK (${(inv.durationMs / 1000).toFixed(1)}s)` : `FAILED — ${inv.errorMessage ?? "unknown error"}`}
                     </p>

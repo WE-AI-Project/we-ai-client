@@ -9,7 +9,7 @@ import {
   BORDER, BORDER_SUBTLE,
   TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG,
+  UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG, UI_BLUE,
   GRADIENT_LOGO, OLIVE_DARK,
 } from "../colors";
 import { fetchProjectChangedFileDiff } from "../lib/api";
@@ -341,7 +341,7 @@ const SEV_META: Record<Severity, { icon: any; color: string; bg: string; label: 
 
 const CAT_META: Record<string, { label: string; color: string }> = {
   naming:     { label: "명명 규칙",    color: "#5A8A4A" },
-  typescript: { label: "TypeScript", color: "#3b82f6" },
+  typescript: { label: "TypeScript", color: UI_BLUE },
   java:       { label: "Java",        color: "#C09840" },
   style:      { label: "코드 스타일", color: "#8b5cf6" },
   structure:  { label: "구조",        color: "#B85450" },
@@ -447,7 +447,7 @@ function FileViolationGroup({
   }, [visible, groupIdx]);
 
   const EXT_COLOR: Record<string, string> = {
-    java: "#C09840", ts: "#3b82f6", tsx: "#06b6d4", gradle: ACCENT,
+    java: "#C09840", ts: UI_BLUE, tsx: "#06b6d4", gradle: ACCENT,
     yml: "#5A8A4A", env: "#C09840",
   };
 

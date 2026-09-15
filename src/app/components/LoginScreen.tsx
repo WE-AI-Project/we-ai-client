@@ -1611,7 +1611,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
         <div className="hidden relative flex h-full w-full items-center justify-center lg:flex lg:w-1/2">
           {/* 로그인 창과 비슷한 크기(약 420px), 라운딩 처리 추가 */}
           <div
-            className="relative h-[65%] max-h-[580px] w-[420px] max-w-[90%] overflow-hidden rounded-[20px]"
+            className="relative h-[65%] max-h-[580px] w-[420px] max-w-[90%] overflow-hidden rounded-2xl"
             style={{ background: SIDEBAR_DEEP }}
           >
             <svg
@@ -1684,7 +1684,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
         <div
           style={{
             background: CARD_BG,
-            borderRadius: 20,
+            borderRadius: "var(--radius-2xl)",
             boxShadow: THICK_SHADOW,
             border: `1px solid ${BORDER}`,
             overflow: "hidden",
@@ -1755,7 +1755,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
             right: 6,
             height: 12,
             background: LOGIN_SHADOW_1,
-            borderRadius: "0 0 20px 20px",
+            borderRadius: "0 0 var(--radius-2xl) var(--radius-2xl)",
             zIndex: -1,
           }}
         />
@@ -1767,7 +1767,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
             right: 12,
             height: 10,
             background: LOGIN_SHADOW_2,
-            borderRadius: "0 0 16px 16px",
+            borderRadius: "0 0 var(--radius-xl) var(--radius-xl)",
             zIndex: -2,
           }}
         />

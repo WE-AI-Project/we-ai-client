@@ -30,6 +30,7 @@ import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
   GRADIENT_SIDEBAR, SIDEBAR_BORDER, CONTENT_BG,
+  TERM_BG, TERM_HEADER, TERM_TEXT, TERM_MUTED, TERM_BORDER_D, UI_RED, UI_AMBER, UI_BLUE,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -88,8 +89,8 @@ type Notification = {
 // ── 커밋 QA 상태 (실제 백엔드 QaReportStatus 기반) ──
 const QA_STATUS_META: Record<QaReportStatus, { color: string; bg: string; label: string; icon: any }> = {
   SUCCESS:  { color:"#10b981", bg:"rgba(16,185,129,0.10)",  label:"Success",  icon:CheckCircle2  },
-  FAILED:   { color:"#ef4444", bg:"rgba(239,68,68,0.10)",   label:"Failed",   icon:XCircle       },
-  RUNNING:  { color:"#3b82f6", bg:"rgba(59,130,246,0.10)",  label:"Running",  icon:Loader2       },
+  FAILED:   { color:UI_RED, bg:"rgba(239,68,68,0.10)",   label:"Failed",   icon:XCircle       },
+  RUNNING:  { color:UI_BLUE, bg:"rgba(59,130,246,0.10)",  label:"Running",  icon:Loader2       },
   PENDING:  { color:"#9b9b9b", bg:"rgba(0,0,0,0.06)",       label:"Pending",  icon:Clock         },
   CANCELED: { color:"#7d7f5b", bg:"rgba(125,127,91,0.10)",  label:"Canceled", icon:XCircle       },
 };
@@ -194,28 +195,28 @@ function ClipThumbnail({ clip, onClick }: { clip: UIClip; onClick: () => void })
     if (!ctx)    return;
 
     // 시뮬레이션 화면 그리기
-    ctx.fillStyle = "#0d1117";
+    ctx.fillStyle = TERM_BG;
     ctx.fillRect(0, 0, 180, 100);
 
     // UI 요소 모의
-    ctx.fillStyle = "#161b22";
+    ctx.fillStyle = TERM_HEADER;
     safeRoundRect(ctx, 8, 8, 164, 12, 3); ctx.fill();
-    ctx.fillStyle = "#21262d";
+    ctx.fillStyle = TERM_BORDER_D;
     safeRoundRect(ctx, 8, 26, 80, 60, 4); ctx.fill();
-    ctx.fillStyle = "#21262d";
+    ctx.fillStyle = TERM_BORDER_D;
     safeRoundRect(ctx, 96, 26, 76, 28, 4); ctx.fill();
-    ctx.fillStyle = "#21262d";
+    ctx.fillStyle = TERM_BORDER_D;
     safeRoundRect(ctx, 96, 58, 76, 28, 4); ctx.fill();
 
     // 빨간 오류 하이라이트
-    ctx.strokeStyle = "#ef4444";
+    ctx.strokeStyle = UI_RED;
     ctx.lineWidth   = 2;
     ctx.setLineDash([3, 3]);
     ctx.strokeRect(96, 58, 76, 28);
 
     // 오류 느낌표
     ctx.setLineDash([]);
-    ctx.fillStyle = "#ef4444";
+    ctx.fillStyle = UI_RED;
     ctx.beginPath();
     ctx.arc(160, 44, 8, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "white";
@@ -231,13 +232,13 @@ function ClipThumbnail({ clip, onClick }: { clip: UIClip; onClick: () => void })
     ctx.lineTo(119, 78); ctx.closePath(); ctx.fill();
 
     // REC 도트
-    ctx.fillStyle = "#ef4444";
+    ctx.fillStyle = UI_RED;
     ctx.beginPath(); ctx.arc(15, 15, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#ef4444";
+    ctx.fillStyle = UI_RED;
     ctx.font      = "7px monospace";
     ctx.textAlign = "left";
     ctx.fillText("REC", 22, 18);
-    ctx.fillStyle = "#8b949e";
+    ctx.fillStyle = TERM_MUTED;
     ctx.fillText(clip.duration, 150, 18);
   }, [clip]);
 
@@ -286,11 +287,11 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
       const t = frame / totalFrames;
 
       // 배경
-      ctx.fillStyle = "#0d1117";
+      ctx.fillStyle = TERM_BG;
       ctx.fillRect(0, 0, 520, 300);
 
       // 네비게이션 바
-      ctx.fillStyle = "#161b22";
+      ctx.fillStyle = TERM_HEADER;
       ctx.fillRect(0, 0, 520, 36);
       ctx.fillStyle = "#30363d";
       ctx.fillRect(16, 12, 120, 12); // 로고
@@ -298,15 +299,15 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
       ctx.fillRect(260, 12, 60, 12);
 
       // 사이드바
-      ctx.fillStyle = "#161b22";
+      ctx.fillStyle = TERM_HEADER;
       ctx.fillRect(0, 36, 52, 264);
 
       // 메인 컨텐츠
-      ctx.fillStyle = "#21262d";
+      ctx.fillStyle = TERM_BORDER_D;
       safeRoundRect(ctx, 68, 52, 200, 110, 6); ctx.fill();
-      ctx.fillStyle = "#21262d";
+      ctx.fillStyle = TERM_BORDER_D;
       safeRoundRect(ctx, 68, 172, 200, 90, 6); ctx.fill();
-      ctx.fillStyle = "#21262d";
+      ctx.fillStyle = TERM_BORDER_D;
       safeRoundRect(ctx, 280, 52, 220, 210, 6); ctx.fill();
 
       // 에이전트 토글 버튼 (오류 요소)
@@ -314,7 +315,7 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
       const toggleY = 140;
       const pulse   = Math.sin(t * Math.PI * 6) * 0.5 + 0.5;
 
-      ctx.fillStyle = frame < 30 ? "#10b981" : "#ef4444";
+      ctx.fillStyle = frame < 30 ? "#10b981" : UI_RED;
       safeRoundRect(ctx, toggleX, toggleY, 44, 20, 10); ctx.fill();
 
       // 오류 하이라이트
@@ -352,7 +353,7 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
       const recAlpha = Math.sin(t * Math.PI * 4) > 0 ? 1 : 0.4;
       ctx.fillStyle  = `rgba(239,68,68,${recAlpha})`;
       ctx.beginPath(); ctx.arc(16, 16, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle  = "#ef4444";
+      ctx.fillStyle  = UI_RED;
       ctx.font       = "bold 8px monospace";
       ctx.textAlign  = "left";
       ctx.fillText("REC", 26, 20);
@@ -380,23 +381,23 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
     >
       <div
         className="rounded-2xl overflow-hidden"
-        style={{ maxWidth: 580, width: "100%", background: "#0d1117", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}
+        style={{ maxWidth: 580, width: "100%", background: TERM_BG, border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}
       >
         {/* 헤더 */}
         <div
           className="flex items-center gap-3 px-4 py-3"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: TERM_HEADER }}
         >
           <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-          <span className="text-[11px] font-semibold" style={{ color: "#c9d1d9" }}>
+          <span className="text-[11px] font-semibold" style={{ color: TERM_TEXT }}>
             오류 영상 — {clip.errorLabel}
           </span>
           <span className="text-[9px] ml-1" style={{ color: "#484f58" }}>{clip.ts}</span>
-          <span className="text-[9px] px-2 py-0.5 rounded-full ml-1" style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444" }}>
+          <span className="text-[9px] px-2 py-0.5 rounded-full ml-1" style={{ background: "rgba(239,68,68,0.15)", color: UI_RED }}>
             {action.element}
           </span>
           <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-white/[0.06]">
-            <X className="w-4 h-4" style={{ color: "#8b949e" }} />
+            <X className="w-4 h-4" style={{ color: TERM_MUTED }} />
           </button>
         </div>
 
@@ -430,8 +431,8 @@ function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; 
         {/* 에러 상세 */}
         <div className="px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex items-start gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: "#ef4444" }} />
-            <p className="text-[11px] leading-snug" style={{ color: "#c9d1d9" }}>{action.error}</p>
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: UI_RED }} />
+            <p className="text-[11px] leading-snug" style={{ color: TERM_TEXT }}>{action.error}</p>
           </div>
         </div>
       </div>
@@ -475,7 +476,7 @@ function LiveScreenManipulationPlayer({
     <div
       className="rounded-2xl overflow-hidden border shadow-xl flex flex-col transition-all mb-4"
       style={{
-        background: "#0d1117",
+        background: TERM_BG,
         borderColor: isTesting ? "rgba(245,158,11,0.5)" : "rgba(255,255,255,0.12)",
       }}
     >
@@ -719,7 +720,7 @@ function CommitQARow({
               <Skeleton className="h-3 w-3/4" />
             </div>
           ) : detailError ? (
-            <p className="pt-3 text-[10px]" style={{ color:"#ef4444" }}>{detailError}</p>
+            <p className="pt-3 text-[10px]" style={{ color:UI_RED }}>{detailError}</p>
           ) : detail && (detail.issues.length > 0 || detail.testResults.length > 0) ? (
             <div className="pt-3 space-y-2">
               {detail.summary && <p className="text-[10px]" style={{ color:TEXT_SECONDARY }}>{detail.summary}</p>}
@@ -730,7 +731,7 @@ function CommitQARow({
                       className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
                       style={{
                         background: issue.severity === "CRITICAL" ? "rgba(239,68,68,0.10)" : issue.severity === "MAJOR" ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.06)",
-                        color: issue.severity === "CRITICAL" ? "#ef4444" : issue.severity === "MAJOR" ? "#f59e0b" : TEXT_TERTIARY,
+                        color: issue.severity === "CRITICAL" ? UI_RED : issue.severity === "MAJOR" ? UI_AMBER : TEXT_TERTIARY,
                       }}
                     >{issue.severity}</span>
                     <p className="text-[10px] font-semibold flex-1 min-w-0 truncate" style={{ color:TEXT_PRIMARY }}>{issue.title}</p>
@@ -746,7 +747,7 @@ function CommitQARow({
               {detail.testResults.map((t, i) => (
                 <div key={i} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
                   <span className="text-[10px]" style={{ color:TEXT_PRIMARY }}>{t.testName}</span>
-                  <span className="text-[9px] font-semibold" style={{ color: t.status === "PASSED" ? "#10b981" : t.status === "FAILED" ? "#ef4444" : TEXT_TERTIARY }}>
+                  <span className="text-[9px] font-semibold" style={{ color: t.status === "PASSED" ? "#10b981" : t.status === "FAILED" ? UI_RED : TEXT_TERTIARY }}>
                     {t.status}
                   </span>
                 </div>
@@ -1002,8 +1003,8 @@ export function AIQAPage({
   const filteredCommits = commitFilter === "all" ? commitReports : commitReports.filter(r => r.status === commitFilter);
 
   const SEV_COLOR: Record<Severity, { color: string; bg: string }> = {
-    critical: { color: "#ef4444", bg: "rgba(239,68,68,0.10)"  },
-    warning:  { color: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
+    critical: { color: UI_RED, bg: "rgba(239,68,68,0.10)"  },
+    warning:  { color: UI_AMBER, bg: "rgba(245,158,11,0.10)" },
     passed:   { color: "#10b981", bg: "rgba(16,185,129,0.10)" },
   };
 
@@ -1072,12 +1073,12 @@ export function AIQAPage({
                       </span>
                     )}
                     {phase === "phase2" && (
-                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>
+                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:UI_AMBER }}>
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" /> PHASE 2 · UI 에이전트
                       </span>
                     )}
                     {phase === "done" && (
-                      <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: criticalCount > 0 ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: criticalCount > 0 ? "#ef4444" : "#10b981" }}>
+                      <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: criticalCount > 0 ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: criticalCount > 0 ? UI_RED : "#10b981" }}>
                         {criticalCount > 0 ? "FAILED" : "PASSED"}
                       </span>
                     )}
@@ -1136,12 +1137,12 @@ export function AIQAPage({
                       className="p-2 rounded-xl transition-all"
                       style={{ background: unreadNotif > 0 ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.80)", border:`1px solid ${BORDER}` }}
                     >
-                      <Bell className="w-4 h-4" style={{ color: unreadNotif > 0 ? "#ef4444" : TEXT_SECONDARY }} />
+                      <Bell className="w-4 h-4" style={{ color: unreadNotif > 0 ? UI_RED : TEXT_SECONDARY }} />
                     </button>
                     {unreadNotif > 0 && (
                       <span
                         className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center"
-                        style={{ background:"#ef4444", color:"white" }}
+                        style={{ background:UI_RED, color:"white" }}
                       >
                         {unreadNotif}
                       </span>
@@ -1286,8 +1287,8 @@ export function AIQAPage({
                       {phase === "phase1" && <span className="ml-auto text-[9px]" style={{ color:TEXT_TERTIARY }}>스캔 중… {scanFiles.length}개 파일</span>}
                       {phase1Done && (
                         <div className="ml-auto flex items-center gap-2">
-                          {criticalCount > 0 && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>{criticalCount} critical</span>}
-                          {warningCount > 0  && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>{warningCount} warning</span>}
+                          {criticalCount > 0 && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(239,68,68,0.10)", color:UI_RED }}>{criticalCount} critical</span>}
+                          {warningCount > 0  && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:UI_AMBER }}>{warningCount} warning</span>}
                         </div>
                       )}
                     </div>
@@ -1305,7 +1306,7 @@ export function AIQAPage({
                           const err = staticErrors.find(e => file.includes(e.file));
                           return (
                             <div key={file} className="flex items-center gap-2.5 rounded-lg px-3 py-2" style={{ background:"rgba(0,0,0,0.025)", border:`1px solid ${BORDER_SUBTLE}` }}>
-                              <FileCode className="w-3 h-3 shrink-0" style={{ color: err ? (err.severity === "critical" ? "#ef4444" : "#f59e0b") : "#10b981" }} />
+                              <FileCode className="w-3 h-3 shrink-0" style={{ color: err ? (err.severity === "critical" ? UI_RED : UI_AMBER) : "#10b981" }} />
                               <span className="flex-1 text-[10px] font-mono truncate" style={{ color:TEXT_PRIMARY }}>{file}</span>
                               {err ? (
                                 <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded" style={{ background: SEV_COLOR[err.severity].bg, color: SEV_COLOR[err.severity].color }}>
@@ -1390,14 +1391,14 @@ export function AIQAPage({
                         className="w-6 h-6 rounded-lg flex items-center justify-center"
                         style={{ background: phase2Done ? "rgba(16,185,129,0.10)" : phase === "phase2" ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.05)" }}
                       >
-                        {phase === "phase2" ? <MousePointer className="w-3.5 h-3.5 animate-bounce" style={{ color:"#f59e0b" }} /> : phase2Done ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} /> : <Monitor className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
+                        {phase === "phase2" ? <MousePointer className="w-3.5 h-3.5 animate-bounce" style={{ color:UI_AMBER }} /> : phase2Done ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} /> : <Monitor className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
                       </div>
                       <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>Phase 2 — AI 화면 조작 테스트</p>
                       <p className="text-[9px] ml-1" style={{ color:TEXT_TERTIARY }}>사람처럼 화면을 직접 조작하며 오류 탐색</p>
                       {(phase === "phase2" || phase2Done) && (
                         <div className="ml-auto flex items-center gap-2 text-[9px]">
                           <span style={{ color:"#10b981" }}>✓{passedActions}</span>
-                          {failedActions > 0 && <span style={{ color:"#ef4444" }}>✗{failedActions}</span>}
+                          {failedActions > 0 && <span style={{ color:UI_RED }}>✗{failedActions}</span>}
                         </div>
                       )}
                     </div>
@@ -1451,9 +1452,9 @@ export function AIQAPage({
                                     : action.status === "passed" ? "rgba(16,185,129,0.10)"
                                     : activeAction === action.id ? "rgba(245,158,11,0.12)"
                                     : "rgba(0,0,0,0.07)",
-                                  color: action.status === "failed" ? "#ef4444"
+                                  color: action.status === "failed" ? UI_RED
                                     : action.status === "passed" ? "#10b981"
-                                    : activeAction === action.id ? "#f59e0b"
+                                    : activeAction === action.id ? UI_AMBER
                                     : TEXT_TERTIARY,
                                 }}
                               >
@@ -1461,19 +1462,19 @@ export function AIQAPage({
                               </span>
 
                               {/* 상태 아이콘 */}
-                              {action.status === "running"  && <Loader2 className="w-3 h-3 shrink-0 animate-spin" style={{ color:"#f59e0b" }} />}
+                              {action.status === "running"  && <Loader2 className="w-3 h-3 shrink-0 animate-spin" style={{ color:UI_AMBER }} />}
                               {action.status === "passed"   && <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color:"#10b981" }} />}
-                              {action.status === "failed"   && <XCircle className="w-3 h-3 shrink-0" style={{ color:"#ef4444" }} />}
+                              {action.status === "failed"   && <XCircle className="w-3 h-3 shrink-0" style={{ color:UI_RED }} />}
                               {action.status === "pending"  && <div className="w-3 h-3 rounded-full shrink-0" style={{ border:"1.5px solid rgba(0,0,0,0.15)" }} />}
 
                               {/* 레이블 + 요소 */}
                               <div className="flex-1 min-w-0">
-                                <p className="text-[11px] font-medium" style={{ color: action.status === "failed" ? "#ef4444" : TEXT_PRIMARY }}>
+                                <p className="text-[11px] font-medium" style={{ color: action.status === "failed" ? UI_RED : TEXT_PRIMARY }}>
                                   {action.label}
                                 </p>
                                 <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>{action.element}</p>
                                 {action.status === "failed" && action.error && (
-                                  <p className="text-[9px] mt-0.5 line-clamp-1" style={{ color:"#ef4444" }}>{action.error}</p>
+                                  <p className="text-[9px] mt-0.5 line-clamp-1" style={{ color:UI_RED }}>{action.error}</p>
                                 )}
                               </div>
 
@@ -1492,7 +1493,7 @@ export function AIQAPage({
                         {clips.length > 0 && (
                           <div className="mt-4">
                             <div className="flex items-center gap-2 mb-2">
-                              <Video className="w-3.5 h-3.5" style={{ color:"#ef4444" }} />
+                              <Video className="w-3.5 h-3.5" style={{ color:UI_RED }} />
                               <p className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>오류 영상 클립 ({clips.length}개)</p>
                             </div>
                             <div className="flex flex-wrap gap-3">
@@ -1505,7 +1506,7 @@ export function AIQAPage({
                                       onClick={() => relAction && setOpenClip({ clip, action: relAction })}
                                     />
                                     <div className="flex items-center gap-1">
-                                      <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>
+                                      <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background:"rgba(239,68,68,0.10)", color:UI_RED }}>
                                         {clip.errorLabel}
                                       </span>
                                       <span className="text-[8px]" style={{ color:TEXT_TERTIARY }}>{clip.ts}</span>
@@ -1557,13 +1558,13 @@ export function AIQAPage({
                 </>
               ) : commitReportsError ? (
                 <div className="rounded-2xl p-6 text-center" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}` }}>
-                  <p className="text-[11px]" style={{ color:"#ef4444" }}>{commitReportsError}</p>
+                  <p className="text-[11px]" style={{ color:UI_RED }}>{commitReportsError}</p>
                 </div>
               ) : (
                 <>
                   {/* 통계 */}
                   <div className="grid grid-cols-4 gap-2.5">
-                    {([["SUCCESS","성공",commitReports.filter(r=>r.status==="SUCCESS").length,"#10b981"],["FAILED","실패",commitReports.filter(r=>r.status==="FAILED").length,"#ef4444"],["RUNNING","진행중",commitReports.filter(r=>r.status==="RUNNING").length,"#3b82f6"],["PENDING","대기",commitReports.filter(r=>r.status==="PENDING").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
+                    {([["SUCCESS","성공",commitReports.filter(r=>r.status==="SUCCESS").length,"#10b981"],["FAILED","실패",commitReports.filter(r=>r.status==="FAILED").length,UI_RED],["RUNNING","진행중",commitReports.filter(r=>r.status==="RUNNING").length,UI_BLUE],["PENDING","대기",commitReports.filter(r=>r.status==="PENDING").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
                       <button
                         key={status}
                         onClick={() => setCommitFilter(commitFilter === status ? "all" : status)}

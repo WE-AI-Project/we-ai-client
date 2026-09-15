@@ -44,6 +44,9 @@ export default defineConfig(({ mode }) => {
     // Relative asset paths so the built app also loads correctly from a
     // file:// URL when packaged into the Electron desktop app.
     base: "./",
+    define: {
+      global: "window",
+    },
     plugins: [
       // The React and Tailwind plugins are both required for Make, even if
       // Tailwind is not being actively used, so do not remove them.

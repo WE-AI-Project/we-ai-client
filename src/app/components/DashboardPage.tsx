@@ -42,6 +42,8 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
+  UI_RED,
+  UI_AMBER,
 } from "../colors";
 import {
   ProjectDashboard,
@@ -116,7 +118,7 @@ export const DEPARTMENT_META: Record<
     koreanName: "데브옵스/인프라",
     desc: "CI/CD, 도커 컨테이너, 클라우드 배포",
     icon: Boxes,
-    color: "#f59e0b",
+    color: UI_AMBER,
     bg: "rgba(245,158,11,0.10)",
   },
   DATABASE: {
@@ -579,7 +581,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                       contentStyle={{
                         background: "rgba(255,255,255,0.96)",
                         border: `1px solid ${BORDER}`,
-                        borderRadius: "12px",
+                        borderRadius: "var(--radius-md)",
                         fontSize: "11px",
                       }}
                     />
@@ -1092,7 +1094,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                                     className="px-1.5 py-0.5 rounded text-[9px] font-semibold"
                                     style={{
                                       background: s.priority === "HIGH" ? "rgba(239,68,68,0.1)" : "rgba(0,0,0,0.05)",
-                                      color: s.priority === "HIGH" ? "#ef4444" : "#666",
+                                      color: s.priority === "HIGH" ? UI_RED : "#666",
                                     }}
                                   >
                                     {s.priority}

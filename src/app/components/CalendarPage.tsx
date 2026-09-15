@@ -26,7 +26,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  BRIGHT_BEIGE, CREAM, CONTENT_BG, BEIGE,
+  BRIGHT_BEIGE, CREAM, CONTENT_BG, BEIGE, UI_RED,
 } from "../colors";
 
 function mapBackendDepartmentToDept(dept?: string): Dept {
@@ -240,7 +240,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div className="space-y-1">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>
-              기능명 <span style={{ color: "#ef4444" }}>*</span>
+              기능명 <span style={{ color: UI_RED }}>*</span>
             </label>
             <input
               value={form.title ?? ""}
@@ -541,7 +541,7 @@ function ScheduleCard({
             <Edit2 className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
           </button>
           <button onClick={() => onDelete(schedule)} className="p-1 rounded hover:bg-red-50">
-            <Trash2 className="w-3 h-3" style={{ color: "#ef4444" }} />
+            <Trash2 className="w-3 h-3" style={{ color: UI_RED }} />
           </button>
         </div>
       </div>

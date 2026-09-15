@@ -15,6 +15,14 @@ import {
   fetchBuildTasks,
   executeBuildTask,
 } from "../lib/api";
+import {
+  loadConnectionConfig,
+  connectionKeyForProject,
+  sshExec,
+  buildSshTaskCommand,
+  DEFAULT_CONNECTION_CONFIG,
+  type ConnectionConfig,
+} from "../lib/serverConnection";
 
 type TaskStatus = "idle" | "running" | "success" | "failed";
 
@@ -39,6 +47,24 @@ const DEFAULT_GRADLE_TASKS: GradleTaskView[] = [
   { id: "check", name: "check", command: "./gradlew.bat check", desc: "코드 검증 태스크 실행", group: "verification", lastRun: "—", lastStatus: "idle", duration: "—" },
 ];
 
+// SSH 원격 실행용 기본 태스크 목록 — 원격 머신은 리눅스 전제이므로 .bat 없는 wrapper를 쓴다.
+const DEFAULT_SSH_GRADLE_TASKS: GradleTaskView[] = [
+  { id: "bootRun", name: "bootRun", command: "./gradlew bootRun", desc: "Spring Boot 앱 실행", group: "application", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "build", name: "build", command: "./gradlew build", desc: "프로젝트 전체 빌드 (컴파일 + 테스트 + jar)", group: "build", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "test", name: "test", command: "./gradlew test", desc: "단위/통합 테스트 실행", group: "verification", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "clean", name: "clean", command: "./gradlew clean", desc: "build/ 디렉토리 삭제", group: "build", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "bootJar", name: "bootJar", command: "./gradlew bootJar", desc: "실행 가능한 Spring Boot JAR 생성", group: "build", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "check", name: "check", command: "./gradlew check", desc: "코드 검증 태스크 실행", group: "verification", lastRun: "—", lastStatus: "idle", duration: "—" },
+];
+
+const DEFAULT_SSH_MAVEN_TASKS: GradleTaskView[] = [
+  { id: "spring-boot:run", name: "spring-boot:run", command: "./mvnw spring-boot:run", desc: "Spring Boot 앱 실행", group: "application", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "package", name: "package", command: "./mvnw package", desc: "프로젝트 패키징 (jar/war)", group: "build", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "test", name: "test", command: "./mvnw test", desc: "단위/통합 테스트 실행", group: "verification", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "clean", name: "clean", command: "./mvnw clean", desc: "target/ 디렉토리 삭제", group: "build", lastRun: "—", lastStatus: "idle", duration: "—" },
+  { id: "verify", name: "verify", command: "./mvnw verify", desc: "통합 검증 실행", group: "verification", lastRun: "—", lastStatus: "idle", duration: "—" },
+];
+
 const STATUS_META: Record<TaskStatus, { color: string; bg: string; icon: any; label: string }> = {
   idle:    { color: UI_GRAY,  bg: UI_GRAY_BG,  icon: Circle,       label: "Idle"    },
   running: { color: ACCENT,   bg: ACCENT_BG_10, icon: RotateCw,     label: "Running" },
@@ -58,9 +84,11 @@ const GROUP_COLOR: Record<string, { color: string; bg: string }> = {
 
 interface BuildManagementPageProps {
   projectId?: number | null;
+  /** ConnectionSettingsCard에서 저장할 때마다 증가 — 연결 설정을 다시 불러오는 트리거 */
+  connectionVersion?: number;
 }
 
-export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
+export function BuildManagementPage({ projectId, connectionVersion = 0 }: BuildManagementPageProps) {
   const [tasks, setTasks] = useState<GradleTaskView[]>(DEFAULT_GRADLE_TASKS);
   const [buildTool, setBuildTool] = useState<string>("GRADLE");
   const [runningTask, setRunning] = useState<string | null>(null);
@@ -68,15 +96,35 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
   const [buildLogs, setBuildLogs] = useState<Record<string, string[]>>({});
   const [elapsedSec, setElapsedSec] = useState<number>(0);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [connection, setConnection] = useState<ConnectionConfig>(DEFAULT_CONNECTION_CONFIG);
 
   const logRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const connectionKey = connectionKeyForProject(projectId);
+
+  // 0. 연결 설정(Local/Link/SSH) 로딩
+  useEffect(() => {
+    let cancelled = false;
+    loadConnectionConfig(connectionKey).then((cfg) => {
+      if (!cancelled) setConnection(cfg);
+    });
+    return () => { cancelled = true; };
+  }, [connectionKey, connectionVersion]);
+
   // 1. 실제 지원되는 빌드 태스크 목록 로드
   const loadTasks = useCallback(async () => {
+    if (connection.mode === "ssh") {
+      // SSH 모드는 원격 태스크 목록 조회 API가 없으므로 빌드 도구별 기본 태스크를 그대로 쓴다.
+      setBuildTool(connection.ssh.buildTool);
+      setTasks(connection.ssh.buildTool === "MAVEN" ? DEFAULT_SSH_MAVEN_TASKS : DEFAULT_SSH_GRADLE_TASKS);
+      return;
+    }
+
     setIsLoadingTasks(true);
     try {
-      const response = await fetchBuildTasks(projectId);
+      const baseUrlOverride = connection.mode === "link" ? connection.linkBaseUrl : undefined;
+      const response = await fetchBuildTasks(projectId, baseUrlOverride);
       if (response && response.tasks && response.tasks.length > 0) {
         setBuildTool(response.buildTool || "GRADLE");
         setTasks((prev) =>
@@ -100,13 +148,13 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
     } finally {
       setIsLoadingTasks(false);
     }
-  }, [projectId]);
+  }, [projectId, connection.mode, connection.linkBaseUrl, connection.ssh.buildTool]);
 
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
 
-  // 2. 실제 백엔드 빌드 태스크 프로세스 실행
+  // 2. 실제 빌드 태스크 실행 — Local(백엔드 REST) / Link(다른 백엔드 REST) / SSH(원격 커맨드)
   const runTask = async (taskName: string) => {
     if (runningTask) return; // 이미 실행 중이면 무시
 
@@ -126,22 +174,35 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
     }, 500);
 
     try {
-      const result = await executeBuildTask(taskName, projectId);
+      const executedAt = new Date().toLocaleTimeString("en-GB");
+      let nextStatus: TaskStatus;
+      let duration: string;
+      let logs: string[];
+      let command: string | undefined;
+
+      if (connection.mode === "ssh") {
+        command = buildSshTaskCommand(connection.ssh.buildTool, taskName);
+        const result = await sshExec(connectionKey, command);
+        nextStatus = result.exitCode === 0 ? "success" : "failed";
+        duration = `${((Date.now() - startMs) / 1000).toFixed(2)}s`;
+        const combined = `${result.stdout}${result.stderr}`.split(/\r?\n/).filter((l) => l.length > 0);
+        logs = combined.length > 0 ? combined : ["(No output produced)"];
+      } else {
+        const baseUrlOverride = connection.mode === "link" ? connection.linkBaseUrl : undefined;
+        const result = await executeBuildTask(taskName, projectId, baseUrlOverride);
+        nextStatus = result.status === "SUCCESS" ? "success" : "failed";
+        duration = result.duration || `${((Date.now() - startMs) / 1000).toFixed(2)}s`;
+        command = result.command;
+        logs = result.logs && result.logs.length > 0 ? result.logs : ["(No output produced)"];
+      }
 
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
 
-      const nextStatus: TaskStatus = result.status === "SUCCESS" ? "success" : "failed";
-      const duration = result.duration || `${((Date.now() - startMs) / 1000).toFixed(2)}s`;
-      const executedAt = result.executedAt ? `Today ${result.executedAt}` : "Just now";
-
       // 로그 저장
-      setBuildLogs((prev) => ({
-        ...prev,
-        [taskName]: result.logs && result.logs.length > 0 ? result.logs : ["(No output produced)"],
-      }));
+      setBuildLogs((prev) => ({ ...prev, [taskName]: logs }));
 
       // 상태 업데이트
       setTasks((prev) =>
@@ -149,9 +210,9 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
           t.id === taskName
             ? {
                 ...t,
-                command: result.command || t.command,
+                command: command || t.command,
                 lastStatus: nextStatus,
-                lastRun: executedAt,
+                lastRun: `Today ${executedAt}`,
                 duration,
               }
             : t
@@ -220,7 +281,11 @@ export function BuildManagementPage({ projectId }: BuildManagementPageProps) {
                 {isLoadingTasks && <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />}
               </div>
               <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                실제 프로젝트 작업 디렉터리에서 Gradle/Maven 태스크를 실행하고 출력 로그를 확인합니다.
+                {connection.mode === "ssh"
+                  ? `SSH로 ${connection.ssh.username || "?"}@${connection.ssh.host || "?"}에 접속해 Gradle/Maven 태스크를 실행합니다.`
+                  : connection.mode === "link"
+                  ? `링크된 백엔드(${connection.linkBaseUrl})의 작업 디렉터리에서 태스크를 실행합니다.`
+                  : "실제 프로젝트 작업 디렉터리에서 Gradle/Maven 태스크를 실행하고 출력 로그를 확인합니다."}
               </p>
             </div>
             {/* 요약 배지 */}

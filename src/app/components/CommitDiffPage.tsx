@@ -42,6 +42,10 @@ import {
   TEXT_ON_DARK_MUTED,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
+  TERM_TEXT,
+  TERM_MUTED,
+  UI_RED,
+  UI_AMBER,
 } from "../colors";
 
 type RepoState = {
@@ -106,7 +110,7 @@ const KNOWN_PART_CONFIGS: Record<string, PartConfig> = {
     repositoryType: "BACKEND",
     label: "DevOps & Infra (Docker/CI)",
     shortLabel: "DevOps",
-    accent: "#f59e0b",
+    accent: UI_AMBER,
     bgAccent: "rgba(245,158,11,0.12)",
     icon: Layers,
   },
@@ -378,7 +382,7 @@ function CommitRow({
         </span>
         <span className="ml-auto inline-flex items-center gap-1">
           <span style={{ color: "#10b981" }}>+{commit.additions}</span>
-          <span style={{ color: "#ef4444" }}>-{commit.deletions}</span>
+          <span style={{ color: UI_RED }}>-{commit.deletions}</span>
           <span>{commit.changedFileCount} files</span>
         </span>
       </div>
@@ -398,7 +402,7 @@ function FileRow({
   onClick: () => void;
 }) {
   const statusColor =
-    file.status === "added" ? "#10b981" : file.status === "deleted" ? "#ef4444" : "#f59e0b";
+    file.status === "added" ? "#10b981" : file.status === "deleted" ? UI_RED : UI_AMBER;
   const statusLabel = file.status === "added" ? "A" : file.status === "deleted" ? "D" : "M";
 
   return (
@@ -426,7 +430,7 @@ function FileRow({
       </p>
       <div className="flex items-center gap-2 text-[9px]">
         <span style={{ color: "#10b981" }}>+{file.additions}</span>
-        <span style={{ color: "#ef4444" }}>-{file.deletions}</span>
+        <span style={{ color: UI_RED }}>-{file.deletions}</span>
       </div>
     </button>
   );
@@ -583,10 +587,10 @@ function DiffPanel({
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#0d1117] text-center p-4">
         <GitCommit className="h-8 w-8" style={{ color: "#30363d" }} />
         <div>
-          <p className="text-[12px] font-semibold" style={{ color: "#c9d1d9" }}>
+          <p className="text-[12px] font-semibold" style={{ color: TERM_TEXT }}>
             {title}
           </p>
-          <p className="mt-1 text-[11px]" style={{ color: "#8b949e" }}>
+          <p className="mt-1 text-[11px]" style={{ color: TERM_MUTED }}>
             {emptyMessage}
           </p>
         </div>
@@ -600,8 +604,8 @@ function DiffPanel({
         <span className="text-[10px] font-semibold" style={{ color: accent }}>
           {title}
         </span>
-        <ChevronRight className="h-3 w-3" style={{ color: "#8b949e" }} />
-        <span className="truncate text-[10px]" style={{ color: "#c9d1d9" }}>
+        <ChevronRight className="h-3 w-3" style={{ color: TERM_MUTED }} />
+        <span className="truncate text-[10px]" style={{ color: TERM_TEXT }}>
           {file.name}
         </span>
       </div>
@@ -966,7 +970,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         <div className="flex items-center gap-2.5 text-[10px] border-l pl-3" style={{ borderColor: BORDER, color: TEXT_TERTIARY }}>
           <span>{totalStats.commitCount} commits</span>
           <span style={{ color: "#10b981" }}>+{totalStats.additions}</span>
-          <span style={{ color: "#ef4444" }}>-{totalStats.deletions}</span>
+          <span style={{ color: UI_RED }}>-{totalStats.deletions}</span>
         </div>
       </div>
 

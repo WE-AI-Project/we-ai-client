@@ -4,7 +4,7 @@ import { Sparkles, AlertTriangle, XCircle, Circle, RefreshCw } from "lucide-reac
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   UI_RED, UI_RED_DARK, UI_RED_BG7, UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
-  UI_GREEN, UI_VIOLET, UI_VIOLET_BG7, UI_GRAY, UI_GRAY_BG,
+  UI_GREEN, UI_VIOLET, UI_VIOLET_BG7, UI_GRAY, UI_GRAY_BG, BTN_DARK,
   ACCENT,
   CONTENT_BG,
 } from "../colors";
@@ -169,7 +169,7 @@ export function QAReportsPage({ projectId }: { projectId: number }) {
               {!isLoading && (
                 <div className="flex items-center gap-3 text-[10px]" style={{ color: TEXT_TERTIARY }}>
                   <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#10b981" }} /> Passed</span>
-                  <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: "#ef4444" }} /> Failed</span>
+                  <span className="flex items-center gap-1"><Circle className="w-2 h-2 fill-current" style={{ color: UI_RED }} /> Failed</span>
                 </div>
               )}
             </div>
@@ -192,7 +192,7 @@ export function QAReportsPage({ projectId }: { projectId: number }) {
                   <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="passed"  name="Passed"  fill="#10b981" radius={[3,3,0,0]} />
-                  <Bar dataKey="failed"  name="Failed"  fill="#ef4444" radius={[3,3,0,0]} />
+                  <Bar dataKey="failed"  name="Failed"  fill={UI_RED} radius={[3,3,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -221,7 +221,7 @@ export function QAReportsPage({ projectId }: { projectId: number }) {
                       onClick={() => setSeverityFilter(f)}
                       className="px-2 py-0.5 rounded text-[9px] font-semibold transition-all"
                       style={{
-                        background: severityFilter === f ? "#1c1c1e" : "rgba(0,0,0,0.05)",
+                        background: severityFilter === f ? BTN_DARK : "rgba(0,0,0,0.05)",
                         color: severityFilter === f ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
                       }}
                     >

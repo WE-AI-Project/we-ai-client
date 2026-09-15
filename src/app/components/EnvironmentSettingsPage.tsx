@@ -12,6 +12,7 @@ import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG,
   CONTENT_BG,
+  TERM_BG, TERM_TEXT, TERM_MUTED, TERM_GREEN, TERM_DIM, TERM_RED, BTN_DARK, UI_RED, UI_AMBER,
 } from "../colors";
 
 // ── 🚨 [수정] 재사용 가능한 스켈레톤 뼈대 컴포넌트 (하얀색 적용) ──
@@ -36,8 +37,8 @@ const RUNTIME_INFO = [
 
 const PROFILE_COLORS = {
   dev:  { color: "#10b981", bg: "rgba(16,185,129,0.10)"  },
-  prod: { color: "#ef4444", bg: "rgba(239,68,68,0.10)"   },
-  test: { color: "#f59e0b", bg: "rgba(245,158,11,0.10)"  },
+  prod: { color: UI_RED, bg: "rgba(239,68,68,0.10)"   },
+  test: { color: UI_AMBER, bg: "rgba(245,158,11,0.10)"  },
 };
 
 // ── 복사 버튼 ──
@@ -82,7 +83,7 @@ function EnvFileViewer({
       <div
         className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
         style={{
-          background: "#0d1117",
+          background: TERM_BG,
           border: "1px solid rgba(255,255,255,0.08)",
           boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
           maxHeight: "80vh",
@@ -93,9 +94,9 @@ function EnvFileViewer({
           className="flex items-center gap-2 px-4 py-3 shrink-0"
           style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
         >
-          <FileText className="w-3.5 h-3.5" style={{ color: "#7ee787" }} />
-          <span className="text-[11px] font-semibold font-mono" style={{ color: "#c9d1d9" }}>.env</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.07)", color: "#8b949e" }}>
+          <FileText className="w-3.5 h-3.5" style={{ color: TERM_GREEN }} />
+          <span className="text-[11px] font-semibold font-mono" style={{ color: TERM_TEXT }}>.env</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.07)", color: TERM_MUTED }}>
             WE&AI Project
           </span>
           <div className="ml-auto flex items-center gap-2">
@@ -104,14 +105,14 @@ function EnvFileViewer({
               className="text-[10px] px-2.5 py-1 rounded-lg font-semibold transition-all"
               style={{
                 background: mode === "edit" ? "rgba(99,91,255,0.25)" : "rgba(255,255,255,0.07)",
-                color: mode === "edit" ? "#a5a0ff" : "#8b949e",
+                color: mode === "edit" ? "#a5a0ff" : TERM_MUTED,
               }}
             >
               {mode === "edit" ? "미리보기" : "편집"}
             </button>
             <CopyBtn value={text} />
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] transition-all">
-              <X className="w-4 h-4" style={{ color: "#8b949e" }} />
+              <X className="w-4 h-4" style={{ color: TERM_MUTED }} />
             </button>
           </div>
         </div>
@@ -121,13 +122,13 @@ function EnvFileViewer({
           {mode === "view" ? (
             <pre
               className="p-4 text-[11px] font-mono leading-relaxed"
-              style={{ color: "#c9d1d9", whiteSpace: "pre" }}
+              style={{ color: TERM_TEXT, whiteSpace: "pre" }}
             >
               {text.split("\n").map((line, i) => {
                 const isComment = line.trim().startsWith("#");
                 const eqIdx    = line.indexOf("=");
                 if (isComment) return (
-                  <div key={i} style={{ color: "#6e7681" }}>{line}</div>
+                  <div key={i} style={{ color: TERM_DIM }}>{line}</div>
                 );
                 if (eqIdx !== -1) {
                   const key = line.slice(0, eqIdx);
@@ -135,12 +136,12 @@ function EnvFileViewer({
                   return (
                     <div key={i}>
                       <span style={{ color: "#79c0ff" }}>{key}</span>
-                      <span style={{ color: "#ff7b72" }}>=</span>
+                      <span style={{ color: TERM_RED }}>=</span>
                       <span style={{ color: "#a5d6ff" }}>{val}</span>
                     </div>
                   );
                 }
-                return <div key={i} style={{ color: "#6e7681" }}>{line || "\u00A0"}</div>;
+                return <div key={i} style={{ color: TERM_DIM }}>{line || "\u00A0"}</div>;
               })}
             </pre>
           ) : (
@@ -150,7 +151,7 @@ function EnvFileViewer({
               className="w-full h-full p-4 text-[11px] font-mono leading-relaxed outline-none resize-none"
               style={{
                 background: "transparent",
-                color: "#c9d1d9",
+                color: TERM_TEXT,
                 minHeight: 360,
               }}
               spellCheck={false}
@@ -164,7 +165,7 @@ function EnvFileViewer({
           style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
         >
           {mode === "edit" && (
-            <div className="flex items-center gap-1 text-[9px]" style={{ color: "#f59e0b" }}>
+            <div className="flex items-center gap-1 text-[9px]" style={{ color: UI_AMBER }}>
               <AlertTriangle className="w-3 h-3" />
               편집 후 "불러오기"를 눌러 적용하세요
             </div>
@@ -188,7 +189,7 @@ function EnvFileViewer({
                 a.click(); URL.revokeObjectURL(url);
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-              style={{ background: "rgba(16,185,129,0.20)", color: "#7ee787" }}
+              style={{ background: "rgba(16,185,129,0.20)", color: TERM_GREEN }}
             >
               <Download className="w-3 h-3" /> .env 다운로드
             </button>
@@ -375,7 +376,7 @@ export function EnvironmentSettingsPage() {
                   <button
                     onClick={handleSave}
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm"
-                    style={{ background: saved ? "#10b981" : "#1c1c1e", color: "rgba(255,255,255,0.92)" }}
+                    style={{ background: saved ? "#10b981" : BTN_DARK, color: "rgba(255,255,255,0.92)" }}
                   >
                     <Save className="w-3 h-3" />
                     {saved ? "로컬 저장 완료!" : "로컬 적용 (Apply)"}
@@ -421,15 +422,15 @@ export function EnvironmentSettingsPage() {
                 {/* PowerShell 커맨드 */}
                 <div
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-mono text-[10px]"
-                  style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.06)", color: "#c9d1d9" }}
+                  style={{ background: TERM_BG, border: "1px solid rgba(255,255,255,0.06)", color: TERM_TEXT }}
                 >
-                  <span style={{ color: "#7ee787" }}>$</span>
+                  <span style={{ color: TERM_GREEN }}>$</span>
                   <span className="flex-1 truncate">
                     <span style={{ color: "#79c0ff" }}>$env:SPRING_PROFILES_ACTIVE</span>
-                    <span style={{ color: "#ff7b72" }}> = </span>
+                    <span style={{ color: TERM_RED }}> = </span>
                     <span style={{ color: "#a5d6ff" }}>"{profile}"</span>
-                    <span style={{ color: "#8b949e" }}>; </span>
-                    <span style={{ color: "#7ee787" }}>./gradlew.bat bootRun</span>
+                    <span style={{ color: TERM_MUTED }}>; </span>
+                    <span style={{ color: TERM_GREEN }}>./gradlew.bat bootRun</span>
                   </span>
                   <CopyBtn value={`$env:SPRING_PROFILES_ACTIVE = "${profile}"; ./gradlew.bat bootRun`} />
                 </div>

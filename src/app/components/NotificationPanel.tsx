@@ -8,7 +8,16 @@ import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
 } from "../colors";
-import { fetchProjectNotifications, deleteNotification, markAllNotificationsAsRead, NotificationItem } from "../lib/api";
+import {
+  fetchProjectNotifications,
+  deleteNotification,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  mapNotificationItem,
+  fetchCurrentUser,
+  NotificationItem,
+} from "../lib/api";
+import { subscribeToProjectNotifications } from "../lib/chatSocket";
 
 export const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
   info:    { color: "#6B7A50",    bg: "rgba(107,122,80,0.10)"  },
@@ -37,6 +46,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
   const [open,   setOpen]   = useState(false);
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [anim,   setAnim]   = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const unread = notifs.filter(n => !n.isRead).length;
@@ -67,26 +77,53 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
 
-  useEffect(() => { 
+  // 뱃지 카운트가 패널을 열기 전에도 정확해야 하므로 projectId가 잡히는 즉시 불러온다.
+  useEffect(() => {
+    let active = true;
     async function loadNotifications() {
-      if (!projectId) return; 
+      if (!projectId) return;
       try {
         const data = await fetchProjectNotifications(projectId);
-        // 서버에서 받아온 데이터를 상태에 저장
-        setNotifs(data || []); 
+        if (active) setNotifs(data || []);
       } catch (error) {
         console.error("알림 목록을 불러오지 못했습니다:", error);
       }
     }
-    // 패널이 열려있거나 처음 렌더링될 때 불러오기
-    if (open && projectId) {
-      loadNotifications();
-    }
-  }, [open, projectId]);
+    loadNotifications();
+    return () => { active = false; };
+  }, [projectId]);
+
+  useEffect(() => {
+    let active = true;
+    fetchCurrentUser()
+      .then((user) => { if (active) setCurrentUserId(user.id); })
+      .catch((error) => console.error("현재 사용자 정보를 불러오지 못했습니다:", error));
+    return () => { active = false; };
+  }, []);
+
+  // 실시간 알림 수신: 서버가 새 알림을 생성하면 STOMP로 바로 밀어준다.
+  useEffect(() => {
+    if (!projectId || !currentUserId) return;
+
+    const numericProjectId = Number(projectId);
+    const subscription = subscribeToProjectNotifications(numericProjectId, currentUserId, (payload) => {
+      const incoming = mapNotificationItem(payload);
+      setNotifs((prev) => {
+        if (prev.some((n) => n.id === incoming.id)) return prev;
+        return [incoming, ...prev];
+      });
+    });
+
+    return () => subscription.unsubscribe();
+  }, [projectId, currentUserId]);
 
 
   const markRead = (id: number) => {
     setNotifs(ns => ns.map(n => n.id === id ? { ...n, isRead: true } : n));
+    if (!projectId) return;
+    markNotificationAsRead(projectId, id).catch((error) => {
+      console.error("알림 읽음 처리에 실패했습니다:", error);
+    });
   };
 
   const markAll = async () => {

@@ -9,8 +9,12 @@ import {
   fetchProjectNotifications,
   deleteNotification,
   markAllNotificationsAsRead,
+  markNotificationAsRead,
+  mapNotificationItem,
+  fetchCurrentUser,
   type NotificationItem,
 } from "../lib/api";
+import { subscribeToProjectNotifications } from "../lib/chatSocket";
 import { LEVEL_COLORS, getNotificationStyle } from "./NotificationPanel";
 
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -71,6 +75,7 @@ function NotifItem({ notif, onRead }: { notif: NotificationItem; onRead: (id: nu
 export function NotificationsPage({ projectId }: { projectId: number | string | null }) {
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -90,12 +95,40 @@ export function NotificationsPage({ projectId }: { projectId: number | string | 
     return () => { active = false; };
   }, [projectId]);
 
+  useEffect(() => {
+    let active = true;
+    fetchCurrentUser()
+      .then((user) => { if (active) setCurrentUserId(user.id); })
+      .catch((error) => console.error("현재 사용자 정보를 불러오지 못했습니다:", error));
+    return () => { active = false; };
+  }, []);
+
+  // 실시간 알림 수신: 페이지를 보고 있는 동안 새 알림이 오면 바로 목록에 반영한다.
+  useEffect(() => {
+    if (!projectId || !currentUserId) return;
+
+    const numericProjectId = Number(projectId);
+    const subscription = subscribeToProjectNotifications(numericProjectId, currentUserId, (payload) => {
+      const incoming = mapNotificationItem(payload);
+      setNotifs((prev) => {
+        if (prev.some((n) => n.id === incoming.id)) return prev;
+        return [incoming, ...prev];
+      });
+    });
+
+    return () => subscription.unsubscribe();
+  }, [projectId, currentUserId]);
+
   const unreadCount = notifs.filter((n) => !n.isRead).length;
   const todayNotifs = notifs.filter((n) => isToday(n.createdAt));
   const earlierNotifs = notifs.filter((n) => !isToday(n.createdAt));
 
   const markRead = (id: number) => {
     setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    if (!projectId) return;
+    markNotificationAsRead(projectId, id).catch((error) => {
+      console.error("알림 읽음 처리에 실패했습니다:", error);
+    });
   };
 
   const markAllRead = async () => {

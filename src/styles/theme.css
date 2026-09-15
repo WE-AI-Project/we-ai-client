@@ -59,8 +59,7 @@
   --chart-4: #00B0F4;
   --chart-5: #F59E0B;
 
-  /* ── 라디우스 ── */
-  --radius: 0.625rem;
+  /* ── 라디우스는 @theme inline 블록에서 직접 정의한다 (아래 참고) ── */
 
   /* ── 사이드바 (초극다크 올리브 — #131507 기반) ── */
   --sidebar: #0A0D3A;
@@ -140,10 +139,15 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* ── 라디우스 (애플 스타일 연속 곡률 스케일 — 클수록 더 크고 부드러운 모서리) ──
+     rounded-sm/md/lg/xl/2xl/3xl 클래스를 쓰는 프로젝트 전역 모든 곳에 자동 반영된다.
+     rounded-full(원형)은 이 스케일과 무관하게 그대로 둔다. */
+  --radius-sm: 8px;   /* 배지, 태그, 체크박스 */
+  --radius-md: 12px;  /* 인풋, 작은 버튼 */
+  --radius-lg: 14px;  /* 일반 버튼, 작은 카드 */
+  --radius-xl: 18px;  /* 큰 카드, 패널, 드롭다운 */
+  --radius-2xl: 22px; /* 모달, 대형 카드 */
+  --radius-3xl: 28px; /* 최상위 컨테이너, 바텀시트 */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

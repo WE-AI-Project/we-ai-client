@@ -41,6 +41,7 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
+  UI_RED,
 } from "../colors";
 import {
   CurrentUser,
@@ -420,7 +421,7 @@ function CreateProjectModal({
             <>
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
-                  프로젝트 이름 <span style={{ color: "#ef4444" }}>*</span>
+                  프로젝트 이름 <span style={{ color: UI_RED }}>*</span>
                 </label>
                 <input
                   autoFocus
@@ -1328,7 +1329,7 @@ export function JoinProjectScreen({
               )}
 
               {codeError && (
-                <p className="mt-2 text-[10px]" style={{ color: "#ef4444" }}>
+                <p className="mt-2 text-[10px]" style={{ color: UI_RED }}>
                   {codeError}
                 </p>
               )}

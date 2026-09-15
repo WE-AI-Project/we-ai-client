@@ -29,7 +29,7 @@ import {
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  UI_GREEN,
+  UI_GREEN, UI_RED, UI_AMBER, UI_BLUE,
   OLIVE_DARK,
 } from "../colors";
 
@@ -244,12 +244,12 @@ function Avatar({ name, size = 7 }: { name: string; size?: number }) {
 }
 
 const FILE_COLOR: Record<string, { bg: string; color: string }> = {
-  java: { bg: "rgba(245,158,11,0.10)", color: "#f59e0b" },
-  ts: { bg: "rgba(59,130,246,0.10)", color: "#3b82f6" },
+  java: { bg: "rgba(245,158,11,0.10)", color: UI_AMBER },
+  ts: { bg: "rgba(59,130,246,0.10)", color: UI_BLUE },
   tsx: { bg: "rgba(6,182,212,0.10)", color: "#06b6d4" },
   gradle: { bg: "rgba(112,130,56,0.10)", color: ACCENT },
   yml: { bg: "rgba(16,185,129,0.10)", color: "#10b981" },
-  pdf: { bg: "rgba(239,68,68,0.10)", color: "#ef4444" },
+  pdf: { bg: "rgba(239,68,68,0.10)", color: UI_RED },
   md: { bg: "rgba(139,92,246,0.10)", color: "#8b5cf6" },
 };
 
@@ -1195,7 +1195,7 @@ export function ChatPage({
                 {isMeeting && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.10)" }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                    <span className="text-[10px] font-semibold" style={{ color: "#ef4444" }}>REC {formatElapsed(elapsed)}</span>
+                    <span className="text-[10px] font-semibold" style={{ color: UI_RED }}>REC {formatElapsed(elapsed)}</span>
                   </div>
                 )}
                 {savingDoc && (
@@ -1220,7 +1220,7 @@ export function ChatPage({
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
                       background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(112,130,56,0.08)",
-                      color: isMeeting ? "#ef4444" : OLIVE_DARK,
+                      color: isMeeting ? UI_RED : OLIVE_DARK,
                       border: `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(112,130,56,0.15)"}`,
                     }}
                   >

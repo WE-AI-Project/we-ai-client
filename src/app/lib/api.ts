@@ -375,13 +375,56 @@ export type NotificationItem = {  // 알림 목록 조회
   type: string;
   title: string;
   body: string;
-  createdAt: string; 
+  createdAt: string;
   isRead: boolean;
 };
 
+// 서버 응답(NotificationListResponse.NotificationResponse)의 원본 필드 이름
+type RawNotification = {
+  notificationId: number;
+  type: string;
+  title: string;
+  message: string;
+  targetType?: string | null;
+  targetId?: number | null;
+  linkUrl?: string | null;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+};
+
+type NotificationListApiResponse = {
+  projectId: number;
+  unreadCount: number;
+  totalCount: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  notifications: RawNotification[];
+};
+
+// 목록 조회 응답과 웹소켓 실시간 푸시 모두 동일한 아이템 형태를 사용하므로 매퍼를 공유한다.
+export function mapNotificationItem(raw: RawNotification): NotificationItem {
+  return {
+    id: raw.notificationId,
+    type: raw.type,
+    title: raw.title,
+    body: raw.message,
+    createdAt: raw.createdAt,
+    isRead: raw.isRead,
+  };
+}
+
 export async function fetchProjectNotifications(projectId: string | number): Promise<NotificationItem[]> {  //알림 목록 조회
-  return request<NotificationItem[]>(`/api/v1/projects/${projectId}/notifications`, {
+  const response = await request<NotificationListApiResponse>(`/api/v1/projects/${projectId}/notifications`, {
     method: "GET",
+  });
+  return (response.notifications ?? []).map(mapNotificationItem);
+}
+
+export async function markNotificationAsRead(projectId: string | number, notificationId: string | number) {  //알림 단일 읽음
+  return request(`/api/v1/projects/${projectId}/notifications/${notificationId}/read`, {
+    method: "PATCH",
   });
 }
 
@@ -393,7 +436,7 @@ export async function deleteNotification(projectId: string | number, notificatio
 
 export async function markAllNotificationsAsRead(projectId: string | number) {  //알림 전체 읽음
   return request(`/api/v1/projects/${projectId}/notifications/read-all`, {
-    method: "PATCH", 
+    method: "PATCH",
   });
 }
 
@@ -1082,6 +1125,40 @@ export function buildApiUrl(path: string): string {
   return apiBaseUrl ? `${apiBaseUrl}${normalizedPath}` : normalizedPath;
 }
 
+// 첨부파일/문서/공유자료 다운로드용. 이 엔드포인트들은 더 이상 공개 정적 경로가 아니라
+// 인증 + 프로젝트 멤버십 검증을 거치는 API이므로, 반드시 Authorization 헤더를 실어서
+// fetch한 뒤 blob으로 받아 로컬 다운로드를 트리거해야 한다 (일반 <a href>/window.open은
+// 토큰을 실어주지 않아 401이 난다).
+export async function downloadAuthenticatedFile(path: string, fallbackFileName = "download"): Promise<void> {
+  const session = loadSession();
+  const headers = new Headers();
+  if (session?.accessToken) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
+  }
+
+  const response = await fetch(buildApiUrl(path), { headers });
+  if (!response.ok) {
+    throw new ApiError(`파일을 다운로드하지 못했습니다. (status ${response.status})`, "DOWNLOAD_FAILED", response.status);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const fileNameMatch = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition);
+  const fileName = decodeURIComponent(fileNameMatch?.[1] ?? fileNameMatch?.[2] ?? fallbackFileName);
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export function loadSession(): AuthSession | null {
   if (typeof window === "undefined") {
     return null;
@@ -1523,21 +1600,40 @@ export type ServerLogEntry = {
   message: string;
 };
 
-export async function fetchRecentServerLogs(projectId?: number | null): Promise<ServerLogEntry[]> {
+// baseUrlOverride가 주어지면 이 앱의 기본 백엔드 대신 그 주소로 직접 호출한다
+// (Server & Build 탭의 "다른 백엔드 링크" 연결 모드용).
+async function requestFrom<T>(baseUrlOverride: string, path: string, init: RequestInit = {}): Promise<T> {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${baseUrlOverride.replace(/\/+$/, "")}${normalizedPath}`;
+  const session = loadSession();
+  const headers = new Headers(init.headers);
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  if (session?.accessToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
+  }
+  const response = await fetch(url, { ...init, headers });
+  return parseResponse<T>(response);
+}
+
+export async function fetchRecentServerLogs(
+  projectId?: number | null,
+  baseUrlOverride?: string
+): Promise<ServerLogEntry[]> {
   const path = projectId
     ? `/api/v1/projects/${projectId}/server/logs`
     : `/api/v1/server/logs`;
+  if (baseUrlOverride) return requestFrom<ServerLogEntry[]>(baseUrlOverride, path, { method: "GET" });
   return request<ServerLogEntry[]>(path, { method: "GET" });
 }
 
-export function getServerLogStreamUrl(projectId?: number | null): string {
+export function getServerLogStreamUrl(projectId?: number | null, baseUrlOverride?: string): string {
   const session = loadSession();
   const token = session?.accessToken;
   const path = projectId
     ? `/api/v1/projects/${projectId}/server/logs/stream`
     : `/api/v1/server/logs/stream`;
 
-  const baseUrl = apiBaseUrl || "";
+  const baseUrl = (baseUrlOverride ? baseUrlOverride.replace(/\/+$/, "") : apiBaseUrl) || "";
   const fullUrl = `${baseUrl}${path}`;
   if (token) {
     const separator = fullUrl.includes("?") ? "&" : "?";
@@ -1572,20 +1668,32 @@ export type BuildTaskExecutionResponse = {
   executedAt: string;
 };
 
-export async function fetchBuildTasks(projectId?: number | null): Promise<BuildTaskListResponse> {
+export async function fetchBuildTasks(
+  projectId?: number | null,
+  baseUrlOverride?: string
+): Promise<BuildTaskListResponse> {
   const path = projectId
     ? `/api/v1/projects/${projectId}/build/tasks`
     : `/api/v1/build/tasks`;
+  if (baseUrlOverride) return requestFrom<BuildTaskListResponse>(baseUrlOverride, path, { method: "GET" });
   return request<BuildTaskListResponse>(path, { method: "GET" });
 }
 
 export async function executeBuildTask(
   taskName: string,
-  projectId?: number | null
+  projectId?: number | null,
+  baseUrlOverride?: string
 ): Promise<BuildTaskExecutionResponse> {
   const path = projectId
     ? `/api/v1/projects/${projectId}/build/execute`
     : `/api/v1/build/execute`;
+  if (baseUrlOverride) {
+    return requestFrom<BuildTaskExecutionResponse>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskName }),
+    });
+  }
   return request<BuildTaskExecutionResponse>(path, {
     method: "POST",
     body: { taskName },

@@ -3,14 +3,14 @@ import { BookOpen, Search, FileText, Download, File, Code2, BookMarked, Layers, 
 import { toast } from "sonner";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  CONTENT_BG,
+  CONTENT_BG, BTN_DARK, UI_AMBER, UI_RED_DARK,
 } from "../colors";
 import {
   fetchLibraryResources,
   uploadLibraryResource,
   viewLibraryResource,
   deleteLibraryResource,
-  buildApiUrl,
+  downloadAuthenticatedFile,
   loadSession,
   type LibraryResource,
   type LibraryResourceCategory,
@@ -38,15 +38,15 @@ const CAT_META: Record<LibraryResourceCategory, { color: string; bg: string }> =
   DOCS:      { color: ACCENT,    bg: "rgba(88,101,242,0.10)" },
   GUIDE:     { color: "#10b981", bg: "rgba(16,185,129,0.08)" },
   REFERENCE: { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)" },
-  TEMPLATE:  { color: "#f59e0b", bg: "rgba(245,158,11,0.08)" },
+  TEMPLATE:  { color: UI_AMBER, bg: "rgba(245,158,11,0.08)" },
 };
 
 function fileMeta(extension: string): { color: string; bg: string; label: string; icon: any } {
   const ext = extension.toLowerCase();
-  if (ext === "pdf") return { color: "#dc2626", bg: "rgba(239,68,68,0.08)", label: "PDF", icon: FileText };
+  if (ext === "pdf") return { color: UI_RED_DARK, bg: "rgba(239,68,68,0.08)", label: "PDF", icon: FileText };
   if (["md", "txt"].includes(ext)) return { color: ACCENT, bg: "rgba(88,101,242,0.08)", label: ext.toUpperCase(), icon: FileText };
   if (["yml", "yaml"].includes(ext)) return { color: "#10b981", bg: "rgba(16,185,129,0.08)", label: "YML", icon: File };
-  if (["java", "ts", "tsx", "js", "jsx"].includes(ext)) return { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", label: ext.toUpperCase(), icon: Code2 };
+  if (["java", "ts", "tsx", "js", "jsx"].includes(ext)) return { color: UI_AMBER, bg: "rgba(245,158,11,0.08)", label: ext.toUpperCase(), icon: Code2 };
   return { color: TEXT_TERTIARY, bg: "rgba(0,0,0,0.05)", label: ext ? ext.toUpperCase() : "FILE", icon: File };
 }
 
@@ -187,7 +187,11 @@ export function SharedLibraryPage({ projectId }: { projectId: number }) {
     } catch {
       // 조회수 반영에 실패해도 다운로드 자체는 계속 진행한다.
     }
-    window.open(buildApiUrl(resource.fileUrl), "_blank", "noopener,noreferrer");
+    try {
+      await downloadAuthenticatedFile(resource.fileUrl, resource.originalFileName);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "파일을 다운로드하지 못했습니다.");
+    }
   };
 
   const handleDelete = async (resource: LibraryResource) => {
@@ -260,7 +264,7 @@ export function SharedLibraryPage({ projectId }: { projectId: number }) {
                 { label: "Total Resources", value: resources.length, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: Layers    },
                 { label: "Docs",            value: catCounts.DOCS ?? 0,      color: ACCENT,    bg: "rgba(88,101,242,0.07)",  icon: FileText  },
                 { label: "Guides",          value: catCounts.GUIDE ?? 0,     color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: BookMarked},
-                { label: "Templates",       value: catCounts.TEMPLATE ?? 0,  color: "#f59e0b", bg: "rgba(245,158,11,0.07)", icon: File      },
+                { label: "Templates",       value: catCounts.TEMPLATE ?? 0,  color: UI_AMBER, bg: "rgba(245,158,11,0.07)", icon: File      },
               ].map(s => {
                 const Icon = s.icon;
                 return (
@@ -308,7 +312,7 @@ export function SharedLibraryPage({ projectId }: { projectId: number }) {
                       onClick={() => setActiveCategory(cat)}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
                       style={{
-                        background: activeCategory === cat ? "#1c1c1e" : "rgba(0,0,0,0.05)",
+                        background: activeCategory === cat ? BTN_DARK : "rgba(0,0,0,0.05)",
                         color: activeCategory === cat ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
                       }}
                     >

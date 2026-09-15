@@ -35,7 +35,7 @@ import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
   GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
-  UI_CYAN, UI_CYAN_BG,
+  UI_CYAN, UI_CYAN_BG, UI_RED, UI_AMBER,
 } from "../colors";
 
 // ── 브라우저 Memory API 타입 ──
@@ -411,7 +411,7 @@ export function ProfilePage({ projectId }: { projectId?: number | string | null 
                     </div>
                     <GaugeBar
                       value={stats.renderLoad}
-                      color={stats.renderLoad > 70 ? "#ef4444" : stats.renderLoad > 40 ? "#f59e0b" : ACCENT}
+                      color={stats.renderLoad > 70 ? UI_RED : stats.renderLoad > 40 ? UI_AMBER : ACCENT}
                       bg="rgba(112,130,56,0.10)"
                     />
                     <div className="mt-2.5 space-y-1">
@@ -421,7 +421,7 @@ export function ProfilePage({ projectId }: { projectId?: number | string | null 
                       </div>
                       <div className="flex justify-between text-[9px]">
                         <span style={{ color: TEXT_TERTIARY }}>Frame Rate</span>
-                        <span className="font-semibold" style={{ color: stats.fps < 30 ? "#ef4444" : stats.fps < 50 ? "#f59e0b" : "#10b981" }}>{stats.fps} fps</span>
+                        <span className="font-semibold" style={{ color: stats.fps < 30 ? UI_RED : stats.fps < 50 ? UI_AMBER : "#10b981" }}>{stats.fps} fps</span>
                       </div>
                     </div>
                   </div>
@@ -433,7 +433,7 @@ export function ProfilePage({ projectId }: { projectId?: number | string | null 
                       <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>Memory</p>
                       <span className="ml-auto text-[10px] font-mono font-semibold" style={{ color: "#5A8A4A" }}>{memPct > 0 ? `${memPct}%` : "—"}</span>
                     </div>
-                    <GaugeBar value={memPct} color={memPct > 80 ? "#ef4444" : memPct > 60 ? "#f59e0b" : "#5A8A4A"} bg="rgba(90,138,74,0.12)" />
+                    <GaugeBar value={memPct} color={memPct > 80 ? UI_RED : memPct > 60 ? UI_AMBER : "#5A8A4A"} bg="rgba(90,138,74,0.12)" />
                     <div className="mt-2.5 space-y-1">
                       {stats.heapUsed > 0 ? (
                         <>
