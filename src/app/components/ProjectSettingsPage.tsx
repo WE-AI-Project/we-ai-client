@@ -940,7 +940,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
                   <Hash className="h-3.5 w-3.5" />
                   {detail.projectCode}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(53,237,126,0.18)", color: "#123B26" }}>
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(53,237,126,0.18)", color: "#D8FFE6" }}>
                   <ShieldCheck className="h-3.5 w-3.5" />
                   {detail.status}
                 </span>
