@@ -868,55 +868,60 @@ export async function leaveProject(projectId: number | string): Promise<void> { 
 export async function fetchProjectCommits(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  limit = 20
+  limit = 20,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitList> {
-  return request<ProjectCommitList>(
-    `/api/v1/projects/${projectId}/commits${buildQueryString({ repositoryType, limit })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits${buildQueryString({ repositoryType, limit })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitList>(path);
 }
 
 export async function fetchFilteredProjectCommits(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  limit = 20
+  limit = 20,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitList> {
-  return request<ProjectCommitList>(
-    `/api/v1/projects/${projectId}/commits/filter${buildQueryString({ repositoryType, limit })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/filter${buildQueryString({ repositoryType, limit })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitList>(path);
 }
 
 export async function fetchProjectCommitDetail(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  commitHash: string
+  commitHash: string,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitDetail> {
-  return request<ProjectCommitDetail>(
-    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}${buildQueryString({ repositoryType })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}${buildQueryString({ repositoryType })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitDetail>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitDetail>(path);
 }
 
 export async function fetchProjectCommitFiles(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  commitHash: string
+  commitHash: string,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitFileList> {
-  return request<ProjectCommitFileList>(
-    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/files${buildQueryString({ repositoryType })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/files${buildQueryString({ repositoryType })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitFileList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitFileList>(path);
 }
 
 export async function fetchProjectCommitFileDiff(
   projectId: number,
   repositoryType: ProjectRepositoryType,
   commitHash: string,
-  filePath: string
+  filePath: string,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitFileDiff> {
-  return request<ProjectCommitFileDiff>(
-    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/diff${buildQueryString({
-      repositoryType,
-      filePath,
-    })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/diff${buildQueryString({
+    repositoryType,
+    filePath,
+  })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitFileDiff>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitFileDiff>(path);
 }
 
 export type LoginPayload = {
@@ -1757,27 +1762,44 @@ export type ProjectGitChangeResult = {
   unstagedFiles: Array<{ path: string; status: string; staged: boolean; unstaged: boolean }>;
 };
 
-export async function fetchProjectChangedFiles(projectId: number | string): Promise<ProjectChangedFileList> {
-  return request<ProjectChangedFileList>(`/api/v1/projects/${projectId}/changes/files`, { method: "GET" });
+export async function fetchProjectChangedFiles(
+  projectId: number | string,
+  baseUrlOverride?: string
+): Promise<ProjectChangedFileList> {
+  const path = `/api/v1/projects/${projectId}/changes/files`;
+  if (baseUrlOverride) return requestFrom<ProjectChangedFileList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectChangedFileList>(path, { method: "GET" });
 }
 
 export async function fetchProjectChangedFileDiff(
   projectId: number | string,
   filePath?: string,
-  staged?: boolean
+  staged?: boolean,
+  baseUrlOverride?: string
 ): Promise<ProjectGitFileDiff> {
   const params = new URLSearchParams();
   if (filePath) params.set("filePath", filePath);
   if (staged !== undefined) params.set("staged", String(staged));
   const query = params.toString() ? `?${params.toString()}` : "";
-  return request<ProjectGitFileDiff>(`/api/v1/projects/${projectId}/changes/diff${query}`, { method: "GET" });
+  const path = `/api/v1/projects/${projectId}/changes/diff${query}`;
+  if (baseUrlOverride) return requestFrom<ProjectGitFileDiff>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectGitFileDiff>(path, { method: "GET" });
 }
 
 export async function stageProjectFiles(
   projectId: number | string,
-  filePaths: string[]
+  filePaths: string[],
+  baseUrlOverride?: string
 ): Promise<ProjectGitChangeResult> {
-  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/stage`, {
+  const path = `/api/v1/projects/${projectId}/changes/stage`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePaths }),
+    });
+  }
+  return request<ProjectGitChangeResult>(path, {
     method: "POST",
     body: { filePaths },
   });
@@ -1785,28 +1807,56 @@ export async function stageProjectFiles(
 
 export async function unstageProjectFiles(
   projectId: number | string,
-  filePaths: string[]
+  filePaths: string[],
+  baseUrlOverride?: string
 ): Promise<ProjectGitChangeResult> {
-  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/unstage`, {
+  const path = `/api/v1/projects/${projectId}/changes/unstage`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePaths }),
+    });
+  }
+  return request<ProjectGitChangeResult>(path, {
     method: "POST",
     body: { filePaths },
   });
 }
 
-export async function stageAllProjectFiles(projectId: number | string): Promise<ProjectGitChangeResult> {
-  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/stage-all`, { method: "POST" });
+export async function stageAllProjectFiles(
+  projectId: number | string,
+  baseUrlOverride?: string
+): Promise<ProjectGitChangeResult> {
+  const path = `/api/v1/projects/${projectId}/changes/stage-all`;
+  if (baseUrlOverride) return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, { method: "POST" });
+  return request<ProjectGitChangeResult>(path, { method: "POST" });
 }
 
-export async function unstageAllProjectFiles(projectId: number | string): Promise<ProjectGitChangeResult> {
-  return request<ProjectGitChangeResult>(`/api/v1/projects/${projectId}/changes/unstage-all`, { method: "POST" });
+export async function unstageAllProjectFiles(
+  projectId: number | string,
+  baseUrlOverride?: string
+): Promise<ProjectGitChangeResult> {
+  const path = `/api/v1/projects/${projectId}/changes/unstage-all`;
+  if (baseUrlOverride) return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, { method: "POST" });
+  return request<ProjectGitChangeResult>(path, { method: "POST" });
 }
 
 export async function createProjectCommit(
   projectId: number | string,
   message: string,
-  description?: string
+  description?: string,
+  baseUrlOverride?: string
 ): Promise<ProjectGitCommitCreated> {
-  return request<ProjectGitCommitCreated>(`/api/v1/projects/${projectId}/changes/commit`, {
+  const path = `/api/v1/projects/${projectId}/changes/commit`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitCommitCreated>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, description }),
+    });
+  }
+  return request<ProjectGitCommitCreated>(path, {
     method: "POST",
     body: { message, description },
   });
@@ -1846,14 +1896,17 @@ export type ProjectGitBranchGraph = {
 
 export async function fetchProjectBranchGraph(
   projectId: number | string,
-  params?: { branch?: string; maxCount?: number; includeRemote?: boolean }
+  params?: { branch?: string; maxCount?: number; includeRemote?: boolean },
+  baseUrlOverride?: string
 ): Promise<ProjectGitBranchGraph> {
   const query = new URLSearchParams();
   if (params?.branch) query.set("branch", params.branch);
   if (params?.maxCount !== undefined) query.set("maxCount", String(params.maxCount));
   if (params?.includeRemote !== undefined) query.set("includeRemote", String(params.includeRemote));
   const qs = query.toString() ? `?${query.toString()}` : "";
-  return request<ProjectGitBranchGraph>(`/api/v1/projects/${projectId}/changes/branches/graph${qs}`, { method: "GET" });
+  const path = `/api/v1/projects/${projectId}/changes/branches/graph${qs}`;
+  if (baseUrlOverride) return requestFrom<ProjectGitBranchGraph>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectGitBranchGraph>(path, { method: "GET" });
 }
 
 export type ConventionIssue = {
@@ -1876,15 +1929,21 @@ export type ProjectGitCommitConventionCheck = {
 export async function checkProjectCommitConvention(
   projectId: number | string,
   message: string,
-  description?: string
+  description?: string,
+  baseUrlOverride?: string
 ): Promise<ProjectGitCommitConventionCheck> {
-  return request<ProjectGitCommitConventionCheck>(
-    `/api/v1/projects/${projectId}/changes/commit-convention/check`,
-    {
+  const path = `/api/v1/projects/${projectId}/changes/commit-convention/check`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitCommitConventionCheck>(baseUrlOverride, path, {
       method: "POST",
-      body: { message, description },
-    }
-  );
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, description }),
+    });
+  }
+  return request<ProjectGitCommitConventionCheck>(path, {
+    method: "POST",
+    body: { message, description },
+  });
 }
 
 // ── QA 리포트 (커밋별 AI QA 실행 이력) ──
