@@ -36,14 +36,15 @@ import {
 
 import {
   BORDER,
-  BORDER_SUBTLE,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
-  TEXT_LABEL,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_MUTED,
   ACCENT,
   ACCENT_BG,
   ACCENT_BORDER,
+  CONTENT_BG,
   TERM_BG,
   TERM_MUTED,
   TERM_GREEN,
@@ -51,6 +52,9 @@ import {
   UI_RED,
   UI_RED_DARK,
 } from "../colors";
+
+const NAVY_SURFACE = "rgba(255,255,255,0.06)";
+const NAVY_BORDER = "rgba(255,255,255,0.12)";
 
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
@@ -248,7 +252,7 @@ function FileRow({
   const sec = isSecurityRiskFile(file);
   const ec = sec.isRisk
     ? { bg: "rgba(239,68,68,0.15)", color: UI_RED_DARK }
-    : (EXT_COLOR[file.ext] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY });
+    : (EXT_COLOR[file.ext] ?? { bg: NAVY_SURFACE, color: TEXT_ON_DARK_MUTED });
   const sm = STATUS_META[file.status] ?? {
     color: "#C09840",
     label: "M",
@@ -260,17 +264,17 @@ function FileRow({
       onClick={onSelect}
       className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all ${sec.isRisk ? "group" : ""}`}
       style={{
-        borderBottom: `1px solid ${BORDER_SUBTLE}`,
+        borderBottom: `1px solid ${NAVY_BORDER}`,
         background: selected
-          ? (sec.isRisk ? "rgba(239,68,68,0.14)" : "rgba(65,67,27,0.08)")
+          ? (sec.isRisk ? "rgba(239,68,68,0.14)" : ACCENT_BG)
           : (sec.isRisk ? "rgba(239,68,68,0.05)" : "transparent"),
         borderLeft: selected
-          ? (sec.isRisk ? "2.5px solid #EF4444" : "2.5px solid #41431B")
+          ? (sec.isRisk ? "2.5px solid #EF4444" : `2.5px solid ${ACCENT}`)
           : (sec.isRisk ? "2.5px solid rgba(239,68,68,0.5)" : "2.5px solid transparent"),
-        borderImage: selected && !sec.isRisk ? "linear-gradient(180deg, #41431B, #AEB784) 1" : "none",
+        borderImage: "none",
       }}
       onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.background = sec.isRisk ? "rgba(239,68,68,0.09)" : "rgba(0,0,0,0.025)";
+        if (!selected) e.currentTarget.style.background = sec.isRisk ? "rgba(239,68,68,0.09)" : NAVY_SURFACE;
       }}
       onMouseLeave={(e) => {
         if (!selected) e.currentTarget.style.background = sec.isRisk ? "rgba(239,68,68,0.05)" : "transparent";
@@ -282,7 +286,7 @@ function FileRow({
         className="w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 cursor-pointer transition-all"
         style={{
           background: staged ? (sec.isRisk ? UI_RED_DARK : ACCENT) : "transparent",
-          border: `1.5px solid ${staged ? (sec.isRisk ? UI_RED_DARK : ACCENT) : (sec.isRisk ? "rgba(239,68,68,0.6)" : "rgba(0,0,0,0.22)")}`,
+          border: `1.5px solid ${staged ? (sec.isRisk ? UI_RED_DARK : ACCENT) : (sec.isRisk ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.35)")}`,
         }}
       >
         {staged && (
@@ -309,7 +313,7 @@ function FileRow({
       {/* 파일명 */}
       <span
         className={`flex-1 text-[11px] truncate ${sec.isRisk ? "font-semibold text-red-600 dark:text-red-400" : ""}`}
-        style={{ color: sec.isRisk ? UI_RED_DARK : (staged ? TEXT_PRIMARY : TEXT_TERTIARY) }}
+        style={{ color: sec.isRisk ? UI_RED_DARK : (staged ? TEXT_ON_DARK : TEXT_ON_DARK_MUTED) }}
         title={`${file.path}${sec.isRisk ? ` [보안위험: ${sec.reason}]` : ""}`}
       >
         {file.name}
@@ -630,27 +634,26 @@ export function ChangesPage({
       />
       <CommittedModal show={showDone} msg={doneMsg} onClose={() => setShowDone(false)} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: CONTENT_BG }}>
         {/* ── 타이틀바 ── */}
         <div
           className="flex items-center gap-3 px-5 h-11 shrink-0"
-          style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(251,252,250,0.98)" }}
+          style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
         >
           <GitCommit className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
-          <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>
+          <p className="text-xs font-semibold" style={{ color: TEXT_ON_DARK }}>
             Changes
           </p>
 
           {/* 레포지토리 선택 (WE-AI-Project Server / Client) */}
-          <div className="ml-2 flex items-center bg-black/5 rounded-lg p-0.5 border border-black/5">
+          <div className="ml-2 flex items-center rounded-lg p-0.5" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
             <button
               onClick={() => setRepoType("BACKEND")}
               disabled={isLoading}
               className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-md transition-all"
               style={{
-                background: repoType === "BACKEND" ? "#ffffff" : "transparent",
-                color: repoType === "BACKEND" ? TEXT_PRIMARY : TEXT_TERTIARY,
-                boxShadow: repoType === "BACKEND" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                background: repoType === "BACKEND" ? "rgba(255,255,255,0.12)" : "transparent",
+                color: repoType === "BACKEND" ? TEXT_ON_DARK : TEXT_ON_DARK_MUTED,
               }}
             >
               <Server className="w-3 h-3" style={{ color: "#62683A" }} />
@@ -661,9 +664,8 @@ export function ChangesPage({
               disabled={isLoading}
               className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-md transition-all"
               style={{
-                background: repoType === "FRONTEND" ? "#ffffff" : "transparent",
-                color: repoType === "FRONTEND" ? TEXT_PRIMARY : TEXT_TERTIARY,
-                boxShadow: repoType === "FRONTEND" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                background: repoType === "FRONTEND" ? "rgba(255,255,255,0.12)" : "transparent",
+                color: repoType === "FRONTEND" ? TEXT_ON_DARK : TEXT_ON_DARK_MUTED,
               }}
             >
               <Monitor className="w-3 h-3" style={{ color: "#0284c7" }} />
@@ -671,7 +673,7 @@ export function ChangesPage({
             </button>
           </div>
 
-          <span className="text-[10px] ml-1" style={{ color: TEXT_TERTIARY }}>
+          <span className="text-[10px] ml-1" style={{ color: TEXT_ON_DARK_MUTED }}>
             {changedFiles.length} files changed
           </span>
           <span className="text-[10px]" style={{ color: "#10b981" }}>
@@ -686,9 +688,9 @@ export function ChangesPage({
               onClick={() => setShowBranch((v) => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
               style={{
-                background: showBranch ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.05)",
-                color: showBranch ? ACCENT : TEXT_SECONDARY,
-                border: `1px solid ${showBranch ? ACCENT : BORDER}`,
+                background: showBranch ? ACCENT_BG : NAVY_SURFACE,
+                color: showBranch ? ACCENT : TEXT_ON_DARK_MUTED,
+                border: `1px solid ${showBranch ? ACCENT : NAVY_BORDER}`,
               }}
             >
               <GitBranch className="w-3.5 h-3.5" />
@@ -707,7 +709,7 @@ export function ChangesPage({
             {/* ── 왼쪽: 파일 트리 + 커밋 패널 ── */}
             <div
               className="w-72 shrink-0 flex flex-col overflow-hidden"
-              style={{ borderRight: `1px solid ${BORDER}`, background: "rgba(250,250,248,0.95)" }}
+              style={{ borderRight: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
             >
               <div className="flex-1 overflow-y-auto">
                 {/* Staged 섹션 */}
@@ -717,9 +719,9 @@ export function ChangesPage({
                     className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left hover:bg-black/[0.03]"
                   >
                     {stagedOpen ? (
-                      <ChevronDown className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                      <ChevronDown className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
                     ) : (
-                      <ChevronRight className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                      <ChevronRight className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
                     )}
                     <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: ACCENT }}>
                       Staged Changes
@@ -737,7 +739,7 @@ export function ChangesPage({
                           unstageAll();
                         }}
                         className="text-[9px] hover:underline cursor-pointer ml-1"
-                        style={{ color: TEXT_TERTIARY }}
+                        style={{ color: TEXT_ON_DARK_MUTED }}
                       >
                         Unstage All
                       </span>
@@ -765,7 +767,7 @@ export function ChangesPage({
                     ))
                   ) : stagedOpen && stagedFiles.length === 0 ? (
                     <div className="px-4 py-3 text-center">
-                      <p className="text-[10px]" style={{ color: loadError ? "#B85450" : TEXT_TERTIARY }}>
+                      <p className="text-[10px]" style={{ color: loadError ? "#B85450" : TEXT_ON_DARK_MUTED }}>
                         {loadError ? "변경된 파일을 불러오지 못했습니다" : "스테이징된 파일 없음"}
                       </p>
                     </div>
@@ -779,16 +781,16 @@ export function ChangesPage({
                     className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left hover:bg-black/[0.03]"
                   >
                     {unstagedOpen ? (
-                      <ChevronDown className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                      <ChevronDown className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
                     ) : (
-                      <ChevronRight className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
+                      <ChevronRight className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
                     )}
-                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: TEXT_LABEL }}>
+                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: TEXT_ON_DARK_MUTED }}>
                       Changes (Unstaged)
                     </span>
                     <span
                       className="ml-auto text-[9px] font-bold px-1.5 py-0.2 rounded-full"
-                      style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+                      style={{ background: NAVY_SURFACE, color: TEXT_ON_DARK_MUTED }}
                     >
                       {unstagedFiles.length}
                     </span>
@@ -799,7 +801,7 @@ export function ChangesPage({
                           stageAll();
                         }}
                         className="text-[9px] hover:underline cursor-pointer ml-1"
-                        style={{ color: TEXT_TERTIARY }}
+                        style={{ color: TEXT_ON_DARK_MUTED }}
                       >
                         Stage All
                       </span>
@@ -827,7 +829,7 @@ export function ChangesPage({
                     ))
                   ) : unstagedOpen && unstagedFiles.length === 0 ? (
                     <div className="px-4 py-3 text-center">
-                      <p className="text-[10px]" style={{ color: loadError ? "#B85450" : TEXT_TERTIARY }}>
+                      <p className="text-[10px]" style={{ color: loadError ? "#B85450" : TEXT_ON_DARK_MUTED }}>
                         {loadError ? "변경된 파일을 불러오지 못했습니다" : "모든 파일이 스테이징됨"}
                       </p>
                     </div>
@@ -837,14 +839,14 @@ export function ChangesPage({
                 {/* 커밋 히스토리 (최근 5개) */}
                 {history.length > 0 && (
                   <div className="p-3 border-t border-black/5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: TEXT_TERTIARY }}>
+                    <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: TEXT_ON_DARK_MUTED }}>
                       Recent Local Commits
                     </p>
                     <div className="space-y-1.5">
                       {history.map((h, i) => (
                         <div key={i} className="flex items-start gap-2">
                           <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5" style={{ color: "#10b981" }} />
-                          <p className="text-[9px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>
+                          <p className="text-[9px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>
                             {h}
                           </p>
                         </div>
@@ -855,7 +857,7 @@ export function ChangesPage({
               </div>
 
               {/* ── 커밋 작성 & 푸시 패널 ── */}
-              <div className="shrink-0 p-3 space-y-2.5" style={{ borderTop: `1px solid ${BORDER}` }}>
+              <div className="shrink-0 p-3 space-y-2.5" style={{ borderTop: `1px solid ${NAVY_BORDER}` }}>
                 {isLoading ? (
                   <div className="space-y-2.5">
                     <Skeleton className="h-6 w-1/2 rounded-full" />
@@ -873,12 +875,12 @@ export function ChangesPage({
                           {(loadSession()?.username || "D").charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
+                      <span className="text-[10px]" style={{ color: TEXT_ON_DARK_MUTED }}>
                         {loadSession()?.username || "Developer"}
                       </span>
                       <div className="flex items-center gap-1 ml-auto">
-                        <GitBranch className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
-                        <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>
+                        <GitBranch className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
+                        <span className="text-[9px] font-mono" style={{ color: TEXT_ON_DARK_MUTED }}>
                           {currentBranch}
                         </span>
                       </div>
@@ -898,14 +900,14 @@ export function ChangesPage({
                       rows={3}
                       className="w-full px-3 py-2 text-[11px] rounded-xl outline-none resize-none transition-all"
                       style={{
-                        background: "#FFFFFF",
-                        border: `1px solid ${message.trim() ? ACCENT_BORDER : BORDER}`,
-                        color: TEXT_PRIMARY,
+                        background: NAVY_SURFACE,
+                        border: `1px solid ${message.trim() ? ACCENT_BORDER : NAVY_BORDER}`,
+                        color: TEXT_ON_DARK,
                         lineHeight: "1.5",
                       }}
                     />
 
-                    <div className="flex items-center gap-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                    <div className="flex items-center gap-1 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
                       <FileCode2 className="w-3 h-3 shrink-0" />
                       <span>
                         {stagedCount} file{stagedCount !== 1 ? "s" : ""} staged
@@ -936,8 +938,8 @@ export function ChangesPage({
                         background:
                           stagedCount > 0 && message.trim() && !isCommitting
                             ? ACCENT
-                            : "rgba(0,0,0,0.07)",
-                        color: stagedCount > 0 && message.trim() && !isCommitting ? "#FFFFFF" : TEXT_TERTIARY,
+                            : NAVY_SURFACE,
+                        color: stagedCount > 0 && message.trim() && !isCommitting ? "#FFFFFF" : TEXT_ON_DARK_MUTED,
                         boxShadow:
                           stagedCount > 0 && message.trim() && !isCommitting ? "0 4px 16px rgba(37,99,235,0.24)" : "none",
                         cursor: stagedCount > 0 && message.trim() && !isCommitting ? "pointer" : "not-allowed",
