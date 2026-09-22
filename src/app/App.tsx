@@ -53,6 +53,7 @@ import { SharedLibraryPage } from "./components/SharedLibraryPage";
 import type { CommitFile } from "./components/commitData";
 import { loadProfile, saveProfile } from "./data/profileStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
+import { saveLastActiveProject, loadLastActiveProject, clearLastActiveProject } from "./data/activeProjectStore";
 import { NotificationPanel } from "./components/NotificationPanel";
 import { WindowControls } from "./components/WindowControls";
 import { AuxTitleBar } from "./components/AuxTitleBar";
@@ -65,6 +66,7 @@ import {
   AUTH_SESSION_EVENT,
   AuthSession,
   CurrentUser,
+  ApiError,
   ProjectDetail,
   ProjectLaunchTarget,
   clearSession,
@@ -149,6 +151,7 @@ function resetWorkspaceState({
   setProjectCode("");
   setLocalPath("");
   setDiffFile(null);
+  clearLastActiveProject();
 }
 
 const NAV_ITEMS = [
@@ -371,6 +374,7 @@ export default function App() {
         setLocalPath("");
         setDiffFile(null);
         setScreen("login");
+        clearLastActiveProject();
       }
     };
 
@@ -409,7 +413,21 @@ export default function App() {
 
         setAuthSession(refreshedSession);
         setCurrentUser(user);
-        setScreen("join");
+
+        // 세션은 살아있는데 화면(App)만 다시 마운트된 경우(예: 개발 서버 풀 리로드) 열려있던
+        // 프로젝트를 잊어버리고 무조건 "프로젝트 시작하기"로 보내던 문제 - 마지막으로 연 프로젝트를
+        // 기억해뒀다가 바로 workspace로 복귀시킨다. 실제로 더 이상 접근 권한이 없다면 아래
+        // syncProjectContext 이펙트가 project 상태 변경 시 검증해서 join 화면으로 되돌린다.
+        const lastProject = loadLastActiveProject();
+        if (lastProject) {
+          setProjectId(lastProject.projectId);
+          setProject(lastProject.projectName);
+          setProjectCode(lastProject.projectCode);
+          setLocalPath(lastProject.localPath ?? "");
+          setScreen("workspace");
+        } else {
+          setScreen("join");
+        }
       } catch {
         if (!active) return;
 
@@ -455,6 +473,20 @@ export default function App() {
         cacheProjectSummary(detail);
       } catch (error) {
         console.error(error);
+        if (!active) return;
+
+        // 네트워크 오류/타임아웃 같은 일시적 실패는 무시한다 - 워크스페이스에서 쫓아낼 근거가
+        // 아니다. 403/404(권한 없음/삭제됨)일 때만 더 이상 접근 불가능한 프로젝트로 확정하고
+        // 선택 화면으로 되돌린다. (복원 시도가 실패한 경우도 여기로 들어온다.)
+        const isAccessDenied = error instanceof ApiError && (error.status === 403 || error.status === 404);
+        if (isAccessDenied) {
+          clearLastActiveProject();
+          setScreen("join");
+          setProjectId(null);
+          setProject("");
+          setProjectCode("");
+          setLocalPath("");
+        }
       }
     };
 
@@ -652,6 +684,7 @@ export default function App() {
     setProjectCode(project.projectCode ?? genProjectCode());
     setLocalPath(project.localPath ?? "");
     setScreen("workspace");
+    saveLastActiveProject(project);
 
     setLeftTabs(["Dashboard"]);
     setActiveLeftTab("Dashboard");
@@ -688,6 +721,7 @@ export default function App() {
     setProjectCode("");
     setLocalPath("");
     setDiffFile(null);
+    clearLastActiveProject();
   };
 
   const handleLogout = async () => {
