@@ -3,7 +3,7 @@ import { Settings, User, Bell, Monitor, Palette, Shield, Save, ChevronRight } fr
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT, ACCENT_SAGE,
   ACCENT_MID, ACCENT_BG_10, ACCENT_BORDER, UI_AMBER, UI_RED, BTN_DARK,
-  CONTENT_BG,
+  BRIGHT_BEIGE,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -98,7 +98,7 @@ export function SettingsPage() {
     setDevSettings(prev => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="w-full max-w-[1400px] mx-auto space-y-4">

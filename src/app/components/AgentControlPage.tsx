@@ -3,7 +3,7 @@ import { Bot, Terminal, Plug, Loader2, CheckCircle2, XCircle, KeyRound, ChevronD
 import { toast } from "sonner";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  ACCENT, ACCENT_BG, ACCENT_BORDER, BRIGHT_BEIGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
   TERM_BG, TERM_TEXT, TERM_MUTED, TERM_GREEN, UI_RED,
 } from "../colors";
 import {
@@ -339,7 +339,7 @@ export function AgentControlPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: BRIGHT_BEIGE }} />
       <div className="absolute inset-0 pointer-events-none">
         <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
         <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: GRADIENT_ORB_2, filter: "blur(50px)" }} />

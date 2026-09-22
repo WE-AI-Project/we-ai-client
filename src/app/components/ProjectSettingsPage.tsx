@@ -25,7 +25,7 @@ import {
   ACCENT_BORDER,
   BORDER,
   BORDER_SUBTLE,
-  GRADIENT_PAGE,
+  BRIGHT_BEIGE,
   GRADIENT_HEADER_BANNER,
   SAGE,
   STATUS_ERROR,
@@ -859,7 +859,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
 
   if (!projectId) {
     return (
-      <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
+      <div className="flex h-full items-center justify-center" style={{ background: BRIGHT_BEIGE }}>
         <div
           className="rounded-3xl border px-6 py-6 text-center"
           style={{ background: "rgba(255,255,255,0.94)", borderColor: BORDER }}
@@ -881,7 +881,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
 
   if (!detail || error) {
     return (
-      <div className="flex h-full items-center justify-center" style={{ background: GRADIENT_PAGE }}>
+      <div className="flex h-full items-center justify-center" style={{ background: BRIGHT_BEIGE }}>
         <div
           className="max-w-lg rounded-3xl border px-6 py-6 text-center"
           style={{ background: "rgba(255,255,255,0.94)", borderColor: BORDER }}
@@ -907,7 +907,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
+    <div className="flex-1 overflow-y-auto p-5" style={{ background: BRIGHT_BEIGE }}>
       <div className="w-full max-w-[1600px] mx-auto space-y-4">
         <section
           className="relative overflow-hidden rounded-2xl border px-6 py-6"

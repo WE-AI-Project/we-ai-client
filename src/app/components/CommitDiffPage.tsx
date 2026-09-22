@@ -36,7 +36,7 @@ import {
   ACCENT,
   BORDER,
   BORDER_SUBTLE,
-  CREAM,
+  BRIGHT_BEIGE,
   TEXT_PRIMARY,
   TEXT_ON_DARK,
   TEXT_ON_DARK_MUTED,
@@ -71,7 +71,7 @@ export type PartConfig = {
   icon: typeof Server;
 };
 
-const PANEL_BG = CREAM;
+const PANEL_BG = BRIGHT_BEIGE;
 
 const KNOWN_PART_CONFIGS: Record<string, PartConfig> = {
   BACKEND: {
@@ -479,7 +479,7 @@ function RepoColumn({
           <GitBranch className="ml-auto h-3 w-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
+        <div className="min-h-0 flex-1 overflow-y-auto" style={{ background: BRIGHT_BEIGE }}>
           {state.loading ? (
             <div className="space-y-3 px-3 py-3">
               {Array.from({ length: 5 }).map((_, index) => (
@@ -523,7 +523,7 @@ function RepoColumn({
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
+        <div className="min-h-0 flex-1 overflow-y-auto" style={{ background: BRIGHT_BEIGE }}>
           {state.loadingCommitHash ? (
             <div className="space-y-3 px-3 py-3">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -864,12 +864,12 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "#ffffff" }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: BRIGHT_BEIGE }} />
 
       {/* 상단 툴바 */}
       <div
         className="relative z-10 flex h-10 shrink-0 items-center gap-3 px-4"
-        style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,250,250,0.98)" }}
+        style={{ borderBottom: `1px solid ${BORDER}`, background: BRIGHT_BEIGE }}
       >
         <GitCommit className="h-3.5 w-3.5" style={{ color: ACCENT }} />
         <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>

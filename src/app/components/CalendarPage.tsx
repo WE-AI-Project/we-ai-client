@@ -24,13 +24,10 @@ import {
 } from "../lib/api";
 
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, TEXT_ON_DARK, TEXT_ON_DARK_MUTED,
+  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  BRIGHT_BEIGE, CONTENT_BG, BEIGE, UI_RED,
+  BRIGHT_BEIGE, CREAM, CONTENT_BG, BEIGE, UI_RED,
 } from "../colors";
-
-const NAVY_SURFACE = "rgba(255,255,255,0.06)";
-const NAVY_BORDER = "rgba(255,255,255,0.12)";
 
 function mapBackendDepartmentToDept(dept?: string): Dept {
   switch ((dept || "").toUpperCase()) {
@@ -513,35 +510,35 @@ function ScheduleCard({
     <div
       className="rounded-xl p-3 transition-all group"
       style={{
-        background: NAVY_SURFACE,
-        border: `1px solid ${NAVY_BORDER}`,
+        background: "rgba(255,255,255,0.88)",
+        border: `1px solid ${BORDER}`,
         borderLeft: `3px solid ${dc.color}`,
       }}
     >
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold leading-snug" style={{ color: TEXT_ON_DARK }}>
+          <p className="text-[11px] font-semibold leading-snug" style={{ color: TEXT_PRIMARY }}>
             {schedule.title}
           </p>
           {schedule.assignee ? (
             <div className="flex items-center gap-1 mt-0.5">
-              <User className="w-2.5 h-2.5 shrink-0" style={{ color: TEXT_ON_DARK_MUTED }} />
-              <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>{schedule.assignee}</span>
+              <User className="w-2.5 h-2.5 shrink-0" style={{ color: TEXT_TERTIARY }} />
+              <span className="text-[9px]" style={{ color: TEXT_SECONDARY }}>{schedule.assignee}</span>
             </div>
           ) : (
-            <p className="text-[9px] mt-0.5" style={{ color: TEXT_ON_DARK_MUTED }}>담당자 미지정</p>
+            <p className="text-[9px] mt-0.5" style={{ color: TEXT_TERTIARY }}>담당자 미지정</p>
           )}
-          <p className="text-[9px] mt-1" style={{ color: TEXT_ON_DARK_MUTED }}>
+          <p className="text-[9px] mt-1" style={{ color: TEXT_TERTIARY }}>
             {formatDateKR(schedule.startDate)} → {formatDateKR(schedule.endDate)}
             <span className="ml-1">({dayCount}일)</span>
           </p>
           {schedule.desc && (
-            <p className="text-[9px] mt-1 line-clamp-1" style={{ color: TEXT_ON_DARK_MUTED }}>{schedule.desc}</p>
+            <p className="text-[9px] mt-1 line-clamp-1" style={{ color: TEXT_TERTIARY }}>{schedule.desc}</p>
           )}
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
           <button onClick={() => onEdit(schedule)} className="p-1 rounded hover:bg-black/[0.06]">
-            <Edit2 className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
+            <Edit2 className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
           </button>
           <button onClick={() => onDelete(schedule)} className="p-1 rounded hover:bg-red-50">
             <Trash2 className="w-3 h-3" style={{ color: UI_RED }} />
@@ -567,6 +564,7 @@ function ScheduleCard({
 
 // ══ 메인 CalendarPage ══
 export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
+  const [schedulePanelWidth, setSchedulePanelWidth] = useState(260);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
@@ -576,6 +574,26 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
 
   const [isLoading, setIsLoading] = useState(true);
+
+  const startSchedulePanelResize = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = schedulePanelWidth;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = "col-resize";
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      setSchedulePanelWidth(Math.min(420, Math.max(200, startWidth + moveEvent.clientX - startX)));
+    };
+    const stopResizing = () => {
+      document.body.style.cursor = previousCursor;
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", stopResizing);
+  };
 
   // 🌟 백엔드 API 연동: 프로젝트 일정 목록 조회
   // 로그인이 필요한 앱이라 오프라인 상태에서는 애초에 이 화면까지 진입할 수 없으므로,
@@ -802,25 +820,26 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
         {/* ══ 왼쪽: 사이드 패널 ══ */}
         <div
-          className="flex flex-col shrink-0 overflow-hidden"
-          style={{ width: 260, borderRight: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
+          className="relative flex flex-col shrink-0 overflow-hidden"
+          style={{ width: schedulePanelWidth, borderRight: `1px solid ${BORDER}`, background: `rgba(254,252,245,0.92)` }}
         >
           <div
             className="flex items-center gap-2 px-4 py-3 shrink-0"
-            style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
+            style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: BRIGHT_BEIGE }}
           >
             <Calendar className="w-3.5 h-3.5" style={{ color: ACCENT }} />
-            <p className="text-xs font-semibold flex-1" style={{ color: TEXT_ON_DARK }}>개발 일정</p>
+            <p className="text-xs font-semibold flex-1" style={{ color: TEXT_PRIMARY }}>개발 일정</p>
           </div>
 
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <div
-            className="flex flex-col gap-1 p-2.5 overflow-y-auto shrink-0"
-            style={{ borderBottom: `1px solid ${NAVY_BORDER}` }}
+            className="flex flex-col gap-0 p-1.5"
+            style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
           >
             {isLoading ? (
               /* [스켈레톤] 좌측 부서 목록 */
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-2.5 px-2.5 py-2">
+                <div key={i} className="flex items-center gap-1.5 px-2 py-1">
                   <Skeleton className="w-2 h-2 rounded-full shrink-0" />
                   <Skeleton className="h-3 w-16" />
                 </div>
@@ -837,16 +856,16 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                     <button
                       type="button"
                       onClick={() => setDeptFilter(d)}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all w-full"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-left transition-all w-full"
                       style={{
                         background: sel ? dc.bg : "transparent",
                         border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
                       }}
                     >
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
-                      <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_ON_DARK_MUTED }}>{d}</span>
+                      <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
                       <div className={`flex items-center shrink-0 min-w-[16px] justify-end transition-all duration-200 ${!isSystemDept ? "group-hover:pr-5" : ""}`}>
-                        <span className="text-[9px] font-mono" style={{ color: sel ? dc.color : TEXT_ON_DARK_MUTED }}>
+                        <span className="text-[9px] font-mono" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>
                           {cnt}
                         </span>
                       </div>
@@ -871,7 +890,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
           </div>
 
           {/* ── 상단 정보 집계 영역: 클릭 인터랙션 및 필터 바인딩 적용 ── */}
-          <div className="px-3 py-2.5 shrink-0" style={{ borderBottom: `1px solid ${NAVY_BORDER}` }}>
+          <div className="px-3 py-2.5 shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
             {isLoading ? (
               /* [스켈레톤] 좌측 통계 블록 */
               <div className="grid grid-cols-3 gap-1.5">
@@ -907,13 +926,13 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
+          <div className="p-2.5 space-y-2">
             {isLoading ? (
               /* [스켈레톤] 좌측 하단 일정 카드 리스트 */
               <div className="space-y-3 pt-1">
                 <Skeleton className="h-3 w-24 mb-2 ml-1" />
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-xl p-3 border" style={{ borderColor: NAVY_BORDER, background: NAVY_SURFACE }}>
+                  <div key={i} className="rounded-xl p-3 border" style={{ borderColor: BORDER, background: "rgba(255,255,255,0.5)" }}>
                     <Skeleton className="h-3 w-3/4 mb-2.5" />
                     <Skeleton className="h-2 w-1/2 mb-2" />
                     <Skeleton className="h-2 w-2/3 mb-3" />
@@ -927,17 +946,17 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
             ) : selectedDay ? (
               <>
                 <div className="flex items-center gap-2 mb-2 px-1">
-                  <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>
+                  <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
                     {formatDateKR(selectedDay)} 일정
                   </p>
                   <button onClick={() => setSelectedDay(null)} className="ml-auto">
-                    <X className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
+                    <X className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
                   </button>
                 </div>
                 {selectedDaySchedules.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 gap-2">
                     <Calendar className="w-6 h-6" style={{ color: ACCENT_BG.replace("0.08", "0.20") }} />
-                    <p className="text-[10px]" style={{ color: TEXT_ON_DARK_MUTED }}>일정 없음</p>
+                    <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>일정 없음</p>
                     <button
                       onClick={() => setEditSchedule({ startDate: selectedDay, endDate: selectedDay })}
                       className="text-[9px] px-2 py-1 rounded-lg"
@@ -960,12 +979,12 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               </>
             ) : (
               <>
-                <p className="text-[9px] font-semibold uppercase tracking-wider px-1 mb-1" style={{ color: TEXT_ON_DARK_MUTED }}>
+                <p className="text-[9px] font-semibold uppercase tracking-wider px-1 mb-1" style={{ color: TEXT_LABEL }}>
                   {deptFilter === "전체" ? "전체" : deptFilter} {statusFilter !== "전체" ? STATUS_META[statusFilter].label : ""} 일정 ({filtered.length})
                 </p>
                 {filtered.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 gap-2">
-                    <p className="text-[10px]" style={{ color: TEXT_ON_DARK_MUTED }}>일정 없음</p>
+                    <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>일정 없음</p>
                   </div>
                 ) : (
                   filtered
@@ -984,6 +1003,14 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               </>
             )}
           </div>
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="개발 일정 패널 너비 조절"
+            onMouseDown={startSchedulePanelResize}
+            className="absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize transition-colors hover:bg-indigo-500/30"
+          />
         </div>
 
         {/* ══ 오른쪽: 캘린더 본체 ══ */}
@@ -992,23 +1019,23 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
           {/* 캘린더 헤더 */}
           <div
             className="flex items-center gap-3 px-5 py-3 shrink-0"
-            style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
+            style={{ borderBottom: `1px solid ${BORDER}`, background: BRIGHT_BEIGE }}
           >
             <button onClick={prevMonth} disabled={isLoading} className="p-1.5 rounded-lg hover:bg-black/[0.06] transition-all disabled:opacity-30">
-              <ChevronLeft className="w-4 h-4" style={{ color: TEXT_ON_DARK_MUTED }} />
+              <ChevronLeft className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
             </button>
             
             {isLoading ? (
                /* [스켈레톤] 헤더 년/월 텍스트 */
                <Skeleton className="h-4 w-20" />
             ) : (
-              <h2 className="text-sm font-bold" style={{ color: TEXT_ON_DARK }}>
+              <h2 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
                 {year}년 {month}월
               </h2>
             )}
 
             <button onClick={nextMonth} disabled={isLoading} className="p-1.5 rounded-lg hover:bg-black/[0.06] transition-all disabled:opacity-30">
-              <ChevronRight className="w-4 h-4" style={{ color: TEXT_ON_DARK_MUTED }} />
+              <ChevronRight className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
             </button>
 
             <button
@@ -1045,7 +1072,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                   return (
                     <div key={d} className="flex items-center gap-1">
                       <div className="w-2 h-2 rounded-full" style={{ background: dc.bg }} />
-                      <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>{d}</span>
+                      <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{d}</span>
                     </div>
                   );
                 })
@@ -1070,7 +1097,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                 <div
                   key={d}
                   className="text-center py-1.5 text-[10px] font-semibold"
-                  style={{ color: i === 0 ? "#FF9A9A" : i === 6 ? "#A8E6B8" : TEXT_ON_DARK_MUTED }}
+                  style={{ color: i === 0 ? "#B85450" : i === 6 ? "#6B7A50" : TEXT_LABEL }}
                 >
                   {d}
                 </div>
@@ -1081,12 +1108,12 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
             <div
               className="grid grid-cols-7 flex-1 gap-px rounded-lg overflow-hidden border"
               style={{
-                background: NAVY_BORDER,
+                background: BORDER,
                 gridTemplateRows: `repeat(${totalCells / 7}, minmax(80px, 1fr))`,
                 height: "100%",
                 minHeight: 0,
                 overflowY: "auto",
-                borderColor: NAVY_BORDER,
+                borderColor: BORDER,
               }}
             >
               {isLoading ? (
@@ -1095,7 +1122,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                   <div
                     key={`skel-${idx}`}
                     className="relative p-2 transition-all flex flex-col gap-2"
-                    style={{ background: NAVY_SURFACE, height: "100%" }}
+                    style={{ background: BRIGHT_BEIGE, height: "100%" }}
                   >
                     <Skeleton className="w-5 h-5 rounded-full" />
                     <div className="space-y-1.5 w-full mt-1">
@@ -1125,12 +1152,12 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                       onClick={() => isValid && setSelectedDay(isSel ? null : ds)}
                       className="relative p-1 transition-all overflow-hidden flex flex-col"
                       style={{
-                        background: !isValid ? "rgba(255,255,255,0.025)"
-                          : isSel ? ACCENT_BG
-                            : NAVY_SURFACE,
+                        background: !isValid ? `rgba(254,252,245,0.45)` : BRIGHT_BEIGE,
                         cursor: isValid ? "pointer" : "default",
                         height: "100%",
-                        minHeight: 0
+                        minHeight: 0,
+                        boxShadow: isSel ? "inset 0 0 0 2px rgba(27,31,58,0.32), 0 3px 10px rgba(27,31,58,0.10)" : "none",
+                        zIndex: isSel ? 1 : 0,
                       }}
                     >
                       {isValid && (
@@ -1139,14 +1166,14 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                             <span
                               className="text-[11px] font-semibold w-6 h-6 flex items-center justify-center rounded-full"
                               style={{
-                                color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#FF9A9A" : isSat ? "#A8E6B8" : TEXT_ON_DARK,
+                                color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
                                 background: isToday ? ACCENT : "transparent",
                               }}
                             >
                               {dayNum}
                             </span>
                             {dayEvts.length > 3 && (
-                              <span className="text-[8px]" style={{ color: TEXT_ON_DARK_MUTED }}>{dayEvts.length}</span>
+                              <span className="text-[8px]" style={{ color: TEXT_TERTIARY }}>{dayEvts.length}</span>
                             )}
                           </div>
 
@@ -1162,7 +1189,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                               />
                             ))}
                             {dayEvts.length > 3 && (
-                              <span className="text-[7px] block" style={{ color: TEXT_ON_DARK_MUTED }}>
+                              <span className="text-[7px] block" style={{ color: TEXT_TERTIARY }}>
                                 +{dayEvts.length - 3}
                               </span>
                             )}
@@ -1180,8 +1207,8 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               className="shrink-0 overflow-y-auto mt-2"
               style={{
                 height: "110px",
-                borderTop: `1px solid ${NAVY_BORDER}`,
-                background: CONTENT_BG
+                borderTop: `1px solid ${BORDER}`,
+                background: CREAM
               }}
             >
               {isLoading ? (
@@ -1194,21 +1221,21 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                 </div>
               ) : (
                 <>
-                  <div className="px-4 pt-2 pb-1 sticky top-0 z-10" style={{ background: CONTENT_BG }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: TEXT_ON_DARK_MUTED }}>
+                  <div className="px-4 pt-2 pb-1 sticky top-0 z-10" style={{ background: CREAM }}>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: TEXT_LABEL }}>
                       {month}월 간트 뷰
                     </p>
                   </div>
                   <div className="overflow-x-auto px-4 pb-2">
                     <div style={{ minWidth: daysInMonth * 20 }}>
-                      <div className="flex mb-1 sticky top-[22px] z-10" style={{ background: CONTENT_BG }}>
+                      <div className="flex mb-1 sticky top-[22px] z-10" style={{ background: CREAM }}>
                         {Array.from({ length: daysInMonth }).map((_, i) => (
                           <div
                             key={i}
                             className="flex-none text-center text-[7px]"
                             style={{
                               width: 20,
-                              color: dateStr(year, month, i + 1) === todayStr ? ACCENT : TEXT_ON_DARK_MUTED,
+                              color: dateStr(year, month, i + 1) === todayStr ? ACCENT : TEXT_TERTIARY,
                               fontWeight: dateStr(year, month, i + 1) === todayStr ? "bold" : "normal",
                             }}
                           >
@@ -1229,7 +1256,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                             <div className="relative flex-1" style={{ height: 12 }}>
                               <div className="absolute inset-0 flex" style={{ opacity: 0.2 }}>
                                 {Array.from({ length: daysInMonth }).map((_, i) => (
-                                  <div key={i} className="flex-none border-r" style={{ width: 20, borderColor: NAVY_BORDER }} />
+                                  <div key={i} className="flex-none border-r" style={{ width: 20, borderColor: BORDER }} />
                                 ))}
                               </div>
                               {dScheds.map(s => {

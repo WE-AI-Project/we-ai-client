@@ -28,7 +28,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  GRADIENT_SIDEBAR, SIDEBAR_BORDER, CONTENT_BG,
+  GRADIENT_SIDEBAR, SIDEBAR_BORDER, BRIGHT_BEIGE,
   TERM_BG, TERM_HEADER, TERM_TEXT, TERM_MUTED, TERM_BORDER_D, UI_RED, UI_AMBER, UI_BLUE,
 } from "../colors";
 
@@ -1047,7 +1047,7 @@ export function AIQAPage({
 
       {/* ── AI QA 탭 ── */}
       {mainTab === "qa" && (
-      <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+      <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="w-full max-w-[1600px] mx-auto space-y-4">
 

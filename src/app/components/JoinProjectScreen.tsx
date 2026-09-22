@@ -194,9 +194,16 @@ function LocalPathInput({
 
 function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
   return (
-    <div className="space-y-2.5 rounded-xl p-3.5" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
+    <div
+      className="space-y-2.5 rounded-xl p-3.5"
+      style={{
+        background: "rgba(88, 101, 242, 0.10)",
+        border: "1px solid rgba(88, 101, 242, 0.32)",
+        boxShadow: "0 8px 20px rgba(88, 101, 242, 0.08)",
+      }}
+    >
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#5A8A4A" }} />
+        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: ACCENT }} />
         <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
           프로젝트 감지 완료
         </p>
@@ -221,7 +228,11 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
       </div>
       <div className="flex flex-wrap gap-1">
         {info.stack.map((stack) => (
-          <span key={stack} className="rounded px-1.5 py-0.5 text-[8px]" style={{ background: ACCENT_BG, color: ACCENT }}>
+          <span
+            key={stack}
+            className="rounded px-1.5 py-0.5 text-[8px]"
+            style={{ background: "rgba(88, 101, 242, 0.16)", color: ACCENT }}
+          >
             {stack}
           </span>
         ))}
