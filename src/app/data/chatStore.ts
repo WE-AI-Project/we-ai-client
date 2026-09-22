@@ -1,4 +1,4 @@
-// ── WE&AI 채팅 & 문서 저장소 ──
+// ── SynAIpse 채팅 & 문서 저장소 ──
 // localStorage 기반 채팅 메시지 & 회의 문서 관리
 
 // ── ID 생성 ──
@@ -35,7 +35,7 @@ const CHAT_KEY = "weai_chat_messages_v1";
 export const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: "m1", sender: "Admin", avatar: "A", role: "other",
-    content: "안녕하세요! WE&AI 프로젝트 킥오프 회의 시작합니다.",
+    content: "안녕하세요! SynAIpse 프로젝트 킥오프 회의 시작합니다.",
     time: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), type: "text",
   },
   {
@@ -81,16 +81,16 @@ export function saveMessages(msgs: ChatMessage[]): void {
   localStorage.setItem(CHAT_KEY, JSON.stringify(msgs));
 }
 
-// ── 회의 요약 생성 ──
-export function generateMeetingSummary(messages: ChatMessage[]): string {
-  if (messages.length === 0) return "회의 내용 없음";
-  const files   = messages.filter(m => m.type === "file").map(m => m.fileName);
-  const senders = [...new Set(messages.map(m => m.sender))];
-  const texts   = messages.filter(m => m.type === "text").map(m => `• ${m.sender}: ${m.content}`);
-  let summary   = `참여자: ${senders.join(", ")} | 메시지 ${messages.length}건`;
-  if (files.length > 0) summary += ` | 공유 파일: ${files.join(", ")}`;
-  summary += "\n\n주요 내용:\n" + texts.slice(0, 8).join("\n");
-  return summary;
+// ── 회의록 원문(트랜스크립트) 생성 ──
+// 회의 중 오간 실제 채팅 메시지를 시간순으로 그대로 옮겨 적은 것 - 회의가 끝나면 이 원문을
+// 서버로 보내고, 실제 요약(AI 생성)은 서버의 MeetingSummaryAiService가 만든다. 여기서는
+// "요약"을 흉내내지 않는다 - 이전 버전은 이 함수 이름이 "요약 생성"이었지만 실제로는 원문을
+// 그대로 나열하기만 했다.
+export function buildMeetingTranscript(messages: { senderName: string; content: string; messageType: string }[]): string {
+  if (messages.length === 0) return "회의 중 채팅 메시지가 없습니다.";
+  return messages
+    .map(m => m.messageType === "TEXT" ? `${m.senderName}: ${m.content}` : `${m.senderName}: [파일 공유] ${m.content}`)
+    .join("\n");
 }
 
 // ── 시간 포맷 ──

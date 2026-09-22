@@ -1,4 +1,4 @@
-// ── WE&AI 프로젝트 설정 스토어 ──
+// ── SynAIpse 프로젝트 설정 스토어 ──
 // 팀 구성 + 기술 스택 버전 관리 (localStorage 기반)
 
 export type MemberRole = "파트장" | "파트원" | "게스트";
@@ -89,12 +89,12 @@ const INITIAL_TECH: TechItem[] = [
   { id: "t12", category: "DevOps",      name: "Git",           version: "2.44.0",  icon: "📦", required: true  },
   { id: "t13", category: "DevOps",      name: "GitHub Actions",version: "—",       icon: "🤖", required: false },
   // Agent
-  { id: "t14", category: "Agent",       name: "WE&AI SDK",     version: "0.3.2",   icon: "🧠", required: true  },
+  { id: "t14", category: "Agent",       name: "SynAIpse SDK",     version: "0.3.2",   icon: "🧠", required: true  },
   { id: "t15", category: "Agent",       name: "OpenAI API",    version: "gpt-4o",  icon: "✨", required: true  },
 ];
 
 const INITIAL_SETTINGS: ProjectSettings = {
-  projectName:  "WE&AI Enterprise",
+  projectName:  "SynAIpse Enterprise",
   description:  "Java/Spring Boot 기반 엔터프라이즈 멀티에이전트 관리 플랫폼",
   startDate:    "2025-03-20",
   targetDate:   "2025-06-30",

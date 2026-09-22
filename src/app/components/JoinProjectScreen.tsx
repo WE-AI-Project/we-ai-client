@@ -409,7 +409,7 @@ function CreateProjectModal({
               새 프로젝트 만들기
             </p>
             <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
-              WE&AI Project Office
+              SynAIpse Project Office
             </p>
           </div>
           <div className="mr-2 flex items-center gap-1.5">
@@ -444,7 +444,7 @@ function CreateProjectModal({
                     setName(event.target.value);
                     setErrorMessage("");
                   }}
-                  placeholder="예: WE&AI Backend Server"
+                  placeholder="예: SynAIpse Backend Server"
                   className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
                   style={{
                     background: "rgba(0,0,0,0.03)",

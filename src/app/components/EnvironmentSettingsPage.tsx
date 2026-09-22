@@ -97,7 +97,7 @@ function EnvFileViewer({
           <FileText className="w-3.5 h-3.5" style={{ color: TERM_GREEN }} />
           <span className="text-[11px] font-semibold font-mono" style={{ color: TERM_TEXT }}>.env</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.07)", color: TERM_MUTED }}>
-            WE&AI Project
+            SynAIpse Project
           </span>
           <div className="ml-auto flex items-center gap-2">
             <button

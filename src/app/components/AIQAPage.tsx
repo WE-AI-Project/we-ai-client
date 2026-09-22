@@ -6,11 +6,11 @@ import {
   FileCode, GitCommit, Clock, ChevronDown,
   ChevronUp, Calendar, MousePointer, Video,
   Bell, Code2, Film, X, Globe, Home,
-  Settings, GitPullRequest,
+  Settings, GitPullRequest, ClipboardCheck,
 } from "lucide-react";
 import { getPendingQA, clearPendingQA } from "../data/qaStore";
 import { getLeader } from "../data/projectSettingsStore";
-import { AgentControlPage } from "./AgentControlPage";
+import { QAReportsPage } from "./QAReportsPage";
 import { BACKEND_COMMITS, FRONTEND_COMMITS, type CommitFile } from "./commitData";
 import {
   buildDiffFromCommitFiles,
@@ -771,8 +771,8 @@ export function AIQAPage({
   projectId?: number | null;
   autoStart?: boolean;
 }) {
-  // ── 최상단 탭: AI QA / Agent Control ──
-  const [mainTab,      setMainTab]      = useState<"qa" | "agents">("qa");
+  // ── 최상단 탭: AI QA / QA Reports ── (Agent Control은 Project Settings로 이동)
+  const [mainTab,      setMainTab]      = useState<"qa" | "reports">("qa");
   const [activeTab,    setActiveTab]    = useState<"run" | "commit">("run");
   const [phase,        setPhase]        = useState<QAPhase>("idle");
   const [elapsed,      setElapsed]      = useState(0);
@@ -1029,21 +1029,21 @@ export function AIQAPage({
           AI QA
         </button>
         <button
-          onClick={() => setMainTab("agents")}
+          onClick={() => setMainTab("reports")}
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
-            color:        mainTab === "agents" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background:   mainTab === "agents" ? "rgba(166,123,91,0.18)" : "transparent",
-            borderBottom: mainTab === "agents" ? "2px solid #A67B5B"      : "2px solid transparent",
+            color:        mainTab === "reports" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
+            background:   mainTab === "reports" ? "rgba(166,123,91,0.18)" : "transparent",
+            borderBottom: mainTab === "reports" ? "2px solid #A67B5B"      : "2px solid transparent",
           }}
         >
-          <Bot className="w-3.5 h-3.5" />
-          Agent Control
+          <ClipboardCheck className="w-3.5 h-3.5" />
+          QA Reports
         </button>
       </div>
 
-      {/* ── Agent Control 탭 ── */}
-      {mainTab === "agents" && <AgentControlPage />}
+      {/* ── QA Reports 탭 ── */}
+      {mainTab === "reports" && <QAReportsPage projectId={projectId ?? 0} />}
 
       {/* ── AI QA 탭 ── */}
       {mainTab === "qa" && (
