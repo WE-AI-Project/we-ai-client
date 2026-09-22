@@ -656,10 +656,6 @@ function LoginForm({
         )}
       </button>
 
-      <p className="text-center text-[10px]" style={{ color: LOGIN_ICON_MUTED }}>
-        퍼블리싱 테스트 계정: <strong style={{ color: OLIVE_DARK }}>publishing.backup.20260720@weai.local / 11!11111</strong>
-      </p>
-
       <button
         type="button"
         onClick={() => onSwitchToEmailCode(email.trim() || undefined)}
