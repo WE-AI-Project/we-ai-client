@@ -1,4 +1,4 @@
-// ── WE&AI 환경 변수 저장소 ──
+// ── SynAIpse 환경 변수 저장소 ──
 // localStorage 기반으로 .env 파일을 읽고 수정할 수 있도록 지원
 
 export type EnvVar = {
@@ -71,7 +71,7 @@ export function generateEnvContent(vars: EnvVar[]): string {
 
   const covered = new Set<string>();
   const lines: string[] = [
-    "# WE&AI Project — Environment Configuration",
+    "# SynAIpse Project — Environment Configuration",
     `# Updated: ${now}`,
     "",
   ];

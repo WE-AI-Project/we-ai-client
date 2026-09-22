@@ -1,4 +1,4 @@
-// ── WE&AI Devicon 목록 (curated) ──
+// ── SynAIpse Devicon 목록 (curated) ──
 // URL: https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/{slug}/{slug}-{variant}.svg
 
 export type DevIcon = {
