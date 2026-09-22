@@ -29,8 +29,9 @@ export const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
 };
 
 function isToday(dateStr: string): boolean {
+  if (!dateStr) return false;
   const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return true;
+  if (Number.isNaN(d.getTime())) return false;
   const now = new Date();
   return (
     d.getFullYear() === now.getFullYear() &&
@@ -40,6 +41,7 @@ function isToday(dateStr: string): boolean {
 }
 
 function formatTime(dateStr: string): string {
+  if (!dateStr) return "";
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
   return isToday(dateStr)
@@ -211,11 +213,12 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
     onViewAll?.();
   };
 
-  const todayAllNotifs = useMemo(
+  // 오늘 날짜 기준 분리
+  const todayNotifs = useMemo(
     () => notifs.filter(n => isToday(n.createdAt)),
     [notifs]
   );
-  const earlierAllNotifs = useMemo(
+  const earlierNotifs = useMemo(
     () => notifs.filter(n => !isToday(n.createdAt)),
     [notifs]
   );
@@ -260,17 +263,17 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
               ══════════════════════════════════════════════════════════ */}
           {showAll && (
             <div
-              className="w-[490px] max-w-[calc(100vw-380px)] rounded-2xl overflow-hidden flex flex-col shrink-0"
+              className="w-[480px] max-w-[calc(100vw-380px)] rounded-2xl overflow-hidden flex flex-col shrink-0"
               style={{
-                height: "530px",
+                height: "400px",
                 background: "#FFFFFF",
                 border: `1px solid ${BORDER}`,
-                boxShadow: "0 24px 64px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.08)",
+                boxShadow: "0 20px 56px rgba(0,0,0,0.20), 0 4px 16px rgba(0,0,0,0.06)",
               }}
             >
               {/* 1-1. 헤더 영역 */}
               <div
-                className="flex items-center justify-between px-4 py-3 shrink-0"
+                className="flex items-center justify-between px-4 py-2.5 shrink-0"
                 style={{
                   borderBottom: `1px solid ${BORDER_SUBTLE}`,
                   background: "rgba(0,0,0,0.018)",
@@ -278,10 +281,10 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
               >
                 <div className="flex items-center gap-2">
                   <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                    className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
                     style={{ background: ACCENT_BG }}
                   >
-                    <Bell className="w-3.5 h-3.5" style={{ color: ACCENT }} />
+                    <Bell className="w-3 h-3" style={{ color: ACCENT }} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -334,15 +337,15 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 </div>
               </div>
 
-              {/* 1-2. 전체 알림 스크롤 목록 */}
+              {/* 1-2. 전체 알림 스크롤 목록 (오늘 / 이전 구분) */}
               <div className="flex-1 overflow-y-auto divide-y" style={{ borderColor: BORDER_SUBTLE }}>
                 {notifs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
+                  <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
                     <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      className="w-9 h-9 rounded-full flex items-center justify-center"
                       style={{ background: ACCENT_BG }}
                     >
-                      <Bell className="w-5 h-5" style={{ color: ACCENT }} />
+                      <Bell className="w-4 h-4" style={{ color: ACCENT }} />
                     </div>
                     <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>
                       알림이 없습니다
@@ -354,19 +357,19 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 ) : (
                   <div>
                     {/* 오늘 알림 */}
-                    {todayAllNotifs.length > 0 && (
+                    {todayNotifs.length > 0 && (
                       <div>
                         <div
-                          className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10"
+                          className="px-4 py-1.5 text-[10px] font-bold sticky top-0 z-10"
                           style={{
                             background: "#F8F9FE",
                             color: TEXT_TERTIARY,
                             borderBottom: `1px solid ${BORDER_SUBTLE}`,
                           }}
                         >
-                          Today ({todayAllNotifs.length})
+                          오늘 ({todayNotifs.length})
                         </div>
-                        {todayAllNotifs.map((n) => (
+                        {todayNotifs.map((n) => (
                           <AllNotifRow
                             key={n.id}
                             notif={n}
@@ -378,19 +381,20 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                     )}
 
                     {/* 이전 알림 */}
-                    {earlierAllNotifs.length > 0 && (
+                    {earlierNotifs.length > 0 && (
                       <div>
                         <div
-                          className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10"
+                          className="px-4 py-1.5 text-[10px] font-bold sticky top-0 z-10"
                           style={{
                             background: "#F8F9FE",
                             color: TEXT_TERTIARY,
                             borderBottom: `1px solid ${BORDER_SUBTLE}`,
+                            borderTop: todayNotifs.length > 0 ? `1px solid ${BORDER_SUBTLE}` : "none",
                           }}
                         >
-                          Earlier ({earlierAllNotifs.length})
+                          이전 알림 ({earlierNotifs.length})
                         </div>
-                        {earlierAllNotifs.map((n) => (
+                        {earlierNotifs.map((n) => (
                           <AllNotifRow
                             key={n.id}
                             notif={n}
@@ -414,7 +418,6 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 }}
               >
                 <span>총 {notifs.length}개 알림</span>
-                <span>알림 클릭 시 읽음 처리</span>
               </div>
             </div>
           )}
@@ -425,15 +428,15 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
           <div
             className="w-84 rounded-2xl overflow-hidden flex flex-col shrink-0"
             style={{
-              height: "530px",
+              height: "400px",
               background: "#FFFFFF",
               border: `1px solid ${BORDER}`,
-              boxShadow: "0 20px 56px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.08)",
+              boxShadow: "0 20px 56px rgba(0,0,0,0.20), 0 4px 16px rgba(0,0,0,0.06)",
             }}
           >
             {/* 2-1. 헤더 영역 */}
             <div
-              className="flex items-center justify-between px-4 py-3 shrink-0"
+              className="flex items-center justify-between px-4 py-2.5 shrink-0"
               style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(0,0,0,0.02)" }}
             >
               <div className="flex items-center">
@@ -469,15 +472,15 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
               )}
             </div>
 
-            {/* 2-2. 알림 목록 */}
+            {/* 2-2. 알림 목록 (오늘 / 이전 구분) */}
             <div className="overflow-y-auto flex-1">
               {notifs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    className="w-9 h-9 rounded-full flex items-center justify-center"
                     style={{ background: ACCENT_BG }}
                   >
-                    <Bell className="w-5 h-5" style={{ color: ACCENT }} />
+                    <Bell className="w-4 h-4" style={{ color: ACCENT }} />
                   </div>
                   <p className="text-[11px] font-medium" style={{ color: TEXT_TERTIARY }}>
                     새 알림이 없습니다
@@ -485,64 +488,63 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 </div>
               ) : (
                 <div>
-                  {notifs.map((n, idx) => {
-                    const { icon: Icon, color, bg } = getNotificationStyle(n.type);
-
-                    return (
+                  {/* 오늘 알림 */}
+                  {todayNotifs.length > 0 && (
+                    <div>
                       <div
-                        key={n.id}
-                        className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-all relative group"
+                        className="px-4 py-1 text-[10px] font-bold sticky top-0 z-10"
                         style={{
-                          borderBottom: idx < notifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
-                          background: n.isRead ? "transparent" : "rgba(88,101,242,0.04)",
+                          background: "#F8F9FE",
+                          color: TEXT_TERTIARY,
+                          borderBottom: `1px solid ${BORDER_SUBTLE}`,
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.025)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = n.isRead ? "transparent" : "rgba(88,101,242,0.04)")}
-                        onClick={() => markRead(n.id)}
                       >
-                        {!n.isRead && (
-                          <div
-                            className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
-                            style={{ background: ACCENT }}
-                          />
-                        )}
-                        <div
-                          className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                          style={{ background: bg }}
-                        >
-                          <Icon className="w-3.5 h-3.5" style={{ color: color }} />
-                        </div>
-                        <div className="flex-1 min-w-0 pr-1">
-                          <p
-                            className="text-[11px] font-semibold leading-tight"
-                            style={{ color: n.isRead ? TEXT_SECONDARY : TEXT_PRIMARY }}
-                          >
-                            {n.title}
-                          </p>
-                          <p className="text-[10px] mt-0.5 leading-snug line-clamp-2" style={{ color: TEXT_TERTIARY }}>
-                            {n.body}
-                          </p>
-                          <p className="text-[9px] mt-1" style={{ color: TEXT_LABEL }}>
-                            {formatTime(n.createdAt)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={(e) => deleteSingle(e, n.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded transition-all shrink-0"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        오늘 ({todayNotifs.length})
                       </div>
-                    );
-                  })}
+                      {todayNotifs.map((n, idx) => (
+                        <QuickNotifRow
+                          key={n.id}
+                          notif={n}
+                          isLast={idx === todayNotifs.length - 1 && earlierNotifs.length === 0}
+                          onRead={markRead}
+                          onDelete={deleteSingle}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 이전 알림 */}
+                  {earlierNotifs.length > 0 && (
+                    <div>
+                      <div
+                        className="px-4 py-1 text-[10px] font-bold sticky top-0 z-10"
+                        style={{
+                          background: "#F8F9FE",
+                          color: TEXT_TERTIARY,
+                          borderBottom: `1px solid ${BORDER_SUBTLE}`,
+                          borderTop: todayNotifs.length > 0 ? `1px solid ${BORDER_SUBTLE}` : "none",
+                        }}
+                      >
+                        이전 알림 ({earlierNotifs.length})
+                      </div>
+                      {earlierNotifs.map((n, idx) => (
+                        <QuickNotifRow
+                          key={n.id}
+                          notif={n}
+                          isLast={idx === earlierNotifs.length - 1}
+                          onRead={markRead}
+                          onDelete={deleteSingle}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* 2-3. 푸터 영역 (좌측 전체 알림창 토글 버튼) */}
             <div
-              className="px-4 py-2.5 shrink-0 flex items-center justify-between"
+              className="px-4 py-2 shrink-0 flex items-center justify-between"
               style={{ borderTop: `1px solid ${BORDER_SUBTLE}`, background: "rgba(0,0,0,0.015)" }}
             >
               <button
@@ -581,6 +583,68 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
   );
 }
 
+// ── 우측 빠른 알림창 개별 행 컴포넌트 ──
+function QuickNotifRow({
+  notif,
+  isLast,
+  onRead,
+  onDelete,
+}: {
+  notif: NotificationItem;
+  isLast: boolean;
+  onRead: (id: number) => void;
+  onDelete: (e: React.MouseEvent, id: number) => void;
+}) {
+  const { icon: Icon, color, bg } = getNotificationStyle(notif.type);
+
+  return (
+    <div
+      className="flex items-start gap-3 px-4 py-2.5 cursor-pointer transition-all relative group"
+      style={{
+        borderBottom: !isLast ? `1px solid ${BORDER_SUBTLE}` : "none",
+        background: notif.isRead ? "transparent" : "rgba(88,101,242,0.04)",
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.025)")}
+      onMouseLeave={e => (e.currentTarget.style.background = notif.isRead ? "transparent" : "rgba(88,101,242,0.04)")}
+      onClick={() => onRead(notif.id)}
+    >
+      {!notif.isRead && (
+        <div
+          className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
+          style={{ background: ACCENT }}
+        />
+      )}
+      <div
+        className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+        style={{ background: bg }}
+      >
+        <Icon className="w-3.5 h-3.5" style={{ color: color }} />
+      </div>
+      <div className="flex-1 min-w-0 pr-1">
+        <p
+          className="text-[11px] font-semibold leading-tight"
+          style={{ color: notif.isRead ? TEXT_SECONDARY : TEXT_PRIMARY }}
+        >
+          {notif.title}
+        </p>
+        <p className="text-[10px] mt-0.5 leading-snug line-clamp-2" style={{ color: TEXT_TERTIARY }}>
+          {notif.body}
+        </p>
+        <p className="text-[9px] mt-1" style={{ color: TEXT_LABEL }}>
+          {formatTime(notif.createdAt)}
+        </p>
+      </div>
+      <button
+        onClick={(e) => onDelete(e, notif.id)}
+        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded transition-all shrink-0 self-center"
+        title="삭제"
+      >
+        <Trash2 className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 // ── 좌측 전체 알림창 개별 행 컴포넌트 ──
 function AllNotifRow({
   notif,
@@ -597,7 +661,7 @@ function AllNotifRow({
   return (
     <div
       onClick={() => onRead(notif.id)}
-      className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-black/[0.025] cursor-pointer relative group"
+      className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-black/[0.025] cursor-pointer relative group"
       style={{
         background: notif.isRead ? "transparent" : "rgba(88,101,242,0.035)",
       }}
@@ -612,15 +676,15 @@ function AllNotifRow({
 
       {/* 아이콘 */}
       <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+        className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
         style={{ background: meta.bg }}
       >
-        <Icon className="w-4 h-4" style={{ color: meta.color }} />
+        <Icon className="w-3.5 h-3.5" style={{ color: meta.color }} />
       </div>
 
       {/* 본문 내용 */}
       <div className="flex-1 min-w-0 pr-2">
-        <div className="flex items-center gap-1.5 mb-1">
+        <div className="flex items-center gap-1.5 mb-0.5">
           <span
             className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded"
             style={{ background: meta.bg, color: meta.color }}
