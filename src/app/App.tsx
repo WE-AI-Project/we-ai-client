@@ -23,7 +23,6 @@ import {
   ChevronsUpDown,
   BarChart2,
   BookOpen,
-  ClipboardCheck,
   Search,
   ArrowLeft,
   ArrowRight,
@@ -47,7 +46,6 @@ import { CalendarPage } from "./components/CalendarPage";
 import { ServerBuildPage } from "./components/ServerBuildPage";
 import { NotificationsPage } from "./components/NotificationsPage";
 import { TasksPage } from "./components/TasksPage";
-import { QAReportsPage } from "./components/QAReportsPage";
 import { AnalyticsPage } from "./components/AnalyticsPage";
 import { SharedLibraryPage } from "./components/SharedLibraryPage";
 import type { CommitFile } from "./components/commitData";
@@ -154,29 +152,32 @@ function resetWorkspaceState({
   clearLastActiveProject();
 }
 
+// 사용 빈도 순으로 정렬: 일상적으로 쓰는 항목(대시보드/채팅/캘린더)을 먼저, 개발 도구
+// (Changes/Commits/Server & Build)를 다음에, 분석/부가 기능(Analytics/Galaxy)을 마지막에 둔다.
 const NAV_ITEMS = [
   { id: "Dashboard", icon: Home, label: "Dashboard" },
+  { id: "Chat", icon: MessageCircle, label: "Chat" },
+  { id: "Calendar", icon: CalendarDays, label: "Calendar" },
   { id: "Changes", icon: GitPullRequest, label: "Changes" },
   { id: "Commits", icon: GitCommit, label: "Commits" },
   { id: "ServerBuild", icon: Terminal, label: "Server & Build" },
-  { id: "Chat", icon: MessageCircle, label: "Chat" },
-  { id: "Calendar", icon: CalendarDays, label: "Calendar" },
-  { id: "Galaxy", icon: Orbit, label: "SynAIpse Galaxy" },
   { id: "Analytics", icon: BarChart2, label: "Analytics" },
+  { id: "Galaxy", icon: Orbit, label: "SynAIpse Galaxy" },
 ] as const;
 
+// QA Reports는 AIQA 탭 안으로 합쳐졌고(내부 서브탭), Agent Control은 Project Settings로
+// 이동했다 - 둘 다 더 이상 별도 사이드바 항목이 아니다.
 const SYSTEM_ITEMS = [
-  { id: "EnvSettings", icon: Settings, label: "Environment" },
-  { id: "AIQA", icon: ShieldCheck, label: "QA & Agents" },
-  { id: "QAReports", icon: ClipboardCheck, label: "QA Reports" },
-  { id: "SharedLibrary", icon: BookOpen, label: "Shared Library" },
   { id: "ProjectSettings", icon: FolderGit2, label: "Project Settings" },
+  { id: "EnvSettings", icon: Settings, label: "Environment" },
+  { id: "AIQA", icon: ShieldCheck, label: "QA" },
+  { id: "SharedLibrary", icon: BookOpen, label: "Shared Library" },
 ] as const;
 
 type NavId =
   | "Dashboard" | "Changes" | "Commits" | "ServerBuild"
   | "Chat" | "Calendar" | "EnvSettings" | "AIQA"
-  | "QAReports" | "SharedLibrary" | "Analytics"
+  | "SharedLibrary" | "Analytics"
   | "ProjectSettings" | "Profile" | "Galaxy" | "Notifications" | "Tasks";
 
 const TAB_LABELS: Record<NavId, string> = {
@@ -187,8 +188,7 @@ const TAB_LABELS: Record<NavId, string> = {
   Chat: "Chat",
   Calendar: "Calendar",
   EnvSettings: "Environment",
-  AIQA: "QA & Agents",
-  QAReports: "QA Reports",
+  AIQA: "QA",
   SharedLibrary: "Shared Library",
   Analytics: "Analytics",
   ProjectSettings: "Project Settings",
@@ -771,7 +771,6 @@ export default function App() {
       case "Calendar": return <CalendarPage projectId={projectId} />;
       case "EnvSettings": return <EnvironmentSettingsPage />;
       case "AIQA": return <AIQAPage projectId={projectId} />;
-      case "QAReports": return <QAReportsPage projectId={projectId ?? 0} />;
       case "SharedLibrary": return <SharedLibraryPage projectId={projectId ?? 0} />;
       case "Analytics": return <AnalyticsPage projectId={projectId ?? 0} />;
       case "ProjectSettings": return <ProjectSettingsPage projectId={projectId} currentUserId={currentUser?.id ?? null} />;

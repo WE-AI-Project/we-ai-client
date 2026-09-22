@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ComponentType, CSSProperties } from "react";
 import {
+  Bot,
   CalendarDays,
   Folder,
   Hash,
@@ -18,6 +19,7 @@ import {
   X,
   AlertCircle,
 } from "lucide-react";
+import { AgentControlPage } from "./AgentControlPage";
 import { toast } from "sonner";
 import {
   ACCENT,
@@ -123,7 +125,7 @@ const FIELD_SURFACE = "rgba(255,255,255,0.86)";
 const MUTED_SURFACE = "rgba(112,130,56,0.055)";
 const PANEL_SHADOW = "0 8px 24px rgba(31,31,31,0.045)";
 
-type TabId = "overview" | "team" | "tech" | "schedules";
+type TabId = "overview" | "team" | "tech" | "schedules" | "agents";
 
 type Props = {
   projectId: number | null;
@@ -999,6 +1001,13 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
                   label="Schedules"
                   description={`${scheduleSummary.total} items`}
                   onClick={() => setActiveTab("schedules")}
+                />
+                <SettingsNavButton
+                  active={activeTab === "agents"}
+                  icon={Bot}
+                  label="Agents"
+                  description="AI agent monitoring"
+                  onClick={() => setActiveTab("agents")}
                 />
               </div>
             </section>
@@ -1958,6 +1967,8 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
             </div>
           </section>
         )}
+
+        {activeTab === "agents" && <AgentControlPage />}
           </div>
         </div>
       </div>
