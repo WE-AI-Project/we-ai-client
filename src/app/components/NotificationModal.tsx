@@ -1,13 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import {
-  Bell, CheckCheck, Trash2, X, CheckCircle2,
-  AlertCircle, Bot, GitCommit, Info,
-  Filter, Check,
+  Bell, CheckCheck, Trash2, X, Filter,
 } from "lucide-react";
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER,
+  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+  ACCENT, ACCENT_BG,
   OLIVE_DARK,
 } from "../colors";
 import {

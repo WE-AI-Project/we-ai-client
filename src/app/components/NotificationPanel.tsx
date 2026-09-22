@@ -7,7 +7,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  UI_RED, UI_AMBER, UI_GREEN,
+  UI_RED, UI_AMBER,
 } from "../colors";
 import {
   fetchProjectNotifications,

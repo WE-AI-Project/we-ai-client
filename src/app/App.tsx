@@ -23,6 +23,7 @@ import {
   ChevronsUpDown,
   BarChart2,
   BookOpen,
+  CheckSquare,
   Search,
   ArrowLeft,
   ArrowRight,
