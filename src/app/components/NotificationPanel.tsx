@@ -7,6 +7,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
+  UI_RED, UI_AMBER,
 } from "../colors";
 import {
   fetchProjectNotifications,
@@ -20,11 +21,30 @@ import {
 import { subscribeToProjectNotifications } from "../lib/chatSocket";
 
 export const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
-  info:    { color: "#6B7A50",    bg: "rgba(107,122,80,0.10)"  },
-  success: { color: "#5A8A4A",    bg: "rgba(90,138,74,0.10)"   },
-  warning: { color: "#C09840",    bg: "rgba(192,152,64,0.10)"  },
-  error:   { color: "#B85450",    bg: "rgba(184,84,80,0.10)"   },
+  info:    { color: ACCENT,       bg: "rgba(88,101,242,0.12)" },
+  success: { color: "#10b981",    bg: "rgba(16,185,129,0.12)" },
+  warning: { color: UI_AMBER,     bg: "rgba(245,158,11,0.12)" },
+  error:   { color: UI_RED,       bg: "rgba(239,68,68,0.12)"  },
 };
+
+function isToday(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return true;
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return isToday(dateStr)
+    ? d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+}
 
 export const getNotificationStyle = (type: string) => {
   switch (type) {
@@ -138,13 +158,15 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
     }
   };
 
-  const clearAll = async () => {  //전체 삭제
-    if (!projectId) return;
+  const clearAll = async () => {
+    if (!projectId || notifs.length === 0) return;
+    if (!window.confirm("모든 알림을 삭제하시겠습니까?")) return;
     try {
       await Promise.all(
         notifs.map((n) => deleteNotification(projectId, n.id))
       );
       setNotifs([]);
+      toast.success("모든 알림을 삭제했습니다.");
     } catch (error) {
       console.error("알림을 삭제하는 도중 문제가 발생했습니다:", error);
       toast.error("일부 알림을 삭제하지 못했습니다.");
@@ -169,12 +191,12 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
       >
         <Bell
           className="w-3.5 h-3.5"
-          style={{ color: unread > 0 ? "#A67B5B" : "rgba(255,255,255,0.55)" }}
+          style={{ color: unread > 0 ? ACCENT : "rgba(255,255,255,0.70)" }}
         />
         {unread > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white"
-            style={{ background: "#B85450", lineHeight: 1 }}
+            className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm"
+            style={{ background: UI_RED, lineHeight: 1 }}
           >
             {unread > 9 ? "9+" : unread}
           </span>
@@ -184,11 +206,11 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
       {/* ── 드롭다운 패널 ── */}
       {open && (
         <div
-          className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50 flex flex-col"
+          className="absolute right-0 top-full mt-2 w-84 rounded-2xl overflow-hidden z-50 flex flex-col"
           style={{
-            background: "rgba(252,252,250,0.98)",
+            background: "#FFFFFF",
             border: `1px solid ${BORDER}`,
-            boxShadow: "0 16px 48px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.08)",
+            boxShadow: "0 20px 56px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.08)",
             transform: anim ? "translateY(0) scale(1)" : "translateY(-8px) scale(0.97)",
             opacity:   anim ? 1 : 0,
             transition: "transform 0.18s cubic-bezier(0.34,1.56,0.64,1), opacity 0.14s ease",
@@ -198,19 +220,23 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
           {/* 1. 헤더 영역 */}
           <div
             className="flex items-center justify-between px-4 py-3 shrink-0"
-            style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: ACCENT_BG }}
+            style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(0,0,0,0.02)" }}
           >
             <div className="flex items-center">
               <Bell className="w-3.5 h-3.5 mr-2" style={{ color: ACCENT }} />
               <span className="text-xs font-bold mr-2" style={{ color: TEXT_PRIMARY }}>
                 알림
               </span>
-              {unread > 0 && (
+              {unread > 0 ? (
                 <span
                   className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
                   style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
                 >
                   {unread}개 미읽음
+                </span>
+              ) : (
+                <span className="text-[9px] text-gray-400">
+                  모두 읽음
                 </span>
               )}
             </div>
@@ -233,8 +259,10 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
           <div className="overflow-y-auto flex-1">
             {notifs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2">
-                <Bell className="w-7 h-7" style={{ color: "rgba(112,130,56,0.15)" }} />
-                <p className="text-[11px]" style={{ color: TEXT_TERTIARY }}>새 알림이 없습니다</p>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: ACCENT_BG }}>
+                  <Bell className="w-5 h-5" style={{ color: ACCENT }} />
+                </div>
+                <p className="text-[11px] font-medium" style={{ color: TEXT_TERTIARY }}>새 알림이 없습니다</p>
               </div>
             ) : (
               <div>
@@ -247,10 +275,10 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                       className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-all relative"
                       style={{
                         borderBottom: idx < notifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none",
-                        background:   n.isRead ? "transparent" : "rgba(166,123,91,0.06)",
+                        background:   n.isRead ? "transparent" : "rgba(88,101,242,0.04)",
                       }}
                       onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.025)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = n.isRead ? "transparent" : "rgba(166,123,91,0.06)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = n.isRead ? "transparent" : "rgba(88,101,242,0.04)")}
                       onClick={() => markRead(n.id)}
                     >
                       {!n.isRead && (
@@ -272,11 +300,11 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                         >
                           {n.title}
                         </p>
-                        <p className="text-[10px] mt-0.5 leading-snug" style={{ color: TEXT_TERTIARY }}>
+                        <p className="text-[10px] mt-0.5 leading-snug line-clamp-2" style={{ color: TEXT_TERTIARY }}>
                           {n.body}
                         </p>
                         <p className="text-[9px] mt-1" style={{ color: TEXT_LABEL }}>
-                          {n.createdAt}
+                          {formatTime(n.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -286,32 +314,30 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
             )}
           </div>
 
-          {/* 3. 푸터 영역 */}
-          {notifs.length > 0 && (
-            <div
-              className="px-4 py-3 shrink-0 flex items-center justify-between"
-              style={{ borderTop: `1px solid ${BORDER_SUBTLE}`, background: "rgba(0,0,0,0.015)" }}
+          {/* 3. 푸터 영역 (알림이 없어도 전체보기 팝업을 열 수 있도록 유지) */}
+          <div
+            className="px-4 py-2.5 shrink-0 flex items-center justify-between"
+            style={{ borderTop: `1px solid ${BORDER_SUBTLE}`, background: "rgba(0,0,0,0.015)" }}
+          >
+            <button
+              onClick={viewAll}
+              className="flex items-center gap-1 text-[11px] font-bold transition-all group"
+              style={{ color: ACCENT }}
             >
-              <button
-                onClick={viewAll}
-                className="flex items-center gap-0.5 text-[10px] font-bold transition-all group"
-                style={{ color: ACCENT }}
-              >
-                전체보기
-                <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-              </button>
-              
+              알림 전체보기
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+            
+            {notifs.length > 0 && (
               <button
                 onClick={clearAll}
-                className="text-[10px] font-semibold transition-all"
+                className="text-[10px] font-semibold transition-all hover:text-red-500"
                 style={{ color: TEXT_TERTIARY }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#B85450")}
-                onMouseLeave={e => (e.currentTarget.style.color = TEXT_TERTIARY)}
               >
                 전체 삭제
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

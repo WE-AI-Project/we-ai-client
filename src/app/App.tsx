@@ -20,9 +20,9 @@ import {
   Orbit,
   X,
   Menu,
-  ChevronsUpDown,
   BarChart2,
   BookOpen,
+  CheckSquare,
   Search,
   ArrowLeft,
   ArrowRight,
@@ -53,6 +53,7 @@ import { loadProfile, saveProfile } from "./data/profileStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
 import { saveLastActiveProject, loadLastActiveProject, clearLastActiveProject } from "./data/activeProjectStore";
 import { NotificationPanel } from "./components/NotificationPanel";
+import { NotificationModal } from "./components/NotificationModal";
 import { WindowControls } from "./components/WindowControls";
 import { AuxTitleBar } from "./components/AuxTitleBar";
 import {
@@ -79,7 +80,7 @@ import {
 import {
   SIDEBAR_BG, SIDEBAR_HOVER, SIDEBAR_ACTIVE,
   GRADIENT_LOGO, GRADIENT_SIDEBAR, GRADIENT_OUTER,
-  CONTENT_BG, ACCENT,
+  TITLEBAR_BG, CONTENT_BG, ACCENT,
   SIDEBAR_TEXT, SIDEBAR_TEXT_ACTIVE, SIDEBAR_TEXT_HOVER,
   SIDEBAR_TEXT_LABEL, SIDEBAR_BORDER,
   TERM_BG, TERM_HEADER, TERM_TEXT, TERM_MUTED, BTN_DARK,
@@ -158,6 +159,7 @@ const NAV_ITEMS = [
   { id: "Dashboard", icon: Home, label: "Dashboard" },
   { id: "Chat", icon: MessageCircle, label: "Chat" },
   { id: "Calendar", icon: CalendarDays, label: "Calendar" },
+  { id: "Tasks", icon: CheckSquare, label: "Tasks" },
   { id: "Changes", icon: GitPullRequest, label: "Changes" },
   { id: "Commits", icon: GitCommit, label: "Commits" },
   { id: "ServerBuild", icon: Terminal, label: "Server & Build" },
@@ -228,9 +230,9 @@ function NavBtn({
         onClick={onClick}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
-        className="w-full flex items-center gap-1.5 text-left transition-all rounded-lg"
+        className="w-full flex items-center gap-2 text-left transition-all rounded-lg"
         style={{
-          padding: collapsed ? "4px 0" : "4px 8px",
+          padding: collapsed ? "5px 0" : "5px 8px",
           justifyContent: collapsed ? "center" : "flex-start",
           color: active ? SIDEBAR_TEXT_ACTIVE : SIDEBAR_TEXT,
           background: active ? SIDEBAR_ACTIVE : hov ? SIDEBAR_HOVER : "transparent",
@@ -238,9 +240,9 @@ function NavBtn({
         onMouseDown={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = "rgba(166,123,91,0.06)"; }}
         onMouseUp={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = hov ? SIDEBAR_HOVER : "transparent"; }}
       >
-        <Icon className="w-[13px] h-[13px] shrink-0" style={{ color: active ? SIDEBAR_TEXT_ACTIVE : hov ? SIDEBAR_TEXT_HOVER : SIDEBAR_TEXT }} />
+        <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: active ? SIDEBAR_TEXT_ACTIVE : hov ? SIDEBAR_TEXT_HOVER : SIDEBAR_TEXT }} />
         {!collapsed && (
-          <span className="text-[10px] flex-1 truncate" style={{ color: active ? SIDEBAR_TEXT_ACTIVE : hov ? SIDEBAR_TEXT_HOVER : SIDEBAR_TEXT }}>
+          <span className="text-[11px] font-medium flex-1 truncate" style={{ color: active ? SIDEBAR_TEXT_ACTIVE : hov ? SIDEBAR_TEXT_HOVER : SIDEBAR_TEXT }}>
             {label}
           </span>
         )}
@@ -252,7 +254,7 @@ function NavBtn({
 
 function SectionLabel({ children, collapsed }: { children: React.ReactNode; collapsed: boolean }) {
   if (collapsed) return <div className="flex justify-center my-1"><div className="w-4 h-px" style={{ background: SIDEBAR_BORDER }} /></div>;
-  return <p className="px-2 text-[7px] font-semibold tracking-wider mb-1" style={{ color: SIDEBAR_TEXT_LABEL }}>{children}</p>;
+  return <p className="px-2 text-[9px] font-semibold tracking-wider mb-1" style={{ color: SIDEBAR_TEXT_LABEL }}>{children}</p>;
 }
 
 // ─────────────────────────────────────────────
@@ -286,6 +288,7 @@ export default function App() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [showStandup, setShowStandup] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
   const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
   const [showSystemMenu, setShowSystemMenu] = useState(false);
@@ -793,13 +796,13 @@ export default function App() {
     return (
       <div
         className="size-full flex flex-col overflow-hidden transition-colors duration-200"
-        style={{ background: TERM_BG }}
+        style={{ background: CONTENT_BG }}
         onClickCapture={() => setActivePanel(panelType)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={() => handleTabDrop(panelType)}
       >
         {shouldShowTabs && (
-          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: TERM_HEADER, borderBottom: "1px solid rgba(255,255,255,0.08)", height: "28px" }}>
+          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "rgba(0,0,0,0.20)", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "34px" }}>
             {tabs.map(tId => {
               const tabLabel = TAB_LABELS[tId];
 
@@ -816,13 +819,13 @@ export default function App() {
                     setDraggedTab(null);
                   }}
                   onClick={() => setActiveTab(tId)}
-                  className="flex items-center gap-1 px-3 py-1 text-[8px] font-medium cursor-pointer transition-all border-r select-none"
+                  className="flex items-center gap-2 px-3.5 py-1.5 text-[11px] font-medium cursor-pointer transition-all border-r select-none"
                   style={{
                     width: HEADER_TAB_WIDTH,
                     minWidth: HEADER_TAB_WIDTH,
                     maxWidth: HEADER_TAB_WIDTH,
                     color: activeTab === tId ? TERM_TEXT : TERM_MUTED,
-                    background: activeTab === tId ? TERM_BG : "transparent",
+                    background: activeTab === tId ? CONTENT_BG : "transparent",
                     borderRight: "1px solid rgba(255,255,255,0.08)",
                     borderTop: activeTab === tId ? `2px solid ${ACCENT}` : "2px solid transparent"
                   }}
@@ -830,7 +833,7 @@ export default function App() {
                 >
                   <span className="min-w-0 flex-1 truncate">{tabLabel}</span>
                   <X
-                    className="w-2.5 h-2.5 hover:text-red-400 transition-colors rounded-sm"
+                    className="w-3 h-3 hover:text-red-400 transition-colors rounded-sm"
                     onClick={(e) => {
                       e.stopPropagation();
                       const nextTabs = tabs.filter(t => t !== tId);
@@ -1115,9 +1118,15 @@ export default function App() {
         />
       )}
 
+      <NotificationModal
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        projectId={projectId}
+      />
+
       <div
         className="flex-1 flex flex-col overflow-hidden relative"
-        style={{ background: SIDEBAR_BG, ...focusRingStyle }}
+        style={{ background: TITLEBAR_BG, ...focusRingStyle }}
       >
         {/* 커스텀 타이틀바 — VS Code 스타일 단일 타이틀바 (탭 바 없음, 좌/중/우 3열 그리드).
             OS 기본 타이틀바는 frame:false(Frameless Window)로 제거되었고, 이 바가 그 자리를 대신한다.
@@ -1129,7 +1138,7 @@ export default function App() {
           style={{
             gridTemplateColumns: "auto 1fr auto",
             borderBottom: `1px solid ${SIDEBAR_BORDER}`,
-            background: GRADIENT_SIDEBAR,
+            background: TITLEBAR_BG,
             WebkitAppRegion: "drag",
           } as React.CSSProperties}
         >
@@ -1283,18 +1292,21 @@ export default function App() {
                 onClick={() => setShowStandup(true)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
                 style={{
-                  background: showStandup ? "rgba(166,123,91,0.20)" : "rgba(166,123,91,0.10)",
-                  color: "#D4CC9E",
-                  border: `1px solid rgba(166,123,91,0.18)`,
+                  background: showStandup ? "rgba(88,101,242,0.25)" : "rgba(88,101,242,0.12)",
+                  color: "#E2E8F0",
+                  border: `1px solid ${showStandup ? "rgba(88,101,242,0.5)" : "rgba(88,101,242,0.25)"}`,
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(166,123,91,0.20)"}
-                onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(166,123,91,0.20)" : "rgba(166,123,91,0.10)"}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(88,101,242,0.25)"}
+                onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(88,101,242,0.25)" : "rgba(88,101,242,0.12)"}
                 title="데일리 스탠드업 브리핑"
               >
-                <Sun className="w-3 h-3" />
+                <Sun className="w-3 h-3 text-amber-300" />
                 스탠드업
               </button>
-              <NotificationPanel projectId={projectId ?? undefined} />
+              <NotificationPanel
+                projectId={projectId ?? undefined}
+                onViewAll={() => setShowNotificationModal(true)}
+              />
             </div>
             <WindowControls />
           </div>
@@ -1348,18 +1360,13 @@ export default function App() {
               {!isCollapsed && (
                 <div className="px-2.5 pt-2.5 pb-2" style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
                   <p className="text-[9px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: SIDEBAR_TEXT_LABEL }}>Current Project</p>
-                  <button
-                    onClick={handleLeaveProject}
-                    title="다른 프로젝트로 전환"
-                    className="w-full text-left px-2 py-1.5 rounded-lg transition-all"
+                  <div
+                    className="w-full text-left px-2 py-1.5 rounded-lg select-none"
                     style={{ background: "rgba(166,123,91,0.12)", border: `1px solid rgba(166,123,91,0.18)` }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(166,123,91,0.22)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(166,123,91,0.12)"}
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       <Circle className="w-1.5 h-1.5 fill-current shrink-0" style={{ color: "#10b981" }} />
                       <p className="text-[10px] font-semibold truncate flex-1" style={{ color: SIDEBAR_TEXT_ACTIVE }}>{projectName}</p>
-                      <ChevronsUpDown className="w-2.5 h-2.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
                     </div>
                     {projectCode && (
                       <div className="flex items-center gap-1 mb-0.5">
@@ -1373,32 +1380,29 @@ export default function App() {
                         <span className="text-[8px] font-mono truncate" style={{ color: SIDEBAR_TEXT }}>{localPath}</span>
                       </div>
                     )}
-                  </button>
+                  </div>
                 </div>
               )}
 
               {isCollapsed && projectCode && (
                 <div className="flex justify-center py-2" style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
-                  <button
-                    onClick={handleLeaveProject}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
                     style={{ background: "rgba(166,123,91,0.12)" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(166,123,91,0.22)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(166,123,91,0.12)"}
-                    title={`${projectName} #${projectCode} — 다른 프로젝트로 전환`}
+                    title={`${projectName} #${projectCode}`}
                   >
                     <Circle className="w-2 h-2 fill-current" style={{ color: "#10b981" }} />
-                  </button>
+                  </div>
                 </div>
               )}
 
               <div className={`pt-2.5 pb-2 ${isCollapsed ? "px-1" : "px-1.5"}`}>
                 <SectionLabel collapsed={isCollapsed}>MAIN</SectionLabel>
-                <nav className="space-y-0">
+                <nav className="space-y-0.5">
                   {NAV_ITEMS.map(item => {
                     const badge = item.id === "Chat" && unreadChatCount > 0 && !isCollapsed ? (
                       <span
-                        className="text-[7px] font-bold px-1.5 py-0.5 rounded-full ml-auto"
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-auto"
                         style={{ background: "#e11d48", color: "#ffffff" }} // 안 읽은 알림처럼 붉은색 계열로 변경
                       >
                         {unreadChatCount}
@@ -1423,7 +1427,7 @@ export default function App() {
 
               <div className={`pb-2 ${isCollapsed ? "px-1" : "px-1.5"}`}>
                 <SectionLabel collapsed={isCollapsed}>SYSTEM</SectionLabel>
-                <nav className="space-y-0">
+                <nav className="space-y-0.5">
                   {SYSTEM_ITEMS.map(item => (
                     <NavBtn
                       key={item.id}
@@ -1454,20 +1458,20 @@ export default function App() {
                 >
                   <button
                     onClick={handleLeaveProject}
-                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-[10px] transition-all hover:bg-white/[0.06]"
+                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-[11px] transition-all hover:bg-white/[0.06]"
                     style={{ color: "#D4CC9E" }}
                   >
-                    <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: "#D4CC9E" }} />
-                    <span className="text-[10px]">Back To Projects</span>
+                    <FolderGit2 className="w-3.5 h-3.5 shrink-0" style={{ color: "#D4CC9E" }} />
+                    <span className="text-[11px]">Back To Projects</span>
                   </button>
 
                   <button
                     onClick={() => void handleLogout()}
-                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-[10px] transition-all hover:bg-[#B85450]/15"
+                    className="w-full flex items-center gap-2 rounded-lg text-left px-2.5 py-2 text-[11px] transition-all hover:bg-[#B85450]/15"
                     style={{ color: "#B85450" }}
                   >
-                    <LogOut className="w-4 h-4 shrink-0" style={{ color: "#B85450" }} />
-                    <span className="text-[10px]">Sign Out</span>
+                    <LogOut className="w-3.5 h-3.5 shrink-0" style={{ color: "#B85450" }} />
+                    <span className="text-[11px]">Sign Out</span>
                   </button>
                 </div>
               )}
@@ -1477,7 +1481,7 @@ export default function App() {
                   onClick={toggleSidebar}
                   className="w-full flex items-center gap-2 rounded-lg transition-all"
                   style={{
-                    padding: isCollapsed ? "7px 0" : "6px 8px",
+                    padding: isCollapsed ? "7px 0" : "5px 8px",
                     justifyContent: isCollapsed ? "center" : "flex-start",
                     color: SIDEBAR_TEXT,
                     background: "transparent",
@@ -1486,11 +1490,11 @@ export default function App() {
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                 >
                   {isCollapsed ? (
-                    <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                    <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
                   ) : (
                     <>
-                      <ChevronLeft className="w-4 h-4 shrink-0" style={{ color: SIDEBAR_TEXT }} />
-                      <span className="text-[10px] font-medium">Collapse</span>
+                      <ChevronLeft className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT }} />
+                      <span className="text-[11px] font-medium">Collapse</span>
                     </>
                   )}
                 </button>
@@ -1502,7 +1506,7 @@ export default function App() {
                   onClick={() => setShowSystemMenu(v => !v)}
                   className="w-full flex items-center gap-2 rounded-lg transition-all"
                   style={{
-                    padding: isCollapsed ? "7px 0" : "6px 8px",
+                    padding: isCollapsed ? "7px 0" : "5px 8px",
                     justifyContent: isCollapsed ? "center" : "flex-start",
                     color: SIDEBAR_TEXT_ACTIVE,
                     background: showSystemMenu ? SIDEBAR_ACTIVE : "transparent",
@@ -1510,8 +1514,8 @@ export default function App() {
                   onMouseEnter={e => { if (!showSystemMenu) e.currentTarget.style.background = SIDEBAR_HOVER; }}
                   onMouseLeave={e => { if (!showSystemMenu) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <Menu className="w-4 h-4 shrink-0" style={{ color: SIDEBAR_TEXT_ACTIVE }} />
-                  {!isCollapsed && <span className="text-[10px] font-medium">System Menu</span>}
+                  <Menu className="w-3.5 h-3.5 shrink-0" style={{ color: SIDEBAR_TEXT_ACTIVE }} />
+                  {!isCollapsed && <span className="text-[11px] font-medium">System Menu</span>}
                 </button>
                 {isCollapsed && <Tooltip label="시스템 메뉴" />}
               </div>

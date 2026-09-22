@@ -494,7 +494,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
             style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
           >
             <div className="mb-4 flex items-center gap-2">
-              <Users className="h-4 w-4" style={{ color: ACCENT }} />
+              <ClipboardList className="h-4 w-4" style={{ color: ACCENT }} />
               <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
                 나의 활동 요약
               </h2>
@@ -1262,7 +1262,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
             style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
           >
             <div className="mb-4 flex items-center gap-2">
-              <Users className="h-4 w-4" style={{ color: ACCENT }} />
+              <CalendarDays className="h-4 w-4" style={{ color: ACCENT }} />
               <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
                 요약
               </h2>
