@@ -716,13 +716,8 @@ export function ChatPage({
     if (type === "DEPARTMENT" && projectId) {
       setIsLoadingDepts(true);
       try {
-        const res = await fetchDepartments(projectId);
-        const deptsArray = Array.isArray(res)
-          ? res
-          : (Array.isArray((res as any)?.data) ? (res as any).data
-            : (Array.isArray((res as any)?.departments) ? (res as any).departments : []));
-
-        setDepartments(deptsArray);
+        const list = await fetchDepartments(projectId);
+        setDepartments(list);
       } catch (error) {
         toast.error("부서 목록을 불러오지 못했습니다.");
       } finally {
@@ -735,33 +730,30 @@ export function ChatPage({
     e.preventDefault();
     if (!projectId) return;
 
-    let targetName = "";
     if (createType === "GENERAL") {
       if (!newRoomName.trim()) {
         toast.error("채팅방 이름을 입력해 주세요.");
         return;
       }
-      targetName = newRoomName.trim();
-    } else {
-      if (!selectedDept) {
-        toast.error("생성할 부서를 선택해 주세요.");
+      const targetName = newRoomName.trim();
+      const hasDuplicateName = chatRooms.some(
+        (room) => normalizeChatRoomName(room.name) === normalizeChatRoomName(targetName),
+      );
+      if (hasDuplicateName) {
+        toast.error("이미 같은 이름의 채팅방이 있습니다.");
         return;
       }
-      targetName = selectedDept.name;
-    }
-
-    const hasDuplicateName = chatRooms.some(
-      (room) => normalizeChatRoomName(room.name) === normalizeChatRoomName(targetName),
-    );
-    if (hasDuplicateName) {
-      toast.error("이미 같은 이름의 채팅방이 있습니다.");
+    } else if (!selectedDept) {
+      toast.error("생성할 부서를 선택해 주세요.");
       return;
     }
 
     setIsCreatingRoom(true);
     try {
-      const newRoom = await createChatRoom(projectId, targetName, createType);
-      const actualName = newRoom?.name || (newRoom as any)?.data?.name || targetName;
+      const newRoom = createType === "GENERAL"
+        ? await createChatRoom(projectId, newRoomName.trim(), createType)
+        : await createChatRoom(projectId, "", createType, selectedDept!.department);
+      const actualName = newRoom?.name || (newRoom as any)?.data?.name || selectedDept?.displayName || newRoomName.trim();
       const actualRoomId = newRoom?.chatRoomId || (newRoom as any)?.data?.chatRoomId;
 
       toast.success(`'${actualName}' 채팅방이 생성되었습니다.`);
@@ -1089,34 +1081,40 @@ export function ChatPage({
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                       {departments.map((dept) => {
                         const isExists = dept.chatRoomExists;
-                        const isSelected = selectedDept?.departmentId === dept.departmentId;
+                        const canSelect = !isExists && dept.selectable;
+                        const isSelected = selectedDept?.department === dept.department;
 
                         return (
                           <div
-                            key={dept.departmentId}
+                            key={dept.department}
                             onClick={() => {
-                              if (!isExists && !isCreatingRoom) {
+                              if (canSelect && !isCreatingRoom) {
                                 setSelectedDept(dept);
                               }
                             }}
-                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${isExists
-                              ? "opacity-50 cursor-not-allowed bg-black/2"
-                              : "cursor-pointer hover:border-black/20"
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${canSelect
+                              ? "cursor-pointer hover:border-black/20"
+                              : "opacity-50 cursor-not-allowed bg-black/2"
                               }`}
                             style={{
                               borderColor: isSelected ? OLIVE_DARK : BORDER_SUBTLE,
-                              background: isSelected ? "rgba(65,67,27,0.06)" : isExists ? "rgba(0,0,0,0.02)" : "white",
+                              background: isSelected ? "rgba(65,67,27,0.06)" : !canSelect ? "rgba(0,0,0,0.02)" : "white",
                             }}
                           >
                             <div className="flex items-center gap-2">
                               <Building2 className="w-3.5 h-3.5" style={{ color: isSelected ? OLIVE_DARK : TEXT_TERTIARY }} />
                               <span className="font-semibold" style={{ color: isSelected ? OLIVE_DARK : TEXT_PRIMARY }}>
-                                {dept.name}
+                                {dept.displayName}
                               </span>
+                              <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{dept.memberCount}명</span>
                             </div>
                             {isExists ? (
                               <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_TERTIARY }}>
                                 이미 생성됨
+                              </span>
+                            ) : !dept.selectable ? (
+                              <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_TERTIARY }}>
+                                멤버 없음
                               </span>
                             ) : (
                               <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: isSelected ? OLIVE_DARK : "rgba(65,67,27,0.08)", color: isSelected ? "white" : OLIVE_DARK }}>

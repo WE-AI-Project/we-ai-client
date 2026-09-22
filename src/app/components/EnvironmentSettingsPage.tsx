@@ -558,7 +558,7 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
                       <Plus className="w-3.5 h-3.5" /> 새 환경 변수 추가
                     </button>
                     <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                      {envVars.length}개 변수 · {fileExists ? "실제 .env 파일" : ".env.example 기반 (아직 저장 안 됨)"}
+                      {envVars.length}개 변수 · {fileExists ? "실제 .env 파일" : usedExample ? ".env.example 기반 (아직 저장 안 됨)" : "새 .env (아직 저장 안 됨)"}
                     </span>
                   </div>
                 )}

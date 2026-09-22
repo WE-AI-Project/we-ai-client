@@ -484,21 +484,30 @@ export async function sendChatMessage(  //채팅 메시지 전송
 }
 
 export type Department = {
-  departmentId: number;
-  name: string;
+  department: ProjectDepartment;
+  displayName: string;
+  memberCount: number;
   chatRoomExists: boolean;
+  selectable: boolean;
 };
 
 export async function fetchDepartments(projectId: number | string): Promise<Department[]> {  //채팅방 부서 목록 조회
-  return request<Department[]>(`/api/v1/projects/${projectId}/departments`, {
-    method: "GET",
-  });
+  const res = await request<{ projectId: number; departments: Department[] }>(
+    `/api/v1/projects/${projectId}/departments`,
+    { method: "GET" }
+  );
+  return res?.departments ?? [];
 }
 
-export async function createChatRoom(projectId: number | string, name: string, type: string): Promise<ChatRoom> {  //채팅방 생성
+export async function createChatRoom(
+  projectId: number | string,
+  name: string,
+  type: string,
+  department?: ProjectDepartment
+): Promise<ChatRoom> {  //채팅방 생성
   return request<ChatRoom>(`/api/v1/projects/${projectId}/chat/rooms`, {
     method: "POST",
-    body: { name, type } as any,
+    body: { name, type, department } as any,
   });
 }
 
