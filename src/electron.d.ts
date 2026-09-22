@@ -7,6 +7,17 @@ declare global {
       pickFolder: () => Promise<string | null>;
       pickFile: () => Promise<string | null>;
       detectStack: (localPath: string) => Promise<import("./app/lib/api").ProjectStackDetection>;
+      env: {
+        read: (localPath: string) => Promise<{ exists: boolean; usedExample: boolean; path: string; content: string }>;
+        write: (localPath: string, content: string) => Promise<{ path: string }>;
+      };
+      runtimeInfo: () => Promise<{
+        platform: string;
+        arch: string;
+        nodeVersion: string;
+        electronVersion: string;
+        chromeVersion: string;
+      }>;
       loadCustomEndpoint: () => Promise<import("./app/lib/customEndpoint").CustomEndpointConfig>;
       saveCustomEndpoint: (
         draft: import("./app/lib/customEndpoint").CustomEndpointSaveDraft

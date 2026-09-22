@@ -104,6 +104,63 @@ ipcMain.handle("stack:detect", async (_event, localPath) => {
   return detectLocalStack(localPath);
 });
 
+// ── Environment Settings 탭: 실제 로컬 프로젝트의 .env 파일 읽기/쓰기 ──
+// 예전에는 이 화면 전체가 localStorage에만 저장되는 가짜 메모장이라, 값이 프로젝트의
+// 실제 .env와 전혀 무관했다. 여기서는 실제로 프로젝트 로컬 경로의 .env(없으면 .env.example)
+// 파일을 직접 읽고 쓴다 - 개발자 본인의 파일이라 안전 저장소 암호화는 불필요하다.
+ipcMain.handle("env:read", async (_event, localPath) => {
+  if (typeof localPath !== "string" || !localPath.trim()) {
+    throw new Error("localPath is required.");
+  }
+  const root = localPath.trim();
+  const envPath = path.join(root, ".env");
+  try {
+    const content = await fs.readFile(envPath, "utf-8");
+    return { exists: true, usedExample: false, path: envPath, content };
+  } catch (envError) {
+    if (envError.code !== "ENOENT") {
+      throw new Error(`.env 파일을 읽을 수 없습니다: ${envError.message}`);
+    }
+    const examplePath = path.join(root, ".env.example");
+    try {
+      const exampleContent = await fs.readFile(examplePath, "utf-8");
+      return { exists: false, usedExample: true, path: envPath, content: exampleContent };
+    } catch (exampleError) {
+      if (exampleError.code === "ENOENT") {
+        return { exists: false, usedExample: false, path: envPath, content: "" };
+      }
+      throw new Error(`.env.example 파일을 읽을 수 없습니다: ${exampleError.message}`);
+    }
+  }
+});
+
+ipcMain.handle("env:write", async (_event, localPath, content) => {
+  if (typeof localPath !== "string" || !localPath.trim()) {
+    throw new Error("localPath is required.");
+  }
+  if (typeof content !== "string") {
+    throw new Error("content is required.");
+  }
+  const envPath = path.join(localPath.trim(), ".env");
+  await fs.writeFile(envPath, content, "utf-8");
+  return { path: envPath };
+});
+
+// ── Environment Settings 탭의 "Runtime Environment" 카드용 실제 프로세스 정보 ──
+// 이전에는 JDK/Gradle/Spring Boot 버전, OS 등이 전부 하드코딩된 문자열이었다.
+// OS/Node/Electron/Chromium 버전은 이 프로세스에서 실제로 가져오고, Java/Gradle/Spring Boot
+// 버전은 stack:detect가 이미 실제 build.gradle/gradle-wrapper.properties를 읽어 알아내므로
+// 렌더러 쪽에서 그 결과를 그대로 재사용한다.
+ipcMain.handle("runtime:info", async () => {
+  return {
+    platform: process.platform,
+    arch: process.arch,
+    nodeVersion: process.versions.node,
+    electronVersion: process.versions.electron,
+    chromeVersion: process.versions.chrome,
+  };
+});
+
 ipcMain.handle("dialog:pick-file", async () => {
   const target = mainWindow ?? BrowserWindow.getFocusedWindow();
   const result = await dialog.showOpenDialog(target, {

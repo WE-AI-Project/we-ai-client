@@ -769,7 +769,7 @@ export default function App() {
           />
         );
       case "Calendar": return <CalendarPage projectId={projectId} />;
-      case "EnvSettings": return <EnvironmentSettingsPage />;
+      case "EnvSettings": return <EnvironmentSettingsPage localPath={localPath} />;
       case "AIQA": return <AIQAPage projectId={projectId} />;
       case "SharedLibrary": return <SharedLibraryPage projectId={projectId ?? 0} />;
       case "Analytics": return <AnalyticsPage projectId={projectId ?? 0} />;
