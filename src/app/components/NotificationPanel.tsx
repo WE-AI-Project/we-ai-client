@@ -271,40 +271,31 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 boxShadow: "0 20px 56px rgba(0,0,0,0.20), 0 4px 16px rgba(0,0,0,0.06)",
               }}
             >
-              {/* 1-1. 헤더 영역 */}
+              {/* 1-1. 헤더 영역 (우측 최근 알림과 동일한 높이 h-11 및 동일한 아이콘 배치) */}
               <div
-                className="flex items-center justify-between px-4 py-2.5 shrink-0"
+                className="h-11 flex items-center justify-between px-4 shrink-0"
                 style={{
                   borderBottom: `1px solid ${BORDER_SUBTLE}`,
-                  background: "rgba(0,0,0,0.018)",
+                  background: "rgba(0,0,0,0.02)",
                 }}
               >
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: ACCENT_BG }}
-                  >
-                    <Bell className="w-3 h-3" style={{ color: ACCENT }} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold" style={{ color: TEXT_PRIMARY }}>
-                        전체 알림
-                      </span>
-                      {unread > 0 ? (
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
-                          style={{ background: UI_RED }}
-                        >
-                          {unread}개 미읽음
-                        </span>
-                      ) : (
-                        <span className="text-[9px] text-gray-400">
-                          모두 읽음
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                <div className="flex items-center">
+                  <Bell className="w-3.5 h-3.5 mr-2" style={{ color: ACCENT }} />
+                  <span className="text-xs font-bold mr-2" style={{ color: TEXT_PRIMARY }}>
+                    전체 알림
+                  </span>
+                  {unread > 0 ? (
+                    <span
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                      style={{ background: ACCENT_BG, color: ACCENT, border: `1px solid ${ACCENT_BORDER}` }}
+                    >
+                      {unread}개 미읽음
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-gray-400">
+                      모두 읽음
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -329,7 +320,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                   )}
                   <button
                     onClick={() => setShowAll(false)}
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-all ml-1"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-all ml-0.5"
                     title="전체 알림창 접기"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -347,11 +338,8 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                     >
                       <Bell className="w-4 h-4" style={{ color: ACCENT }} />
                     </div>
-                    <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>
+                    <p className="text-[11px] font-medium" style={{ color: TEXT_TERTIARY }}>
                       알림이 없습니다
-                    </p>
-                    <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
-                      새로운 알림이 도착하면 여기에 표시됩니다.
                     </p>
                   </div>
                 ) : (
@@ -360,7 +348,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                     {todayNotifs.length > 0 && (
                       <div>
                         <div
-                          className="px-4 py-1.5 text-[10px] font-bold sticky top-0 z-10"
+                          className="h-6 flex items-center px-4 text-[10px] font-bold sticky top-0 z-10"
                           style={{
                             background: "#F8F9FE",
                             color: TEXT_TERTIARY,
@@ -384,7 +372,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                     {earlierNotifs.length > 0 && (
                       <div>
                         <div
-                          className="px-4 py-1.5 text-[10px] font-bold sticky top-0 z-10"
+                          className="h-6 flex items-center px-4 text-[10px] font-bold sticky top-0 z-10"
                           style={{
                             background: "#F8F9FE",
                             color: TEXT_TERTIARY,
@@ -408,9 +396,9 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 )}
               </div>
 
-              {/* 1-3. 전체 알림창 푸터 */}
+              {/* 1-3. 전체 알림창 푸터 (우측과 동일한 높이 h-9로 상단 경계선 높이 일치) */}
               <div
-                className="px-4 py-2 shrink-0 flex items-center justify-between text-[10px]"
+                className="h-9 flex items-center justify-between px-4 shrink-0 text-[10px]"
                 style={{
                   borderTop: `1px solid ${BORDER_SUBTLE}`,
                   background: "rgba(0,0,0,0.015)",
@@ -434,9 +422,9 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
               boxShadow: "0 20px 56px rgba(0,0,0,0.20), 0 4px 16px rgba(0,0,0,0.06)",
             }}
           >
-            {/* 2-1. 헤더 영역 */}
+            {/* 2-1. 헤더 영역 (좌측과 동일한 높이 h-11로 하단 경계선 높이 일치) */}
             <div
-              className="flex items-center justify-between px-4 py-2.5 shrink-0"
+              className="h-11 flex items-center justify-between px-4 shrink-0"
               style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(0,0,0,0.02)" }}
             >
               <div className="flex items-center">
@@ -492,7 +480,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                   {todayNotifs.length > 0 && (
                     <div>
                       <div
-                        className="px-4 py-1 text-[10px] font-bold sticky top-0 z-10"
+                        className="h-6 flex items-center px-4 text-[10px] font-bold sticky top-0 z-10"
                         style={{
                           background: "#F8F9FE",
                           color: TEXT_TERTIARY,
@@ -517,7 +505,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                   {earlierNotifs.length > 0 && (
                     <div>
                       <div
-                        className="px-4 py-1 text-[10px] font-bold sticky top-0 z-10"
+                        className="h-6 flex items-center px-4 text-[10px] font-bold sticky top-0 z-10"
                         style={{
                           background: "#F8F9FE",
                           color: TEXT_TERTIARY,
@@ -542,9 +530,9 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
               )}
             </div>
 
-            {/* 2-3. 푸터 영역 (좌측 전체 알림창 토글 버튼) */}
+            {/* 2-3. 푸터 영역 (좌측과 동일한 높이 h-9로 상단 경계선 높이 일치) */}
             <div
-              className="px-4 py-2 shrink-0 flex items-center justify-between"
+              className="h-9 flex items-center justify-between px-4 shrink-0"
               style={{ borderTop: `1px solid ${BORDER_SUBTLE}`, background: "rgba(0,0,0,0.015)" }}
             >
               <button
