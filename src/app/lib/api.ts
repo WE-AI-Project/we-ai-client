@@ -1887,6 +1887,8 @@ export type ProjectGitCommitNode = {
   authorEmail: string;
   committedAt: string;
   branchNames: string[];
+  x: number | null;
+  y: number;
 };
 
 export type ProjectGitCommitEdge = {

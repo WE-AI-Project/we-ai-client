@@ -805,7 +805,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
           }
         }
       } catch (err) {
-        // Fallback default parts
+        console.error("프로젝트 부서 목록을 불러오지 못해 기본값으로 대체합니다:", err);
       }
 
       if (isSubscribed) {

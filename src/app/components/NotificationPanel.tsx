@@ -155,10 +155,12 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
   }, [projectId, currentUserId]);
 
   const markRead = (id: number) => {
-    setNotifs(ns => ns.map(n => n.id === id ? { ...n, isRead: true } : n));
     if (!projectId) return;
+    const prev = notifs;
+    setNotifs(ns => ns.map(n => n.id === id ? { ...n, isRead: true } : n));
     markNotificationAsRead(projectId, id).catch((error) => {
       console.error("알림 읽음 처리에 실패했습니다:", error);
+      setNotifs(prev);
     });
   };
 

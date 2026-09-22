@@ -703,7 +703,7 @@ export function ChangesPage({
         {/* ── 본문 영역 ── */}
         {showBranch ? (
           <div className="flex-1 flex overflow-hidden">
-            <BranchVisualization />
+            <BranchVisualization projectId={projectId} />
           </div>
         ) : (
           <div className="flex-1 flex overflow-hidden">
