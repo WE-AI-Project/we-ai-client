@@ -32,7 +32,7 @@ export const SIDEBAR_TEXT_MUTED  = "rgba(255,255,255,0.18)";
 export const OUTER_BG       = "#000000";   // 최외부 래퍼 배경 (순검정)
 export const SIDEBAR_BG     = "#13184E";   // 사이드바 배경 (헤더바보다 조금 더 연한 네이비)
 export const TITLEBAR_BG    = "#0A0D3A";   // 타이틀바/헤더바 배경 (가장 짙은 기준 다크 네이비)
-export const CONTENT_BG     = "#1C2366";   // 메인 콘텐츠 배경 (메뉴바보다 조금 더 연한 네이비)
+export const CONTENT_BG     = BRIGHT_BEIGE; // 메인 콘텐츠 배경 (대시보드와 동일한 밝은 배경 #F7F8FF)
 export const PANEL_BG       = "#FFFFFF";   // 패널 배경
 export const CARD_BG        = "#FFFFFF";   // 카드 배경
 export const INPUT_BG       = "#F7F8FF";   // 인풋 배경
@@ -150,8 +150,8 @@ export const GRADIENT_RAINBOW_BORDER = "linear-gradient(180deg, #635bff 0%, #8b5
 export const GRADIENT_RAINBOW_BORDER2 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 40%, #ec4899 80%, #fbbf24 100%) 1";
 export const GRADIENT_RAINBOW_BORDER3 = "linear-gradient(180deg, #635bff 0%, #8b5cf6 50%, #ec4899 100%) 1";
 
-/** 페이지 콘텐츠 배경 */
-export const GRADIENT_PAGE = "#1C2366";
+/** 페이지 콘텐츠 배경 (대시보드와 통일) */
+export const GRADIENT_PAGE = BRIGHT_BEIGE;
 /** 사이드바 배경 — 네이비 단색 */
 export const GRADIENT_SIDEBAR = "#13184E";
 /** 외부 래퍼 배경 — 순검정 단색 */

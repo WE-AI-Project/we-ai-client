@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Terminal, Hammer, Plug, ChevronDown, ChevronUp } from "lucide-react";
 import { ServerLogsPage } from "./ServerLogsPage";
 import { BuildManagementPage } from "./BuildManagementPage";
@@ -9,10 +9,13 @@ import {
   type ConnectionConfig,
 } from "../lib/serverConnection";
 import {
+  BORDER,
   BORDER_SUBTLE,
-  GRADIENT_SIDEBAR,
+  BRIGHT_BEIGE,
   ACCENT_BG_10,
   ACCENT,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
 } from "../colors";
 
 interface ServerBuildPageProps {
@@ -30,8 +33,8 @@ function connectionBadgeText(config: ConnectionConfig | null): string {
 export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
   const [tab, setTab] = useState<"logs" | "build">("logs");
   const [showConnection, setShowConnection] = useState(false);
-  const [connectionVersion, setConnectionVersion] = useState(0);
   const [connection, setConnection] = useState<ConnectionConfig | null>(null);
+  const [connectionVersion, setConnectionVersion] = useState(0);
 
   const connectionKey = connectionKeyForProject(projectId);
 
@@ -54,8 +57,8 @@ export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
       <div
         className="flex items-center shrink-0 px-3 gap-1"
         style={{
-          borderBottom: `1px solid ${BORDER_SUBTLE}`,
-          background: GRADIENT_SIDEBAR,
+          borderBottom: `1px solid ${BORDER}`,
+          background: BRIGHT_BEIGE,
           minHeight: 36,
         }}
       >
@@ -63,9 +66,9 @@ export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
           onClick={() => setTab("logs")}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all"
           style={{
-            color:      tab === "logs" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background: tab === "logs" ? "rgba(166,123,91,0.18)" : "transparent",
-            borderBottom: tab === "logs" ? "2px solid #A67B5B" : "2px solid transparent",
+            color:      tab === "logs" ? ACCENT : TEXT_SECONDARY,
+            background: tab === "logs" ? "rgba(88,101,242,0.08)" : "transparent",
+            borderBottom: tab === "logs" ? `2px solid ${ACCENT}` : "2px solid transparent",
             borderRadius: 0,
           }}
         >
@@ -76,9 +79,9 @@ export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
           onClick={() => setTab("build")}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all"
           style={{
-            color:      tab === "build" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background: tab === "build" ? "rgba(166,123,91,0.18)" : "transparent",
-            borderBottom: tab === "build" ? "2px solid #A67B5B" : "2px solid transparent",
+            color:      tab === "build" ? ACCENT : TEXT_SECONDARY,
+            background: tab === "build" ? "rgba(88,101,242,0.08)" : "transparent",
+            borderBottom: tab === "build" ? `2px solid ${ACCENT}` : "2px solid transparent",
             borderRadius: 0,
           }}
         >
@@ -91,7 +94,7 @@ export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all ml-auto"
           style={{
             background: showConnection ? ACCENT_BG_10 : "transparent",
-            color: showConnection ? ACCENT : "rgba(154,155,114,0.85)",
+            color: showConnection ? ACCENT : TEXT_SECONDARY,
           }}
           title="이 탭이 지금 어떤 서버/머신을 대상으로 동작 중인지 확인하고 바꿉니다"
         >
@@ -102,7 +105,7 @@ export function ServerBuildPage({ projectId }: ServerBuildPageProps) {
       </div>
 
       {showConnection && (
-        <div className="shrink-0 px-3 pt-3 pb-1" style={{ background: GRADIENT_SIDEBAR }}>
+        <div className="shrink-0 px-3 pt-3 pb-1" style={{ background: BRIGHT_BEIGE, borderBottom: `1px solid ${BORDER}` }}>
           <ConnectionSettingsCard projectId={projectId} onSaved={handleConnectionSaved} />
         </div>
       )}

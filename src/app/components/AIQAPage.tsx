@@ -1007,12 +1007,12 @@ export function AIQAPage({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* ── 최상단 탭 바 (AI QA / Agent Control) ── */}
+      {/* ── 최상단 탭 바 (AI QA / QA Reports) ── */}
       <div
         className="flex items-center shrink-0 px-3 gap-1"
         style={{
-          borderBottom: `1px solid ${SIDEBAR_BORDER}`,
-          background: GRADIENT_SIDEBAR,
+          borderBottom: `1px solid ${BORDER}`,
+          background: BRIGHT_BEIGE,
           minHeight: 36,
         }}
       >
@@ -1020,8 +1020,8 @@ export function AIQAPage({
           onClick={() => setMainTab("qa")}
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
-            color:        mainTab === "qa" ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.60)",
-            background:   mainTab === "qa" ? "rgba(88,101,242,0.20)" : "transparent",
+            color:        mainTab === "qa" ? ACCENT : TEXT_SECONDARY,
+            background:   mainTab === "qa" ? "rgba(88,101,242,0.08)" : "transparent",
             borderBottom: mainTab === "qa" ? `2px solid ${ACCENT}` : "2px solid transparent",
           }}
         >
@@ -1032,8 +1032,8 @@ export function AIQAPage({
           onClick={() => setMainTab("reports")}
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
-            color:        mainTab === "reports" ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.60)",
-            background:   mainTab === "reports" ? "rgba(88,101,242,0.20)" : "transparent",
+            color:        mainTab === "reports" ? ACCENT : TEXT_SECONDARY,
+            background:   mainTab === "reports" ? "rgba(88,101,242,0.08)" : "transparent",
             borderBottom: mainTab === "reports" ? `2px solid ${ACCENT}` : "2px solid transparent",
           }}
         >
