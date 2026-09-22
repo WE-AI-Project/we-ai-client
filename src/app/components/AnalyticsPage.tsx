@@ -5,8 +5,8 @@ import {
 } from "recharts";
 import { BarChart2, TrendingUp, GitCommit, CheckSquare, ListTodo } from "lucide-react";
 import {
-  BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  CONTENT_BG, BTN_DARK, UI_AMBER,
+  BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, ACCENT,
+  BRIGHT_BEIGE, BTN_DARK,
 } from "../colors";
 import {
   fetchProjectBranchGraph,
@@ -25,11 +25,14 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 }
 
 const RANGES = ["7 Days", "14 Days", "30 Days"] as const;
+const SURFACE_BG = "#FFFFFF";
+const SURFACE_BORDER = "rgba(27,31,58,0.18)";
+const CHART_GRID = "rgba(27,31,58,0.14)";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg px-3 py-2 text-[11px]" style={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${BORDER}`, boxShadow: "0 4px 16px rgba(0,0,0,0.08)" }}>
+    <div className="rounded-lg px-3 py-2 text-[11px]" style={{ background: SURFACE_BG, border: `1px solid ${SURFACE_BORDER}`, boxShadow: "0 6px 18px rgba(27,31,58,0.14)" }}>
       <p className="font-semibold mb-1" style={{ color: TEXT_PRIMARY }}>{label}</p>
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.stroke ?? p.fill }}>{p.name}: <strong>{p.value}</strong></p>
@@ -151,7 +154,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
   const completionRate = schedules.length > 0 ? Math.round((doneCount / schedules.length) * 100) : 0;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="w-full max-w-400 mx-auto space-y-4">
 
@@ -168,7 +171,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
                 <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>프로젝트 활동 · 작업 트렌드 (실제 커밋/일정 데이터)</p>
               )}
             </div>
-            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: SURFACE_BG, border: `1px solid ${SURFACE_BORDER}`, boxShadow: "0 2px 8px rgba(27,31,58,0.08)" }}>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="w-13 h-6 rounded-lg mx-0.5" />
@@ -201,7 +204,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
           <div className="grid grid-cols-4 gap-2.5">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                <div key={i} className="rounded-xl p-3.5" style={{ background: SURFACE_BG, border: `1px solid ${SURFACE_BORDER}`, boxShadow: "0 2px 8px rgba(27,31,58,0.06)" }}>
                   <Skeleton className="w-6 h-6 rounded-lg mb-2" />
                   <Skeleton className="w-12 h-5 mb-1" />
                   <Skeleton className="w-20 h-2.5" />
@@ -209,19 +212,19 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
               ))
             ) : (
               [
-                { label: "Commits",         value: totalCommits,        color: ACCENT,    bg: "rgba(88,101,242,0.07)",  icon: GitCommit   },
-                { label: "Tasks Done",      value: totalTasksDone,      color: "#10b981", bg: "rgba(16,185,129,0.07)", icon: CheckSquare },
-                { label: "Open Tasks",      value: openTasks,           color: UI_AMBER, bg: "rgba(245,158,11,0.07)", icon: ListTodo    },
-                { label: "Completion Rate", value: `${completionRate}%`, color: "#8b5cf6", bg: "rgba(139,92,246,0.07)", icon: TrendingUp },
+                { label: "Commits",         value: totalCommits,        color: ACCENT,    bg: "rgba(88,101,242,0.14)",  icon: GitCommit   },
+                { label: "Tasks Done",      value: totalTasksDone,      color: "#15803D", bg: "rgba(22,163,74,0.14)",  icon: CheckSquare },
+                { label: "Open Tasks",      value: openTasks,           color: "#C2410C", bg: "rgba(234,88,12,0.14)",  icon: ListTodo    },
+                { label: "Completion Rate", value: `${completionRate}%`, color: "#6D28D9", bg: "rgba(109,40,217,0.13)", icon: TrendingUp },
               ].map(s => {
                 const Icon = s.icon;
                 return (
-                  <div key={s.label} className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
+                  <div key={s.label} className="rounded-xl p-3.5" style={{ background: SURFACE_BG, border: `1px solid ${SURFACE_BORDER}`, boxShadow: "0 2px 8px rgba(27,31,58,0.06)" }}>
                     <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: s.bg }}>
                       <Icon className="w-3 h-3" style={{ color: s.color }} />
                     </div>
                     <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_LABEL }}>{s.label}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_SECONDARY }}>{s.label}</p>
                   </div>
                 );
               })
@@ -229,7 +232,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
           </div>
 
           {/* ── 일별 활동 라인 차트 ── */}
-          <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+          <div className="rounded-2xl p-4" style={{ background: SURFACE_BG, border: `1px solid ${SURFACE_BORDER}`, boxShadow: "0 3px 12px rgba(27,31,58,0.07)" }}>
             {isLoading ? (
               <>
                 <Skeleton className="w-64 h-3.5 mb-4" />
@@ -240,13 +243,13 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
                 <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Daily Activity — Commits & Task Completions</p>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart id="analytics-daily-line" data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                    <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+                    <CartesianGrid stroke={CHART_GRID} strokeDasharray="4 4" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 10, color: TEXT_TERTIARY }} iconType="circle" iconSize={6} />
                     <Line key="line-commits" type="monotone" dataKey="commits" name="Commits" stroke={ACCENT}    strokeWidth={2} dot={{ r: 2, fill: ACCENT }}    activeDot={{ r: 4 }} />
-                    <Line key="line-tasks"   type="monotone" dataKey="tasks"   name="Tasks"   stroke="#10b981"   strokeWidth={2} dot={{ r: 2, fill: "#10b981" }} activeDot={{ r: 4 }} />
+                    <Line key="line-tasks"   type="monotone" dataKey="tasks"   name="Tasks"   stroke="#15803D"   strokeWidth={2} dot={{ r: 2, fill: "#15803D" }} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </>
@@ -254,7 +257,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
           </div>
 
           {/* ── 주별 태스크 막대 차트 ── */}
-          <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+          <div className="rounded-2xl p-4" style={{ background: SURFACE_BG, border: `1px solid ${SURFACE_BORDER}`, boxShadow: "0 3px 12px rgba(27,31,58,0.07)" }}>
             {isLoading ? (
               <>
                 <Skeleton className="w-40 h-3.5 mb-4" />
@@ -265,14 +268,14 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
                 <p className="text-xs font-semibold mb-3" style={{ color: TEXT_PRIMARY }}>Weekly Task Progress</p>
                 <ResponsiveContainer width="100%" height={150}>
                   <BarChart id="analytics-weekly-bar" data={weeklyTasks} margin={{ top: 4, right: 8, left: -24, bottom: 0 }} barSize={12}>
-                    <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="4 4" vertical={false} />
+                    <CartesianGrid stroke={CHART_GRID} strokeDasharray="4 4" vertical={false} />
                     <XAxis dataKey="week" tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fontSize: 8, fill: TEXT_TERTIARY }} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 10, color: TEXT_TERTIARY }} iconType="circle" iconSize={6} />
-                    <Bar key="bar-done"    dataKey="done"    name="Done"    fill="#10b981" radius={[3,3,0,0]} />
+                    <Bar key="bar-done"    dataKey="done"    name="Done"    fill="#15803D" radius={[3,3,0,0]} />
                     <Bar key="bar-todo"    dataKey="todo"    name="To Do"   fill={ACCENT}  radius={[3,3,0,0]} />
-                    <Bar key="bar-backlog" dataKey="backlog" name="Backlog" fill="#d1d5db" radius={[3,3,0,0]} />
+                    <Bar key="bar-backlog" dataKey="backlog" name="Backlog" fill="#94A3B8" radius={[3,3,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </>

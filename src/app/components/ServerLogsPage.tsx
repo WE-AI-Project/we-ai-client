@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Terminal, Play, Square, Trash2, Search, RefreshCw, WifiOff } from "lucide-react";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-  ACCENT, CONTENT_BG,
+  ACCENT, BRIGHT_BEIGE,
   TERM_BG, TERM_HEADER, TERM_TEXT, TERM_MUTED, TERM_GREEN, TERM_DIM, BTN_DARK, UI_RED,
 } from "../colors";
 import {
@@ -292,7 +292,7 @@ export function ServerLogsPage({ projectId, connectionVersion = 0 }: ServerLogsP
   const warnCount = logs.filter((l) => l.level === "WARN").length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden p-4 gap-3">
         <div className="w-full max-w-[1600px] mx-auto flex flex-col flex-1 gap-3 overflow-hidden">
 

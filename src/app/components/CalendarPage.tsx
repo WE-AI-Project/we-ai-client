@@ -26,7 +26,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  BRIGHT_BEIGE, CREAM, CONTENT_BG, BEIGE, UI_RED,
+  BRIGHT_BEIGE, CREAM, BEIGE, UI_RED,
 } from "../colors";
 
 function mapBackendDepartmentToDept(dept?: string): Dept {
@@ -815,7 +815,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   };
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+    <div className="w-full h-full flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 flex overflow-hidden h-full">
 
         {/* ══ 왼쪽: 사이드 패널 ══ */}
