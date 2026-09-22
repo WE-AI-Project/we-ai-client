@@ -802,7 +802,7 @@ export default function App() {
         onDrop={() => handleTabDrop(panelType)}
       >
         {shouldShowTabs && (
-          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "rgba(0,0,0,0.20)", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "34px" }}>
+          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "rgba(0,0,0,0.03)", borderBottom: "1px solid rgba(27,31,58,0.10)", height: "34px" }}>
             {tabs.map(tId => {
               const tabLabel = TAB_LABELS[tId];
 
@@ -824,9 +824,9 @@ export default function App() {
                     width: HEADER_TAB_WIDTH,
                     minWidth: HEADER_TAB_WIDTH,
                     maxWidth: HEADER_TAB_WIDTH,
-                    color: activeTab === tId ? TERM_TEXT : TERM_MUTED,
+                    color: activeTab === tId ? "#1B1F3A" : "#656B91",
                     background: activeTab === tId ? CONTENT_BG : "transparent",
-                    borderRight: "1px solid rgba(255,255,255,0.08)",
+                    borderRight: "1px solid rgba(27,31,58,0.08)",
                     borderTop: activeTab === tId ? `2px solid ${ACCENT}` : "2px solid transparent"
                   }}
                   title={tabLabel}
@@ -878,7 +878,7 @@ export default function App() {
               {renderPage(activeTab)}
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-xs text-white/30">
+            <div className="h-full flex items-center justify-center text-xs" style={{ color: "#767DA6" }}>
               열려있는 메뉴가 없습니다.
             </div>
           )}
@@ -917,7 +917,7 @@ export default function App() {
             className="absolute top-0 bottom-0 w-2 hover:bg-[#5865F2]/60 cursor-col-resize z-30 transition-colors"
             style={{
               left: `calc(${splitPercent}% - 4px)`,
-              background: "linear-gradient(90deg, transparent 45%, rgba(255,255,255,0.16) 45%, rgba(255,255,255,0.16) 55%, transparent 55%)",
+              background: "linear-gradient(90deg, transparent 45%, rgba(27,31,58,0.16) 45%, rgba(27,31,58,0.16) 55%, transparent 55%)",
             }}
             title="드래그하여 크기 조절"
           />
