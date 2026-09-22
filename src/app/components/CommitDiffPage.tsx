@@ -34,10 +34,14 @@ import {
 } from "../lib/api";
 import {
   ACCENT,
-  ACCENT_BG,
-  CONTENT_BG,
+  BORDER,
+  BORDER_SUBTLE,
+  CREAM,
+  TEXT_PRIMARY,
   TEXT_ON_DARK,
   TEXT_ON_DARK_MUTED,
+  TEXT_SECONDARY,
+  TEXT_TERTIARY,
   TERM_TEXT,
   TERM_MUTED,
   UI_RED,
@@ -67,9 +71,7 @@ export type PartConfig = {
   icon: typeof Server;
 };
 
-const PANEL_BG = CONTENT_BG;
-const NAVY_SURFACE = "rgba(255,255,255,0.06)";
-const NAVY_BORDER = "rgba(255,255,255,0.12)";
+const PANEL_BG = CREAM;
 
 const KNOWN_PART_CONFIGS: Record<string, PartConfig> = {
   BACKEND: {
@@ -352,28 +354,28 @@ function CommitRow({
       onClick={onClick}
       className="w-full px-3 py-2.5 text-left transition-all"
       style={{
-        borderBottom: `1px solid ${NAVY_BORDER}`,
-        background: selected ? "rgba(88,101,242,0.22)" : "transparent",
+        borderBottom: `1px solid ${BORDER_SUBTLE}`,
+        background: selected ? "rgba(99,91,255,0.05)" : "transparent",
         borderLeft: selected ? `2px solid ${accent}` : "2px solid transparent",
       }}
     >
       <div className="mb-1 flex items-center gap-2">
         <span
           className="rounded px-1.5 py-0.5 font-mono text-[9px]"
-          style={{ background: NAVY_SURFACE, color: selected ? "#BFC5FF" : TEXT_ON_DARK_MUTED }}
+          style={{ background: "rgba(0,0,0,0.05)", color: selected ? ACCENT : TEXT_TERTIARY }}
         >
           {commit.shortCommitHash}
         </span>
-        <span className="ml-auto text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
+        <span className="ml-auto text-[9px]" style={{ color: TEXT_TERTIARY }}>
           {formatCommittedAt(commit.committedAt)}
         </span>
       </div>
 
-      <p className="mb-1 line-clamp-2 text-[11px] font-medium" style={{ color: TEXT_ON_DARK }}>
+      <p className="mb-1 line-clamp-2 text-[11px] font-medium" style={{ color: TEXT_PRIMARY }}>
         {commit.message}
       </p>
 
-      <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
+      <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
         <span className="inline-flex items-center gap-1">
           <User className="h-2.5 w-2.5" />
           {commit.authorName}
@@ -409,21 +411,21 @@ function FileRow({
       onClick={onClick}
       className="w-full px-3 py-2.5 text-left transition-all"
       style={{
-        borderBottom: `1px solid ${NAVY_BORDER}`,
-        background: selected ? "rgba(88,101,242,0.22)" : "transparent",
+        borderBottom: `1px solid ${BORDER_SUBTLE}`,
+        background: selected ? "rgba(99,91,255,0.05)" : "transparent",
         borderLeft: selected ? `2px solid ${accent}` : "2px solid transparent",
       }}
     >
       <div className="mb-1 flex items-center gap-2">
-        <FolderCode className="h-3.5 w-3.5 shrink-0" style={{ color: TEXT_ON_DARK_MUTED }} />
-        <span className="flex-1 truncate text-[11px] font-medium" style={{ color: TEXT_ON_DARK }}>
+        <FolderCode className="h-3.5 w-3.5 shrink-0" style={{ color: TEXT_TERTIARY }} />
+        <span className="flex-1 truncate text-[11px] font-medium" style={{ color: TEXT_PRIMARY }}>
           {file.name}
         </span>
         <span className="text-[9px] font-bold" style={{ color: statusColor }}>
           {statusLabel}
         </span>
       </div>
-      <p className="mb-1 truncate text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
+      <p className="mb-1 truncate text-[9px]" style={{ color: TEXT_TERTIARY }}>
         {file.path}
       </p>
       <div className="flex items-center gap-2 text-[9px]">
@@ -464,21 +466,20 @@ function RepoColumn({
         width: isSplit ? "100%" : 420,
         minWidth: isSplit ? 340 : 420,
         flex: isSplit ? "1 1 0" : "none",
-        borderRight: `1px solid ${NAVY_BORDER}`,
-        background: CONTENT_BG,
+        borderRight: `1px solid ${BORDER}`,
       }}
     >
       {/* 1. 커밋 목록 컬럼 */}
-      <div className="flex w-1/2 shrink-0 flex-col overflow-hidden" style={{ borderRight: `1px solid ${NAVY_BORDER}` }}>
-        <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${NAVY_BORDER}` }}>
+      <div className="flex w-1/2 shrink-0 flex-col overflow-hidden" style={{ borderRight: `1px solid ${BORDER}` }}>
+        <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
           <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
-          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }} title={label}>
+          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }} title={label}>
             {isSplit && shortLabel ? shortLabel : label}
           </p>
-          <GitBranch className="ml-auto h-3 w-3 shrink-0" style={{ color: TEXT_ON_DARK_MUTED }} />
+          <GitBranch className="ml-auto h-3 w-3 shrink-0" style={{ color: TEXT_TERTIARY }} />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
           {state.loading ? (
             <div className="space-y-3 px-3 py-3">
               {Array.from({ length: 5 }).map((_, index) => (
@@ -494,7 +495,7 @@ function RepoColumn({
               {state.error}
             </div>
           ) : state.commits.length === 0 ? (
-            <div className="px-3 py-4 text-[11px]" style={{ color: TEXT_ON_DARK_MUTED }}>
+            <div className="px-3 py-4 text-[11px]" style={{ color: TEXT_TERTIARY }}>
               조회된 커밋이 없습니다.
             </div>
           ) : (
@@ -513,16 +514,16 @@ function RepoColumn({
 
       {/* 2. 변경 파일 목록 컬럼 */}
       <div className="flex w-1/2 shrink-0 flex-col overflow-hidden">
-        <div className="px-3 py-2" style={{ borderBottom: `1px solid ${NAVY_BORDER}` }}>
-          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }}>
+        <div className="px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          <p className="truncate text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>
             {selectedDetail?.message ?? "Changed Files"}
           </p>
-          <p className="mt-1 truncate text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
+          <p className="mt-1 truncate text-[9px]" style={{ color: TEXT_TERTIARY }}>
             {formatCommitHeader(selectedDetail)}
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
           {state.loadingCommitHash ? (
             <div className="space-y-3 px-3 py-3">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -533,7 +534,7 @@ function RepoColumn({
               ))}
             </div>
           ) : files.length === 0 ? (
-            <div className="px-3 py-4 text-[11px]" style={{ color: TEXT_ON_DARK_MUTED }}>
+            <div className="px-3 py-4 text-[11px]" style={{ color: TEXT_TERTIARY }}>
               변경 파일이 없습니다.
             </div>
           ) : (
@@ -863,22 +864,22 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: CONTENT_BG }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: "#ffffff" }} />
 
       {/* 상단 툴바 */}
       <div
         className="relative z-10 flex h-10 shrink-0 items-center gap-3 px-4"
-        style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
+        style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,250,250,0.98)" }}
       >
         <GitCommit className="h-3.5 w-3.5" style={{ color: ACCENT }} />
-        <p className="text-xs font-semibold" style={{ color: TEXT_ON_DARK }}>
+        <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>
           Commit History
         </p>
 
         {/* 파트 수 표시 뱃지 */}
         <span
           className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-          style={{ background: NAVY_SURFACE, color: TEXT_ON_DARK_MUTED }}
+          style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
         >
           {activeParts.length} Parts
         </span>
@@ -887,7 +888,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         {!isSplit && (
           <div
             className="ml-2 flex items-center gap-1 rounded-lg p-0.5 overflow-x-auto"
-            style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}
+            style={{ background: "rgba(0,0,0,0.06)", border: `1px solid ${BORDER}` }}
           >
             {activeParts.map((partKey) => {
               const cfg = getPartConfig(partKey);
@@ -900,11 +901,12 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
                   onClick={() => setSelectedPart(partKey)}
                   className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold transition-all whitespace-nowrap"
                   style={{
-                    background: isSelected ? "rgba(255,255,255,0.12)" : "transparent",
-                    color: isSelected ? TEXT_ON_DARK : TEXT_ON_DARK_MUTED,
+                    background: isSelected ? "#ffffff" : "transparent",
+                    color: isSelected ? TEXT_PRIMARY : TEXT_TERTIARY,
+                    boxShadow: isSelected ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
                   }}
                 >
-                  <Icon className="w-3 h-3" style={{ color: isSelected ? cfg.accent : TEXT_ON_DARK_MUTED }} />
+                  <Icon className="w-3 h-3" style={{ color: isSelected ? cfg.accent : TEXT_TERTIARY }} />
                   <span>{cfg.shortLabel}</span>
                 </button>
               );
@@ -915,7 +917,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         {/* 2. 스플릿 모드일 때: 활성화된 파트 목록 태그들 */}
         {isSplit && (
           <div className="ml-2 flex items-center gap-1.5 overflow-x-auto">
-            <span className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK_MUTED }}>
+            <span className="text-[10px] font-semibold" style={{ color: TEXT_TERTIARY }}>
               전체 분배:
             </span>
             {activeParts.map((partKey) => {
@@ -945,17 +947,17 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
           onClick={() => setIsSplit((prev) => !prev)}
           className="ml-auto flex items-center gap-2 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
           style={{
-            background: isSplit ? ACCENT_BG : NAVY_SURFACE,
-            border: `1px solid ${isSplit ? ACCENT : NAVY_BORDER}`,
-            color: isSplit ? ACCENT : TEXT_ON_DARK_MUTED,
+            background: isSplit ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.04)",
+            border: `1px solid ${isSplit ? ACCENT : BORDER}`,
+            color: isSplit ? ACCENT : TEXT_SECONDARY,
           }}
           title={isSplit ? "스플릿 뷰 끄기 (단일 파트 선택 보기)" : "스플릿 뷰 켜기 (프로젝트 파트 수 분배 보기)"}
         >
-          <Columns2 className="w-3.5 h-3.5" style={{ color: isSplit ? ACCENT : TEXT_ON_DARK_MUTED }} />
+          <Columns2 className="w-3.5 h-3.5" style={{ color: isSplit ? ACCENT : TEXT_SECONDARY }} />
           <span>Split View</span>
           <div
             className="w-6 h-3.5 rounded-full transition-colors relative flex items-center px-0.5"
-            style={{ background: isSplit ? ACCENT : "rgba(255,255,255,0.22)" }}
+            style={{ background: isSplit ? ACCENT : "rgba(0,0,0,0.18)" }}
           >
             <div
               className="w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-xs"
@@ -965,7 +967,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
         </button>
 
         {/* 커밋 통계 */}
-        <div className="flex items-center gap-2.5 text-[10px] border-l pl-3" style={{ borderColor: NAVY_BORDER, color: TEXT_ON_DARK_MUTED }}>
+        <div className="flex items-center gap-2.5 text-[10px] border-l pl-3" style={{ borderColor: BORDER, color: TEXT_TERTIARY }}>
           <span>{totalStats.commitCount} commits</span>
           <span style={{ color: "#10b981" }}>+{totalStats.additions}</span>
           <span style={{ color: UI_RED }}>-{totalStats.deletions}</span>
@@ -995,7 +997,7 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
             style={{
               width: isSplit ? `${Math.min(100, activeParts.length * 420)}px` : "420px",
               maxWidth: isSplit ? "75%" : "420px",
-              borderRight: `1px solid ${NAVY_BORDER}`,
+              borderRight: `1px solid ${BORDER}`,
             }}
           >
             {isSplit ? (

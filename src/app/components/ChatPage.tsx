@@ -28,7 +28,7 @@ import {
 } from "../../api/aiApi";
 
 import {
-  BORDER, BORDER_SUBTLE, CONTENT_BG, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, TEXT_ON_DARK, TEXT_ON_DARK_MUTED, ACCENT,
+  BORDER, BORDER_SUBTLE, BRIGHT_BEIGE, CREAM, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
   UI_GREEN, UI_RED, UI_AMBER, UI_BLUE,
   OLIVE_DARK,
 } from "../colors";
@@ -53,9 +53,13 @@ import {
 } from "../lib/api";
 
 const ALLOWED_BRIEFING_EXTENSIONS = ["pdf", "txt", "md", "doc", "docx", "ppt", "pptx"];
-const NAVY_SURFACE = "rgba(255,255,255,0.06)";
-const NAVY_SURFACE_STRONG = "rgba(255,255,255,0.10)";
-const NAVY_BORDER = "rgba(255,255,255,0.12)";
+const CONTENT_BG = BRIGHT_BEIGE;
+const CHAT_CANVAS = BRIGHT_BEIGE;
+const NAVY_SURFACE = CREAM;
+const NAVY_SURFACE_STRONG = "#FFFFFF";
+const NAVY_BORDER = BORDER;
+const TEXT_ON_DARK = TEXT_PRIMARY;
+const TEXT_ON_DARK_MUTED = TEXT_SECONDARY;
 
 function normalizeChatRoomName(name: string) {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
@@ -74,8 +78,8 @@ export type BriefingData = {
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
-      style={style}
+      className={`animate-pulse rounded-md ${className || ""}`}
+      style={{ background: "rgba(88,101,242,0.16)", ...style }}
     />
   );
 }
@@ -1177,7 +1181,7 @@ export function ChatPage({
                   className="flex items-center gap-1.5 px-3 h-full text-[11px] font-semibold transition-all border-b-2"
                   style={{
                     height: 44,
-                    color: mainTab === tab.id ? "#BFC5FF" : TEXT_ON_DARK_MUTED,
+                    color: mainTab === tab.id ? ACCENT : TEXT_ON_DARK_MUTED,
                     borderBottomColor: mainTab === tab.id ? OLIVE_DARK : "transparent",
                     background: tab.id === "ai" && mainTab === "ai" ? NAVY_SURFACE : "transparent",
                   }}
@@ -1371,7 +1375,7 @@ export function ChatPage({
                     {/* 마우스 호버 시 전체 팀원 목록 팝업창 */}
                     {displayMembers.length > 0 && (
                       <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 p-3 rounded-xl shadow-xl z-50 min-w-37.5" style={{ background: CONTENT_BG, border: `1px solid ${NAVY_BORDER}` }}>
-                        <div className="text-[10px] font-bold pb-1.5 border-b border-white/10 text-white/80 flex items-center justify-between">
+                        <div className="text-[10px] font-bold pb-1.5 border-b flex items-center justify-between" style={{ borderColor: BORDER, color: TEXT_PRIMARY }}>
                           <span>전체 팀원 목록</span>
                           <span className="text-[9px] font-normal text-gray-400">{displayMembers.length}명</span>
                         </div>
@@ -1387,8 +1391,8 @@ export function ChatPage({
                                 >
                                   {name[0]}
                                 </div>
-                                <span className="text-[11px] font-semibold text-white/85 truncate">{name}</span>
-                                {role && <span className="text-[9px] text-white/50 ml-auto shrink-0">{role}</span>}
+                                <span className="text-[11px] font-semibold truncate" style={{ color: TEXT_PRIMARY }}>{name}</span>
+                                {role && <span className="text-[9px] ml-auto shrink-0" style={{ color: TEXT_TERTIARY }}>{role}</span>}
                               </div>
                             );
                           })}
@@ -1400,7 +1404,7 @@ export function ChatPage({
               })()}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CONTENT_BG }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
               {isLoadingMessages ? (
                 <div className="space-y-4">
                   {Array.from({ length: 4 }).map((_, i) => {
@@ -1468,7 +1472,7 @@ export function ChatPage({
                     className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-semibold transition-all disabled:opacity-50"
                     style={{
                       background: briefingLoading ? NAVY_SURFACE : "rgba(112,130,56,0.14)",
-                      color: briefingLoading ? TEXT_ON_DARK_MUTED : "#B8F5D0",
+                      color: briefingLoading ? TEXT_ON_DARK_MUTED : OLIVE_DARK,
                       border: `1px solid ${briefingLoading ? NAVY_BORDER : "rgba(112,130,56,0.35)"}`,
                       cursor: briefingLoading || isLoadingMessages ? "not-allowed" : "pointer",
                     }}
@@ -1610,7 +1614,7 @@ export function ChatPage({
                           className="rounded-lg px-1.5 py-1.5 text-[8px] font-semibold transition-all disabled:opacity-50"
                           style={{
                             border: `1px solid ${selected ? OLIVE_DARK : NAVY_BORDER}`,
-                            color: selected ? "#B8F5D0" : TEXT_ON_DARK_MUTED,
+                            color: selected ? OLIVE_DARK : TEXT_ON_DARK_MUTED,
                             background: selected ? "rgba(112,130,56,0.16)" : NAVY_SURFACE,
                           }}
                         >
@@ -1638,7 +1642,7 @@ export function ChatPage({
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CONTENT_BG }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
               {isLoadingRooms ? (
                 <div className="flex gap-2.5 items-start mb-4">
                   <Skeleton className="w-7 h-7 rounded-full shrink-0" />
@@ -1731,11 +1735,11 @@ export function ChatPage({
                 <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>AI 한글화 문서 포함</span>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: CONTENT_BG }}>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: CHAT_CANVAS }}>
               {isLoadingDocs ? (
                 /* [스켈레톤] 문서 카드들 */
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-xl p-3 border border-white/10 space-y-2" style={{ background: NAVY_SURFACE }}>
+                  <div key={i} className="rounded-xl p-3 border space-y-2" style={{ background: NAVY_SURFACE, borderColor: BORDER }}>
                     <div className="flex gap-2 items-center">
                       <Skeleton className="w-6 h-6 rounded-lg" />
                       <Skeleton className="h-4 w-1/2" />
