@@ -80,7 +80,7 @@ import {
 import {
   SIDEBAR_BG, SIDEBAR_HOVER, SIDEBAR_ACTIVE,
   GRADIENT_LOGO, GRADIENT_SIDEBAR, GRADIENT_OUTER,
-  CONTENT_BG, ACCENT,
+  TITLEBAR_BG, CONTENT_BG, ACCENT,
   SIDEBAR_TEXT, SIDEBAR_TEXT_ACTIVE, SIDEBAR_TEXT_HOVER,
   SIDEBAR_TEXT_LABEL, SIDEBAR_BORDER,
   TERM_BG, TERM_HEADER, TERM_TEXT, TERM_MUTED, BTN_DARK,
@@ -796,13 +796,13 @@ export default function App() {
     return (
       <div
         className="size-full flex flex-col overflow-hidden transition-colors duration-200"
-        style={{ background: TERM_BG }}
+        style={{ background: CONTENT_BG }}
         onClickCapture={() => setActivePanel(panelType)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={() => handleTabDrop(panelType)}
       >
         {shouldShowTabs && (
-          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: TERM_HEADER, borderBottom: "1px solid rgba(255,255,255,0.08)", height: "34px" }}>
+          <div className="flex items-center shrink-0 overflow-x-auto select-none" style={{ background: "rgba(0,0,0,0.20)", borderBottom: "1px solid rgba(255,255,255,0.08)", height: "34px" }}>
             {tabs.map(tId => {
               const tabLabel = TAB_LABELS[tId];
 
@@ -825,7 +825,7 @@ export default function App() {
                     minWidth: HEADER_TAB_WIDTH,
                     maxWidth: HEADER_TAB_WIDTH,
                     color: activeTab === tId ? TERM_TEXT : TERM_MUTED,
-                    background: activeTab === tId ? TERM_BG : "transparent",
+                    background: activeTab === tId ? CONTENT_BG : "transparent",
                     borderRight: "1px solid rgba(255,255,255,0.08)",
                     borderTop: activeTab === tId ? `2px solid ${ACCENT}` : "2px solid transparent"
                   }}
@@ -1126,7 +1126,7 @@ export default function App() {
 
       <div
         className="flex-1 flex flex-col overflow-hidden relative"
-        style={{ background: SIDEBAR_BG, ...focusRingStyle }}
+        style={{ background: TITLEBAR_BG, ...focusRingStyle }}
       >
         {/* 커스텀 타이틀바 — VS Code 스타일 단일 타이틀바 (탭 바 없음, 좌/중/우 3열 그리드).
             OS 기본 타이틀바는 frame:false(Frameless Window)로 제거되었고, 이 바가 그 자리를 대신한다.
@@ -1138,7 +1138,7 @@ export default function App() {
           style={{
             gridTemplateColumns: "auto 1fr auto",
             borderBottom: `1px solid ${SIDEBAR_BORDER}`,
-            background: GRADIENT_SIDEBAR,
+            background: TITLEBAR_BG,
             WebkitAppRegion: "drag",
           } as React.CSSProperties}
         >
