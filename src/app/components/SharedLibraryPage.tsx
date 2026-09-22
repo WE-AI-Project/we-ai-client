@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BookOpen, Search, FileText, Download, File, Code2, BookMarked, Layers, Plus, X, Loader2, Trash2 } from "lucide-react";
+import { BookOpen, Search, FileText, Download, File, Code2, BookMarked, Layers, Plus, X, Loader2, Trash2, MessagesSquare } from "lucide-react";
 import { toast } from "sonner";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
@@ -380,9 +380,20 @@ export function SharedLibraryPage({ projectId }: { projectId: number }) {
                         </div>
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold truncate" style={{ color: TEXT_PRIMARY }}>{r.title}</p>
-                          <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded inline-block mt-0.5" style={{ background: cm.bg, color: cm.color }}>
-                            {CATEGORY_LABEL[r.category]}
-                          </span>
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded inline-block" style={{ background: cm.bg, color: cm.color }}>
+                              {CATEGORY_LABEL[r.category]}
+                            </span>
+                            {r.source === "MEETING" && (
+                              <span
+                                className="flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded inline-block"
+                                style={{ background: "rgba(88,101,242,0.10)", color: ACCENT }}
+                                title="채팅/회의 문서 업로드에서 자동으로 동기화된 자료입니다."
+                              >
+                                <MessagesSquare className="w-2.5 h-2.5" /> 회의 자동 업로드
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: fm.bg, color: fm.color }}>

@@ -2035,11 +2035,13 @@ export async function fetchQaReportDetail(
 // ── 공유 자료실 (Shared Library) ──
 
 export type LibraryResourceCategory = "DOCS" | "GUIDE" | "REFERENCE" | "TEMPLATE";
+export type LibraryResourceSource = "MANUAL" | "MEETING";
 
 export type LibraryResource = {
   id: number;
   title: string;
   category: LibraryResourceCategory;
+  source: LibraryResourceSource;
   description: string | null;
   originalFileName: string;
   fileUrl: string;
