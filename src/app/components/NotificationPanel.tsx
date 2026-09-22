@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import {
   Bell, GitCommit, Bot, AlertCircle,
   CheckCircle2, Info, Check, CheckCheck,
-  ChevronRight, ChevronLeft, Trash2, X, Search, Filter
+  ChevronRight, ChevronLeft, Trash2, X
 } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
@@ -58,8 +58,6 @@ export const getNotificationStyle = (type: string) => {
   }
 };
 
-type FilterType = "all" | "unread" | "info" | "success" | "warning" | "error";
-
 interface NotificationPanelProps {
   projectId?: number | string;
   onViewAll?: () => void;
@@ -67,15 +65,20 @@ interface NotificationPanelProps {
 
 export function NotificationPanel({ projectId, onViewAll }: NotificationPanelProps) {
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [anim, setAnim] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("all");
   const panelRef = useRef<HTMLDivElement>(null);
 
   const unread = notifs.filter(n => !n.isRead).length;
+
+  // 창이 닫히면 전체보기 상태도 기본 닫힘(false)으로 초기화
+  useEffect(() => {
+    if (!open) {
+      setShowAll(false);
+    }
+  }, [open]);
 
   // 패널 열릴 때 애니메이션
   useEffect(() => {
@@ -208,31 +211,13 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
     onViewAll?.();
   };
 
-  // 좌측 전체 알림창 필터링 & 검색
-  const filteredAllNotifs = useMemo(() => {
-    return notifs.filter((n) => {
-      // 1) 탭 필터
-      if (filterType === "unread" && n.isRead) return false;
-      if (filterType !== "all" && filterType !== "unread" && n.type !== filterType) return false;
-
-      // 2) 검색어 필터
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchTitle = n.title?.toLowerCase().includes(q);
-        const matchBody = n.body?.toLowerCase().includes(q);
-        if (!matchTitle && !matchBody) return false;
-      }
-      return true;
-    });
-  }, [notifs, filterType, searchQuery]);
-
   const todayAllNotifs = useMemo(
-    () => filteredAllNotifs.filter(n => isToday(n.createdAt)),
-    [filteredAllNotifs]
+    () => notifs.filter(n => isToday(n.createdAt)),
+    [notifs]
   );
   const earlierAllNotifs = useMemo(
-    () => filteredAllNotifs.filter(n => !isToday(n.createdAt)),
-    [filteredAllNotifs]
+    () => notifs.filter(n => !isToday(n.createdAt)),
+    [notifs]
   );
 
   return (
@@ -271,7 +256,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
           }}
         >
           {/* ══════════════════════════════════════════════════════════
-              [1] 좌측: 전체 알림창 (알림 아이콘 누르면 바로 왼쪽에 나란히 뜸)
+              [1] 좌측: 전체 알림창 (알림 전체보기 클릭 시 바로 왼쪽에 나란히 뜸)
               ══════════════════════════════════════════════════════════ */}
           {showAll && (
             <div
@@ -349,82 +334,9 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 </div>
               </div>
 
-              {/* 1-2. 검색창 & 필터 바 */}
-              <div
-                className="px-4 py-2.5 shrink-0 space-y-2"
-                style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "#FBFBFE" }}
-              >
-                {/* 검색 인풋 */}
-                <div className="relative flex items-center">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 text-gray-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="알림 검색 (제목, 본문)..."
-                    className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border outline-none transition-all placeholder:text-gray-400"
-                    style={{
-                      borderColor: BORDER_SUBTLE,
-                      background: "#FFFFFF",
-                      color: TEXT_PRIMARY,
-                    }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = BORDER_SUBTLE; }}
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-2 text-gray-400 hover:text-gray-600 p-0.5"
-                      title="검색어 지우기"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                {/* 필터 칩 목록 */}
-                <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-                  <Filter className="w-3 h-3 text-gray-400 shrink-0 mr-0.5" />
-                  {(
-                    [
-                      { id: "all", label: "전체", count: notifs.length },
-                      { id: "unread", label: "미읽음", count: unread },
-                      { id: "info", label: "정보", count: notifs.filter(n => n.type === "info").length },
-                      { id: "success", label: "성공", count: notifs.filter(n => n.type === "success").length },
-                      { id: "warning", label: "경고", count: notifs.filter(n => n.type === "warning").length },
-                      { id: "error", label: "오류", count: notifs.filter(n => n.type === "error").length },
-                    ] as const
-                  ).map((item) => {
-                    const isActive = filterType === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => setFilterType(item.id)}
-                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 transition-all"
-                        style={{
-                          background: isActive ? ACCENT : "rgba(0,0,0,0.04)",
-                          color: isActive ? "#FFFFFF" : TEXT_SECONDARY,
-                        }}
-                      >
-                        <span>{item.label}</span>
-                        <span
-                          className="text-[9px] px-1 rounded-full font-bold"
-                          style={{
-                            background: isActive ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.06)",
-                            color: isActive ? "#FFFFFF" : TEXT_TERTIARY,
-                          }}
-                        >
-                          {item.count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 1-3. 전체 알림 스크롤 목록 */}
+              {/* 1-2. 전체 알림 스크롤 목록 */}
               <div className="flex-1 overflow-y-auto divide-y" style={{ borderColor: BORDER_SUBTLE }}>
-                {filteredAllNotifs.length === 0 ? (
+                {notifs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center"
@@ -433,24 +345,11 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                       <Bell className="w-5 h-5" style={{ color: ACCENT }} />
                     </div>
                     <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>
-                      표시할 알림이 없습니다
+                      알림이 없습니다
                     </p>
                     <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
-                      {searchQuery
-                        ? "검색 조건과 일치하는 알림이 없습니다."
-                        : filterType === "unread"
-                        ? "모든 알림을 확인했습니다."
-                        : "새로운 알림이 도착하면 여기에 표시됩니다."}
+                      새로운 알림이 도착하면 여기에 표시됩니다.
                     </p>
-                    {(searchQuery || filterType !== "all") && (
-                      <button
-                        onClick={() => { setSearchQuery(""); setFilterType("all"); }}
-                        className="text-[10px] font-semibold underline mt-1"
-                        style={{ color: ACCENT }}
-                      >
-                        필터 초기화
-                      </button>
-                    )}
                   </div>
                 ) : (
                   <div>
@@ -505,7 +404,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                 )}
               </div>
 
-              {/* 1-4. 전체 알림창 푸터 */}
+              {/* 1-3. 전체 알림창 푸터 */}
               <div
                 className="px-4 py-2 shrink-0 flex items-center justify-between text-[10px]"
                 style={{
@@ -514,7 +413,7 @@ export function NotificationPanel({ projectId, onViewAll }: NotificationPanelPro
                   color: TEXT_TERTIARY,
                 }}
               >
-                <span>총 {filteredAllNotifs.length}개 알림</span>
+                <span>총 {notifs.length}개 알림</span>
                 <span>알림 클릭 시 읽음 처리</span>
               </div>
             </div>
