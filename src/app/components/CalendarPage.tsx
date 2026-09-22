@@ -189,7 +189,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
     onColorChange(finalDept, {
       bg: customColor.bg,
-      color: customColor.bg
+      color: customColor.color
     });
 
     onSave({
@@ -843,7 +843,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                         border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
                       }}
                     >
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.color }} />
                       <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_ON_DARK_MUTED }}>{d}</span>
                       <div className={`flex items-center shrink-0 min-w-[16px] justify-end transition-all duration-200 ${!isSystemDept ? "group-hover:pr-5" : ""}`}>
                         <span className="text-[9px] font-mono" style={{ color: sel ? dc.color : TEXT_ON_DARK_MUTED }}>
@@ -1044,7 +1044,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
                   return (
                     <div key={d} className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full" style={{ background: dc.bg }} />
+                      <div className="w-2 h-2 rounded-full" style={{ background: dc.color }} />
                       <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>{d}</span>
                     </div>
                   );

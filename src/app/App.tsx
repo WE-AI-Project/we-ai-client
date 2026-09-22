@@ -55,6 +55,7 @@ import { loadProfile, saveProfile } from "./data/profileStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
 import { saveLastActiveProject, loadLastActiveProject, clearLastActiveProject } from "./data/activeProjectStore";
 import { NotificationPanel } from "./components/NotificationPanel";
+import { NotificationModal } from "./components/NotificationModal";
 import { WindowControls } from "./components/WindowControls";
 import { AuxTitleBar } from "./components/AuxTitleBar";
 import {
@@ -161,6 +162,7 @@ const NAV_ITEMS = [
   { id: "ServerBuild", icon: Terminal, label: "Server & Build" },
   { id: "Chat", icon: MessageCircle, label: "Chat" },
   { id: "Calendar", icon: CalendarDays, label: "Calendar" },
+  { id: "Tasks", icon: CheckSquare, label: "Tasks" },
   { id: "Galaxy", icon: Orbit, label: "SynAIpse Galaxy" },
   { id: "Analytics", icon: BarChart2, label: "Analytics" },
 ] as const;
@@ -286,6 +288,7 @@ export default function App() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [showStandup, setShowStandup] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
   const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
   const [showSystemMenu, setShowSystemMenu] = useState(false);
@@ -825,7 +828,7 @@ export default function App() {
                     color: activeTab === tId ? TERM_TEXT : TERM_MUTED,
                     background: activeTab === tId ? TERM_BG : "transparent",
                     borderRight: "1px solid rgba(255,255,255,0.08)",
-                    borderTop: activeTab === tId ? "2px solid #A67B5B" : "2px solid transparent"
+                    borderTop: activeTab === tId ? `2px solid ${ACCENT}` : "2px solid transparent"
                   }}
                   title={tabLabel}
                 >
@@ -1116,6 +1119,12 @@ export default function App() {
         />
       )}
 
+      <NotificationModal
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        projectId={projectId}
+      />
+
       <div
         className="flex-1 flex flex-col overflow-hidden relative"
         style={{ background: SIDEBAR_BG, ...focusRingStyle }}
@@ -1284,18 +1293,21 @@ export default function App() {
                 onClick={() => setShowStandup(true)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all"
                 style={{
-                  background: showStandup ? "rgba(166,123,91,0.20)" : "rgba(166,123,91,0.10)",
-                  color: "#D4CC9E",
-                  border: `1px solid rgba(166,123,91,0.18)`,
+                  background: showStandup ? "rgba(88,101,242,0.25)" : "rgba(88,101,242,0.12)",
+                  color: "#E2E8F0",
+                  border: `1px solid ${showStandup ? "rgba(88,101,242,0.5)" : "rgba(88,101,242,0.25)"}`,
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(166,123,91,0.20)"}
-                onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(166,123,91,0.20)" : "rgba(166,123,91,0.10)"}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(88,101,242,0.25)"}
+                onMouseLeave={e => e.currentTarget.style.background = showStandup ? "rgba(88,101,242,0.25)" : "rgba(88,101,242,0.12)"}
                 title="데일리 스탠드업 브리핑"
               >
-                <Sun className="w-3 h-3" />
+                <Sun className="w-3 h-3 text-amber-300" />
                 스탠드업
               </button>
-              <NotificationPanel projectId={projectId ?? undefined} />
+              <NotificationPanel
+                projectId={projectId ?? undefined}
+                onViewAll={() => setShowNotificationModal(true)}
+              />
             </div>
             <WindowControls />
           </div>

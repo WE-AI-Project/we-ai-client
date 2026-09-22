@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle,
@@ -1020,9 +1020,9 @@ export function AIQAPage({
           onClick={() => setMainTab("qa")}
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
-            color:        mainTab === "qa" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background:   mainTab === "qa" ? "rgba(166,123,91,0.18)" : "transparent",
-            borderBottom: mainTab === "qa" ? "2px solid #A67B5B"      : "2px solid transparent",
+            color:        mainTab === "qa" ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.60)",
+            background:   mainTab === "qa" ? "rgba(88,101,242,0.20)" : "transparent",
+            borderBottom: mainTab === "qa" ? `2px solid ${ACCENT}` : "2px solid transparent",
           }}
         >
           <ShieldCheck className="w-3.5 h-3.5" />
@@ -1032,9 +1032,9 @@ export function AIQAPage({
           onClick={() => setMainTab("agents")}
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
-            color:        mainTab === "agents" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background:   mainTab === "agents" ? "rgba(166,123,91,0.18)" : "transparent",
-            borderBottom: mainTab === "agents" ? "2px solid #A67B5B"      : "2px solid transparent",
+            color:        mainTab === "agents" ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.60)",
+            background:   mainTab === "agents" ? "rgba(88,101,242,0.20)" : "transparent",
+            borderBottom: mainTab === "agents" ? `2px solid ${ACCENT}` : "2px solid transparent",
           }}
         >
           <Bot className="w-3.5 h-3.5" />
