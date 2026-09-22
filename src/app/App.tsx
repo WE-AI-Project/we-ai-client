@@ -53,7 +53,6 @@ import { loadProfile, saveProfile } from "./data/profileStore";
 import { saveSettings, loadSettings } from "./data/projectSettingsStore";
 import { saveLastActiveProject, loadLastActiveProject, clearLastActiveProject } from "./data/activeProjectStore";
 import { NotificationPanel } from "./components/NotificationPanel";
-import { NotificationModal } from "./components/NotificationModal";
 import { WindowControls } from "./components/WindowControls";
 import { AuxTitleBar } from "./components/AuxTitleBar";
 import {
@@ -288,7 +287,6 @@ export default function App() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [showStandup, setShowStandup] = useState(false);
-  const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_EXPANDED);
   const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
   const [showSystemMenu, setShowSystemMenu] = useState(false);
@@ -1118,12 +1116,6 @@ export default function App() {
         />
       )}
 
-      <NotificationModal
-        isOpen={showNotificationModal}
-        onClose={() => setShowNotificationModal(false)}
-        projectId={projectId}
-      />
-
       <div
         className="flex-1 flex flex-col overflow-hidden relative"
         style={{ background: TITLEBAR_BG, ...focusRingStyle }}
@@ -1305,7 +1297,6 @@ export default function App() {
               </button>
               <NotificationPanel
                 projectId={projectId ?? undefined}
-                onViewAll={() => setShowNotificationModal(true)}
               />
             </div>
             <WindowControls />
