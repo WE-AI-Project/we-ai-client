@@ -5,6 +5,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   pickFolder: () => ipcRenderer.invoke("dialog:pick-folder"),
   pickFile: () => ipcRenderer.invoke("dialog:pick-file"),
   detectStack: (localPath) => ipcRenderer.invoke("stack:detect", localPath),
+  env: {
+    read: (localPath) => ipcRenderer.invoke("env:read", localPath),
+    write: (localPath, content) => ipcRenderer.invoke("env:write", localPath, content),
+  },
+  runtimeInfo: () => ipcRenderer.invoke("runtime:info"),
   loadCustomEndpoint: () => ipcRenderer.invoke("custom-endpoint:load"),
   saveCustomEndpoint: (draft) => ipcRenderer.invoke("custom-endpoint:save", draft),
   testCustomEndpoint: (draft) => ipcRenderer.invoke("custom-endpoint:test", draft),
