@@ -9,7 +9,7 @@ import {
 
 import {
   ChatMessage, MeetingDoc,
-  generateMeetingSummary, formatTime, formatDate, genId,
+  buildMeetingTranscript, formatTime, formatDate, genId,
 } from "../data/chatStore";
 
 import { briefingSummaryToMeetingDoc, meetingMinuteSummaryToMeetingDoc } from "../lib/docMappers";
@@ -25,10 +25,11 @@ import {
   type AiChatResponse,
   type DebateResponse,
   type SingleAgentResponse,
+  type ThinkingLevel,
 } from "../../api/aiApi";
 
 import {
-  BORDER, BORDER_SUBTLE, CONTENT_BG, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, TEXT_ON_DARK, TEXT_ON_DARK_MUTED, ACCENT,
+  BORDER, BORDER_SUBTLE, BRIGHT_BEIGE, CREAM, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
   UI_GREEN, UI_RED, UI_AMBER, UI_BLUE,
   OLIVE_DARK,
 } from "../colors";
@@ -53,9 +54,13 @@ import {
 } from "../lib/api";
 
 const ALLOWED_BRIEFING_EXTENSIONS = ["pdf", "txt", "md", "doc", "docx", "ppt", "pptx"];
-const NAVY_SURFACE = "rgba(255,255,255,0.06)";
-const NAVY_SURFACE_STRONG = "rgba(255,255,255,0.10)";
-const NAVY_BORDER = "rgba(255,255,255,0.12)";
+const CONTENT_BG = BRIGHT_BEIGE;
+const CHAT_CANVAS = BRIGHT_BEIGE;
+const NAVY_SURFACE = CREAM;
+const NAVY_SURFACE_STRONG = "#FFFFFF";
+const NAVY_BORDER = BORDER;
+const TEXT_ON_DARK = TEXT_PRIMARY;
+const TEXT_ON_DARK_MUTED = TEXT_SECONDARY;
 
 function normalizeChatRoomName(name: string) {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
@@ -74,8 +79,8 @@ export type BriefingData = {
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
-      style={style}
+      className={`animate-pulse rounded-md ${className || ""}`}
+      style={{ background: "rgba(88,101,242,0.16)", ...style }}
     />
   );
 }
@@ -88,7 +93,7 @@ function DocBriefingBubble({ briefing, savedToDoc, onViewDoc, time }: { briefing
       </div>
       <div className="flex-1 max-w-[85%] flex flex-col gap-1">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-[9px] font-semibold" style={{ color: "#5A8A4A" }}>WE&AI Briefing</span>
+          <span className="text-[9px] font-semibold" style={{ color: "#5A8A4A" }}>SynAIpse Briefing</span>
           <span className="text-[8px] px-1.5 py-0.5 rounded-full border" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER, color: TEXT_ON_DARK_MUTED }}>System</span>
         </div>
         <div className="rounded-2xl p-3" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}`, boxShadow: "0 1px 4px rgba(0,0,0,0.20)" }}>
@@ -159,25 +164,20 @@ interface AIMsg {
   data?: any;
 }
 
+// "rag" 모드(일반 대화)는 AiChatService(시스템 프롬프트: "You are Oracle...")가 항상 응답을
+// 생성하므로 언제나 Oracle 답변이다. "agent" 모드는 사용자가 고른 에이전트가 ORACLE일 때만.
+// "debate" 모드는 여러 에이전트가 함께 참여하므로(단일 AI 대화가 아님) 뱃지 대상에서 제외한다.
+function isOracleAnswer(msg: AIMsg): boolean {
+  if (msg.kind === "rag") return true;
+  if (msg.kind === "agent") return (msg.data as SingleAgentResponse | undefined)?.agent === "ORACLE";
+  return false;
+}
+
 function formatAiChatAnswer(response: AiChatResponse): string {
-  const answer = response.answer?.trim();
-  const contexts = (response.contexts ?? []).filter(Boolean);
-
-  // 커스텀 엔드포인트 응답은 애초에 프로젝트 문서 RAG를 거치지 않으므로 항상 contexts가
-  // 비어있다 — "표본 부족" 경고는 백엔드 RAG 응답에만 의미가 있으므로 여기선 생략한다.
-  if (response.source === "custom-endpoint") {
-    return compactAiAnswer(answer || "답변");
-  }
-
-  if (!answer && contexts.length === 0) {
-    return "주의: 충분한 프로젝트의 표본이 없습니다.";
-  }
-
-  if (contexts.length === 0) {
-    return `주의: 충분한 프로젝트의 표본이 없습니다.\n\n${answer || "프로젝트 문서를 추가하면 더 정확한 답변을 받을 수 있습니다."}`;
-  }
-
-  return compactAiAnswer(answer || "답변");
+  // 서버(Oracle)는 프로젝트 문서 컨텍스트가 부족해도 답변을 중단하지 않고, 필요하면 그 사실을
+  // 답변 안에 짧게 안내한 뒤 자체 지식으로 답을 완결한다 - 여기서 별도로 "표본이 없습니다"
+  // 경고를 덧붙이면 같은 내용이 중복 표시된다.
+  return compactAiAnswer(response.answer?.trim() || "답변을 생성하지 못했습니다.");
 }
 
 function compactAiAnswer(text: string, maxLength = 900): string {
@@ -199,16 +199,22 @@ function compactAiAnswer(text: string, maxLength = 900): string {
   return `${shortened.slice(0, safeEnd).trim()}\n\n… 답변이 길어 핵심 내용만 표시했습니다.`;
 }
 
-function buildEditorContext(projectId: number | null | undefined, question: string, ragMaxResults: number) {
+function buildEditorContext(projectId: number | null | undefined, question: string, level: ThinkingLevel) {
   return {
     projectId,
     fileName: "SYNAIPSE Chat AI Console",
     currentCodeSnippet: "No editor selection was provided. Use the project RAG context and the user question.",
     cursorLine: 1,
     userQuery: question,
-    ragMaxResults,
+    level,
   };
 }
+
+const THINKING_LEVEL_OPTIONS: { value: ThinkingLevel; label: string; description: string }[] = [
+  { value: "LOW", label: "Low · 빠른 답변", description: "핵심 위주로 간결하게 즉시 답변" },
+  { value: "DEFAULT", label: "Default · 표준", description: "표준 RAG 검색과 심층 분석 결합" },
+  { value: "HIGH", label: "High · 심층 추론", description: "광범위한 컨텍스트로 다각도 심층 분석" },
+];
 
 function formatSingleAgentAnswer(response: SingleAgentResponse) {
   const warning = (response.ragContexts?.length ?? 0) === 0
@@ -221,7 +227,7 @@ function formatDebateSummary(response: DebateResponse) {
   const warning = (response.ragContexts?.length ?? 0) === 0
     ? "주의: 충분한 표본이 없습니다. · "
     : "";
-  return `${warning}선택한 에이전트 토론 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 라운드`;
+  return `${warning}선택한 에이전트 심층 분석 세션 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 단계`;
 }
 
 const DEFAULT_AI_AGENTS: AiAgent[] = [
@@ -350,8 +356,17 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
       <div className={`flex-1 ${isUser ? "items-end" : "items-start"} flex flex-col gap-0.5 min-w-0`} style={{ maxWidth: "82%" }}>
         {!isUser && (
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>WE&AI Assistant</span>
+            <span className="text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>SynAIpse Assistant</span>
             <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}>AI</span>
+            {isOracleAnswer(msg) && (
+              <span
+                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full tracking-wide"
+                style={{ background: "rgba(112,130,56,0.9)", color: "white" }}
+                title="Oracle 엔진(최고 권위 심층 분석 모델)이 생성한 답변입니다"
+              >
+                [ORACLE]
+              </span>
+            )}
           </div>
         )}
         <div
@@ -387,14 +402,14 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
             {(msg.data.turns ?? []).map((turn: any, index: number) => (
               <div key={`${turn.round}-${turn.agent}-${index}`} className="rounded-xl p-3" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
                 <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>
-                  <span>Round {turn.round}</span><span>·</span><span>{turn.agent}</span><span>·</span><span>{turn.role}</span>
+                  <span>{turn.round}단계</span><span>·</span><span>{turn.agent}</span><span>·</span><span>{turn.role}</span>
                   <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(112,130,56,0.08)" }}>{turn.model}</span>
                 </div>
                 <p className="whitespace-pre-wrap text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{compactAiAnswer(turn.message, 700)}</p>
               </div>
             ))}
             {(msg.data.ragContexts?.length ?? 0) > 0 && (
-              <p className="px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 · 실행 {msg.data.executedRounds}/{msg.data.maxRounds} 라운드</p>
+              <p className="px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 · 실행 {msg.data.executedRounds}/{msg.data.maxRounds} 단계</p>
             )}
           </div>
         )}
@@ -563,8 +578,7 @@ export function ChatPage({
 
   const [isMeeting, setIsMeeting] = useState(false);
   const [activeMeetingId, setActiveMeetingId] = useState<number | null>(null);
-  const [, setMeetingStart] = useState<Date | null>(null);
-  const [meetingMsgs, setMeetingMsgs] = useState<ChatMessage[]>([]);
+  const [meetingStart, setMeetingStart] = useState<Date | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [savingDoc, setSavingDoc] = useState(false);
   const [docSaved, setDocSaved] = useState(false);
@@ -579,7 +593,7 @@ export function ChatPage({
   const [selectedAgents, setSelectedAgents] = useState<AiAgentKey[]>(["ORACLE", "BACKEND"]);
   const [singleAgent, setSingleAgent] = useState<AiAgentKey>("ORACLE");
   const [maxRounds, setMaxRounds] = useState(2);
-  const [ragMaxResults, setRagMaxResults] = useState(4);
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("DEFAULT");
   const [briefingLoading, setBriefingLoading] = useState<string | null>(null);
 
   const briefFileRef = useRef<HTMLInputElement>(null);
@@ -788,9 +802,8 @@ export function ChatPage({
   const addLocalMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
     setLocalMessages(prev => [...prev, full]);
-    if (isMeeting) setMeetingMsgs(prev => [...prev, full]);
     return full;
-  }, [isMeeting]);
+  }, []);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -807,19 +820,10 @@ export function ChatPage({
     try {
       const newMsg = await sendChatMessage(projectId, activeRoomId, text);
       if (newMsg) {
-        setServerMessages(prev => [...prev, newMsg]);
-
-        if (isMeeting) {
-          setMeetingMsgs(prev => [...prev, {
-            id: (newMsg.messageId ?? genId()).toString(),
-            sender: newMsg.senderName || "나",
-            avatar: (newMsg.senderName?.[0]) || "나",
-            role: (newMsg.senderId === currentUserId ? "me" : "other") as "me" | "other",
-            content: newMsg.content,
-            time: newMsg.createdAt || new Date().toISOString(),
-            type: "text",
-          }]);
-        }
+        // 이 REST 응답이 도착하기 전에 같은 메시지의 WebSocket 브로드캐스트(자기 자신에게도
+        // 옴)가 먼저 도착해있을 수 있다 - messageId로 중복 여부를 확인하지 않으면 메시지가
+        // 화면에 두 번 찍힌다.
+        setServerMessages(prev => prev.some(m => m.messageId === newMsg.messageId) ? prev : [...prev, newMsg]);
       }
     } catch (error: any) {
       console.error("메시지 전송 실패 상세:", error);
@@ -837,15 +841,15 @@ export function ChatPage({
     try {
       let aiMsg: AIMsg;
       if (aiMode === "rag") {
-        const response = await runAiChat({ projectId, question: text });
+        const response = await runAiChat({ projectId, question: text, level: thinkingLevel });
         aiMsg = { id: genId(), role: "ai", content: formatAiChatAnswer(response), time: new Date().toISOString(), kind: "rag", data: response };
       } else if (aiMode === "agent") {
-        const response = await askAiAgent(singleAgent, buildEditorContext(projectId, text, ragMaxResults));
+        const response = await askAiAgent(singleAgent, buildEditorContext(projectId, text, thinkingLevel));
         aiMsg = { id: genId(), role: "ai", content: formatSingleAgentAnswer(response), time: new Date().toISOString(), kind: "agent", data: response };
       } else {
         if (selectedAgents.length === 0) throw new Error("토론에 참여할 에이전트를 한 명 이상 선택해 주세요.");
         const response = await runCustomAiDebate({
-          context: buildEditorContext(projectId, text, ragMaxResults),
+          context: buildEditorContext(projectId, text, thinkingLevel),
           agents: selectedAgents,
           maxRounds,
         });
@@ -927,7 +931,7 @@ export function ChatPage({
 
       setBriefingLoading(null);
       addLocalMessage({
-        sender: "WE&AI", avatar: "AI", role: "other",
+        sender: "SynAIpse", avatar: "AI", role: "other",
         content: `**${file.name}** 한글 브리핑이 완료됐습니다.`,
         type: "briefing",
         briefing: { fileName: file.name, summary: briefingRes.summary, points: briefingRes.keyPoints },
@@ -947,7 +951,7 @@ export function ChatPage({
     try {
       const res = await startChatMeeting(projectId, { title, chatRoomId: activeRoomId ?? undefined });
       setActiveMeetingId(res.meetingId);
-      setIsMeeting(true); setMeetingStart(new Date()); setMeetingMsgs([]); setElapsed(0); setDocSaved(false);
+      setIsMeeting(true); setMeetingStart(new Date()); setElapsed(0); setDocSaved(false);
       addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "회의 모드가 시작되었습니다.", type: "system" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "회의 시작에 실패했습니다.");
@@ -960,7 +964,14 @@ export function ChatPage({
     addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "⏹️ 회의 모드 종료. 문서로 저장 중...", type: "system" });
     setSavingDoc(true);
     try {
-      const content = generateMeetingSummary(meetingMsgs);
+      // meetingMsgs 같은 별도 상태를 안 쓰고 serverMessages(전체 참여자 메시지가 WebSocket으로
+      // 실시간 반영되는, 이미 messageId로 중복 제거된 목록)에서 회의 시작 이후 것만 걸러 쓴다 -
+      // 이전 방식은 "내가 보낸" 메시지만 REST 응답 시점에 따로 쌓아서 다른 참여자 발언이
+      // 회의록에서 통째로 빠지는 문제가 있었다.
+      const meetingMessages = meetingStart
+        ? serverMessages.filter(m => new Date(m.createdAt).getTime() >= meetingStart.getTime())
+        : serverMessages;
+      const content = buildMeetingTranscript(meetingMessages);
       await endChatMeeting(projectId, activeMeetingId, { content });
       await loadDocsData();
       setMainTab("docs");
@@ -1177,7 +1188,7 @@ export function ChatPage({
                   className="flex items-center gap-1.5 px-3 h-full text-[11px] font-semibold transition-all border-b-2"
                   style={{
                     height: 44,
-                    color: mainTab === tab.id ? "#BFC5FF" : TEXT_ON_DARK_MUTED,
+                    color: mainTab === tab.id ? ACCENT : TEXT_ON_DARK_MUTED,
                     borderBottomColor: mainTab === tab.id ? OLIVE_DARK : "transparent",
                     background: tab.id === "ai" && mainTab === "ai" ? NAVY_SURFACE : "transparent",
                   }}
@@ -1371,7 +1382,7 @@ export function ChatPage({
                     {/* 마우스 호버 시 전체 팀원 목록 팝업창 */}
                     {displayMembers.length > 0 && (
                       <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 p-3 rounded-xl shadow-xl z-50 min-w-37.5" style={{ background: CONTENT_BG, border: `1px solid ${NAVY_BORDER}` }}>
-                        <div className="text-[10px] font-bold pb-1.5 border-b border-white/10 text-white/80 flex items-center justify-between">
+                        <div className="text-[10px] font-bold pb-1.5 border-b flex items-center justify-between" style={{ borderColor: BORDER, color: TEXT_PRIMARY }}>
                           <span>전체 팀원 목록</span>
                           <span className="text-[9px] font-normal text-gray-400">{displayMembers.length}명</span>
                         </div>
@@ -1387,8 +1398,8 @@ export function ChatPage({
                                 >
                                   {name[0]}
                                 </div>
-                                <span className="text-[11px] font-semibold text-white/85 truncate">{name}</span>
-                                {role && <span className="text-[9px] text-white/50 ml-auto shrink-0">{role}</span>}
+                                <span className="text-[11px] font-semibold truncate" style={{ color: TEXT_PRIMARY }}>{name}</span>
+                                {role && <span className="text-[9px] ml-auto shrink-0" style={{ color: TEXT_TERTIARY }}>{role}</span>}
                               </div>
                             );
                           })}
@@ -1400,7 +1411,7 @@ export function ChatPage({
               })()}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CONTENT_BG }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
               {isLoadingMessages ? (
                 <div className="space-y-4">
                   {Array.from({ length: 4 }).map((_, i) => {
@@ -1468,7 +1479,7 @@ export function ChatPage({
                     className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-semibold transition-all disabled:opacity-50"
                     style={{
                       background: briefingLoading ? NAVY_SURFACE : "rgba(112,130,56,0.14)",
-                      color: briefingLoading ? TEXT_ON_DARK_MUTED : "#B8F5D0",
+                      color: briefingLoading ? TEXT_ON_DARK_MUTED : OLIVE_DARK,
                       border: `1px solid ${briefingLoading ? NAVY_BORDER : "rgba(112,130,56,0.35)"}`,
                       cursor: briefingLoading || isLoadingMessages ? "not-allowed" : "pointer",
                     }}
@@ -1503,11 +1514,11 @@ export function ChatPage({
                 <Bot className="w-4 h-4" style={{ color: "white" }} />
               </div>
               <div>
-                <p className="text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }}>WE&AI Project Assistant</p>
+                <p className="text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }}>SynAIpse Project Assistant</p>
                 <p className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
                   {aiMode === "rag" && "프로젝트 RAG 질의"}
                   {aiMode === "agent" && "선택 에이전트 단독 분석"}
-                  {aiMode === "debate" && `${selectedAgents.length}명 · 최대 ${maxRounds}라운드 심화 토론`}
+                  {aiMode === "debate" && `${selectedAgents.length}명 · 최대 ${maxRounds}단계 심층 분석 세션`}
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
@@ -1574,7 +1585,7 @@ export function ChatPage({
                       </select>
                     </label>
                     <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
-                      심화 토론
+                      탐구 단계
                       <select
                         value={maxRounds}
                         onChange={event => setMaxRounds(Number(event.target.value))}
@@ -1582,19 +1593,19 @@ export function ChatPage({
                         className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
                         style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
                       >
-                        {[1, 2, 3, 4, 5].map(round => <option key={round} value={round}>{round}라운드</option>)}
+                        {[1, 2, 3, 4, 5].map(round => <option key={round} value={round}>{round}단계</option>)}
                       </select>
                     </label>
                     <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
-                      RAG 문서
+                      추론 강도
                       <select
-                        value={ragMaxResults}
-                        onChange={event => setRagMaxResults(Number(event.target.value))}
+                        value={thinkingLevel}
+                        onChange={event => setThinkingLevel(event.target.value as ThinkingLevel)}
                         disabled={aiTyping}
                         className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
                         style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
                       >
-                        {[2, 4, 6, 8, 10, 12].map(count => <option key={count} value={count}>{count}개</option>)}
+                        {THINKING_LEVEL_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                     </label>
                   </div>
@@ -1610,7 +1621,7 @@ export function ChatPage({
                           className="rounded-lg px-1.5 py-1.5 text-[8px] font-semibold transition-all disabled:opacity-50"
                           style={{
                             border: `1px solid ${selected ? OLIVE_DARK : NAVY_BORDER}`,
-                            color: selected ? "#B8F5D0" : TEXT_ON_DARK_MUTED,
+                            color: selected ? OLIVE_DARK : TEXT_ON_DARK_MUTED,
                             background: selected ? "rgba(112,130,56,0.16)" : NAVY_SURFACE,
                           }}
                         >
@@ -1622,59 +1633,51 @@ export function ChatPage({
                 </>
               )}
 
-              {aiMode === "agent" && (
+              {(aiMode === "agent" || aiMode === "rag") && (
                 <label className="flex items-center justify-between text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
-                  RAG 검색 문서 수
+                  답변 심층도
                   <select
-                    value={ragMaxResults}
-                    onChange={event => setRagMaxResults(Number(event.target.value))}
+                    value={thinkingLevel}
+                    onChange={event => setThinkingLevel(event.target.value as ThinkingLevel)}
                     disabled={aiTyping}
+                    title={THINKING_LEVEL_OPTIONS.find(opt => opt.value === thinkingLevel)?.description}
                     className="rounded-lg px-2 py-1 text-[9px] outline-none"
                     style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
                   >
-                    {[2, 4, 6, 8, 10, 12].map(count => <option key={count} value={count}>{count}개</option>)}
+                    {THINKING_LEVEL_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </label>
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CONTENT_BG }}>
-              {isLoadingRooms ? (
-                <div className="flex gap-2.5 items-start mb-4">
-                  <Skeleton className="w-7 h-7 rounded-full shrink-0" />
-                  <Skeleton className="h-16 w-3/4 rounded-2xl" />
+            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
+              {aiMessages.length === 0 && (
+                <div className="mx-auto mt-8 max-w-xs rounded-2xl px-4 py-5 text-center" style={{ border: `1px dashed ${NAVY_BORDER}`, background: NAVY_SURFACE }}>
+                  <Bot className="mx-auto mb-2 h-5 w-5" style={{ color: OLIVE_DARK }} />
+                  <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>실제 AI 응답만 표시됩니다</p>
+                  <p className="mt-1 text-[9px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>
+                    모드를 고르고 질문을 입력하세요. 단일 AI와 토론 모드에서는 에이전트별 역할과 모델도 함께 확인할 수 있습니다.
+                  </p>
                 </div>
-              ) : (
-                <>
-                  {aiMessages.length === 0 && (
-                    <div className="mx-auto mt-8 max-w-xs rounded-2xl px-4 py-5 text-center" style={{ border: `1px dashed ${NAVY_BORDER}`, background: NAVY_SURFACE }}>
-                      <Bot className="mx-auto mb-2 h-5 w-5" style={{ color: OLIVE_DARK }} />
-                      <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>실제 AI 응답만 표시됩니다</p>
-                      <p className="mt-1 text-[9px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>
-                        모드를 고르고 질문을 입력하세요. 단일 AI와 토론 모드에서는 에이전트별 역할과 모델도 함께 확인할 수 있습니다.
-                      </p>
-                    </div>
-                  )}
-                  {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
-                  {aiTyping && (
-                    <div className="flex gap-2.5 items-start mb-4">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
-                        <Bot className="w-3.5 h-3.5" style={{ color: "white" }} />
-                      </div>
-                      <div className="rounded-2xl px-4 py-3 mt-0.5" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
-                        <div className="flex gap-1 items-center">
-                          {[0, 1, 2].map(i => (
-                            <div key={i} className="w-1.5 h-1.5 rounded-full"
-                              style={{ background: OLIVE_DARK, opacity: 0.5, animation: `bounce 1s ${i * 0.15}s infinite` }} />
-                          ))}
-                          <span className="ml-2 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>분석 중...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={aiBottomRef} />
-                </>
               )}
+              {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
+              {aiTyping && (
+                <div className="flex gap-2.5 items-start mb-4">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
+                    <Bot className="w-3.5 h-3.5" style={{ color: "white" }} />
+                  </div>
+                  <div className="rounded-2xl px-4 py-3 mt-0.5" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
+                    <div className="flex gap-1 items-center">
+                      {[0, 1, 2].map(i => (
+                        <div key={i} className="w-1.5 h-1.5 rounded-full"
+                          style={{ background: OLIVE_DARK, opacity: 0.5, animation: `bounce 1s ${i * 0.15}s infinite` }} />
+                      ))}
+                      <span className="ml-2 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>분석 중...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={aiBottomRef} />
             </div>
 
             <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}>
@@ -1731,11 +1734,11 @@ export function ChatPage({
                 <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>AI 한글화 문서 포함</span>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: CONTENT_BG }}>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: CHAT_CANVAS }}>
               {isLoadingDocs ? (
                 /* [스켈레톤] 문서 카드들 */
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-xl p-3 border border-white/10 space-y-2" style={{ background: NAVY_SURFACE }}>
+                  <div key={i} className="rounded-xl p-3 border space-y-2" style={{ background: NAVY_SURFACE, borderColor: BORDER }}>
                     <div className="flex gap-2 items-center">
                       <Skeleton className="w-6 h-6 rounded-lg" />
                       <Skeleton className="h-4 w-1/2" />

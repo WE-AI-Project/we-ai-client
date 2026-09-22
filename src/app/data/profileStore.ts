@@ -1,4 +1,4 @@
-﻿// ── WE&AI 프로필 저장소 ──
+﻿// ── SynAIpse 프로필 저장소 ──
 // localStorage 기반 프로필 데이터 관리
 
 export type TechEntry = {

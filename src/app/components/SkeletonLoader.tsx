@@ -1,4 +1,4 @@
-import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM, GRADIENT_HEADER_BANNER, GRADIENT_PAGE } from "../colors";
+import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM, GRADIENT_HEADER_BANNER } from "../colors";
 
 const SKELETON_BG = "rgba(88,101,242,0.12)";
 const SKELETON_SHIMMER = "rgba(88,101,242,0.20)";
@@ -141,7 +141,7 @@ export function ProfileSkeleton() {
 
 export function ProjectSettingsSkeleton() {
   return (
-    <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
+    <div className="flex-1 overflow-y-auto p-5" style={{ background: BRIGHT_BEIGE }}>
       <div className="mx-auto max-w-7xl space-y-5">
         <section
           className="relative overflow-hidden rounded-3xl border px-6 py-6"

@@ -3,7 +3,7 @@ import { BookOpen, Search, FileText, Download, File, Code2, BookMarked, Layers, 
 import { toast } from "sonner";
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  CONTENT_BG, BTN_DARK, UI_AMBER, UI_RED_DARK,
+  BRIGHT_BEIGE, BTN_DARK, UI_AMBER, UI_RED_DARK,
 } from "../colors";
 import {
   fetchLibraryResources,
@@ -215,7 +215,7 @@ export function SharedLibraryPage({ projectId }: { projectId: number }) {
   resources.forEach(r => { catCounts[r.category] = (catCounts[r.category] ?? 0) + 1; });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="w-full max-w-[1600px] mx-auto space-y-4">
 

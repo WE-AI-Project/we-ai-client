@@ -44,8 +44,10 @@ export type AiAgent = {
   model: string;
 };
 
+export type ThinkingLevel = "LOW" | "DEFAULT" | "HIGH";
+
 export type EditorContextRequest = DebateRequest & {
-  ragMaxResults?: number;
+  level?: ThinkingLevel;
 };
 
 export type CustomDebateRequest = {
@@ -105,6 +107,7 @@ export type QaResponse = {
 export type AiChatRequest = {
   projectId?: number | null;
   question: string;
+  level?: ThinkingLevel;
 };
 
 export type AiChatResponse = {
@@ -207,6 +210,7 @@ export async function runAiChat(request: AiChatRequest): Promise<AiChatResponse>
     body: {
       projectId: resolveProjectId(request.projectId),
       question: request.question,
+      level: request.level,
     },
   });
 }

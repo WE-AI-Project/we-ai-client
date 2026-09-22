@@ -12,7 +12,12 @@ import {
   OLIVE_DARK,
 } from "../colors";
 import { toast } from "sonner";
-import { fetchDailyStandup, updateProjectAccessTime, hideDailyStandupToday } from "../lib/api"; // 실제 API 함수 임포트
+import {
+  fetchDailyStandup,
+  updateProjectAccessTime,
+  hideDailyStandupToday,
+  type ProjectDepartment,
+} from "../lib/api";
 
 // ─────────────────────────────────────────────────────────────
 // 데이터 타입
@@ -27,7 +32,7 @@ type StandupMember = {
   name: string;
   avatar: string;
   role: string;
-  part: "Backend" | "Frontend" | "QA" | "DevOps";
+  part: ProjectDepartment;
   partKo: string;
   color: string;
   bg: string;
@@ -40,6 +45,58 @@ type StandupMember = {
   navigatePage: string;
   lastAccessedAt?: string;
 };
+
+// 서버(DailyStandupMemberResponse)는 부서 원본 값(BACKEND 등)만 내려준다 - 카드 색상/한글
+// 라벨은 화면 표시 관심사라 클라이언트에서 결정한다.
+const DEPARTMENT_META: Record<ProjectDepartment, { label: string; color: string; bg: string }> = {
+  BACKEND:  { label: "Backend",  color: "#635bff", bg: "rgba(99,91,255,0.12)" },
+  FRONTEND: { label: "Frontend", color: "#06b6d4", bg: "rgba(6,182,212,0.12)" },
+  QA:       { label: "QA",       color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  DEVOPS:   { label: "DevOps",   color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  AI:       { label: "AI",       color: "#8b5cf6", bg: "rgba(139,92,246,0.12)" },
+  DATABASE: { label: "Database", color: "#0ea5e9", bg: "rgba(14,165,233,0.12)" },
+  DESIGN:   { label: "Design",   color: "#ec4899", bg: "rgba(236,72,153,0.12)" },
+  PM:       { label: "PM",       color: "#a67b5b", bg: "rgba(166,123,91,0.15)" },
+};
+
+type RawStandupItem = { title: string; description?: string | null };
+type RawStandupMember = {
+  name: string;
+  department: ProjectDepartment;
+  completed: RawStandupItem[];
+  inProgress: RawStandupItem[];
+  blockers: RawStandupItem[];
+  relevantToMe: boolean;
+  relevantReason: string;
+  relevantAction: string;
+  navigatePage: string;
+  lastAccessedAt?: string | null;
+};
+
+function toWorkItem(item: RawStandupItem): WorkItem {
+  return { text: item.title };
+}
+
+function mapRawStandupMember(raw: RawStandupMember): StandupMember {
+  const meta = DEPARTMENT_META[raw.department] ?? DEPARTMENT_META.BACKEND;
+  return {
+    name: raw.name,
+    avatar: raw.name?.[0] ?? "?",
+    role: meta.label,
+    part: raw.department,
+    partKo: meta.label,
+    color: meta.color,
+    bg: meta.bg,
+    completed: (raw.completed ?? []).map(toWorkItem),
+    inProgress: (raw.inProgress ?? []).map(toWorkItem),
+    blockers: (raw.blockers ?? []).map(item => item.title),
+    relevantToMe: raw.relevantToMe,
+    relevantReason: raw.relevantReason,
+    relevantAction: raw.relevantAction,
+    navigatePage: raw.navigatePage,
+    lastAccessedAt: raw.lastAccessedAt ?? undefined,
+  };
+}
 
 const DISMISS_KEY = "weai_standup_dismissed";
 const DISMISS_1HOUR_PREFIX = "weai_standup_dismiss_1hour_";
@@ -275,7 +332,7 @@ function MemberCard({
             )}
             {/* 접속 시간 뱃지 */}
             {(() => {
-              const rel = formatRelativeAccessTime(member.lastAccessedAt || new Date(Date.now() - (idx + 1) * 3 * 60 * 1000).toISOString());
+              const rel = formatRelativeAccessTime(member.lastAccessedAt);
               return (
                 <span className={`text-[7.5px] px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-1 shrink-0 ${rel.badgeClass}`}>
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: rel.dotColor }} />
@@ -429,8 +486,8 @@ export function DailyStandupModal({
       if (rawData?.lastAccessedAt) {
         setLastAccessedTime(rawData.lastAccessedAt);
       }
-      const dataList = rawData?.members || (Array.isArray(rawData) ? rawData : []);
-      setMembers(Array.isArray(dataList) ? dataList : []);
+      const rawMembers: RawStandupMember[] = Array.isArray(rawData?.members) ? rawData.members : [];
+      setMembers(rawMembers.map(mapRawStandupMember));
     } catch (err) {
       console.error("데일리 스탠드업 데이터를 불러오지 못했습니다:", err);
       setMembers([]);

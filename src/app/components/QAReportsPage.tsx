@@ -6,7 +6,7 @@ import {
   UI_RED, UI_RED_DARK, UI_RED_BG7, UI_AMBER, UI_AMBER_DARK, UI_AMBER_BG,
   UI_GREEN, UI_VIOLET, UI_VIOLET_BG7, UI_GRAY, UI_GRAY_BG, BTN_DARK,
   ACCENT,
-  CONTENT_BG,
+  BRIGHT_BEIGE,
 } from "../colors";
 import {
   fetchQaReports,
@@ -98,7 +98,7 @@ export function QAReportsPage({ projectId }: { projectId: number }) {
   const filteredIssues = issueRows.filter(x => severityFilter === "all" || x.issue.severity === severityFilter);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="w-full max-w-[1600px] mx-auto space-y-4">
 

@@ -1,4 +1,4 @@
-// ── WE&AI 개발 일정 스토어 ──
+// ── SynAIpse 개발 일정 스토어 ──
 // 부서별 기능 일정 관리 (localStorage 기반)
 
 export type Dept = "전체" | "Frontend" | "Backend" | "Agent" | "DevOps" | "QA" | "Design";

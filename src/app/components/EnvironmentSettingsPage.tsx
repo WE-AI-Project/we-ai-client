@@ -11,7 +11,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG,
-  CONTENT_BG,
+  BRIGHT_BEIGE,
   TERM_BG, TERM_TEXT, TERM_MUTED, TERM_GREEN, TERM_DIM, TERM_RED, BTN_DARK, UI_RED, UI_AMBER,
 } from "../colors";
 
@@ -97,7 +97,7 @@ function EnvFileViewer({
           <FileText className="w-3.5 h-3.5" style={{ color: TERM_GREEN }} />
           <span className="text-[11px] font-semibold font-mono" style={{ color: TERM_TEXT }}>.env</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.07)", color: TERM_MUTED }}>
-            WE&AI Project
+            SynAIpse Project
           </span>
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -285,7 +285,7 @@ export function EnvironmentSettingsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
+    <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
         <div className="max-w-4xl mx-auto space-y-4">
 
@@ -293,23 +293,24 @@ export function EnvironmentSettingsPage() {
           <div
             className="flex items-center gap-3 px-4 py-3 rounded-2xl border"
             style={{
-              background: "rgba(16, 185, 129, 0.08)",
-              borderColor: "rgba(16, 185, 129, 0.25)",
+              background: "#DCFCE7",
+              borderColor: "#86EFAC",
+              boxShadow: "0 4px 14px rgba(22, 163, 74, 0.12)",
             }}
           >
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#BBF7D0" }}>
+              <ShieldCheck className="w-4 h-4" style={{ color: "#15803D" }} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                <span className="text-[11px] font-bold" style={{ color: "#14532D" }}>
                   🔒 로컬 전용 보안 환경 변수 관리 (Air-Gapped Local Storage)
                 </span>
-                <span className="text-[8px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-200">
+                <span className="text-[8px] font-semibold px-1.5 py-0.2 rounded" style={{ background: "#86EFAC", color: "#14532D" }}>
                   서버 전송 없음
                 </span>
               </div>
-              <p className="text-[10px] text-emerald-900/80 dark:text-emerald-200/80 mt-0.5 leading-normal">
+              <p className="text-[10px] mt-0.5 leading-normal" style={{ color: "#166534" }}>
                 환경 변수는 외부 인터넷 서버로 전송되지 않고 오직 사용자의 로컬 브라우저/작업 디렉토리에만 안전하게 관리됩니다. 값 수정, 추가 및 삭제가 자유롭게 지원됩니다.
               </p>
             </div>
