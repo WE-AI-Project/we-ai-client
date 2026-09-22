@@ -4,7 +4,7 @@ import { Hammer, Play, CheckCircle2, XCircle, Clock, RotateCw, Circle, RefreshCw
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BG_10, ACCENT_BG_08, ACCENT_BG_04, ACCENT_BORDER, ACCENT_TRACK,
-  CONTENT_BG, TABLE_BG, TABLE_HEADER_BG,
+  BRIGHT_BEIGE, TABLE_BG, TABLE_HEADER_BG,
   UI_GRAY, UI_GRAY_BG, UI_GRAY_BG8, UI_GREEN, UI_GREEN_BG, UI_GREEN_BG8,
   UI_RED, UI_RED_BG, UI_AMBER, UI_AMBER_BG8,
   TERM_BG, TERM_HEADER, TERM_MUTED, TERM_TEXT, TERM_RED2, TERM_GREEN, TERM_BLUE2,
@@ -265,7 +265,7 @@ export function BuildManagementPage({ projectId, connectionVersion = 0 }: BuildM
   const failedCount = tasks.filter((t) => t.lastStatus === "failed").length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: CONTENT_BG }}>
+    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: BRIGHT_BEIGE }}>
       <div className="flex-1 overflow-y-auto p-5">
         <div className="w-full max-w-[1600px] mx-auto space-y-4">
 

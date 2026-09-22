@@ -38,7 +38,7 @@ import {
   ACCENT_BG,
   BORDER,
   BORDER_SUBTLE,
-  GRADIENT_PAGE,
+  BRIGHT_BEIGE,
   TEXT_LABEL,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
@@ -414,7 +414,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
   const showSkeleton = loading;
 
   return (
-    <div className="flex-1 overflow-y-auto p-5" style={{ background: GRADIENT_PAGE }}>
+    <div className="flex-1 overflow-y-auto p-5" style={{ background: BRIGHT_BEIGE }}>
       <StateViewWrapper
         status={status}
         emptyMessage="진행 중인 프로젝트나 대시보드 데이터가 없습니다."

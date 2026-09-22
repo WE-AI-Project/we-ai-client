@@ -39,12 +39,10 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
-  TEXT_ON_DARK,
-  TEXT_ON_DARK_MUTED,
   ACCENT,
   ACCENT_BG,
   ACCENT_BORDER,
-  CONTENT_BG,
+  BRIGHT_BEIGE,
   TERM_BG,
   TERM_MUTED,
   TERM_GREEN,
@@ -53,8 +51,11 @@ import {
   UI_RED_DARK,
 } from "../colors";
 
-const NAVY_SURFACE = "rgba(255,255,255,0.06)";
-const NAVY_BORDER = "rgba(255,255,255,0.12)";
+const CONTENT_BG = BRIGHT_BEIGE;
+const NAVY_SURFACE = "#FFFFFF";
+const NAVY_BORDER = BORDER;
+const TEXT_ON_DARK = TEXT_PRIMARY;
+const TEXT_ON_DARK_MUTED = TEXT_TERTIARY;
 
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
