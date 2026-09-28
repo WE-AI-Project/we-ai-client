@@ -585,6 +585,7 @@ function QuickNotifRow({
   onRead: (id: number) => void;
   onDelete: (e: React.MouseEvent, id: number) => void;
 }) {
+  const [hovered, setHovered] = useState(false);
   const { icon: Icon, color, bg } = getNotificationStyle(notif.type);
 
   return (
@@ -592,10 +593,14 @@ function QuickNotifRow({
       className="flex items-start gap-3 px-4 py-2.5 cursor-pointer transition-all relative group"
       style={{
         borderBottom: !isLast ? `1px solid ${BORDER_SUBTLE}` : "none",
-        background: notif.isRead ? "transparent" : "rgba(88,101,242,0.04)",
+        background: hovered
+          ? "rgba(0,0,0,0.025)"
+          : notif.isRead
+          ? "transparent"
+          : "rgba(88,101,242,0.04)",
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.025)")}
-      onMouseLeave={e => (e.currentTarget.style.background = notif.isRead ? "transparent" : "rgba(88,101,242,0.04)")}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       onClick={() => onRead(notif.id)}
     >
       {!notif.isRead && (
@@ -624,12 +629,25 @@ function QuickNotifRow({
           {formatTime(notif.createdAt)}
         </p>
       </div>
+
+      {/* 마우스 호버 시 뜨는 쓰레기통 삭제 버튼 */}
       <button
-        onClick={(e) => onDelete(e, notif.id)}
-        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded transition-all shrink-0 self-center"
-        title="삭제"
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(e, notif.id);
+        }}
+        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 self-center"
+        style={{
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? "auto" : "none",
+          transform: hovered ? "scale(1)" : "scale(0.9)",
+          transition: "opacity 0.15s ease, transform 0.15s ease, color 0.15s ease, background-color 0.15s ease",
+        }}
+        title="알림 삭제"
+        aria-label="알림 삭제"
       >
-        <Trash2 className="w-3 h-3" />
+        <Trash2 className="w-3.5 h-3.5" />
       </button>
     </div>
   );
@@ -645,15 +663,22 @@ function AllNotifRow({
   onRead: (id: number) => void;
   onDelete: (e: React.MouseEvent, id: number) => void;
 }) {
+  const [hovered, setHovered] = useState(false);
   const meta = getNotificationStyle(notif.type);
   const Icon = meta.icon;
 
   return (
     <div
       onClick={() => onRead(notif.id)}
-      className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-black/[0.025] cursor-pointer relative group"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex items-start gap-3 px-4 py-2.5 transition-colors cursor-pointer relative group"
       style={{
-        background: notif.isRead ? "transparent" : "rgba(88,101,242,0.035)",
+        background: hovered
+          ? "rgba(0,0,0,0.025)"
+          : notif.isRead
+          ? "transparent"
+          : "rgba(88,101,242,0.035)",
       }}
     >
       {/* 안읽음 파란 점 */}
@@ -704,11 +729,22 @@ function AllNotifRow({
         </p>
       </div>
 
-      {/* 개별 삭제 버튼 (호버 시 표시) */}
+      {/* 마우스 호버 시 뜨는 쓰레기통 삭제 버튼 */}
       <button
-        onClick={(e) => onDelete(e, notif.id)}
-        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 self-center"
-        title="이 알림 삭제"
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(e, notif.id);
+        }}
+        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 self-center"
+        style={{
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? "auto" : "none",
+          transform: hovered ? "scale(1)" : "scale(0.9)",
+          transition: "opacity 0.15s ease, transform 0.15s ease, color 0.15s ease, background-color 0.15s ease",
+        }}
+        title="알림 삭제"
+        aria-label="알림 삭제"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
