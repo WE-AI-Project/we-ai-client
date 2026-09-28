@@ -1,17 +1,23 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import {
-  Sun, Sparkles, CheckCircle2, Clock, AlertTriangle,
-  ArrowRight, ChevronRight, FileCode2, GitPullRequest,
-  Zap, Bell, ExternalLink, Bot, RefreshCw, Loader2,
+  Sun, CheckCircle2, Clock, AlertTriangle,
+  ArrowRight, ChevronRight, GitPullRequest,
+  Zap, ExternalLink, RefreshCw, Loader2,
 } from "lucide-react";
 import {
   BORDER, BORDER_SUBTLE,
-  TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
+  TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG,
-  GRADIENT_LOGO, OLIVE_DARK,
+  UI_GREEN, UI_GREEN_BG, UI_AMBER, UI_AMBER_BG, UI_RED_BG, TERM_GREEN, TERM_RED,
+  OLIVE_DARK,
 } from "../colors";
-import { fetchDailyStandup, updateProjectAccessTime, hideDailyStandupToday } from "../lib/api"; // 실제 API 함수 임포트
+import { toast } from "sonner";
+import {
+  fetchDailyStandup,
+  updateProjectAccessTime,
+  hideDailyStandupToday,
+  type ProjectDepartment,
+} from "../lib/api";
 
 // ─────────────────────────────────────────────────────────────
 // 데이터 타입
@@ -26,7 +32,7 @@ type StandupMember = {
   name: string;
   avatar: string;
   role: string;
-  part: "Backend" | "Frontend" | "QA" | "DevOps";
+  part: ProjectDepartment;
   partKo: string;
   color: string;
   bg: string;
@@ -37,14 +43,143 @@ type StandupMember = {
   relevantReason: string;
   relevantAction: string;
   navigatePage: string;
+  lastAccessedAt?: string;
 };
 
+// 서버(DailyStandupMemberResponse)는 부서 원본 값(BACKEND 등)만 내려준다 - 카드 색상/한글
+// 라벨은 화면 표시 관심사라 클라이언트에서 결정한다.
+const DEPARTMENT_META: Record<ProjectDepartment, { label: string; color: string; bg: string }> = {
+  BACKEND:  { label: "Backend",  color: "#635bff", bg: "rgba(99,91,255,0.12)" },
+  FRONTEND: { label: "Frontend", color: "#06b6d4", bg: "rgba(6,182,212,0.12)" },
+  QA:       { label: "QA",       color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  DEVOPS:   { label: "DevOps",   color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  AI:       { label: "AI",       color: "#8b5cf6", bg: "rgba(139,92,246,0.12)" },
+  DATABASE: { label: "Database", color: "#0ea5e9", bg: "rgba(14,165,233,0.12)" },
+  DESIGN:   { label: "Design",   color: "#ec4899", bg: "rgba(236,72,153,0.12)" },
+  PM:       { label: "PM",       color: "#a67b5b", bg: "rgba(166,123,91,0.15)" },
+};
+
+type RawStandupItem = { title: string; description?: string | null };
+type RawStandupMember = {
+  name: string;
+  department: ProjectDepartment;
+  completed: RawStandupItem[];
+  inProgress: RawStandupItem[];
+  blockers: RawStandupItem[];
+  relevantToMe: boolean;
+  relevantReason: string;
+  relevantAction: string;
+  navigatePage: string;
+  lastAccessedAt?: string | null;
+};
+
+function toWorkItem(item: RawStandupItem): WorkItem {
+  return { text: item.title };
+}
+
+function mapRawStandupMember(raw: RawStandupMember): StandupMember {
+  const meta = DEPARTMENT_META[raw.department] ?? DEPARTMENT_META.BACKEND;
+  return {
+    name: raw.name,
+    avatar: raw.name?.[0] ?? "?",
+    role: meta.label,
+    part: raw.department,
+    partKo: meta.label,
+    color: meta.color,
+    bg: meta.bg,
+    completed: (raw.completed ?? []).map(toWorkItem),
+    inProgress: (raw.inProgress ?? []).map(toWorkItem),
+    blockers: (raw.blockers ?? []).map(item => item.title),
+    relevantToMe: raw.relevantToMe,
+    relevantReason: raw.relevantReason,
+    relevantAction: raw.relevantAction,
+    navigatePage: raw.navigatePage,
+    lastAccessedAt: raw.lastAccessedAt ?? undefined,
+  };
+}
+
 const DISMISS_KEY = "weai_standup_dismissed";
-function getTodayKey() { return new Date().toISOString().slice(0, 10); }
-function isDismissedToday(): boolean {
+const DISMISS_1HOUR_PREFIX = "weai_standup_dismiss_1hour_";
+const LAST_ACCESS_PREFIX = "weai_last_access_time_";
+
+export function getTodayKey() { return new Date().toISOString().slice(0, 10); }
+
+export function isDismissedToday(): boolean {
   return localStorage.getItem(DISMISS_KEY) === getTodayKey();
 }
-function dismissToday() { localStorage.setItem(DISMISS_KEY, getTodayKey()); }
+
+export function dismissToday() {
+  localStorage.setItem(DISMISS_KEY, getTodayKey());
+}
+
+export function isDismissedFor1Hour(projectId: number | string): boolean {
+  const raw = localStorage.getItem(`${DISMISS_1HOUR_PREFIX}${projectId}`);
+  if (!raw) return false;
+  const until = parseInt(raw, 10);
+  return !isNaN(until) && Date.now() < until;
+}
+
+export function dismissFor1Hour(projectId: number | string) {
+  const until = Date.now() + 60 * 60 * 1000; // 1시간
+  localStorage.setItem(`${DISMISS_1HOUR_PREFIX}${projectId}`, until.toString());
+}
+
+export function isRecentAccessWithin10Min(projectId: number | string): boolean {
+  const raw = localStorage.getItem(`${LAST_ACCESS_PREFIX}${projectId}`);
+  if (!raw) return false;
+  const lastTime = parseInt(raw, 10);
+  if (isNaN(lastTime)) return false;
+  const diff = Date.now() - lastTime;
+  // 10분 이내 (600,000ms)
+  return diff > 0 && diff < 10 * 60 * 1000;
+}
+
+export function recordProjectAccessTime(projectId: number | string) {
+  localStorage.setItem(`${LAST_ACCESS_PREFIX}${projectId}`, Date.now().toString());
+}
+
+export function shouldShowDailyStandup(projectId: number | string): boolean {
+  if (isDismissedToday()) return false;
+  if (isDismissedFor1Hour(projectId)) return false;
+  if (isRecentAccessWithin10Min(projectId)) return false;
+  return true;
+}
+
+export function formatRelativeAccessTime(dateInput?: string | number | Date | null): {
+  label: string;
+  isOnline: boolean;
+  badgeClass: string;
+  dotColor: string;
+} {
+  if (!dateInput) {
+    return { label: "접속 기록 없음", isOnline: false, badgeClass: "text-gray-400 bg-gray-500/10", dotColor: "#9ca3af" };
+  }
+  const date = typeof dateInput === "number" ? new Date(dateInput) : new Date(dateInput);
+  if (isNaN(date.getTime())) {
+    return { label: "방금 전 접속", isOnline: true, badgeClass: "text-emerald-600 bg-emerald-500/10", dotColor: "#10b981" };
+  }
+
+  const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSec < 0 || diffSec < 60) {
+    return { label: "방금 전 접속", isOnline: true, badgeClass: "text-emerald-600 bg-emerald-500/10", dotColor: "#10b981" };
+  }
+  if (diffSec < 3600) {
+    const mins = Math.floor(diffSec / 60);
+    const isRecent = mins <= 10;
+    return {
+      label: `${mins}분 전 접속`,
+      isOnline: isRecent,
+      badgeClass: isRecent ? "text-emerald-600 bg-emerald-500/10" : "text-amber-600 bg-amber-500/10",
+      dotColor: isRecent ? "#10b981" : UI_AMBER,
+    };
+  }
+  if (diffSec < 86400) {
+    const hours = Math.floor(diffSec / 3600);
+    return { label: `${hours}시간 전 접속`, isOnline: false, badgeClass: "text-gray-600 bg-gray-500/10", dotColor: "#6b7280" };
+  }
+  const days = Math.floor(diffSec / 86400);
+  return { label: `${days}일 전 접속`, isOnline: false, badgeClass: "text-gray-500 bg-gray-500/10", dotColor: "#9ca3af" };
+}
 
 // ─────────────────────────────────────────────────────────────
 // 타이핑 애니메이션 텍스트
@@ -183,7 +318,7 @@ function MemberCard({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-[11px] font-bold" style={{ color: member.color }}>{member.name}</p>
             <span
               className="text-[8px] px-1.5 py-0.5 rounded-full font-semibold"
@@ -195,6 +330,16 @@ function MemberCard({
                 style={{ background: member.color, color: "white" }}
               >나에게 관련</span>
             )}
+            {/* 접속 시간 뱃지 */}
+            {(() => {
+              const rel = formatRelativeAccessTime(member.lastAccessedAt);
+              return (
+                <span className={`text-[7.5px] px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-1 shrink-0 ${rel.badgeClass}`}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: rel.dotColor }} />
+                  {rel.label}
+                </span>
+              );
+            })()}
           </div>
           <p className="text-[9px] mt-0.5" style={{ color: member.color + "99" }}>{member.role}</p>
         </div>
@@ -316,26 +461,20 @@ export function DailyStandupModal({
   onClose: () => void;
   onNavigate: (page: string) => void;
 }) {
-  const activeProjectId = Number(
-    projectId || 
-    localStorage.getItem("currentProjectId") || 
-    localStorage.getItem("projectId") || 
-    1
-  );
-  
   const [visible, setVisible] = useState(false);
   const [highlightShow, setHighlightShow] = useState(false);
   const [cardsShow, setCardsShow] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "relevant">("relevant");
+  const [skip1Hour, setSkip1Hour] = useState(false);
   const [skipToday, setSkipToday] = useState(false);
 
   // API 연동 상태
   const [members, setMembers] = useState<StandupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [lastAccessedTime, setLastAccessedTime] = useState<string | null>(null);
 
   const todayStr = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
-  const lastLoginStr = "어제 오전 11:42";
 
   // 데이터 로드 함수
   const loadStandupData = async () => {
@@ -343,62 +482,39 @@ export function DailyStandupModal({
       setLoading(true);
       setError(false);
       const res = await fetchDailyStandup(projectId);
-      console.log("스탠드업 API 응답 데이터 확인:", res);
-
       const rawData = res?.data || res;
-      // 백엔드 응답에서 lastAccessedAt 저장
       if (rawData?.lastAccessedAt) {
         setLastAccessedTime(rawData.lastAccessedAt);
       }
-
-      const dataList = rawData?.members || (Array.isArray(rawData) ? rawData : []);
-
-      setMembers(dataList);
+      const rawMembers: RawStandupMember[] = Array.isArray(rawData?.members) ? rawData.members : [];
+      setMembers(rawMembers.map(mapRawStandupMember));
     } catch (err) {
-      console.error("Failed to load standup data:", err);
+      console.error("데일리 스탠드업 데이터를 불러오지 못했습니다:", err);
+      setMembers([]);
       setError(true);
+      toast.error("데일리 스탠드업 데이터를 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
-  const closeWithPatch = async (callback: () => void) => {
-    try {
-      // 닫기 전에 PATCH 호출하여 이번 접속 시간 갱신
-      await updateProjectAccessTime(projectId);
-      console.log("프로젝트 접속 시간 갱신 완료");
-    } catch (err) {
-      console.error("프로젝트 접속 시간 갱신 실패", err);
-    } finally {
-      callback();
-    }
-  };
-
-  const [lastAccessedTime, setLastAccessedTime] = useState<string | null>(null);  //접속 시간 저장
-
-  // ✅ 1. 모든 종료/이동 액션 시 공통으로 실행될 통신 로직
+  // ✅ 모든 종료/이동 액션 시 공통으로 실행될 통신 로직
   const executeCloseActions = async (callback: () => void) => {
-    // 💡 F12 콘솔에서 projectId가 제대로 된 숫자로 뜨는지 확인해 보세요!
-    console.log("🛠 현재 전달된 projectId:", projectId);
-
-    // 안전 장치: projectId가 없거나 유효하지 않으면 API 호출을 건너뛰고 모달만 닫음
     if (!projectId || projectId === "undefined" || projectId === 0 || projectId === "0") {
-      console.warn("⚠️ 유효하지 않은 projectId입니다. API를 호출하지 않고 모달을 닫습니다.");
       callback();
       return;
     }
 
     try {
-      // 오늘 다시 보지 않기 체크 시 로컬스토리지 저장 및 API 호출
+      if (skip1Hour) {
+        dismissFor1Hour(projectId);
+      }
       if (skipToday) {
         dismissToday();
-        await hideDailyStandupToday(Number(projectId));
-        console.log("✅ 오늘 다시 보지 않기 설정 완료");
+        await hideDailyStandupToday(Number(projectId)).catch(() => null);
       }
-      
-      // 프로젝트 접속 시간 갱신 API 호출
-      await updateProjectAccessTime(projectId);
-      console.log("✅ 프로젝트 접속 시간 갱신 완료");
+      recordProjectAccessTime(projectId);
+      await updateProjectAccessTime(projectId).catch(() => null);
     } catch (err) {
       console.error("❌ 종료 액션 처리 중 서버 에러 발생:", err);
     } finally {
@@ -406,29 +522,11 @@ export function DailyStandupModal({
     }
   };
 
-  const formatLastLoginTime = (timeStr?: string | null) => {  //날짜 포멧팅 함수(이전 답변 코드 활용)
-    if (!timeStr) return "최근 접속 기록 없음"; 
-    const date = new Date(timeStr);
-    const now = new Date();
-    
-    const isToday = date.toDateString() === now.toDateString();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday = date.toDateString() === yesterday.toDateString();
-
-    const timeFormatted = date.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: 'numeric', hour12: true });
-
-    if (isToday) return `오늘 ${timeFormatted}`;
-    if (isYesterday) return `어제 ${timeFormatted}`;
-    return `${date.getMonth() + 1}월 ${date.getDate()}일 ${timeFormatted}`;
-  };
-
   useEffect(() => {
     if (!projectId || projectId === 0 || projectId === "0") {
       setLoading(false);
       return;
     }
-
     loadStandupData();
   }, [projectId]);
 
@@ -465,7 +563,9 @@ export function DailyStandupModal({
     });
   };
 
-  const greetingText = `안녕하세요, ${userName} 님! 마지막 접속(${lastLoginStr}) 이후 팀 변경 사항을 분석했어요.`;
+  const lastLoginStr = formatRelativeAccessTime(lastAccessedTime).label.replace(" 접속", "");
+
+  const greetingText = `안녕하세요, ${userName}(${userPart}) 님! 마지막 접속(${lastLoginStr}) 이후 팀 변경 사항을 분석했어요.`;
 
   return (
     <div
@@ -473,7 +573,7 @@ export function DailyStandupModal({
       style={{
         background: "rgba(12,14,2,0.72)",
         backdropFilter: "blur(10px)",
-        opacity: 1,
+        opacity: visible ? 1 : 0,
         transition: "opacity 0.28s ease",
       }}
     >
@@ -507,7 +607,7 @@ export function DailyStandupModal({
           <div className="flex items-start gap-3">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-              style={{ background: "rgba(174,183,132,0.20)" }}
+              style={{ background: "rgba(166,123,91,0.20)" }}
             >
               <Sun className="w-5 h-5" style={{ color: "#D4CC9E" }} />
             </div>
@@ -519,7 +619,7 @@ export function DailyStandupModal({
                 </h2>
                 <span
                   className="text-[8px] px-2 py-0.5 rounded-full font-bold"
-                  style={{ background: "rgba(174,183,132,0.20)", color: "#AEB784" }}
+                  style={{ background: "rgba(166,123,91,0.20)", color: "#A67B5B" }}
                 >AI 자동 생성</span>
               </div>
               <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
@@ -529,15 +629,14 @@ export function DailyStandupModal({
                 <TypedGreeting text={greetingText} delay={400} />
               </p>
             </div>
-
           </div>
 
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             {[
-              { label: "완료 항목", value: totalCompleted, color: "#7ee787", bg: "rgba(126,231,135,0.12)" },
+              { label: "완료 항목", value: totalCompleted, color: TERM_GREEN, bg: "rgba(126,231,135,0.12)" },
               { label: "진행 중", value: totalInProgress, color: "#D4CC9E", bg: "rgba(212,204,158,0.12)" },
-              { label: "블로커", value: totalBlockers, color: "#ff7b72", bg: "rgba(255,123,114,0.12)" },
-              { label: "관련 항목", value: relevantMembers.length, color: "#AEB784", bg: "rgba(174,183,132,0.15)" },
+              { label: "블로커", value: totalBlockers, color: TERM_RED, bg: "rgba(255,123,114,0.12)" },
+              { label: "관련 항목", value: relevantMembers.length, color: "#A67B5B", bg: "rgba(166,123,91,0.15)" },
             ].map(s => (
               <div key={s.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: s.bg }}>
                 <span className="text-[11px] font-bold" style={{ color: s.color }}>{s.value}</span>
@@ -545,7 +644,7 @@ export function DailyStandupModal({
               </div>
             ))}
             <div className="ml-auto flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#7ee787", animation: "_su_pulse 1.8s ease infinite" }} />
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: TERM_GREEN, animation: "_su_pulse 1.8s ease infinite" }} />
               <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.40)" }}>
                 마지막 분석: {lastLoginStr}
               </span>
@@ -575,76 +674,60 @@ export function DailyStandupModal({
             </div>
           ) : (
             <>
-              {/* 나에게 관련 하이라이트 섹션 */}
-              <div className="px-5 pt-4 pb-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className="w-5 h-5 rounded-lg flex items-center justify-center"
-                    style={{ background: ACCENT_BG }}
-                  >
-                    <Bell className="w-3 h-3" style={{ color: ACCENT }} />
-                  </div>
-                  <p className="text-[11px] font-bold" style={{ color: TEXT_PRIMARY }}>
-                    나에게 관련된 항목
-                  </p>
-                  <span
-                    className="text-[8px] px-1.5 py-0.5 rounded-full font-semibold"
-                    style={{ background: ACCENT_BG, color: ACCENT }}
-                  >
-                    {relevantMembers.length}건
-                  </span>
-                  <span className="ml-auto text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                    {userPart} 파트 기준
-                  </span>
-                </div>
-
-                <div
-                  className="rounded-2xl p-3 space-y-1.5"
-                  style={{ background: "rgba(255,255,255,0.70)", border: `1px solid ${ACCENT_BORDER}` }}
-                >
-                  {relevantMembers.map((m, i) => (
+              {/* ── 나와 관련된 항목 미리보기 하이라이트 ── */}
+              {relevantMembers.length > 0 && (
+                <div className="px-5 pt-3 space-y-1.5">
+                  {relevantMembers.slice(0, 3).map((m, i) => (
                     <RelevantHighlight
                       key={m.name}
                       member={m}
-                      idx={i}
                       visible={highlightShow}
+                      idx={i}
                       onNavigate={handleNavigate}
                     />
                   ))}
                 </div>
+              )}
+
+              {/* ── 탭 바 ── */}
+              <div
+                className="flex items-center gap-1 px-5 pt-3 pb-2 sticky top-0 z-10"
+                style={{ background: "rgba(250,250,247,0.95)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${BORDER_SUBTLE}` }}
+              >
+                <button
+                  onClick={() => setActiveTab("relevant")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all"
+                  style={{
+                    background: activeTab === "relevant" ? ACCENT_BG : "transparent",
+                    color: activeTab === "relevant" ? ACCENT : TEXT_TERTIARY,
+                    border: `1px solid ${activeTab === "relevant" ? ACCENT_BORDER : "transparent"}`,
+                  }}
+                >
+                  <Zap className="w-3 h-3" />
+                  나와 관련된 항목
+                  {relevantMembers.length > 0 && (
+                    <span
+                      className="text-[8px] px-1.5 py-0.2 rounded-full font-bold ml-0.5"
+                      style={{ background: ACCENT, color: "white" }}
+                    >{relevantMembers.length}</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("all")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all"
+                  style={{
+                    background: activeTab === "all" ? ACCENT_BG : "transparent",
+                    color: activeTab === "all" ? ACCENT : TEXT_TERTIARY,
+                    border: `1px solid ${activeTab === "all" ? ACCENT_BORDER : "transparent"}`,
+                  }}
+                >
+                  전체 팀원 ({allMembers.length}명)
+                </button>
               </div>
 
-              <div className="mx-5 mb-3" style={{ height: 1, background: BORDER_SUBTLE }} />
-
-              {/* 팀 전체 현황 */}
-              <div className="px-5 pb-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-5 h-5 rounded-lg flex items-center justify-center"
-                    style={{ background: "rgba(65,67,27,0.08)" }}
-                  >
-                    <Bot className="w-3 h-3" style={{ color: ACCENT }} />
-                  </div>
-                  <p className="text-[11px] font-bold" style={{ color: TEXT_PRIMARY }}>팀 전체 현황</p>
-
-                  <div className="flex items-center gap-1 ml-auto">
-                    {(["relevant", "all"] as const).map(tab => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className="px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all"
-                        style={{
-                          background: activeTab === tab ? ACCENT_BG : "transparent",
-                          color: activeTab === tab ? ACCENT : TEXT_TERTIARY,
-                          border: `1px solid ${activeTab === tab ? ACCENT_BORDER : "transparent"}`,
-                        }}
-                      >
-                        {tab === "relevant" ? "관련된 팀원" : "전체 팀원"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
+              {/* ── 팀원별 카드 목록 ── */}
+              <div className="p-5 space-y-3">
                 <div className="space-y-2.5">
                   {displayMembers.map((m, i) => (
                     <MemberCard
@@ -673,12 +756,34 @@ export function DailyStandupModal({
 
         {/* ══ 푸터 ══ */}
         <div
-          className="shrink-0 px-5 py-3.5 flex items-center gap-3"
+          className="shrink-0 px-5 py-3.5 flex items-center gap-3 flex-wrap"
           style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.98)" }}
         >
+          {/* 1시간 동안 보지 않기 */}
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
             <div
-              onClick={() => setSkipToday(s => !s)}
+              onClick={() => {
+                setSkip1Hour(s => !s);
+                if (!skip1Hour) setSkipToday(false);
+              }}
+              className="w-3.5 h-3.5 rounded flex items-center justify-center transition-all"
+              style={{
+                background: skip1Hour ? ACCENT : "transparent",
+                border: `1.5px solid ${skip1Hour ? ACCENT : "rgba(0,0,0,0.22)"}`,
+              }}
+            >
+              {skip1Hour && <div className="w-1.5 h-1 border-b-[1.5px] border-r-[1.5px] border-white rotate-45 translate-y-[-1px]" />}
+            </div>
+            <span className="text-[9px] font-medium" style={{ color: TEXT_SECONDARY }}>1시간 동안 보지 않기</span>
+          </label>
+
+          {/* 오늘 하루 보지 않기 */}
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <div
+              onClick={() => {
+                setSkipToday(s => !s);
+                if (!skipToday) setSkip1Hour(false);
+              }}
               className="w-3.5 h-3.5 rounded flex items-center justify-center transition-all"
               style={{
                 background: skipToday ? ACCENT : "transparent",
@@ -687,7 +792,7 @@ export function DailyStandupModal({
             >
               {skipToday && <div className="w-1.5 h-1 border-b-[1.5px] border-r-[1.5px] border-white rotate-45 translate-y-[-1px]" />}
             </div>
-            <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>오늘 다시 보지 않기</span>
+            <span className="text-[9px] font-medium" style={{ color: TEXT_SECONDARY }}>오늘 다시 보지 않기</span>
           </label>
 
           <div className="ml-auto flex items-center gap-2">
@@ -699,7 +804,7 @@ export function DailyStandupModal({
                 color: ACCENT,
                 border: `1px solid ${ACCENT_BORDER}`,
               }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(65,67,27,0.12)"}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(112,130,56,0.12)"}
               onMouseLeave={e => e.currentTarget.style.background = ACCENT_BG}
             >
               <GitPullRequest className="w-3.5 h-3.5" />
@@ -725,5 +830,3 @@ export function DailyStandupModal({
     </div>
   );
 }
-
-export { isDismissedToday };

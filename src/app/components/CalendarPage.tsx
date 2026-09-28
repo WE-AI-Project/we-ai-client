@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Calendar, Plus, X, ChevronLeft, ChevronRight,
-  User, Flag, CheckCircle2, Clock, Circle, Tag,
-  Edit2, Trash2, Save, AlertCircle, Loader2,
+  User, Flag, Circle,
+  Edit2, Trash2, Save,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Schedule, Dept, SchedulePriority, ScheduleStatus,
   DEPT_COLOR, STATUS_META, PRIORITY_META,
-  loadSchedules, saveSchedules, genId,
+  genId,
   getDaysInMonth, getFirstDayOfMonth, dateStr,
   isInRange, formatDateKR, today as getTodayStr,
 } from "../data/scheduleStore";
@@ -17,7 +17,6 @@ import {
   createProjectSchedule,
   updateProjectSchedule,
   deleteProjectSchedule,
-  updateProjectScheduleStatus,
   type ProjectSchedule,
   type ProjectDepartment,
   type ProjectSchedulePriority,
@@ -27,8 +26,7 @@ import {
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
   ACCENT, ACCENT_BG, ACCENT_BORDER,
-  BRIGHT_BEIGE, CREAM, PANEL_BG, CONTENT_BG, BEIGE,
-  GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  BRIGHT_BEIGE, CREAM, BEIGE, UI_RED,
 } from "../colors";
 
 function mapBackendDepartmentToDept(dept?: string): Dept {
@@ -182,13 +180,13 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
     const finalDept = isCustomDept ? customDept.trim() : form.department;
     if (!finalDept) {
-      alert("추가하실 부서명을 입력해주세요.");
+      toast.error("추가하실 부서명을 입력해주세요.");
       return;
     }
 
     onColorChange(finalDept, {
       bg: customColor.bg,
-      color: customColor.bg
+      color: customColor.color
     });
 
     onSave({
@@ -242,7 +240,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div className="space-y-1">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>
-              기능명 <span style={{ color: "#ef4444" }}>*</span>
+              기능명 <span style={{ color: UI_RED }}>*</span>
             </label>
             <input
               value={form.title ?? ""}
@@ -465,7 +463,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
         <div className="flex gap-2 px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
           <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: BEIGE, color: TEXT_SECONDARY }}>
-            취소
+            작성 취소
           </button>
           <button
             type="button"
@@ -473,13 +471,13 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
             disabled={!form.title?.trim()}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold"
             style={{
-              background: form.title?.trim() ? "linear-gradient(135deg, #41431B, #6B7040)" : BEIGE,
+              background: form.title?.trim() ? "linear-gradient(135deg, #708238, #6B7040)" : BEIGE,
               color: form.title?.trim() ? "rgba(254,252,245,0.95)" : TEXT_TERTIARY,
-              boxShadow: form.title?.trim() ? "0 4px 14px rgba(65,67,27,0.22)" : "none",
+              boxShadow: form.title?.trim() ? "0 4px 14px rgba(112,130,56,0.22)" : "none",
             }}
           >
             <Save className="w-3.5 h-3.5" />
-            저장
+            일정 저장하기
           </button>
         </div>
       </div>
@@ -543,7 +541,7 @@ function ScheduleCard({
             <Edit2 className="w-3 h-3" style={{ color: TEXT_TERTIARY }} />
           </button>
           <button onClick={() => onDelete(schedule)} className="p-1 rounded hover:bg-red-50">
-            <Trash2 className="w-3 h-3" style={{ color: "#ef4444" }} />
+            <Trash2 className="w-3 h-3" style={{ color: UI_RED }} />
           </button>
         </div>
       </div>
@@ -566,18 +564,40 @@ function ScheduleCard({
 
 // ══ 메인 CalendarPage ══
 export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
-  const [schedules, setSchedules] = useState<Schedule[]>(() => loadSchedules());
+  const [schedulePanelWidth, setSchedulePanelWidth] = useState(260);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [deptFilter, setDeptFilter] = useState<Dept>("전체");
   const [statusFilter, setStatusFilter] = useState<ScheduleStatus | "전체">("전체");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editSchedule, setEditSchedule] = useState<Partial<Schedule> | null | "new">(null);
-  const [view, setView] = useState<"month" | "list">("month");
 
   const [isLoading, setIsLoading] = useState(true);
 
+  const startSchedulePanelResize = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = schedulePanelWidth;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = "col-resize";
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      setSchedulePanelWidth(Math.min(420, Math.max(200, startWidth + moveEvent.clientX - startX)));
+    };
+    const stopResizing = () => {
+      document.body.style.cursor = previousCursor;
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", stopResizing);
+  };
+
   // 🌟 백엔드 API 연동: 프로젝트 일정 목록 조회
+  // 로그인이 필요한 앱이라 오프라인 상태에서는 애초에 이 화면까지 진입할 수 없으므로,
+  // 오프라인 폴백은 두지 않는다 — 실패는 사유 불문 전부 동일하게 오류로 처리한다.
   const loadApiSchedules = useCallback(async () => {
     if (!projectId) {
       setIsLoading(false);
@@ -586,17 +606,9 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
     try {
       setIsLoading(true);
       const res = await fetchProjectSchedules(projectId);
-      if (res && res.schedules && res.schedules.length > 0) {
-        const converted = res.schedules.map(convertBackendSchedule);
-        setSchedules(converted);
-        saveSchedules(converted);
-      } else {
-        const local = loadSchedules();
-        setSchedules(local);
-      }
+      setSchedules((res?.schedules ?? []).map(convertBackendSchedule));
     } catch (err) {
-      console.warn("프로젝트 일정 API 조회 실패, 로컬 캐시 사용:", err);
-      setSchedules(loadSchedules());
+      toast.error(err instanceof Error ? err.message : "일정을 불러오지 못했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -636,11 +648,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
   const confirmDeleteDept = () => {
     if (!deptToDelete) return;
-    setSchedules(prev => {
-      const next = prev.filter(s => s.department !== deptToDelete);
-      saveSchedules(next);
-      return next;
-    });
+    setSchedules(prev => prev.filter(s => s.department !== deptToDelete));
 
     setDeptColors(prev => {
       const next = { ...prev };
@@ -687,65 +695,62 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   const selectedDaySchedules = selectedDay ? (daySchedules[selectedDay] ?? []) : [];
 
   const handleSave = async (s: Schedule) => {
-    // 낙관적 UI 업데이트
-    setSchedules(prev => {
-      const next = prev.some(x => x.id === s.id)
-        ? prev.map(x => x.id === s.id ? s : x)
-        : [...prev, s];
-      saveSchedules(next);
-      return next;
-    });
+    const previous = schedules;
+
+    // 낙관적 UI 업데이트 — 실패 시 아래에서 롤백
+    setSchedules(prev =>
+      prev.some(x => x.id === s.id) ? prev.map(x => x.id === s.id ? s : x) : [...prev, s]
+    );
     setEditSchedule(null);
 
-    if (projectId) {
-      try {
-        const isNumericId = /^\d+$/.test(s.id);
-        if (isNumericId) {
-          await updateProjectSchedule(projectId, Number(s.id), {
-            title: s.title,
-            description: s.desc,
-            department: mapDeptToBackendDepartment(s.department),
-            startDate: s.startDate,
-            endDate: s.endDate,
-            priority: mapPriorityToBackend(s.priority),
-            status: mapStatusToBackend(s.status),
-          });
-          toast.success("일정이 수정되었습니다.");
-        } else {
-          const created = await createProjectSchedule(projectId, {
-            title: s.title,
-            description: s.desc,
-            department: mapDeptToBackendDepartment(s.department),
-            startDate: s.startDate,
-            endDate: s.endDate,
-            priority: mapPriorityToBackend(s.priority),
-            status: mapStatusToBackend(s.status),
-          });
-          if (created && created.scheduleId) {
-            setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, id: String(created.scheduleId) } : x));
-          }
-          toast.success("새 일정이 등록되었습니다.");
+    if (!projectId) return;
+
+    try {
+      const isNumericId = /^\d+$/.test(s.id);
+      if (isNumericId) {
+        await updateProjectSchedule(projectId, Number(s.id), {
+          title: s.title,
+          description: s.desc,
+          department: mapDeptToBackendDepartment(s.department),
+          startDate: s.startDate,
+          endDate: s.endDate,
+          priority: mapPriorityToBackend(s.priority),
+          status: mapStatusToBackend(s.status),
+        });
+        toast.success("일정이 수정되었습니다.");
+      } else {
+        const created = await createProjectSchedule(projectId, {
+          title: s.title,
+          description: s.desc,
+          department: mapDeptToBackendDepartment(s.department),
+          startDate: s.startDate,
+          endDate: s.endDate,
+          priority: mapPriorityToBackend(s.priority),
+          status: mapStatusToBackend(s.status),
+        });
+        if (created && created.scheduleId) {
+          setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, id: String(created.scheduleId) } : x));
         }
-      } catch (err) {
-        console.warn("백엔드 일정 동기화 실패 (로컬 유지됨):", err);
+        toast.success("새 일정이 등록되었습니다.");
       }
+    } catch (err) {
+      setSchedules(previous); // 실패 시 낙관적 업데이트 롤백 — 가짜 성공 상태로 방치하지 않음
+      toast.error(err instanceof Error ? err.message : "일정 저장에 실패했습니다. 다시 시도해 주세요.");
     }
   };
 
   const handleDelete = async (id: string) => {
-    setSchedules(prev => {
-      const next = prev.filter(s => s.id !== id);
-      saveSchedules(next);
-      return next;
-    });
+    const previous = schedules;
+    setSchedules(prev => prev.filter(s => s.id !== id));
 
-    if (projectId && /^\d+$/.test(id)) {
-      try {
-        await deleteProjectSchedule(projectId, Number(id));
-        toast.success("일정이 삭제되었습니다.");
-      } catch (err) {
-        console.warn("백엔드 일정 삭제 실패:", err);
-      }
+    if (!projectId || !/^\d+$/.test(id)) return;
+
+    try {
+      await deleteProjectSchedule(projectId, Number(id));
+      toast.success("일정이 삭제되었습니다.");
+    } catch (err) {
+      setSchedules(previous); // 실패 시 롤백
+      toast.error(err instanceof Error ? err.message : "일정 삭제에 실패했습니다.");
     }
   };
 
@@ -810,19 +815,13 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   };
 
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
-        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: GRADIENT_ORB_2, filter: "blur(50px)" }} />
-      </div>
-
+    <div className="w-full h-full flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 flex overflow-hidden h-full">
 
         {/* ══ 왼쪽: 사이드 패널 ══ */}
         <div
-          className="flex flex-col shrink-0 overflow-hidden"
-          style={{ width: 260, borderRight: `1px solid ${BORDER}`, background: `rgba(254,252,245,0.92)` }}
+          className="relative flex flex-col shrink-0 overflow-hidden"
+          style={{ width: schedulePanelWidth, borderRight: `1px solid ${BORDER}`, background: `rgba(254,252,245,0.92)` }}
         >
           <div
             className="flex items-center gap-2 px-4 py-3 shrink-0"
@@ -832,14 +831,15 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
             <p className="text-xs font-semibold flex-1" style={{ color: TEXT_PRIMARY }}>개발 일정</p>
           </div>
 
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <div
-            className="flex flex-col gap-1 p-2.5 overflow-y-auto shrink-0"
+            className="flex flex-col gap-0 p-1.5"
             style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
           >
             {isLoading ? (
               /* [스켈레톤] 좌측 부서 목록 */
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-2.5 px-2.5 py-2">
+                <div key={i} className="flex items-center gap-1.5 px-2 py-1">
                   <Skeleton className="w-2 h-2 rounded-full shrink-0" />
                   <Skeleton className="h-3 w-16" />
                 </div>
@@ -856,13 +856,13 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                     <button
                       type="button"
                       onClick={() => setDeptFilter(d)}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all w-full"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-left transition-all w-full"
                       style={{
                         background: sel ? dc.bg : "transparent",
                         border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
                       }}
                     >
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.bg }} />
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dc.color }} />
                       <span className="text-[11px] font-semibold flex-1 min-w-0 truncate text-left" style={{ color: sel ? dc.color : TEXT_SECONDARY }}>{d}</span>
                       <div className={`flex items-center shrink-0 min-w-[16px] justify-end transition-all duration-200 ${!isSystemDept ? "group-hover:pr-5" : ""}`}>
                         <span className="text-[9px] font-mono" style={{ color: sel ? dc.color : TEXT_TERTIARY }}>
@@ -926,7 +926,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
+          <div className="p-2.5 space-y-2">
             {isLoading ? (
               /* [스켈레톤] 좌측 하단 일정 카드 리스트 */
               <div className="space-y-3 pt-1">
@@ -1003,6 +1003,14 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               </>
             )}
           </div>
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="개발 일정 패널 너비 조절"
+            onMouseDown={startSchedulePanelResize}
+            className="absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize transition-colors hover:bg-indigo-500/30"
+          />
         </div>
 
         {/* ══ 오른쪽: 캘린더 본체 ══ */}
@@ -1063,7 +1071,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
                   return (
                     <div key={d} className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full" style={{ background: dc.bg }} />
+                      <div className="w-2 h-2 rounded-full" style={{ background: dc.color }} />
                       <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{d}</span>
                     </div>
                   );
@@ -1075,7 +1083,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               onClick={() => setEditSchedule("new")}
               disabled={isLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all ml-2 disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #41431B, #6B7040)", color: "rgba(254,252,245,0.95)", boxShadow: "0 4px 12px rgba(65,67,27,0.22)" }}
+              style={{ background: "linear-gradient(135deg, #708238, #6B7040)", color: "rgba(254,252,245,0.95)", boxShadow: "0 4px 12px rgba(112,130,56,0.22)" }}
             >
               <Plus className="w-3.5 h-3.5" /> 일정 추가
             </button>
@@ -1098,13 +1106,14 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
             {/* 날짜 셀 그리드 */}
             <div
-              className="grid grid-cols-7 flex-1 gap-px"
+              className="grid grid-cols-7 flex-1 gap-px rounded-lg overflow-hidden border"
               style={{
                 background: BORDER,
-                gridTemplateRows: `repeat(${totalCells / 7}, 115px)`,
+                gridTemplateRows: `repeat(${totalCells / 7}, minmax(80px, 1fr))`,
                 height: "100%",
                 minHeight: 0,
-                overflowY: "auto"
+                overflowY: "auto",
+                borderColor: BORDER,
               }}
             >
               {isLoading ? (
@@ -1143,12 +1152,12 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                       onClick={() => isValid && setSelectedDay(isSel ? null : ds)}
                       className="relative p-1 transition-all overflow-hidden flex flex-col"
                       style={{
-                        background: !isValid ? `rgba(254,252,245,0.45)`
-                          : isSel ? ACCENT_BG
-                            : BRIGHT_BEIGE,
+                        background: !isValid ? `rgba(254,252,245,0.45)` : BRIGHT_BEIGE,
                         cursor: isValid ? "pointer" : "default",
                         height: "100%",
-                        minHeight: 0
+                        minHeight: 0,
+                        boxShadow: isSel ? "inset 0 0 0 2px rgba(27,31,58,0.32), 0 3px 10px rgba(27,31,58,0.10)" : "none",
+                        zIndex: isSel ? 1 : 0,
                       }}
                     >
                       {isValid && (

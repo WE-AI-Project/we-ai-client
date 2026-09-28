@@ -1,9 +1,27 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Cpu, MemoryStick, Play, Square, RotateCw, ChevronDown, Terminal, Circle, Filter } from "lucide-react";
+import { Bot, Terminal, Plug, Loader2, CheckCircle2, XCircle, KeyRound, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "sonner";
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  ACCENT, ACCENT_BG, ACCENT_BORDER, BRIGHT_BEIGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
+  TERM_BG, TERM_TEXT, TERM_MUTED, TERM_GREEN, UI_RED,
 } from "../colors";
+import {
+  loadCustomEndpointConfig,
+  saveCustomEndpointConfig,
+  testCustomEndpointConnection,
+  type CustomEndpointConfig,
+  type CustomEndpointDialect,
+  type CustomEndpointTestResult,
+} from "../lib/customEndpoint";
+import {
+  fetchAiAgents,
+  fetchAgentMetrics,
+  fetchAgentInvocations,
+  type AiAgent,
+  type AgentMetrics,
+  type AgentInvocation,
+} from "../../api/aiApi";
 
 // ── 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -15,139 +33,313 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
-// ── 에이전트 더미 데이터 ──
-type AgentStatus = "running" | "idle" | "error" | "stopped";
-type Agent = {
-  id: string;
-  name: string;
-  shortName: string;
-  status: AgentStatus;
-  currentTask: string;
-  cpu: number;
-  mem: number;
-  uptime: string;
-  port: number;
-  tasksCompleted: number;
-  lastLog: string;
+// 에이전트(ORACLE/BACKEND/FRONTEND/INSPECTOR)는 상시 실행되는 OS 프로세스가 아니라
+// 디베이트/QA 요청 시점에 호출되는 LLM 페르소나다. 따라서 CPU/메모리/포트/가동시간처럼
+// "항상 켜져 있는 서버"를 전제로 한 지표는 이 시스템에 존재하지 않는다.
+// 대신 실제 호출 이력(agent_invocation_logs)에서 집계한 진짜 사용 현황을 보여준다.
+function agentActivityMeta(metrics: AgentMetrics | undefined): { color: string; bg: string; label: string } {
+  if (!metrics || metrics.totalInvocations === 0) {
+    return { color: "#9A9B72", bg: "rgba(154,155,114,0.10)", label: "No activity yet" };
+  }
+  if (metrics.failureCount > 0 && metrics.failureCount === metrics.totalInvocations) {
+    return { color: "#B85450", bg: "rgba(184,84,80,0.10)", label: "All calls failing" };
+  }
+  return { color: "#5A8A4A", bg: "rgba(90,138,74,0.10)", label: "Active" };
+}
+
+const DIALECT_LABEL: Record<CustomEndpointDialect, string> = {
+  "ollama-native": "Ollama (네이티브)",
+  "openai-compatible": "OpenAI 호환 (vLLM, LM Studio 등)",
 };
 
-const INITIAL_AGENTS: Agent[] = [
-  {
-    id: "alpha",  name: "DataSync Alpha",    shortName: "AGT-01",
-    status: "running", currentTask: "Fetching API endpoints from /api/v1/data",
-    cpu: 38, mem: 412, uptime: "2h 14m", port: 8081, tasksCompleted: 142,
-    lastLog: "[INFO] DataSync: Batch fetch complete. 48 records synced.",
-  },
-  {
-    id: "beta",   name: "Classifier Beta",   shortName: "AGT-02",
-    status: "running", currentTask: "Classifying user intent batch #47",
-    cpu: 72, mem: 680, uptime: "2h 14m", port: 8082, tasksCompleted: 89,
-    lastLog: "[WARN] ClassifierBeta: Memory usage at 83%. Consider scaling.",
-  },
-  {
-    id: "gamma",  name: "Logger Gamma",      shortName: "AGT-03",
-    status: "idle",    currentTask: "Waiting for task assignment",
-    cpu: 2,  mem: 120, uptime: "2h 14m", port: 8083, tasksCompleted: 201,
-    lastLog: "[INFO] LoggerGamma: Idle. Last flush at 09:41:02.",
-  },
-  {
-    id: "delta",  name: "Parser Delta",      shortName: "AGT-04",
-    status: "error",   currentTask: "JSON parse failed — retry #3",
-    cpu: 0,  mem: 0,   uptime: "—",      port: 8084, tasksCompleted: 54,
-    lastLog: "[ERROR] ParserDelta: Unexpected token '<' at pos 0. Aborting.",
-  },
-  {
-    id: "epsilon",name: "Scheduler Epsilon", shortName: "AGT-05",
-    status: "running", currentTask: "Scheduling task queue flush (T+30s)",
-    cpu: 18, mem: 230, uptime: "2h 14m", port: 8085, tasksCompleted: 118,
-    lastLog: "[INFO] SchedulerEps: Next flush in 28s. Queue depth: 12.",
-  },
-  {
-    id: "zeta",   name: "Analyzer Zeta",     shortName: "AGT-06",
-    status: "idle",    currentTask: "Analysis complete — standing by",
-    cpu: 4,  mem: 98,  uptime: "2h 14m", port: 8086, tasksCompleted: 77,
-    lastLog: "[INFO] AnalyzerZeta: Report generated. Awaiting next dataset.",
-  },
-];
+// ── 커스텀 AI 엔드포인트 설정 카드 ──
+// 사용자가 기본 백엔드 대신 신뢰하는 다른 서버(팀원의 로컬 Ollama, ngrok 주소 등)로
+// 직접 AI 요청을 보낼 수 있게 하는 설정 UI. 실제 저장/헬스체크/호출 로직은
+// ../lib/customEndpoint.ts에 있으며, Electron 환경에서는 electron/main.cjs가
+// 메인 프로세스에서 안전하게 처리한다(API 키는 렌더러로 다시 노출되지 않음).
+function CustomEndpointCard() {
+  const [expanded, setExpanded] = useState(false);
+  const [loaded, setLoaded] = useState<CustomEndpointConfig | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [dialect, setDialect] = useState<CustomEndpointDialect>("ollama-native");
+  const [model, setModel] = useState("llama3.1");
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<CustomEndpointTestResult | null>(null);
+  const [saving, setSaving] = useState(false);
 
-// ── 에이전트별 로그 더미 ──
-const AGENT_LOGS: Record<string, string[]> = {
-  alpha:   ["[09:52:01] [INFO] DataSync: Batch fetch started (48 items)", "[09:51:58] [INFO] DataSync: Connected to /api/v1/data", "[09:50:00] [DEBUG] DataSync: Auth token refreshed"],
-  beta:    ["[09:52:00] [WARN] ClassifierBeta: Memory at 83%", "[09:51:30] [INFO] ClassifierBeta: Batch #47 processing (12/48)", "[09:50:00] [INFO] ClassifierBeta: Model loaded OK"],
-  gamma:   ["[09:41:02] [INFO] LoggerGamma: Flush complete. 0 pending.", "[09:30:00] [INFO] LoggerGamma: Idle mode entered", "[09:00:00] [INFO] LoggerGamma: Service started"],
-  delta:   ["[09:52:05] [ERROR] ParserDelta: Unexpected token '<' at pos 0", "[09:52:03] [ERROR] ParserDelta: Retry #3 failed", "[09:52:01] [ERROR] ParserDelta: Retry #2 failed", "[09:52:00] [WARN] ParserDelta: Retry #1 started"],
-  epsilon: ["[09:52:00] [INFO] SchedulerEps: Next flush T-28s. Queue: 12", "[09:51:30] [INFO] SchedulerEps: Flushed 8 tasks", "[09:50:00] [DEBUG] SchedulerEps: Heartbeat OK"],
-  zeta:    ["[09:45:00] [INFO] AnalyzerZeta: Report saved to /reports/09.pdf", "[09:44:00] [INFO] AnalyzerZeta: Analysis complete", "[09:30:00] [INFO] AnalyzerZeta: Dataset loaded"],
-};
+  useEffect(() => {
+    loadCustomEndpointConfig().then(cfg => {
+      setLoaded(cfg);
+      setEnabled(cfg.enabled);
+      setBaseUrl(cfg.baseUrl);
+      setDialect(cfg.dialect);
+      setModel(cfg.model);
+      if (cfg.enabled || cfg.baseUrl) setExpanded(true);
+    });
+  }, []);
 
-const STATUS_META: Record<AgentStatus, { color: string; bg: string; label: string }> = {
-  running: { color: "#5A8A4A", bg: "rgba(90,138,74,0.10)",   label: "Running" },
-  idle:    { color: "#9A9B72", bg: "rgba(154,155,114,0.10)", label: "Idle"    },
-  error:   { color: "#B85450", bg: "rgba(184,84,80,0.10)",   label: "Error"   },
-  stopped: { color: "#888A62", bg: "rgba(136,138,98,0.10)",  label: "Stopped" },
-};
+  const healthPath = dialect === "openai-compatible" ? "/v1/models" : "/api/tags";
 
-// On/Off 토글 컴포넌트
-function AgentToggle({ agent, onToggle }: { agent: Agent; onToggle: () => void }) {
-  const isOn = agent.status === "running" || agent.status === "idle";
+  const handleTest = async () => {
+    if (!baseUrl.trim()) {
+      toast.error("먼저 서버 주소를 입력해 주세요.");
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await testCustomEndpointConnection({ baseUrl, healthPath, apiKey: apiKeyInput || undefined });
+      setTestResult(result);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (enabled && !baseUrl.trim()) {
+      toast.error("사용하려면 서버 주소가 필요합니다.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await saveCustomEndpointConfig({
+        enabled,
+        baseUrl,
+        dialect,
+        healthPath,
+        model,
+        apiKey: apiKeyInput.length > 0 ? apiKeyInput : undefined,
+      });
+      setLoaded(saved);
+      setApiKeyInput("");
+      if (saved.keySaveFailed) {
+        toast.error("다른 설정은 저장됐지만, 이 기기에서는 API 키를 안전하게 저장할 수 없어 키는 저장되지 않았습니다.");
+      } else {
+        toast.success("커스텀 엔드포인트 설정이 저장되었습니다.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveKey = async () => {
+    setSaving(true);
+    try {
+      const saved = await saveCustomEndpointConfig({ enabled, baseUrl, dialect, healthPath, model, apiKey: null });
+      setLoaded(saved);
+      toast.success("저장된 API 키를 삭제했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <button
-      onClick={onToggle}
-      className="relative w-10 h-5 rounded-full transition-all shrink-0"
-      style={{ background: isOn ? "#10b981" : "rgba(0,0,0,0.14)" }}
-      title={isOn ? "Stop agent" : "Start agent"}
+    <div
+      className="rounded-2xl overflow-hidden shrink-0"
+      style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
     >
-      <div
-        className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all"
-        style={{ left: isOn ? "calc(100% - 1.125rem)" : "0.125rem" }}
-      />
-    </button>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-2.5 px-4 py-3 text-left"
+      >
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_BG }}>
+          <Plug className="w-4 h-4" style={{ color: ACCENT }} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>커스텀 AI 엔드포인트</p>
+          <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
+            {loaded?.enabled && loaded.baseUrl ? `사용 중 · ${loaded.baseUrl}` : "기본 서버 대신 다른 AI 서버를 연결합니다"}
+          </p>
+        </div>
+        <span
+          className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+          style={{
+            background: loaded?.enabled ? "rgba(90,138,74,0.10)" : "rgba(0,0,0,0.06)",
+            color: loaded?.enabled ? "#5A8A4A" : TEXT_TERTIARY,
+          }}
+        >
+          {loaded?.enabled ? "ON" : "OFF"}
+        </span>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} /> : <ChevronDown className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 pt-1 space-y-3" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
+          <div className="flex items-center justify-between pt-3">
+            <div>
+              <p className="text-[10.5px] font-semibold" style={{ color: TEXT_PRIMARY }}>이 엔드포인트 사용</p>
+              <p className="text-[9.5px]" style={{ color: TEXT_TERTIARY }}>켜면 AI 채팅 요청이 아래 서버로 직접 전송됩니다 (프로젝트 문서 검색은 지원되지 않습니다)</p>
+            </div>
+            <button
+              onClick={() => setEnabled(v => !v)}
+              className="relative w-10 h-5 rounded-full transition-all shrink-0"
+              style={{ background: enabled ? "#10b981" : "rgba(0,0,0,0.14)" }}
+            >
+              <div className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all" style={{ left: enabled ? "calc(100% - 1.125rem)" : "0.125rem" }} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <label className="col-span-2 space-y-1">
+              <span className="text-[9.5px] font-semibold" style={{ color: TEXT_LABEL }}>서버 주소 (Base URL)</span>
+              <input
+                value={baseUrl}
+                onChange={e => { setBaseUrl(e.target.value); setTestResult(null); }}
+                placeholder="http://192.168.0.10:11434 또는 https://xxxx.ngrok-free.app"
+                className="w-full px-2.5 py-1.5 text-[11px] rounded-lg outline-none font-mono"
+                style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              />
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-[9.5px] font-semibold" style={{ color: TEXT_LABEL }}>API 방언</span>
+              <select
+                value={dialect}
+                onChange={e => setDialect(e.target.value as CustomEndpointDialect)}
+                className="w-full px-2.5 py-1.5 text-[11px] rounded-lg outline-none"
+                style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              >
+                {(Object.keys(DIALECT_LABEL) as CustomEndpointDialect[]).map(d => (
+                  <option key={d} value={d}>{DIALECT_LABEL[d]}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-[9.5px] font-semibold" style={{ color: TEXT_LABEL }}>모델명</span>
+              <input
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                placeholder="llama3.1"
+                className="w-full px-2.5 py-1.5 text-[11px] rounded-lg outline-none font-mono"
+                style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+              />
+            </label>
+
+            <label className="col-span-2 space-y-1">
+              <span className="text-[9.5px] font-semibold flex items-center gap-1" style={{ color: TEXT_LABEL }}>
+                <KeyRound className="w-2.5 h-2.5" /> API 키 (선택 — 프록시/터널에 인증이 있는 경우만)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={apiKeyInput}
+                  onChange={e => setApiKeyInput(e.target.value)}
+                  type="password"
+                  placeholder={loaded?.hasApiKey ? "저장된 키가 있습니다 · 새 값 입력 시 교체" : "비워두면 인증 없이 연결"}
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-[11px] rounded-lg outline-none font-mono"
+                  style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+                />
+                {loaded?.hasApiKey && (
+                  <button
+                    onClick={handleRemoveKey}
+                    disabled={saving}
+                    className="shrink-0 text-[9px] font-semibold px-2 py-1.5 rounded-lg hover:bg-black/[0.06]"
+                    style={{ color: "#B85450" }}
+                  >
+                    키 삭제
+                  </button>
+                )}
+              </div>
+            </label>
+          </div>
+
+          {testResult && (
+            <div
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-[10px]"
+              style={{
+                background: testResult.ok ? "rgba(90,138,74,0.08)" : "rgba(184,84,80,0.08)",
+                color: testResult.ok ? "#5A8A4A" : "#B85450",
+              }}
+            >
+              {testResult.ok ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <XCircle className="w-3 h-3 shrink-0" />}
+              {testResult.ok
+                ? `연결 성공 · ${testResult.latencyMs}ms${testResult.modelsFound != null ? ` · 모델 ${testResult.modelsFound}개 발견` : ""}`
+                : testResult.reason}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleTest}
+              disabled={testing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:bg-black/[0.04]"
+              style={{ border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+            >
+              {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plug className="w-3 h-3" />}
+              연결 테스트
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all ml-auto"
+              style={{ background: ACCENT, color: "white", border: `1px solid ${ACCENT_BORDER}` }}
+            >
+              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              저장
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 export function AgentControlPage() {
-  const [agents, setAgents]           = useState(INITIAL_AGENTS);
+  const [agents, setAgents]           = useState<AiAgent[]>([]);
+  const [metrics, setMetrics]         = useState<Record<string, AgentMetrics>>({});
+  const [isLoading, setIsLoading]     = useState(true);
+  const [loadError, setLoadError]     = useState<string | null>(null);
+
   const [selectedAgent, setSelected]  = useState<string | null>(null);
-  const [filterStatus, setFilter]     = useState<AgentStatus | "all">("all");
+  const [invocations, setInvocations] = useState<AgentInvocation[]>([]);
+  const [invocationsLoading, setInvocationsLoading] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
-  const isLoading = false;
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setLoadError(null);
+    Promise.all([fetchAiAgents(), fetchAgentMetrics()])
+      .then(([agentList, metricsList]) => {
+        if (cancelled) return;
+        setAgents(agentList);
+        setMetrics(Object.fromEntries(metricsList.map(m => [m.agent, m])));
+      })
+      .catch((err: any) => { if (!cancelled) setLoadError(err?.message || "에이전트 정보를 불러오지 못했습니다."); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
-  // 에이전트 토글 (running/idle ↔ stopped)
-  const toggleAgent = (id: string) => {
-    setAgents(prev => prev.map(a => {
-      if (a.id !== id) return a;
-      if (a.status === "running" || a.status === "idle") {
-        return { ...a, status: "stopped" as const, currentTask: "Stopped by user", cpu: 0, mem: 0, uptime: "—" };
-      } else {
-        return { ...a, status: "idle" as const, currentTask: "Starting up…", cpu: 2, mem: 80, uptime: "0m" };
-      }
-    }));
+  const selectedAgentData = agents.find(a => a.agent === selectedAgent);
+
+  const selectAgent = (agentKey: string) => {
+    const next = selectedAgent === agentKey ? null : agentKey;
+    setSelected(next);
+    if (next) {
+      setInvocationsLoading(true);
+      fetchAgentInvocations(next as AiAgent["agent"], 20)
+        .then(setInvocations)
+        .catch(() => setInvocations([]))
+        .finally(() => setInvocationsLoading(false));
+    }
   };
-
-  // 에이전트 재시작
-  const restartAgent = (id: string) => {
-    setAgents(prev => prev.map(a =>
-      a.id === id ? { ...a, status: "idle" as const, currentTask: "Restarting…", cpu: 1, mem: 60, uptime: "0m" } : a
-    ));
-  };
-
-  const filtered = filterStatus === "all"
-    ? agents
-    : agents.filter(a => a.status === filterStatus);
-
-  const selectedAgentData = agents.find(a => a.id === selectedAgent);
-  const logs = selectedAgent ? (AGENT_LOGS[selectedAgent] ?? []) : [];
 
   // 로그 패널 스크롤 최하단
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [selectedAgent]);
+  }, [selectedAgent, invocations]);
+
+  const totalInvocations = Object.values(metrics).reduce((s, m) => s + m.totalInvocations, 0);
+  const totalFailures    = Object.values(metrics).reduce((s, m) => s + m.failureCount, 0);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: BRIGHT_BEIGE }} />
       <div className="absolute inset-0 pointer-events-none">
         <div style={{ position: "absolute", top: "-10%", left: "-5%", width: "45%", height: "45%", borderRadius: "50%", background: GRADIENT_ORB_1, filter: "blur(50px)" }} />
         <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: "50%", height: "50%", borderRadius: "50%", background: GRADIENT_ORB_2, filter: "blur(50px)" }} />
@@ -169,36 +361,20 @@ export function AgentControlPage() {
                 <Skeleton className="h-3 w-32 mt-1.5" />
               ) : (
                 <p className="text-[11px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-                  {agents.filter(a => a.status === "running").length}개 실행 중 ·{" "}
-                  {agents.filter(a => a.status === "error").length}개 오류
+                  실제 호출 이력 총 {totalInvocations}건{totalFailures > 0 ? ` · 실패 ${totalFailures}건` : ""}
                 </p>
               )}
             </div>
-
-            {/* 상태 필터 */}
-            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}` }}>
-              {isLoading ? (
-                /* [스켈레톤] 필터 버튼들 */
-                Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-6 w-12 rounded-lg m-0.5" />
-                ))
-              ) : (
-                (["all", "running", "idle", "error", "stopped"] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-semibold capitalize transition-all"
-                    style={{
-                      background: filterStatus === f ? "#1c1c1e" : "transparent",
-                      color: filterStatus === f ? "rgba(255,255,255,0.9)" : TEXT_SECONDARY,
-                    }}
-                  >
-                    {f}
-                  </button>
-                ))
-              )}
-            </div>
           </div>
+
+          {loadError && (
+            <div className="rounded-xl p-3 text-[11px] shrink-0" style={{ background: "rgba(184,84,80,0.08)", color: "#B85450", border: `1px solid ${BORDER}` }}>
+              {loadError}
+            </div>
+          )}
+
+          {/* ── 커스텀 AI 엔드포인트 설정 ── */}
+          <CustomEndpointCard />
 
           {/* ── 에이전트 카드 목록 ── */}
           <div className="grid grid-cols-2 gap-3 shrink-0">
@@ -253,14 +429,15 @@ export function AgentControlPage() {
                 </div>
               ))
             ) : (
-              /* 실제 에이전트 데이터 렌더링 */
-              filtered.map(agent => {
-                const sm = STATUS_META[agent.status];
-                const isSelected = selectedAgent === agent.id;
+              /* 실제 에이전트 + 실제 호출 통계 렌더링 */
+              agents.map(agent => {
+                const m = metrics[agent.agent];
+                const sm = agentActivityMeta(m);
+                const isSelected = selectedAgent === agent.agent;
                 return (
                   <div
-                    key={agent.id}
-                    onClick={() => setSelected(isSelected ? null : agent.id)}
+                    key={agent.agent}
+                    onClick={() => selectAgent(agent.agent)}
                     className="rounded-2xl p-4 cursor-pointer transition-all"
                     style={{
                       background: isSelected ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
@@ -278,61 +455,43 @@ export function AgentControlPage() {
                         <div>
                           <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>{agent.name}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>{agent.shortName}</span>
+                            <span className="text-[9px] font-mono" style={{ color: TEXT_TERTIARY }}>{agent.model}</span>
                             <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: sm.bg, color: sm.color }}>
                               {sm.label}
                             </span>
                           </div>
                         </div>
                       </div>
-                      {/* On/Off 토글 */}
-                      <div onClick={e => e.stopPropagation()}>
-                        <AgentToggle agent={agent} onToggle={() => toggleAgent(agent.id)} />
-                      </div>
                     </div>
 
-                    {/* 현재 태스크 */}
+                    {/* 역할 */}
                     <p className="text-[10px] mb-3 line-clamp-1 leading-relaxed" style={{ color: TEXT_SECONDARY }}>
-                      {agent.currentTask}
+                      {agent.role}
                     </p>
 
-                    {/* CPU / Memory 게이지 */}
-                    <div className="space-y-1.5 mb-3">
-                      {[
-                        { label: "CPU",  value: agent.cpu, max: 100, color: agent.cpu > 70 ? "#ef4444" : ACCENT, unit: "%" },
-                        { label: "Mem",  value: agent.mem, max: 1024, color: "#8b5cf6", unit: "MB" },
-                      ].map(g => (
-                        <div key={g.label} className="flex items-center gap-2">
-                          <span className="text-[9px] w-6 shrink-0" style={{ color: TEXT_LABEL }}>{g.label}</span>
-                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.06)" }}>
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{ width: `${Math.min(100, (g.value / g.max) * 100)}%`, background: g.color }}
-                            />
-                          </div>
-                          <span className="text-[9px] w-12 text-right font-mono shrink-0" style={{ color: g.color }}>
-                            {g.value}{g.unit}
-                          </span>
-                        </div>
-                      ))}
+                    {/* 실제 호출 성능 지표 */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="rounded-lg px-2 py-1.5" style={{ background: "rgba(0,0,0,0.03)" }}>
+                        <p className="text-[8px]" style={{ color: TEXT_LABEL }}>평균 응답</p>
+                        <p className="text-[11px] font-mono font-semibold" style={{ color: ACCENT }}>
+                          {m && m.totalInvocations > 0 ? `${(m.avgDurationMs / 1000).toFixed(1)}s` : "—"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg px-2 py-1.5" style={{ background: "rgba(0,0,0,0.03)" }}>
+                        <p className="text-[8px]" style={{ color: TEXT_LABEL }}>성공률</p>
+                        <p className="text-[11px] font-mono font-semibold" style={{ color: m && m.failureCount > 0 ? UI_RED : "#10b981" }}>
+                          {m && m.totalInvocations > 0 ? `${Math.round((m.successCount / m.totalInvocations) * 100)}%` : "—"}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* 하단 메타 + 재시작 버튼 */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                        <span>Port :{agent.port}</span>
-                        <span>·</span>
-                        <span>Up {agent.uptime}</span>
-                        <span>·</span>
-                        <span>{agent.tasksCompleted} tasks</span>
-                      </div>
-                      <button
-                        onClick={e => { e.stopPropagation(); restartAgent(agent.id); }}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold transition-all hover:bg-black/[0.06]"
-                        style={{ color: TEXT_SECONDARY }}
-                      >
-                        <RotateCw className="w-2.5 h-2.5" /> Restart
-                      </button>
+                    {/* 하단 메타 */}
+                    <div className="flex items-center gap-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                      <span>{m?.totalInvocations ?? 0} calls</span>
+                      <span>·</span>
+                      <span>
+                        {m?.lastInvokedAt ? `Last ${new Date(m.lastInvokedAt).toLocaleString("ko-KR")}` : "호출 이력 없음"}
+                      </span>
                     </div>
                   </div>
                 );
@@ -340,52 +499,47 @@ export function AgentControlPage() {
             )}
           </div>
 
-          {/* ── 개별 에이전트 로그 패널 (선택 시 표시) ── */}
+          {/* ── 선택한 에이전트의 실제 호출 이력 (선택 시 표시) ── */}
           {!isLoading && selectedAgent && selectedAgentData && (
             <div
               className="rounded-2xl overflow-hidden flex flex-col shrink-0 animate-in fade-in slide-in-from-bottom-2 duration-300"
               style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}
             >
-              {/* 로그 헤더 */}
+              {/* 헤더 */}
               <div
                 className="flex items-center gap-2.5 px-4 py-2.5 shrink-0"
                 style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.85)" }}
               >
                 <Terminal className="w-3.5 h-3.5" style={{ color: TEXT_SECONDARY }} />
                 <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>
-                  {selectedAgentData.name} — Agent Log
+                  {selectedAgentData.name} — 최근 호출 이력
                 </p>
-                <span
-                  className="ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-                  style={{ background: STATUS_META[selectedAgentData.status].bg, color: STATUS_META[selectedAgentData.status].color }}
-                >
-                  {STATUS_META[selectedAgentData.status].label}
-                </span>
                 <button
                   onClick={() => setSelected(null)}
-                  className="text-[9px] ml-2 px-2 py-0.5 rounded hover:bg-black/10 transition-colors"
+                  className="text-[9px] ml-auto px-2 py-0.5 rounded hover:bg-black/10 transition-colors"
                   style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
                 >
                   Close
                 </button>
               </div>
-              {/* 로그 내용 */}
+              {/* 이력 내용 */}
               <div
                 ref={logRef}
-                className="p-4 overflow-y-auto font-mono text-[10px] leading-relaxed"
-                style={{ maxHeight: 140, background: "#0d1117", color: "#c9d1d9" }}
+                className="p-4 overflow-y-auto font-mono text-[10px] leading-relaxed space-y-1"
+                style={{ maxHeight: 180, background: TERM_BG, color: TERM_TEXT }}
               >
-                {logs.map((line, i) => {
-                  const isError = line.includes("[ERROR]");
-                  const isWarn  = line.includes("[WARN]");
-                  const isDebug = line.includes("[DEBUG]");
-                  const color = isError ? "#f97583" : isWarn ? "#e3b341" : isDebug ? "#8b949e" : "#c9d1d9";
-                  return (
-                    <p key={i} style={{ color }}>
-                      {line}
+                {invocationsLoading ? (
+                  <p style={{ color: TERM_MUTED }}>불러오는 중...</p>
+                ) : invocations.length === 0 ? (
+                  <p style={{ color: TERM_MUTED }}>이 에이전트에 대한 실제 호출 이력이 아직 없습니다.</p>
+                ) : (
+                  invocations.map((inv, i) => (
+                    <p key={i} style={{ color: inv.success ? TERM_GREEN : "#f97583" }}>
+                      [{new Date(inv.createdAt).toLocaleString("ko-KR")}] project #{inv.projectId} ·{" "}
+                      {inv.success ? `OK (${(inv.durationMs / 1000).toFixed(1)}s)` : `FAILED — ${inv.errorMessage ?? "unknown error"}`}
                     </p>
-                  );
-                })}
+                  ))
+                )}
               </div>
             </div>
           )}

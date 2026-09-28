@@ -1,7 +1,7 @@
-import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM } from "../colors";
+import { ACCENT_BG, BEIGE, BORDER, BRIGHT_BEIGE, CREAM, GRADIENT_HEADER_BANNER } from "../colors";
 
-const SKELETON_BG = "rgba(65,67,27,0.06)";
-const SKELETON_SHIMMER = "rgba(65,67,27,0.11)";
+const SKELETON_BG = "rgba(88,101,242,0.12)";
+const SKELETON_SHIMMER = "rgba(88,101,242,0.20)";
 const PAGE_BG = BRIGHT_BEIGE;
 
 export function SkeletonBox({
@@ -63,12 +63,12 @@ export function DashboardSkeleton() {
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex items-center gap-3">
-              <SkeletonBox style={{ width: "40px", height: "40px", borderRadius: "8px" }} />
+              <SkeletonBox style={{ width: "40px", height: "40px", borderRadius: "var(--radius-sm)" }} />
               <div className="flex-1 space-y-2">
                 <SkeletonBox style={{ width: "60%", height: "14px" }} />
                 <SkeletonBox style={{ width: "40%", height: "12px" }} />
               </div>
-              <SkeletonBox style={{ width: "60px", height: "24px", borderRadius: "6px" }} />
+              <SkeletonBox style={{ width: "60px", height: "24px", borderRadius: "var(--radius-sm)" }} />
             </div>
           ))}
         </div>
@@ -82,7 +82,7 @@ export function TableSkeleton({ rows = 8 }: { rows?: number }) {
     <div className="flex-1 flex flex-col p-6 gap-4 overflow-y-auto" style={{ background: PAGE_BG }}>
       <div className="flex items-center justify-between">
         <SkeletonBox style={{ width: "200px", height: "24px" }} />
-        <SkeletonBox style={{ width: "120px", height: "36px", borderRadius: "8px" }} />
+        <SkeletonBox style={{ width: "120px", height: "36px", borderRadius: "var(--radius-md)" }} />
       </div>
 
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: BORDER }}>
@@ -141,19 +141,19 @@ export function ProfileSkeleton() {
 
 export function ProjectSettingsSkeleton() {
   return (
-    <div className="flex-1 overflow-y-auto p-5" style={{ background: PAGE_BG }}>
+    <div className="flex-1 overflow-y-auto p-5" style={{ background: BRIGHT_BEIGE }}>
       <div className="mx-auto max-w-7xl space-y-5">
         <section
-          className="relative overflow-hidden rounded-[28px] border px-6 py-6"
+          className="relative overflow-hidden rounded-3xl border px-6 py-6"
           style={{
-            background: "linear-gradient(135deg, #131507 0%, #24270D 54%, #41431B 100%)",
+            background: GRADIENT_HEADER_BANNER,
             borderColor: "rgba(255,255,255,0.10)",
-            boxShadow: "0 18px 42px rgba(12,14,2,0.20)",
+            boxShadow: "0 18px 42px rgba(88,101,242,0.28)",
           }}
         >
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-1/2"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(174,183,132,0.16))" }}
+            style={{ background: "linear-gradient(90deg, transparent, rgba(236,72,189,0.28))" }}
           />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-3">
@@ -174,11 +174,11 @@ export function ProjectSettingsSkeleton() {
           </div>
 
           <div className="relative mt-5 flex flex-wrap gap-2">
-            {Array.from({ length: 3 }).map((_, index) => (
+            {Array.from({ length: 2 }).map((_, index) => (
               <SkeletonBox
                 key={index}
                 style={{
-                  width: index === 1 ? "118px" : "96px",
+                  width: index === 1 ? "108px" : "92px",
                   height: "30px",
                   borderRadius: "999px",
                   background: "rgba(255,255,255,0.12)",
@@ -188,45 +188,48 @@ export function ProjectSettingsSkeleton() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
-              <SkeletonBox style={{ width: "78px", height: "12px", marginBottom: "10px" }} />
-              <SkeletonBox style={{ width: index === 0 ? "96px" : "56px", height: "24px" }} />
-            </div>
-          ))}
-        </section>
-
-        <section className="grid gap-5 lg:grid-cols-[280px,1fr]">
-          <aside
-            className="rounded-[28px] border px-4 py-4"
-            style={{
-              background: "rgba(255,255,255,0.92)",
-              borderColor: BORDER,
-              boxShadow: "0 8px 24px rgba(32,35,27,0.045)",
-            }}
-          >
-            <SkeletonBox style={{ width: "88px", height: "13px", marginBottom: "14px" }} />
-            <div className="space-y-2.5">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-3 rounded-2xl border px-3.5 py-3"
-                  style={{ background: index === 0 ? ACCENT_BG : "rgba(255,255,255,0.86)", borderColor: BORDER }}
-                >
-                  <SkeletonBox style={{ width: "36px", height: "36px", borderRadius: "12px" }} />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <SkeletonBox style={{ width: `${62 + index * 7}%`, height: "12px" }} />
-                    <SkeletonBox style={{ width: `${78 - index * 6}%`, height: "10px" }} />
+        <section className="grid gap-5 xl:grid-cols-[280px,minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <section
+              className="rounded-3xl border p-3"
+              style={{ background: "rgba(255,255,255,0.92)", borderColor: BORDER, boxShadow: "0 8px 24px rgba(32,35,27,0.045)" }}
+            >
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 rounded-2xl border px-3.5 py-3"
+                    style={{ background: index === 0 ? ACCENT_BG : "rgba(255,255,255,0.86)", borderColor: BORDER }}
+                  >
+                    <SkeletonBox style={{ width: "36px", height: "36px", borderRadius: "var(--radius-md)" }} />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <SkeletonBox style={{ width: `${62 + index * 7}%`, height: "12px" }} />
+                      <SkeletonBox style={{ width: `${78 - index * 6}%`, height: "10px" }} />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </section>
+
+            <section
+              className="rounded-3xl border p-4"
+              style={{ background: "rgba(255,255,255,0.92)", borderColor: BORDER, boxShadow: "0 8px 24px rgba(32,35,27,0.045)" }}
+            >
+              <SkeletonBox style={{ width: "68px", height: "11px", marginBottom: "12px" }} />
+              <div className="grid grid-cols-2 gap-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="rounded-2xl px-3 py-3" style={{ background: ACCENT_BG }}>
+                    <SkeletonBox style={{ width: "44px", height: "10px", marginBottom: "8px" }} />
+                    <SkeletonBox style={{ width: index < 2 ? "34px" : "24px", height: "18px" }} />
+                  </div>
+                ))}
+              </div>
+            </section>
           </aside>
 
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-5">
             <section
-              className="rounded-[28px] border px-5 py-5"
+              className="rounded-3xl border px-5 py-5"
               style={{
                 background: "rgba(255,255,255,0.92)",
                 borderColor: BORDER,
@@ -239,58 +242,24 @@ export function ProjectSettingsSkeleton() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className={index === 1 || index === 5 ? "md:col-span-2" : ""}>
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <div key={index} className={index === 2 ? "md:col-span-2" : ""}>
                     <SkeletonBox style={{ width: "88px", height: "11px", marginBottom: "10px" }} />
                     <SkeletonBox
                       style={{
                         width: "100%",
-                        height: index === 1 ? "92px" : "46px",
-                        borderRadius: "16px",
-                        background: "rgba(65,67,27,0.055)",
+                        height: index === 2 ? "108px" : "46px",
+                        borderRadius: "var(--radius-lg)",
+                        background: "rgba(88,101,242,0.08)",
                       }}
                     />
                   </div>
                 ))}
               </div>
 
-              <div className="mt-5 flex justify-end gap-2">
-                <SkeletonBox style={{ width: "104px", height: "38px", borderRadius: "999px" }} />
-                <SkeletonBox style={{ width: "118px", height: "38px", borderRadius: "999px", background: ACCENT_BG }} />
+              <div className="mt-5 flex justify-end">
+                <SkeletonBox style={{ width: "108px", height: "30px", borderRadius: "var(--radius-md)", background: "rgba(184,84,80,0.22)" }} />
               </div>
-            </section>
-
-            <section className="grid gap-4 md:grid-cols-2">
-              {Array.from({ length: 2 }).map((_, sectionIndex) => (
-                <div
-                  key={sectionIndex}
-                  className="rounded-[28px] border px-5 py-5"
-                  style={{
-                    background: "rgba(255,255,255,0.92)",
-                    borderColor: BORDER,
-                    boxShadow: "0 8px 24px rgba(32,35,27,0.045)",
-                  }}
-                >
-                  <SkeletonBox style={{ width: "126px", height: "18px", marginBottom: "16px" }} />
-                  <div className="space-y-3">
-                    {Array.from({ length: 3 }).map((__, itemIndex) => (
-                      <div
-                        key={itemIndex}
-                        className="rounded-2xl border px-4 py-3"
-                        style={{ borderColor: "rgba(65,67,27,0.08)", background: ACCENT_BG }}
-                      >
-                        <SkeletonBox style={{ width: "84px", height: "11px", marginBottom: "10px" }} />
-                        <SkeletonBox
-                          style={{
-                            width: sectionIndex === 0 ? `${72 - itemIndex * 10}%` : `${56 + itemIndex * 10}%`,
-                            height: "16px",
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
             </section>
           </div>
         </section>
@@ -309,7 +278,7 @@ export function ProjectPickerSkeleton({ rows = 4 }: { rows?: number }) {
           style={{ background: "rgba(0,0,0,0.03)", border: `1.5px solid ${BORDER}` }}
         >
           <div className="flex items-center gap-3">
-            <SkeletonBox style={{ width: "32px", height: "32px", borderRadius: "12px" }} />
+            <SkeletonBox style={{ width: "32px", height: "32px", borderRadius: "var(--radius-md)" }} />
             <div className="min-w-0 flex-1 space-y-2">
               <SkeletonBox style={{ width: `${56 + index * 6}%`, height: "12px" }} />
               <SkeletonBox style={{ width: `${44 + index * 5}%`, height: "10px" }} />

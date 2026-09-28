@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   User, GitCommit, Bot, FolderGit2, MapPin, Mail, Code2,
   Monitor, Cpu, MemoryStick, Wifi,
   Activity, Pencil, Plus,
 } from "lucide-react";
 import { ProfileEditModal } from "./ProfileEditModal";
-// 기존 localStorage 기반 loadProfile 대신 초기값 뼈대만 사용 (ProfileData 타입은 유지)
-import { ProfileData, AVATAR_GRADIENTS } from "../data/profileStore";
+import { ProfileData, AVATAR_GRADIENTS, loadProfile } from "../data/profileStore";
 import { deviconUrl } from "../data/devicons";
 
 // 🌟 API 통신 함수들 가져오기
@@ -33,9 +33,9 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 // ── 디자인 토큰 ──
 import {
   BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, ACCENT_SAGE,
+  ACCENT, ACCENT_BG, ACCENT_BORDER,
   GRADIENT_PAGE, GRADIENT_ORB_1, GRADIENT_ORB_2,
-  UI_CYAN, UI_CYAN_BG,
+  UI_CYAN, UI_CYAN_BG, UI_RED, UI_AMBER,
 } from "../colors";
 
 // ── 브라우저 Memory API 타입 ──
@@ -155,7 +155,7 @@ function TechBadge({ name, slug, variant }: { name: string; slug: string; varian
 
 // ── 메인 ProfilePage ──
 // props로 현재 진입한 프로젝트 ID를 받도록 확장 (기본값 설정)
-export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) {
+export function ProfilePage({ projectId }: { projectId?: number | string | null }) {
   // 로딩 상태 관리를 위해 true로 시작
   const [isLoading, setIsLoading] = useState(true);
 
@@ -176,33 +176,50 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
   const [activitySummary, setActivitySummary] = useState<MyActivitySummary | null>(null);
   const [recentActivities, setRecentActivities] = useState<MyActivity[]>([]);
 
-  // 🌟 페이지 마운트 시 실서버 통신
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setIsLoading(true);
-        // 병렬로 API 3개 동시 호출 (내 정보, 활동 요약, 최근 활동)
-        const [sessionUser, summary, activitiesRes] = await Promise.all([
+        const cached = loadProfile();
+        
+        const [userRes, summaryRes, activitiesRes] = await Promise.allSettled([
           fetchCurrentUser(),
-          fetchMyActivitySummary(projectId),
-          fetchMyActivities(projectId)
+          fetchMyActivitySummary(),
+          fetchMyActivities()
         ]);
 
-        // 받아온 정보로 프로필 상태 업데이트
+        const sessionUser = userRes.status === "fulfilled" ? userRes.value : null;
+        const summary = summaryRes.status === "fulfilled" ? summaryRes.value : null;
+        const activities = activitiesRes.status === "fulfilled" && Array.isArray(activitiesRes.value) ? activitiesRes.value : [];
+
+        if (userRes.status === "rejected") {
+          console.error("현재 사용자 정보를 불러오지 못했습니다:", userRes.reason);
+          if (!cached) toast.error("프로필 정보를 불러오지 못했습니다.");
+        }
+        if (summaryRes.status === "rejected") {
+          console.error("활동 요약을 불러오지 못했습니다:", summaryRes.reason);
+        }
+        if (activitiesRes.status === "rejected") {
+          console.error("최근 활동을 불러오지 못했습니다:", activitiesRes.reason);
+        }
+
         setProfile({
-          displayName: sessionUser.name || "Unknown User",
-          role: sessionUser.role || "Member",
-          email: sessionUser.email || "",
-          location: "Seoul, Korea", // API에 location 필드가 없다면 기본값 또는 빈 문자열
-          bio: "SynAIpse 개발자",   // API에 bio 필드가 없다면 기본값 또는 빈 문자열
-          avatarColor: "olive",     // 사용자 선호 색상 연동 시 변경 가능
-          techStack: [],            // 프로필 확장 시 연동
+          displayName: sessionUser?.name || cached?.displayName || "",
+          role: sessionUser?.role || cached?.role || "",
+          email: sessionUser?.email || cached?.email || "",
+          location: cached?.location || "",
+          bio: cached?.bio || "",
+          avatarColor: cached?.avatarColor || "olive",
+          techStack: cached?.techStack || [],
         });
 
+        // summary/activities는 API가 실패하면 null/빈 배열 그대로 둔다 — 화면은 이미
+        // activitySummary?.xxx ?? 0 및 "최근 활동 내역이 없습니다" 빈 상태를 처리한다.
         setActivitySummary(summary);
-        setRecentActivities(activitiesRes.activities);
+        setRecentActivities(activities);
       } catch (e) {
-        console.error("프로필 데이터를 불러오는 중 오류가 발생했습니다.", e);
+        console.error("프로필 데이터를 불러오는 중 오류가 발생했습니다:", e);
+        toast.error("프로필 데이터를 불러오지 못했습니다.");
       } finally {
         setIsLoading(false);
       }
@@ -235,10 +252,10 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
       // 3. 로컬 상태 업데이트 및 모달 닫기
       setProfile(updatedProfile);
       setEditOpen(false);
-      
+      toast.success("프로필이 성공적으로 저장되었습니다.");
     } catch (error) {
       console.error("프로필 업데이트 실패:", error);
-      alert("프로필 저장에 실패했습니다. 다시 시도해 주세요.");
+      toast.error("프로필 저장에 실패했습니다. 다시 시도해 주세요.");
     }
   };
 
@@ -246,8 +263,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
     ? Math.round((stats.heapUsed / stats.heapTotal) * 100)
     : 0;
 
-  const grad = AVATAR_GRADIENTS[profile.avatarColor] ?? AVATAR_GRADIENTS["olive"];
-  const gradBg = `linear-gradient(135deg, ${grad.from}, ${grad.via}, ${grad.to})`;
+  const gradBg = AVATAR_GRADIENTS[profile.avatarColor] ?? AVATAR_GRADIENTS["olive"];
 
   // ── 동적 통계 카드 구성 ──
   const dynamicStats = [
@@ -404,8 +420,8 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
                     </div>
                     <GaugeBar
                       value={stats.renderLoad}
-                      color={stats.renderLoad > 70 ? "#ef4444" : stats.renderLoad > 40 ? "#f59e0b" : ACCENT}
-                      bg="rgba(65,67,27,0.10)"
+                      color={stats.renderLoad > 70 ? UI_RED : stats.renderLoad > 40 ? UI_AMBER : ACCENT}
+                      bg="rgba(112,130,56,0.10)"
                     />
                     <div className="mt-2.5 space-y-1">
                       <div className="flex justify-between text-[9px]">
@@ -414,7 +430,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
                       </div>
                       <div className="flex justify-between text-[9px]">
                         <span style={{ color: TEXT_TERTIARY }}>Frame Rate</span>
-                        <span className="font-semibold" style={{ color: stats.fps < 30 ? "#ef4444" : stats.fps < 50 ? "#f59e0b" : "#10b981" }}>{stats.fps} fps</span>
+                        <span className="font-semibold" style={{ color: stats.fps < 30 ? UI_RED : stats.fps < 50 ? UI_AMBER : "#10b981" }}>{stats.fps} fps</span>
                       </div>
                     </div>
                   </div>
@@ -426,7 +442,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
                       <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>Memory</p>
                       <span className="ml-auto text-[10px] font-mono font-semibold" style={{ color: "#5A8A4A" }}>{memPct > 0 ? `${memPct}%` : "—"}</span>
                     </div>
-                    <GaugeBar value={memPct} color={memPct > 80 ? "#ef4444" : memPct > 60 ? "#f59e0b" : "#5A8A4A"} bg="rgba(90,138,74,0.12)" />
+                    <GaugeBar value={memPct} color={memPct > 80 ? UI_RED : memPct > 60 ? UI_AMBER : "#5A8A4A"} bg="rgba(90,138,74,0.12)" />
                     <div className="mt-2.5 space-y-1">
                       {stats.heapUsed > 0 ? (
                         <>
@@ -566,7 +582,7 @@ export function ProfilePage({ projectId = 1 }: { projectId?: number | string }) 
                 </div>
               ) : profile.techStack.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 gap-2">
-                  <Code2 className="w-6 h-6" style={{ color: "rgba(65,67,27,0.20)" }} />
+                  <Code2 className="w-6 h-6" style={{ color: "rgba(112,130,56,0.20)" }} />
                   <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>기술 스택을 추가하세요</p>
                 </div>
               ) : (

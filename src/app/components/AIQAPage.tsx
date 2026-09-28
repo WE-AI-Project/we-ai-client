@@ -1,22 +1,43 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle,
-  Loader2, Bot, Server, Monitor, Cpu, Play, RotateCw,
-  FileCode, AlertCircle, GitCommit, Clock, ChevronDown,
-  ChevronUp, Hash, User, Calendar, MousePointer, Video,
-  Bell, Eye, Code2, Zap, Film, X, Volume2,
+  Loader2, Monitor, Play, RotateCw,
+  FileCode, GitCommit, Clock, ChevronDown,
+  ChevronUp, Calendar, Code2, ClipboardCheck,
 } from "lucide-react";
 import { getPendingQA, clearPendingQA } from "../data/qaStore";
-import { getLeader, getAllLeaders } from "../data/projectSettingsStore";
-import { AgentControlPage } from "./AgentControlPage";
-import { BACKEND_COMMITS, FRONTEND_COMMITS } from "./commitData";
-import { buildDiffFromCommitFiles, runAiQa, type QaResponse } from "../../api/aiApi";
+import { QAReportsPage } from "./QAReportsPage";
+import type { CommitFile } from "./commitData";
+import {
+  buildDiffFromCommitFiles,
+  runAiQa,
+  type QaResponse,
+} from "../../api/aiApi";
+import {
+  fetchQaReports,
+  fetchQaReportDetail,
+  executeBuildTask,
+  type QaReportSummary,
+  type QaReportDetail,
+  type QaReportStatus,
+  type BuildTaskExecutionResponse,
+} from "../lib/api";
+import {
+  loadConnectionConfig,
+  connectionKeyForProject,
+  sshExec,
+  buildSshTaskCommand,
+  DEFAULT_CONNECTION_CONFIG,
+  type ConnectionConfig,
+} from "../lib/serverConnection";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG, ACCENT_BORDER, GRADIENT_PAGE, GRADIENT_ORB_1,
-  GRADIENT_SIDEBAR, SIDEBAR_BORDER,
+  ACCENT, ACCENT_BG, ACCENT_BORDER,
+  BRIGHT_BEIGE,
+  TERM_BG, TERM_HEADER, TERM_TEXT, TERM_MUTED, UI_RED, UI_AMBER, UI_BLUE,
+  TERM_RED2, TERM_GREEN, TRAFFIC_RED, TRAFFIC_YELLOW, TRAFFIC_GREEN,
 } from "../colors";
 
 // ── 🚨 [추가] 재사용 가능한 스켈레톤 뼈대 컴포넌트 ──
@@ -31,7 +52,6 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 
 // ── 타입 ──
 type Severity   = "critical" | "warning" | "passed";
-type TestStatus = "waiting" | "running" | "passed" | "failed";
 type QAPhase    = "idle" | "phase1" | "phase2" | "done";
 
 type StaticError = {
@@ -45,122 +65,30 @@ type StaticError = {
   fix?:     string;
 };
 
-type UIAction = {
-  id:        string;
-  step:      number;
-  label:     string;
-  element:   string;
-  status:    "pending" | "running" | "passed" | "failed";
-  error?:    string;
-  clip?:     UIClip;
+// ── 커밋 QA 상태 (실제 백엔드 QaReportStatus 기반) ──
+const QA_STATUS_META: Record<QaReportStatus, { color: string; bg: string; label: string; icon: any }> = {
+  SUCCESS:  { color:"#10b981", bg:"rgba(16,185,129,0.10)",  label:"Success",  icon:CheckCircle2  },
+  FAILED:   { color:UI_RED, bg:"rgba(239,68,68,0.10)",   label:"Failed",   icon:XCircle       },
+  RUNNING:  { color:UI_BLUE, bg:"rgba(59,130,246,0.10)",  label:"Running",  icon:Loader2       },
+  PENDING:  { color:"#9b9b9b", bg:"rgba(0,0,0,0.06)",       label:"Pending",  icon:Clock         },
+  CANCELED: { color:"#7d7f5b", bg:"rgba(125,127,91,0.10)",  label:"Canceled", icon:XCircle       },
 };
 
-type UIClip = {
-  id:         string;
-  thumbnail:  string;   // data URL or placeholder
-  duration:   string;
-  errorLabel: string;
-  ts:         string;
-};
-
-type Notification = {
-  id:        string;
-  to:        string;    // 파트장 이름
-  dept:      string;
-  message:   string;
-  time:      string;
-  read:      boolean;
-  severity:  Severity;
-};
-
-// ── 커밋 QA 상태 ──
-type CommitQAStatus = "passed" | "failed" | "partial" | "pending" | "skipped";
-type CommitQAResult = {
-  id: string; hash: string; message: string; author: string;
-  date: string; branch: string; qaStatus: CommitQAStatus;
-  parts: { name: string; status: CommitQAStatus; tests: number; passed: number; failed: number; note?: string }[];
-};
-
-const COMMIT_QA_DATA: CommitQAResult[] = [
-  {
-    id:"c1", hash:"a3f9d21", message:"Refactored Multi-Agent communication logic",
-    author:"병권", date:"2025-03-31 14:22", branch:"feat/multi-agent",
-    qaStatus:"failed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"failed",  tests:8,  passed:6,  failed:2, note:"ParserAgent NullPointerException" },
-      { name:"Frontend (React/TS)",   status:"passed",  tests:5,  passed:5,  failed:0 },
-      { name:"Agent Integration",     status:"partial", tests:4,  passed:3,  failed:1, note:"DataSync ↔ Classifier handshake 타임아웃" },
-    ],
-  },
-  {
-    id:"c2", hash:"b7c3e18", message:"Fixed JDK 17 toolchain issue in settings.gradle",
-    author:"병권", date:"2025-03-31 11:05", branch:"fix/toolchain",
-    qaStatus:"passed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"passed", tests:8, passed:8, failed:0 },
-      { name:"Frontend (React/TS)",   status:"passed", tests:5, passed:5, failed:0 },
-      { name:"Agent Integration",     status:"passed", tests:4, passed:4, failed:0 },
-    ],
-  },
-  {
-    id:"c3", hash:"d2a1f45", message:"Added DataSyncAgent retry mechanism",
-    author:"병권", date:"2025-03-30 19:47", branch:"feat/agent-retry",
-    qaStatus:"passed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"passed",  tests:12, passed:12, failed:0 },
-      { name:"Frontend (React/TS)",   status:"skipped", tests:0,  passed:0,  failed:0, note:"해당 없음" },
-      { name:"Agent Integration",     status:"passed",  tests:6,  passed:6,  failed:0 },
-    ],
-  },
-  {
-    id:"c4", hash:"e5b8c72", message:"Updated AgentScheduler queue flush logic",
-    author:"병권", date:"2025-03-30 15:30", branch:"fix/scheduler",
-    qaStatus:"partial",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"partial", tests:6, passed:4, failed:2, note:"ConcurrentModificationException (risk)" },
-      { name:"Frontend (React/TS)",   status:"passed",  tests:3, passed:3, failed:0 },
-      { name:"Agent Integration",     status:"skipped", tests:0, passed:0, failed:0, note:"스케줄러 격리 테스트 미완성" },
-    ],
-  },
-  {
-    id:"c5", hash:"f1d7a09", message:"Initial project setup — Spring Boot 3.2.5",
-    author:"병권", date:"2025-03-29 10:00", branch:"main",
-    qaStatus:"passed",
-    parts:[
-      { name:"Backend (Java/Spring)", status:"passed", tests:4, passed:4, failed:0 },
-      { name:"Frontend (React/TS)",   status:"passed", tests:4, passed:4, failed:0 },
-      { name:"Agent Integration",     status:"passed", tests:2, passed:2, failed:0 },
-    ],
-  },
-];
-
-const QA_STATUS_META: Record<CommitQAStatus, { color: string; bg: string; label: string; icon: any }> = {
-  passed:  { color:"#10b981", bg:"rgba(16,185,129,0.10)",  label:"Passed",  icon:CheckCircle2  },
-  failed:  { color:"#ef4444", bg:"rgba(239,68,68,0.10)",   label:"Failed",  icon:XCircle       },
-  partial: { color:"#f59e0b", bg:"rgba(245,158,11,0.10)",  label:"Partial", icon:AlertTriangle },
-  pending: { color:"#9b9b9b", bg:"rgba(0,0,0,0.06)",       label:"Pending", icon:Clock         },
-  skipped: { color:"#7d7f5b", bg:"rgba(125,127,91,0.10)",  label:"Skipped", icon:ChevronDown   },
-};
-
-// ── Phase 1 더미 정적 분석 결과 ──
-const STATIC_ERRORS: StaticError[] = [
-  { id:"se1", file:"ParserAgent.java",           line:87,  col:12, type:"NullPointerException",          severity:"critical", message:"response 객체가 null일 수 있습니다. null 체크 추가 필요",              fix:"if (response != null) { ... }" },
-  { id:"se2", file:"MultiAgentController.java",  line:42,  col:5,  type:"ConcurrentModificationException",severity:"warning",  message:"agentRegistry에 동기화 없이 접근 — synchronized 블록 필요",            fix:"synchronized(agentRegistry) { ... }" },
-  { id:"se3", file:"apiClient.ts",               line:13,  col:3,  type:"UnhandledRejection",            severity:"warning",  message:"fetch() 오류가 catch되지 않음 — .catch() 또는 try/catch 블록 필요",  fix:"try { await fetch(...) } catch(e) { ... }" },
-  { id:"se4", file:"DataSyncAgent.java",         line:204, col:8,  type:"PotentialMemoryLeak",            severity:"warning",  message:"ExecutorService가 종료되지 않을 수 있음 — shutdown() 호출 누락",       fix:"executor.shutdown();" },
-  { id:"se5", file:"AgentScheduler.java",        line:118, col:22, type:"DeadlockRisk",                  severity:"critical", message:"중첩 synchronized 블록에서 데드락 위험 감지됨",                         fix:"Lock ordering 패턴 적용 필요" },
-];
-
-// ── Phase 2 UI 액션 시나리오 ──
-function mapQaResponseToErrors(response: QaResponse): StaticError[] {
+// ── Phase 1: AI QA 응답 → 정적 분석 오류 목록으로 변환 ──
+// scanTargets(실제 스캔된 파일 경로 목록)을 함께 넘기면 bugReport 본문에
+// 등장하는 파일명을 찾아 file 필드를 실제 경로로 보강한다.
+function mapQaResponseToErrors(response: QaResponse, scanTargets: string[] = []): StaticError[] {
   const bugReport = response.bugReport ?? response.bug_report ?? "";
   const optimization = response.optimization ?? "";
   const commitMsg = response.commitMsg ?? response.commit_msg ?? "";
 
+  const guessFile = (text: string) =>
+    scanTargets.find((path) => text.includes(path.split("/").pop() ?? path)) ?? "전체 변경 diff";
+
   return [
     bugReport && {
       id: "ai-bug-report",
-      file: "AI 분석 diff",
+      file: guessFile(bugReport),
       line: 1,
       col: 1,
       type: "AI Bug Risk",
@@ -180,290 +108,44 @@ function mapQaResponseToErrors(response: QaResponse): StaticError[] {
   ].filter((item): item is StaticError => Boolean(item));
 }
 
-const UI_ACTIONS: UIAction[] = [
-  { id:"a1", step:1,  label:"앱 초기 로딩 확인",          element:"<App />",                   status:"pending" },
-  { id:"a2", step:2,  label:"대시보드 렌더링 검사",         element:"<DashboardPage />",         status:"pending" },
-  { id:"a3", step:3,  label:"사이드바 네비게이션 클릭",     element:"<NavBtn id='Changes' />",   status:"pending" },
-  { id:"a4", step:4,  label:"Changes 페이지 파일 목록",     element:"<FileRow />",              status:"pending" },
-  { id:"a5", step:5,  label:"파일 클릭 → Diff 뷰어",       element:"<FileDiffViewer />",        status:"pending" },
-  { id:"a6", step:6,  label:"커밋 메시지 입력 필드",        element:"<textarea#commitMsg />",    status:"pending" },
-  { id:"a7", step:7,  label:"Agent Control 페이지 이동",    element:"<AgentControlPage />",      status:"pending" },
-  { id:"a8", step:8,  label:"에이전트 토글 버튼 동작",      element:"<AgentToggle />",           status:"pending", error:"Toggle state not updated after click — state mutation issue detected", clip: { id:"clip1", thumbnail:"", duration:"0:03", errorLabel:"에이전트 토글 오작동", ts:"14:22:07" } },
-  { id:"a9", step:9,  label:"환경 변수 설정 페이지",        element:"<EnvironmentSettingsPage />",status:"pending" },
-  { id:"a10",step:10, label:"Build 관리 페이지 이동",       element:"<BuildManagementPage />",   status:"pending" },
-  { id:"a11",step:11, label:"채팅 페이지 메시지 전송",      element:"<ChatPage send />",         status:"pending" },
-  { id:"a12",step:12, label:"QA 결과 페이지 로딩 완료",     element:"<AIQAPage />",              status:"pending" },
-];
-
-// ── UI 클립 Canvas 썸네일 ──
-function ClipThumbnail({ clip, onClick }: { clip: UIClip; onClick: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx    = canvas.getContext("2d");
-    if (!ctx)    return;
-
-    // 시뮬레이션 화면 그리기
-    ctx.fillStyle = "#0d1117";
-    ctx.fillRect(0, 0, 180, 100);
-
-    // UI 요소 모의
-    ctx.fillStyle = "#161b22";
-    ctx.roundRect(8, 8, 164, 12, 3); ctx.fill();
-    ctx.fillStyle = "#21262d";
-    ctx.roundRect(8, 26, 80, 60, 4); ctx.fill();
-    ctx.fillStyle = "#21262d";
-    ctx.roundRect(96, 26, 76, 28, 4); ctx.fill();
-    ctx.fillStyle = "#21262d";
-    ctx.roundRect(96, 58, 76, 28, 4); ctx.fill();
-
-    // 빨간 오류 하이라이트
-    ctx.strokeStyle = "#ef4444";
-    ctx.lineWidth   = 2;
-    ctx.setLineDash([3, 3]);
-    ctx.strokeRect(96, 58, 76, 28);
-
-    // 오류 느낌표
-    ctx.setLineDash([]);
-    ctx.fillStyle = "#ef4444";
-    ctx.beginPath();
-    ctx.arc(160, 44, 8, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "white";
-    ctx.font      = "bold 10px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("!", 160, 48);
-
-    // 커서
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.moveTo(110, 70); ctx.lineTo(110, 82); ctx.lineTo(113, 79);
-    ctx.lineTo(115, 84); ctx.lineTo(117, 83); ctx.lineTo(115, 78);
-    ctx.lineTo(119, 78); ctx.closePath(); ctx.fill();
-
-    // REC 도트
-    ctx.fillStyle = "#ef4444";
-    ctx.beginPath(); ctx.arc(15, 15, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#ef4444";
-    ctx.font      = "7px monospace";
-    ctx.textAlign = "left";
-    ctx.fillText("REC", 22, 18);
-    ctx.fillStyle = "#8b949e";
-    ctx.fillText(clip.duration, 150, 18);
-  }, [clip]);
-
-  return (
-    <button
-      onClick={onClick}
-      className="relative rounded-xl overflow-hidden group transition-all"
-      style={{ width: 180, height: 100, boxShadow: "0 4px 16px rgba(239,68,68,0.25)", border: "1px solid rgba(239,68,68,0.30)" }}
-    >
-      <canvas ref={canvasRef} width={180} height={100} />
-      {/* 플레이 버튼 오버레이 */}
-      <div
-        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-        style={{ background: "rgba(0,0,0,0.45)" }}
-      >
-        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.80)" }}>
-          <Film className="w-5 h-5 text-white" />
-        </div>
-      </div>
-    </button>
-  );
-}
-
-// ── 클립 재생 모달 ──
-function ClipModal({ clip, action, onClose }: { clip: UIClip; action: UIAction; onClose: () => void }) {
-  const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const frameRef    = useRef(0);
-  const animRef     = useRef<number>(0);
-  const [playing,   setPlaying]   = useState(true);
-  const [progress,  setProgress]  = useState(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx    = canvas.getContext("2d");
-    if (!ctx)    return;
-
-    let frame = 0;
-    const totalFrames = 90; // ~3초 at 30fps
-
-    const draw = () => {
-      frame = (frame + 1) % totalFrames;
-      frameRef.current = frame;
-      setProgress(frame / totalFrames);
-
-      const t = frame / totalFrames;
-
-      // 배경
-      ctx.fillStyle = "#0d1117";
-      ctx.fillRect(0, 0, 520, 300);
-
-      // 네비게이션 바
-      ctx.fillStyle = "#161b22";
-      ctx.fillRect(0, 0, 520, 36);
-      ctx.fillStyle = "#30363d";
-      ctx.fillRect(16, 12, 120, 12); // 로고
-      ctx.fillRect(160, 12, 80, 12);
-      ctx.fillRect(260, 12, 60, 12);
-
-      // 사이드바
-      ctx.fillStyle = "#161b22";
-      ctx.fillRect(0, 36, 52, 264);
-
-      // 메인 컨텐츠
-      ctx.fillStyle = "#21262d";
-      ctx.roundRect(68, 52, 200, 110, 6); ctx.fill();
-      ctx.fillStyle = "#21262d";
-      ctx.roundRect(68, 172, 200, 90, 6); ctx.fill();
-      ctx.fillStyle = "#21262d";
-      ctx.roundRect(280, 52, 220, 210, 6); ctx.fill();
-
-      // 에이전트 토글 버튼 (오류 요소)
-      const toggleX = 288;
-      const toggleY = 140;
-      const pulse   = Math.sin(t * Math.PI * 6) * 0.5 + 0.5;
-
-      ctx.fillStyle = frame < 30 ? "#10b981" : "#ef4444";
-      ctx.roundRect(toggleX, toggleY, 44, 20, 10); ctx.fill();
-
-      // 오류 하이라이트
-      if (frame >= 28) {
-        ctx.strokeStyle = `rgba(239,68,68,${0.4 + pulse * 0.6})`;
-        ctx.lineWidth   = 2;
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect(toggleX - 6, toggleY - 6, 56, 32);
-        ctx.setLineDash([]);
-
-        // 오류 말풍선
-        if (frame >= 35) {
-          ctx.fillStyle = "rgba(239,68,68,0.90)";
-          ctx.roundRect(toggleX - 40, toggleY - 44, 180, 32, 6); ctx.fill();
-          ctx.fillStyle = "white";
-          ctx.font      = "9px -apple-system, sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText("Toggle state not updated!", toggleX - 34, toggleY - 24);
-          ctx.fillText("State mutation issue detected", toggleX - 34, toggleY - 13);
-        }
-      }
-
-      // 커서 이동 애니메이션
-      const cursorX = 68 + t * 260;
-      const cursorY = frame < 40 ? 100 + t * 40 : toggleY + 10;
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.beginPath();
-      ctx.moveTo(cursorX, cursorY);
-      ctx.lineTo(cursorX, cursorY + 14); ctx.lineTo(cursorX + 4, cursorY + 11);
-      ctx.lineTo(cursorX + 6, cursorY + 15); ctx.lineTo(cursorX + 8, cursorY + 14);
-      ctx.lineTo(cursorX + 6, cursorY + 10); ctx.lineTo(cursorX + 10, cursorY + 10);
-      ctx.closePath(); ctx.fill();
-
-      // REC 표시
-      const recAlpha = Math.sin(t * Math.PI * 4) > 0 ? 1 : 0.4;
-      ctx.fillStyle  = `rgba(239,68,68,${recAlpha})`;
-      ctx.beginPath(); ctx.arc(16, 16, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle  = "#ef4444";
-      ctx.font       = "bold 8px monospace";
-      ctx.textAlign  = "left";
-      ctx.fillText("REC", 26, 20);
-
-      // 타임코드
-      ctx.fillStyle  = "rgba(255,255,255,0.5)";
-      ctx.font       = "8px monospace";
-      ctx.textAlign  = "right";
-      ctx.fillText(`00:0${Math.floor(frame / 30)}.${(frame % 30).toString().padStart(2,"0")}`, 508, 20);
-
-      if (playing) {
-        animRef.current = requestAnimationFrame(draw);
-      }
-    };
-
-    animRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [playing]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(12px)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="rounded-2xl overflow-hidden"
-        style={{ maxWidth: 580, width: "100%", background: "#0d1117", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}
-      >
-        {/* 헤더 */}
-        <div
-          className="flex items-center gap-3 px-4 py-3"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#161b22" }}
-        >
-          <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-          <span className="text-[11px] font-semibold" style={{ color: "#c9d1d9" }}>
-            오류 영상 — {clip.errorLabel}
-          </span>
-          <span className="text-[9px] ml-1" style={{ color: "#484f58" }}>{clip.ts}</span>
-          <span className="text-[9px] px-2 py-0.5 rounded-full ml-1" style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444" }}>
-            {action.element}
-          </span>
-          <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-white/[0.06]">
-            <X className="w-4 h-4" style={{ color: "#8b949e" }} />
-          </button>
-        </div>
-
-        {/* 캔버스 */}
-        <div className="relative">
-          <canvas ref={canvasRef} width={520} height={300} className="w-full" />
-
-          {/* 컨트롤 바 */}
-          <div
-            className="absolute bottom-0 left-0 right-0 flex items-center gap-3 px-4 py-2"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.8), transparent)" }}
-          >
-            <button
-              onClick={() => setPlaying(p => !p)}
-              className="w-7 h-7 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.15)" }}
-            >
-              {playing
-                ? <span className="flex gap-0.5"><span className="w-1 h-3.5 bg-white rounded-full" /><span className="w-1 h-3.5 bg-white rounded-full" /></span>
-                : <Film className="w-3.5 h-3.5 text-white" />
-              }
-            </button>
-            {/* 진행 바 */}
-            <div className="flex-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.15)" }}>
-              <div className="h-full rounded-full bg-red-400" style={{ width: `${progress * 100}%` }} />
-            </div>
-            <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,0.60)" }}>{clip.duration}</span>
-          </div>
-        </div>
-
-        {/* 에러 상세 */}
-        <div className="px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: "#ef4444" }} />
-            <p className="text-[11px] leading-snug" style={{ color: "#c9d1d9" }}>{action.error}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── CommitQARow ──
-function CommitQARow({ commit }: { commit: CommitQAResult }) {
+function CommitQARow({
+  projectId,
+  report,
+}: {
+  projectId: number;
+  report: QaReportSummary;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const sm  = QA_STATUS_META[commit.qaStatus];
+  const [detail, setDetail] = useState<QaReportDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const sm  = QA_STATUS_META[report.status];
   const Icon  = sm.icon;
-  const total = commit.parts.reduce((a,p) => a + p.tests,  0);
-  const pass  = commit.parts.reduce((a,p) => a + p.passed, 0);
+  const totalTests = report.testPassCount + report.testFailCount;
+  const createdLabel = (() => {
+    const d = new Date(report.createdAt);
+    return Number.isNaN(d.getTime()) ? report.createdAt : d.toLocaleString("ko-KR");
+  })();
+
+  const toggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && !detail && !detailLoading) {
+      setDetailLoading(true);
+      setDetailError(null);
+      fetchQaReportDetail(projectId, report.qaReportId)
+        .then(setDetail)
+        .catch((err: any) => setDetailError(err?.message || "QA 리포트 상세 조회에 실패했습니다."))
+        .finally(() => setDetailLoading(false));
+    }
+  };
 
   return (
     <div style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-        onClick={() => setExpanded(e => !e)}
+        onClick={toggle}
         onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.015)")}
         onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
       >
@@ -472,30 +154,18 @@ function CommitQARow({ commit }: { commit: CommitQAResult }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background:"rgba(0,0,0,0.05)", color:ACCENT }}>
-              #{commit.hash}
-            </span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:TEXT_SECONDARY }}>
-              {commit.branch}
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold" style={{ background:"rgba(0,0,0,0.05)", color:ACCENT }}>
+              #{report.commitId}
             </span>
           </div>
-          <p className="text-[11px] mt-0.5 truncate" style={{ color:TEXT_PRIMARY }}>{commit.message}</p>
+          <p className="text-[11px] mt-0.5 truncate font-medium" style={{ color:TEXT_PRIMARY }}>{report.commitMessage}</p>
           <div className="flex items-center gap-3 mt-0.5 text-[9px]" style={{ color:TEXT_TERTIARY }}>
-            <span className="flex items-center gap-1"><User className="w-2.5 h-2.5" />{commit.author}</span>
-            <span className="flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />{commit.date}</span>
-            {total > 0 && <span className="flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5" />{pass}/{total}</span>}
+            <span className="flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />{createdLabel}</span>
+            {totalTests > 0 && <span className="flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5" />{report.testPassCount}/{totalTests}</span>}
+            {report.totalIssueCount > 0 && <span>이슈 {report.totalIssueCount}건{report.criticalCount > 0 ? ` (심각 ${report.criticalCount})` : ""}</span>}
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-1 shrink-0">
-          {commit.parts.map(p => {
-            const psm = QA_STATUS_META[p.status]; const PI = psm.icon;
-            return (
-              <div key={p.name} className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background:psm.bg }} title={p.name}>
-                <PI className="w-2.5 h-2.5" style={{ color:psm.color }} />
-              </div>
-            );
-          })}
-        </div>
+
         <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ background:sm.bg, color:sm.color }}>
           {sm.label}
         </span>
@@ -506,34 +176,48 @@ function CommitQARow({ commit }: { commit: CommitQAResult }) {
 
       {expanded && (
         <div className="px-4 pb-3" style={{ borderTop:`1px solid ${BORDER_SUBTLE}`, background:"rgba(0,0,0,0.015)" }}>
-          <div className="pt-3 space-y-2">
-            {commit.parts.map(part => {
-              const psm = QA_STATUS_META[part.status]; const pct = part.tests > 0 ? Math.round((part.passed / part.tests)*100) : 0; const PI = psm.icon;
-              return (
-                <div key={part.name} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background:psm.bg }}>
-                    <PI className="w-3 h-3" style={{ color:psm.color }} />
+          {detailLoading ? (
+            <div className="pt-3 space-y-2">
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-3 w-3/4" />
+            </div>
+          ) : detailError ? (
+            <p className="pt-3 text-[10px]" style={{ color:UI_RED }}>{detailError}</p>
+          ) : detail && (detail.issues.length > 0 || detail.testResults.length > 0) ? (
+            <div className="pt-3 space-y-2">
+              {detail.summary && <p className="text-[10px]" style={{ color:TEXT_SECONDARY }}>{detail.summary}</p>}
+              {detail.issues.map(issue => (
+                <div key={issue.issueId} className="rounded-xl px-3 py-2.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: issue.severity === "CRITICAL" ? "rgba(239,68,68,0.10)" : issue.severity === "MAJOR" ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.06)",
+                        color: issue.severity === "CRITICAL" ? UI_RED : issue.severity === "MAJOR" ? UI_AMBER : TEXT_TERTIARY,
+                      }}
+                    >{issue.severity}</span>
+                    <p className="text-[10px] font-semibold flex-1 min-w-0 truncate" style={{ color:TEXT_PRIMARY }}>{issue.title}</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>{part.name}</p>
-                    {part.note && <p className="text-[9px] mt-0.5" style={{ color:TEXT_TERTIARY }}>{part.note}</p>}
-                    {part.tests > 0 && (
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background:"rgba(0,0,0,0.08)" }}>
-                          <div className="h-full rounded-full" style={{ width:`${pct}%`, background:part.failed>0?"linear-gradient(90deg,#10b981,#ef4444)":"#10b981" }} />
-                        </div>
-                        <span className="text-[9px] shrink-0 font-mono" style={{ color:TEXT_TERTIARY }}>{part.passed}/{part.tests}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[9px] shrink-0">
-                    {part.tests > 0 && <><span style={{ color:"#10b981" }}>✓{part.passed}</span>{part.failed>0&&<span style={{ color:"#ef4444" }}>✗{part.failed}</span>}</>}
-                    <span className="px-1.5 py-0.5 rounded-full font-semibold" style={{ background:psm.bg, color:psm.color }}>{psm.label}</span>
-                  </div>
+                  {issue.filePath && (
+                    <p className="text-[9px] mt-1 font-mono" style={{ color:TEXT_TERTIARY }}>
+                      {issue.filePath}{issue.lineNumber ? `:${issue.lineNumber}` : ""}
+                    </p>
+                  )}
+                  {issue.description && <p className="text-[9px] mt-1" style={{ color:TEXT_SECONDARY }}>{issue.description}</p>}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+              {detail.testResults.map((t, i) => (
+                <div key={i} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
+                  <span className="text-[10px]" style={{ color:TEXT_PRIMARY }}>{t.testName}</span>
+                  <span className="text-[9px] font-semibold" style={{ color: t.status === "PASSED" ? "#10b981" : t.status === "FAILED" ? UI_RED : TEXT_TERTIARY }}>
+                    {t.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="pt-3 text-[10px]" style={{ color:TEXT_TERTIARY }}>세부 이슈/테스트 결과가 없습니다.</p>
+          )}
         </div>
       )}
     </div>
@@ -550,8 +234,8 @@ export function AIQAPage({
   projectId?: number | null;
   autoStart?: boolean;
 }) {
-  // ── 최상단 탭: AI QA / Agent Control ──
-  const [mainTab,      setMainTab]      = useState<"qa" | "agents">("qa");
+  // ── 최상단 탭: AI QA / QA Reports ── (Agent Control은 Project Settings로 이동)
+  const [mainTab,      setMainTab]      = useState<"qa" | "reports">("qa");
   const [activeTab,    setActiveTab]    = useState<"run" | "commit">("run");
   const [phase,        setPhase]        = useState<QAPhase>("idle");
   const [elapsed,      setElapsed]      = useState(0);
@@ -559,30 +243,49 @@ export function AIQAPage({
 
   const isLoading = false;
 
-  // ── 커밋 정보 ──
+  // ── 커밋 정보 (Changes 페이지에서 스테이징된 실제 변경 파일을 넘겨받음 - 없으면 QA를 돌릴 대상이 없다) ──
   const pendingQA  = getPendingQA();
   const [commitInfo] = useState(pendingQA);
   useEffect(() => { clearPendingQA(); }, []);
+  const hasQaTarget = Boolean(commitInfo?.diffFiles?.length);
 
-  // ── Phase 1: 정적 분석 ──
+  // ── Phase 1: 정적 분석 (실제 AI QA 백엔드 호출) ──
   const [scanFiles,    setScanFiles]    = useState<string[]>([]);
   const [scanCurrent,  setScanCurrent]  = useState<string>("");
   const [staticErrors, setStaticErrors] = useState<StaticError[]>([]);
   const [phase1Done,   setPhase1Done]   = useState(false);
 
-  // ── Phase 2: UI 테스트 ──
-  const [actions,      setActions]      = useState<UIAction[]>(UI_ACTIONS.map(a => ({ ...a })));
-  const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [clips,        setClips]        = useState<UIClip[]>([]);
-  const [phase2Done,   setPhase2Done]   = useState(false);
-  const [openClip,     setOpenClip]     = useState<{ clip: UIClip; action: UIAction } | null>(null);
+  // ── Phase 2: 실제 자동화 테스트 실행 (Server & Build와 동일한 local/link/ssh 연결) ──
+  const [connection,   setConnection]   = useState<ConnectionConfig>(DEFAULT_CONNECTION_CONFIG);
+  const [testRun,       setTestRun]       = useState<BuildTaskExecutionResponse | null>(null);
+  const [testRunning,   setTestRunning]   = useState(false);
+  const [testError,     setTestError]     = useState<string | null>(null);
+  const [logsExpanded,  setLogsExpanded]  = useState(true);
 
-  // ── 알림 ──
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showNotif,     setShowNotif]      = useState(false);
+  const connectionKey = connectionKeyForProject(projectId);
+  useEffect(() => {
+    let cancelled = false;
+    loadConnectionConfig(connectionKey).then(cfg => { if (!cancelled) setConnection(cfg); });
+    return () => { cancelled = true; };
+  }, [connectionKey]);
 
-  // ── 커밋 탭 필터 ──
-  const [commitFilter, setCommitFilter] = useState<CommitQAStatus | "all">("all");
+  // ── 커밋 탭: 실제 QA 리포트 이력 ──
+  const [commitFilter, setCommitFilter] = useState<QaReportStatus | "all">("all");
+  const [commitReports, setCommitReports] = useState<QaReportSummary[]>([]);
+  const [commitReportsLoading, setCommitReportsLoading] = useState(false);
+  const [commitReportsError, setCommitReportsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== "commit" || !projectId) return;
+    let cancelled = false;
+    setCommitReportsLoading(true);
+    setCommitReportsError(null);
+    fetchQaReports(projectId, { size: 50 })
+      .then((res) => { if (!cancelled) setCommitReports(res.reports); })
+      .catch((err: any) => { if (!cancelled) setCommitReportsError(err?.message || "QA 리포트를 불러오지 못했습니다."); })
+      .finally(() => { if (!cancelled) setCommitReportsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, projectId]);
 
   // ── 타이머 ──
   useEffect(() => {
@@ -595,18 +298,16 @@ export function AIQAPage({
   }, [phase]);
 
   useEffect(() => {
-    // isLoading 끝난 후 autoStart 처리
-    if (!isLoading && autoStart) setTimeout(() => startQA(), 400);
-  }, [isLoading, autoStart]);
-
-  const addNotification = useCallback((n: Omit<Notification, "id" | "time" | "read">) => {
-    setNotifications(prev => [{
-      ...n, id: Math.random().toString(36).slice(2), time: new Date().toLocaleTimeString("ko-KR"), read: false,
-    }, ...prev]);
-  }, []);
+    // isLoading 끝난 후 autoStart 처리 (분석할 실제 변경사항이 있을 때만)
+    if (!isLoading && autoStart && hasQaTarget) setTimeout(() => startQA(), 400);
+  }, [isLoading, autoStart, hasQaTarget]);
 
   // ── QA 시작 ──
   const startQA = () => {
+    if (!hasQaTarget) {
+      toast.error("먼저 Changes 페이지에서 변경된 파일을 스테이징하고 QA를 요청해 주세요.");
+      return;
+    }
     if (phase !== "idle" && phase !== "done") return;
     setPhase("phase1");
     setElapsed(0);
@@ -614,10 +315,9 @@ export function AIQAPage({
     setScanCurrent("");
     setStaticErrors([]);
     setPhase1Done(false);
-    setActions(UI_ACTIONS.map(a => ({ ...a, status: "pending" })));
-    setClips([]);
-    setPhase2Done(false);
-    setNotifications([]);
+    setTestRun(null);
+    setTestRunning(false);
+    setTestError(null);
     void runPhase1FromApi();
   };
 
@@ -628,161 +328,121 @@ export function AIQAPage({
     setScanCurrent("");
     setStaticErrors([]);
     setPhase1Done(false);
-    setActions(UI_ACTIONS.map(a => ({ ...a, status: "pending" })));
-    setClips([]);
-    setPhase2Done(false);
-    setNotifications([]);
+    setTestRun(null);
+    setTestRunning(false);
+    setTestError(null);
   };
 
-  // ── Phase 1: 정적 분석 시뮬레이션 ──
+  // ── Phase 1: 정적 코드 분석 ──
+  // Changes 페이지에서 실제로 스테이징된 변경 파일(commitInfo.diffFiles)의 diff를 그대로
+  // 백엔드 AI QA(/api/v1/ai/qa)에 보낸다. 분석 대상이 없으면 QA를 시작조차 하지 않는다
+  // (예전에는 데모용 목업 커밋으로 조용히 대체했었다).
   const runPhase1FromApi = async () => {
-    const filesForQa = [
-      ...(BACKEND_COMMITS[0]?.files ?? []),
-      ...(FRONTEND_COMMITS[0]?.files ?? []),
-    ];
+    const filesForQa: CommitFile[] = commitInfo?.diffFiles ?? [];
     const scanTargets = filesForQa.map((file) => file.path);
 
-    scanTargets.forEach((file, index) => {
-      setTimeout(() => {
-        setScanCurrent(file);
-        setScanFiles(prev => prev.includes(file) ? prev : [...prev, file]);
-      }, index * 140);
+    setScanFiles([]);
+    setScanCurrent(scanTargets[0] || "");
+
+    let cancelled = false;
+    const revealTimers: ReturnType<typeof setTimeout>[] = [];
+    scanTargets.forEach((path, i) => {
+      revealTimers.push(setTimeout(() => {
+        if (cancelled) return;
+        setScanCurrent(path);
+        setScanFiles(prev => [...prev, path]);
+      }, i * 260));
     });
+    const revealMs = scanTargets.length * 260;
+
+    const finishPhase1 = (errors: StaticError[]) => {
+      cancelled = true;
+      revealTimers.forEach(clearTimeout);
+      setScanFiles(scanTargets);
+      setScanCurrent("");
+      setStaticErrors(errors);
+      setPhase1Done(true);
+      setPhase("phase2");
+      setTimeout(() => void runRealTestPhase(), 400);
+    };
 
     try {
-      const response = await runAiQa({
-        projectId,
-        diff: buildDiffFromCommitFiles(filesForQa),
-      });
-      const errors = mapQaResponseToErrors(response);
-      setStaticErrors(errors);
+      const diff = buildDiffFromCommitFiles(filesForQa);
+      const response = await runAiQa({ projectId, diff });
+
+      const errors = mapQaResponseToErrors(response, scanTargets);
       if (errors.length > 0) {
         toast.warning("AI QA 분석에서 확인할 항목이 발견되었습니다.");
       }
+      // 파일 스캔 애니메이션이 너무 짧게 끝나지 않도록 최소 재생 시간을 보장한다.
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, revealMs - 260)));
+      finishPhase1(errors);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "AI QA 분석에 실패했습니다.");
-    } finally {
-      setTimeout(() => {
-        setScanCurrent("");
-        setPhase1Done(true);
-        setPhase("phase2");
-        setTimeout(() => runPhase2(), 600);
-      }, Math.max(scanTargets.length * 140, 500));
+      finishPhase1([]);
     }
   };
 
-  const runPhase1 = () => {
-    const FILES = [
-      "src/main/java/com/weai/agent/ParserAgent.java",
-      "src/main/java/com/weai/controller/MultiAgentController.java",
-      "src/main/java/com/weai/agent/DataSyncAgent.java",
-      "src/main/java/com/weai/scheduler/AgentScheduler.java",
-      "src/main/resources/application-dev.yml",
-      "src/api/apiClient.ts",
-      "src/app/components/AgentControlPage.tsx",
-      "build.gradle",
-      "settings.gradle",
-    ];
-
-    let delay = 0;
-    FILES.forEach((file, i) => {
-      setTimeout(() => {
-        setScanCurrent(file);
-        setScanFiles(prev => [...prev, file]);
-        // 오류 발견 시뮬레이션
-        const err = STATIC_ERRORS.find(e => file.includes(e.file));
-        if (err) {
-          setTimeout(() => {
-            setStaticErrors(prev => prev.some(e => e.id === err.id) ? prev : [...prev, err]);
-          }, 400);
-        }
-      }, delay);
-      delay += 320 + Math.random() * 200;
-    });
-
-    // Phase 1 완료 → Phase 2 시작
-    setTimeout(() => {
-      setScanCurrent("");
-      setPhase1Done(true);
-      setPhase("phase2");
-      // Backend 파트장에게 알림
-      const leader = getLeader("Backend");
-      if (leader) {
-        addNotification({
-          to: leader.name, dept: "Backend",
-          message: "Phase 1 코드 분석 완료 — Critical 오류 2건, Warning 3건 발견",
-          severity: "critical",
-        });
+  // ── Phase 2: 실제 자동화 테스트 실행 ──
+  // "Server & Build" 탭과 동일한 연결(로컬/링크/SSH)로 실제 test 태스크를 실행한다.
+  // 화면을 대신 조작해주는 AI는 없다 - 실제 존재하는 자동화 테스트 스위트를 그대로 돌리고
+  // 진짜 종료 코드/로그를 보여준다.
+  const runRealTestPhase = async () => {
+    setTestRunning(true);
+    setTestError(null);
+    try {
+      let result: BuildTaskExecutionResponse;
+      if (connection.mode === "ssh") {
+        const command = buildSshTaskCommand(connection.ssh.buildTool, "test");
+        const started = Date.now();
+        const sshResult = await sshExec(connectionKey, command);
+        const combined = `${sshResult.stdout}${sshResult.stderr}`.split(/\r?\n/).filter(l => l.length > 0);
+        result = {
+          taskName: "test",
+          command,
+          status: sshResult.exitCode === 0 ? "SUCCESS" : "FAILED",
+          exitCode: sshResult.exitCode,
+          duration: `${((Date.now() - started) / 1000).toFixed(2)}s`,
+          logs: combined.length > 0 ? combined : ["(No output produced)"],
+          executedAt: new Date().toLocaleTimeString("en-GB"),
+        };
+      } else {
+        const baseUrlOverride = connection.mode === "link" ? connection.linkBaseUrl : undefined;
+        result = await executeBuildTask("test", projectId, baseUrlOverride);
       }
-      setTimeout(() => runPhase2(), 600);
-    }, delay + 800);
-  };
-
-  // ── Phase 2: UI 에이전트 테스트 시뮬레이션 ──
-  const runPhase2 = () => {
-    let delay = 0;
-    UI_ACTIONS.forEach((action, i) => {
-      setTimeout(() => {
-        setActiveAction(action.id);
-        setActions(prev => prev.map(a => a.id === action.id ? { ...a, status: "running" } : a));
-      }, delay);
-
-      const duration = 700 + Math.random() * 400;
-      setTimeout(() => {
-        const hasFail = !!action.error;
-        setActions(prev => prev.map(a =>
-          a.id === action.id ? { ...a, status: hasFail ? "failed" : "passed" } : a
-        ));
-        setActiveAction(null);
-
-        if (hasFail && action.clip) {
-          const clip: UIClip = { ...action.clip };
-          setClips(prev => [...prev, clip]);
-          // 관련 파트장에게 알림
-          const leader = getLeader("Frontend");
-          if (leader) {
-            addNotification({
-              to: leader.name, dept: "Frontend",
-              message: `UI 테스트 오류 발생 — "${action.label}" 단계에서 오류 감지. 영상 클립 저장됨.`,
-              severity: "critical",
-            });
-          }
-        }
-      }, delay + duration);
-
-      delay += duration + 200;
-    });
-
-    // Phase 2 완료
-    setTimeout(() => {
-      setPhase2Done(true);
+      setTestRun(result);
+      if (result.status !== "SUCCESS") {
+        toast.warning("자동화 테스트가 실패했습니다.");
+      }
+    } catch (error) {
+      setTestError(error instanceof Error ? error.message : "테스트 실행에 실패했습니다.");
+    } finally {
+      setTestRunning(false);
       setPhase("done");
-    }, delay + 600);
+    }
   };
 
   // 계산값
   const elapsedSec    = (elapsed / 1000).toFixed(1);
   const criticalCount = staticErrors.filter(e => e.severity === "critical").length;
   const warningCount  = staticErrors.filter(e => e.severity === "warning").length;
-  const passedActions = actions.filter(a => a.status === "passed").length;
-  const failedActions = actions.filter(a => a.status === "failed").length;
-  const unreadNotif   = notifications.filter(n => !n.read).length;
-  const filteredCommits = commitFilter === "all" ? COMMIT_QA_DATA : COMMIT_QA_DATA.filter(c => c.qaStatus === commitFilter);
+  const testPassed    = testRun?.status === "SUCCESS";
+  const filteredCommits = commitFilter === "all" ? commitReports : commitReports.filter(r => r.status === commitFilter);
 
   const SEV_COLOR: Record<Severity, { color: string; bg: string }> = {
-    critical: { color: "#ef4444", bg: "rgba(239,68,68,0.10)"  },
-    warning:  { color: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
+    critical: { color: UI_RED, bg: "rgba(239,68,68,0.10)"  },
+    warning:  { color: UI_AMBER, bg: "rgba(245,158,11,0.10)" },
     passed:   { color: "#10b981", bg: "rgba(16,185,129,0.10)" },
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* ── 최상단 탭 바 (AI QA / Agent Control) ── */}
+      {/* ── 최상단 탭 바 (AI QA / QA Reports) ── */}
       <div
         className="flex items-center shrink-0 px-3 gap-1"
         style={{
-          borderBottom: `1px solid ${SIDEBAR_BORDER}`,
-          background: GRADIENT_SIDEBAR,
+          borderBottom: `1px solid ${BORDER}`,
+          background: BRIGHT_BEIGE,
           minHeight: 36,
         }}
       >
@@ -790,43 +450,36 @@ export function AIQAPage({
           onClick={() => setMainTab("qa")}
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
-            color:        mainTab === "qa" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background:   mainTab === "qa" ? "rgba(174,183,132,0.18)" : "transparent",
-            borderBottom: mainTab === "qa" ? "2px solid #AEB784"      : "2px solid transparent",
+            color:        mainTab === "qa" ? ACCENT : TEXT_SECONDARY,
+            background:   mainTab === "qa" ? "rgba(88,101,242,0.08)" : "transparent",
+            borderBottom: mainTab === "qa" ? `2px solid ${ACCENT}` : "2px solid transparent",
           }}
         >
           <ShieldCheck className="w-3.5 h-3.5" />
           AI QA
         </button>
         <button
-          onClick={() => setMainTab("agents")}
+          onClick={() => setMainTab("reports")}
           className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all"
           style={{
-            color:        mainTab === "agents" ? "rgba(254,252,245,0.95)" : "rgba(154,155,114,0.85)",
-            background:   mainTab === "agents" ? "rgba(174,183,132,0.18)" : "transparent",
-            borderBottom: mainTab === "agents" ? "2px solid #AEB784"      : "2px solid transparent",
+            color:        mainTab === "reports" ? ACCENT : TEXT_SECONDARY,
+            background:   mainTab === "reports" ? "rgba(88,101,242,0.08)" : "transparent",
+            borderBottom: mainTab === "reports" ? `2px solid ${ACCENT}` : "2px solid transparent",
           }}
         >
-          <Bot className="w-3.5 h-3.5" />
-          Agent Control
+          <ClipboardCheck className="w-3.5 h-3.5" />
+          QA Reports
         </button>
       </div>
 
-      {/* ── Agent Control 탭 ── */}
-      {mainTab === "agents" && <AgentControlPage />}
+      {/* ── QA Reports 탭 ── */}
+      {mainTab === "reports" && <QAReportsPage projectId={projectId ?? 0} />}
 
       {/* ── AI QA 탭 ── */}
       {mainTab === "qa" && (
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-      {/* 배경 */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: GRADIENT_PAGE }} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div style={{ position:"absolute", top:"-10%", left:"-5%", width:"45%", height:"45%", borderRadius:"50%", background: GRADIENT_ORB_1, filter:"blur(50px)" }} />
-        <div style={{ position:"absolute", bottom:"-10%", right:"-5%", width:"50%", height:"50%", borderRadius:"50%", background:"radial-gradient(circle, rgba(251,191,122,0.12) 0%, transparent 70%)", filter:"blur(50px)" }} />
-      </div>
-
+      <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: BRIGHT_BEIGE }}>
       <div className="relative z-10 flex-1 overflow-y-auto p-5">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
           {/* ── 헤더 ── */}
           <div className="flex items-start justify-between gap-4">
@@ -847,13 +500,13 @@ export function AIQAPage({
                       </span>
                     )}
                     {phase === "phase2" && (
-                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" /> PHASE 2 · UI 에이전트
+                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:UI_AMBER }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" /> PHASE 2 · 자동화 테스트
                       </span>
                     )}
                     {phase === "done" && (
-                      <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: criticalCount > 0 ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: criticalCount > 0 ? "#ef4444" : "#10b981" }}>
-                        {criticalCount > 0 ? "FAILED" : "PASSED"}
+                      <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: (criticalCount > 0 || testRun?.status === "FAILED" || testError) ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: (criticalCount > 0 || testRun?.status === "FAILED" || testError) ? UI_RED : "#10b981" }}>
+                        {(criticalCount > 0 || testRun?.status === "FAILED" || testError) ? "FAILED" : "PASSED"}
                       </span>
                     )}
                   </>
@@ -871,7 +524,7 @@ export function AIQAPage({
               ) : commitInfo ? (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:ACCENT_BG, border:`1px solid ${ACCENT_BORDER}` }}>
-                    <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background:"rgba(65,67,27,0.10)" }}>
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background:"rgba(112,130,56,0.10)" }}>
                       <span className="text-[7px] font-bold" style={{ color:ACCENT }}>{commitInfo.author[0]}</span>
                     </div>
                     <span className="text-[10px] font-semibold" style={{ color:ACCENT }}>{commitInfo.author}</span>
@@ -888,9 +541,10 @@ export function AIQAPage({
               ) : (
                 <p className="text-[11px] mt-1" style={{ color:TEXT_TERTIARY }}>
                   {phase === "phase1" ? `파일 스캔 중… ${scanFiles.length}개 완료 · ${elapsedSec}s`
-                  : phase === "phase2" ? `UI 에이전트 테스트 ${passedActions + failedActions}/${actions.length} · ${elapsedSec}s`
-                  : phase === "done"   ? `완료 — 오류 ${criticalCount + warningCount}건 · UI 오류 ${failedActions}건 · ${elapsedSec}s`
-                  : "QA를 시작하거나 커밋별 현황을 확인하세요"}
+                  : phase === "phase2" ? `자동화 테스트 실행 중… ${elapsedSec}s`
+                  : phase === "done"   ? `완료 — 코드 분석 오류 ${criticalCount + warningCount}건 · 테스트 ${testError ? "실행 실패" : testPassed ? "통과" : "실패"} · ${elapsedSec}s`
+                  : hasQaTarget ? "QA를 시작하거나 커밋별 현황을 확인하세요"
+                  : "Changes 페이지에서 변경사항을 스테이징하고 QA를 요청하면 여기서 실행됩니다"}
                 </p>
               )}
             </div>
@@ -904,101 +558,31 @@ export function AIQAPage({
                 </>
               ) : (
                 <>
-                  {/* 알림 버튼 */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowNotif(s => !s)}
-                      className="p-2 rounded-xl transition-all"
-                      style={{ background: unreadNotif > 0 ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.80)", border:`1px solid ${BORDER}` }}
-                    >
-                      <Bell className="w-4 h-4" style={{ color: unreadNotif > 0 ? "#ef4444" : TEXT_SECONDARY }} />
-                    </button>
-                    {unreadNotif > 0 && (
-                      <span
-                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center"
-                        style={{ background:"#ef4444", color:"white" }}
-                      >
-                        {unreadNotif}
-                      </span>
-                    )}
-                  </div>
-
                   {phase === "done" && (
                     <button onClick={reset} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all" style={{ background:"rgba(255,255,255,0.80)", border:`1px solid ${BORDER}`, color:TEXT_SECONDARY }}>
-                      <RotateCw className="w-3 h-3" /> Reset
+                      <RotateCw className="w-3 h-3" /> 검사 초기화
                     </button>
                   )}
                   {activeTab === "run" && (
                     <button
                       onClick={startQA}
-                      disabled={phase !== "idle" && phase !== "done"}
+                      disabled={(phase !== "idle" && phase !== "done") || !hasQaTarget}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
                       style={{
-                        background: phase !== "idle" && phase !== "done" ? "rgba(0,0,0,0.07)" : ACCENT,
-                        color:      phase !== "idle" && phase !== "done" ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
-                        boxShadow:  phase !== "idle" && phase !== "done" ? "none" : "0 4px 14px rgba(65,67,27,0.25)",
-                        cursor:     phase !== "idle" && phase !== "done" ? "not-allowed" : "pointer",
+                        background: (phase !== "idle" && phase !== "done") || !hasQaTarget ? "rgba(0,0,0,0.07)" : ACCENT,
+                        color:      (phase !== "idle" && phase !== "done") || !hasQaTarget ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
+                        boxShadow:  (phase !== "idle" && phase !== "done") || !hasQaTarget ? "none" : "0 4px 14px rgba(112,130,56,0.25)",
+                        cursor:     (phase !== "idle" && phase !== "done") || !hasQaTarget ? "not-allowed" : "pointer",
                       }}
                     >
                       {phase !== "idle" && phase !== "done" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                      {phase !== "idle" && phase !== "done" ? "Running…" : "Run QA"}
+                      {phase !== "idle" && phase !== "done" ? "검사 진행 중…" : "AI QA 전체 검사 실행"}
                     </button>
                   )}
                 </>
               )}
             </div>
           </div>
-
-          {/* ── 알림 드롭다운 ── */}
-          {showNotif && !isLoading && (
-            <div
-              className="rounded-2xl overflow-hidden"
-              style={{ background:"rgba(255,255,255,0.95)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)", boxShadow:"0 12px 36px rgba(0,0,0,0.12)" }}
-            >
-              <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom:`1px solid ${BORDER_SUBTLE}` }}>
-                <Bell className="w-3.5 h-3.5" style={{ color:ACCENT }} />
-                <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>파트장 알림</p>
-                <button
-                  onClick={() => { setNotifications(n => n.map(x => ({ ...x, read:true }))); setShowNotif(false); }}
-                  className="ml-auto text-[9px] px-2 py-0.5 rounded-full" style={{ background:"rgba(0,0,0,0.05)", color:TEXT_TERTIARY }}
-                >
-                  모두 읽음
-                </button>
-              </div>
-              {notifications.length === 0 ? (
-                <div className="py-8 text-center"><p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>알림 없음</p></div>
-              ) : (
-                <div>
-                  {notifications.map(n => {
-                    const sc = SEV_COLOR[n.severity];
-                    return (
-                      <div
-                        key={n.id}
-                        className="flex items-start gap-3 px-4 py-3"
-                        style={{
-                          borderBottom:`1px solid ${BORDER_SUBTLE}`,
-                          background: n.read ? "transparent" : ACCENT_BG,
-                        }}
-                      >
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background:"rgba(65,67,27,0.10)" }}>
-                          <span className="text-[10px] font-bold" style={{ color:ACCENT }}>{n.to[0]}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>{n.to}</span>
-                            <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background:sc.bg, color:sc.color }}>{n.dept} 파트장</span>
-                            {!n.read && <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACCENT }} />}
-                          </div>
-                          <p className="text-[10px] mt-0.5 leading-snug" style={{ color:TEXT_SECONDARY }}>{n.message}</p>
-                          <p className="text-[8px] mt-0.5" style={{ color:TEXT_TERTIARY }}>{n.time}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* ── 탭 ── */}
           <div className="flex rounded-xl overflow-hidden p-0.5 gap-0.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
@@ -1016,9 +600,9 @@ export function AIQAPage({
                 <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
                   style={{
-                    background: activeTab === tab.id ? "rgba(65,67,27,0.08)" : "transparent",
+                    background: activeTab === tab.id ? "rgba(112,130,56,0.08)" : "transparent",
                     color:      activeTab === tab.id ? ACCENT : TEXT_SECONDARY,
-                    boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
+                    boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(112,130,56,0.12)" : "none",
                   }}
                 >
                   <tab.icon className="w-3.5 h-3.5" />{tab.label}
@@ -1061,8 +645,8 @@ export function AIQAPage({
                       {phase === "phase1" && <span className="ml-auto text-[9px]" style={{ color:TEXT_TERTIARY }}>스캔 중… {scanFiles.length}개 파일</span>}
                       {phase1Done && (
                         <div className="ml-auto flex items-center gap-2">
-                          {criticalCount > 0 && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>{criticalCount} critical</span>}
-                          {warningCount > 0  && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:"#f59e0b" }}>{warningCount} warning</span>}
+                          {criticalCount > 0 && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(239,68,68,0.10)", color:UI_RED }}>{criticalCount} critical</span>}
+                          {warningCount > 0  && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:UI_AMBER }}>{warningCount} warning</span>}
                         </div>
                       )}
                     </div>
@@ -1076,11 +660,11 @@ export function AIQAPage({
                             <p className="text-[11px]" style={{ color:TEXT_SECONDARY }}>파일 목록 수집 중…</p>
                           </div>
                         )}
-                        {scanFiles.map((file, i) => {
+                        {scanFiles.map((file) => {
                           const err = staticErrors.find(e => file.includes(e.file));
                           return (
                             <div key={file} className="flex items-center gap-2.5 rounded-lg px-3 py-2" style={{ background:"rgba(0,0,0,0.025)", border:`1px solid ${BORDER_SUBTLE}` }}>
-                              <FileCode className="w-3 h-3 shrink-0" style={{ color: err ? (err.severity === "critical" ? "#ef4444" : "#f59e0b") : "#10b981" }} />
+                              <FileCode className="w-3 h-3 shrink-0" style={{ color: err ? (err.severity === "critical" ? UI_RED : UI_AMBER) : "#10b981" }} />
                               <span className="flex-1 text-[10px] font-mono truncate" style={{ color:TEXT_PRIMARY }}>{file}</span>
                               {err ? (
                                 <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded" style={{ background: SEV_COLOR[err.severity].bg, color: SEV_COLOR[err.severity].color }}>
@@ -1118,7 +702,7 @@ export function AIQAPage({
                                       <p className="text-[10px]" style={{ color:TEXT_SECONDARY }}>{err.message}</p>
                                       {err.fix && (
                                         <div className="mt-1.5 px-2 py-1 rounded-lg" style={{ background:"rgba(0,0,0,0.05)" }}>
-                                          <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>💡 수정 제안: {err.fix}</p>
+                                          <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>수정 제안: {err.fix}</p>
                                         </div>
                                       )}
                                     </div>
@@ -1133,7 +717,7 @@ export function AIQAPage({
 
                     {phase === "idle" && (
                       <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <Code2 className="w-8 h-8" style={{ color:"rgba(65,67,27,0.25)" }} />
+                        <Code2 className="w-8 h-8" style={{ color:"rgba(112,130,56,0.25)" }} />
                         <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>QA 시작 시 파일을 읽고 문법 오류, 런타임 오류를 분석합니다</p>
                       </div>
                     )}
@@ -1141,7 +725,7 @@ export function AIQAPage({
                 )}
               </div>
 
-              {/* ── Phase 2: UI 에이전트 ── */}
+              {/* ── Phase 2: 실제 자동화 테스트 실행 ── */}
               <div className="rounded-2xl overflow-hidden" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)" }}>
                 {isLoading ? (
                   /* [스켈레톤] Phase 2 패널 */
@@ -1163,122 +747,87 @@ export function AIQAPage({
                     >
                       <div
                         className="w-6 h-6 rounded-lg flex items-center justify-center"
-                        style={{ background: phase2Done ? "rgba(16,185,129,0.10)" : phase === "phase2" ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.05)" }}
+                        style={{ background: testRun?.status === "SUCCESS" ? "rgba(16,185,129,0.10)" : (testRun?.status === "FAILED" || testError) ? "rgba(239,68,68,0.10)" : (phase === "phase2" || testRunning) ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.05)" }}
                       >
-                        {phase === "phase2" ? <MousePointer className="w-3.5 h-3.5 animate-bounce" style={{ color:"#f59e0b" }} /> : phase2Done ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} /> : <Monitor className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
+                        {(phase === "phase2" || testRunning) ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color:UI_AMBER }} />
+                          : testRun?.status === "SUCCESS" ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} />
+                          : (testRun?.status === "FAILED" || testError) ? <XCircle className="w-3.5 h-3.5" style={{ color:UI_RED }} />
+                          : <Monitor className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
                       </div>
-                      <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>Phase 2 — AI 화면 조작 테스트</p>
-                      <p className="text-[9px] ml-1" style={{ color:TEXT_TERTIARY }}>사람처럼 화면을 직접 조작하며 오류 탐색</p>
-                      {(phase === "phase2" || phase2Done) && (
+                      <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>Phase 2 — 자동화 테스트 실행</p>
+                      <p className="text-[9px] ml-1" style={{ color:TEXT_TERTIARY }}>
+                        {connection.mode === "ssh" ? `SSH · ${connection.ssh.host || "미설정"}`
+                          : connection.mode === "link" ? `원격 링크 · ${connection.linkBaseUrl || "미설정"}`
+                          : "로컬 실행"}
+                      </p>
+                      {testRun && (
                         <div className="ml-auto flex items-center gap-2 text-[9px]">
-                          <span style={{ color:"#10b981" }}>✓{passedActions}</span>
-                          {failedActions > 0 && <span style={{ color:"#ef4444" }}>✗{failedActions}</span>}
+                          <span style={{ color: testRun.status === "SUCCESS" ? "#10b981" : UI_RED }}>
+                            {testRun.status === "SUCCESS" ? "PASS" : "FAIL"} · {testRun.duration}
+                          </span>
                         </div>
                       )}
                     </div>
 
-                    {(phase === "phase2" || phase2Done || (phase === "done")) && (
+                    {(phase === "phase2" || testRunning || testRun || testError) ? (
                       <div className="p-4">
-                        {/* 액션 스텝 목록 */}
-                        <div className="space-y-1.5">
-                          {actions.map((action, i) => (
+                        {testError ? (
+                          <div className="rounded-xl p-4" style={{ background:"rgba(239,68,68,0.06)", border:"1px solid rgba(239,68,68,0.15)" }}>
+                            <div className="flex items-center gap-2">
+                              <XCircle className="w-3.5 h-3.5 shrink-0" style={{ color:UI_RED }} />
+                              <p className="text-[11px] font-semibold" style={{ color:UI_RED }}>테스트 실행 실패</p>
+                            </div>
+                            <p className="text-[10px] mt-1.5" style={{ color:TEXT_SECONDARY }}>{testError}</p>
+                          </div>
+                        ) : (phase === "phase2" || testRunning) ? (
+                          <div className="flex flex-col items-center justify-center py-8 gap-2">
+                            <Loader2 className="w-6 h-6 animate-spin" style={{ color:UI_AMBER }} />
+                            <p className="text-[11px]" style={{ color:TEXT_SECONDARY }}>
+                              {connection.mode === "ssh" ? buildSshTaskCommand(connection.ssh.buildTool, "test") : "test 태스크"} 실행 중… {elapsedSec}s
+                            </p>
+                          </div>
+                        ) : testRun && (
+                          <div className="rounded-2xl overflow-hidden" style={{ background: TERM_BG, border: "1px solid rgba(255,255,255,0.06)" }}>
                             <div
-                              key={action.id}
-                              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all"
-                              style={{
-                                background: activeAction === action.id
-                                  ? "rgba(245,158,11,0.08)"
-                                  : action.status === "failed" ? "rgba(239,68,68,0.06)"
-                                  : action.status === "passed" ? "rgba(16,185,129,0.04)"
-                                  : "rgba(0,0,0,0.025)",
-                                border: `1px solid ${
-                                  activeAction === action.id ? "rgba(245,158,11,0.25)"
-                                  : action.status === "failed" ? "rgba(239,68,68,0.15)"
-                                  : action.status === "passed" ? "rgba(16,185,129,0.10)"
-                                  : BORDER_SUBTLE
-                                }`,
-                              }}
+                              className="flex items-center gap-2 px-4 py-2 cursor-pointer"
+                              style={{ borderBottom: logsExpanded ? "1px solid rgba(255,255,255,0.06)" : "none", background: TERM_HEADER }}
+                              onClick={() => setLogsExpanded(v => !v)}
                             >
-                              {/* 단계 번호 */}
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: TRAFFIC_RED }} />
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: TRAFFIC_YELLOW }} />
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: TRAFFIC_GREEN }} />
+                              <span className="ml-2 text-[10px] font-mono" style={{ color: TERM_MUTED }}>{testRun.command}</span>
                               <span
-                                className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0"
-                                style={{
-                                  background: action.status === "failed" ? "rgba(239,68,68,0.12)"
-                                    : action.status === "passed" ? "rgba(16,185,129,0.10)"
-                                    : activeAction === action.id ? "rgba(245,158,11,0.12)"
-                                    : "rgba(0,0,0,0.07)",
-                                  color: action.status === "failed" ? "#ef4444"
-                                    : action.status === "passed" ? "#10b981"
-                                    : activeAction === action.id ? "#f59e0b"
-                                    : TEXT_TERTIARY,
-                                }}
+                                className="ml-auto text-[9px] font-semibold"
+                                style={{ color: testRun.status === "SUCCESS" ? TERM_GREEN : TERM_RED2 }}
                               >
-                                {action.step}
+                                exit {testRun.exitCode} · {testRun.executedAt}
                               </span>
-
-                              {/* 상태 아이콘 */}
-                              {action.status === "running"  && <Loader2 className="w-3 h-3 shrink-0 animate-spin" style={{ color:"#f59e0b" }} />}
-                              {action.status === "passed"   && <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color:"#10b981" }} />}
-                              {action.status === "failed"   && <XCircle className="w-3 h-3 shrink-0" style={{ color:"#ef4444" }} />}
-                              {action.status === "pending"  && <div className="w-3 h-3 rounded-full shrink-0" style={{ border:"1.5px solid rgba(0,0,0,0.15)" }} />}
-
-                              {/* 레이블 + 요소 */}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[11px] font-medium" style={{ color: action.status === "failed" ? "#ef4444" : TEXT_PRIMARY }}>
-                                  {action.label}
-                                </p>
-                                <p className="text-[9px] font-mono" style={{ color:TEXT_TERTIARY }}>{action.element}</p>
-                                {action.status === "failed" && action.error && (
-                                  <p className="text-[9px] mt-0.5 line-clamp-1" style={{ color:"#ef4444" }}>{action.error}</p>
-                                )}
+                              {logsExpanded ? <ChevronUp className="w-3 h-3" style={{ color: TERM_MUTED }} /> : <ChevronDown className="w-3 h-3" style={{ color: TERM_MUTED }} />}
+                            </div>
+                            {logsExpanded && (
+                              <div className="p-4 font-mono text-[10px] leading-relaxed overflow-y-auto select-text" style={{ maxHeight: 260, color: TERM_TEXT }}>
+                                {testRun.logs.map((line, i) => {
+                                  const isFail = line.includes("FAILED") || line.includes("FAILURE") || line.includes("ERROR") || line.startsWith("[ERROR]");
+                                  const isSuccess = line.includes("SUCCESSFUL") || line.includes("PASSED") || line.includes("BUILD SUCCESS");
+                                  const color = isFail ? TERM_RED2 : isSuccess ? TERM_GREEN : TERM_TEXT;
+                                  return (
+                                    <p key={i} style={{ color }} className="whitespace-pre-wrap break-all">
+                                      {line || " "}
+                                    </p>
+                                  );
+                                })}
                               </div>
-
-                              {/* 영상 클립 썸네일 */}
-                              {action.status === "failed" && action.clip && (
-                                <ClipThumbnail
-                                  clip={action.clip}
-                                  onClick={() => setOpenClip({ clip: action.clip!, action })}
-                                />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* 저장된 오류 클립 목록 */}
-                        {clips.length > 0 && (
-                          <div className="mt-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Video className="w-3.5 h-3.5" style={{ color:"#ef4444" }} />
-                              <p className="text-[10px] font-semibold" style={{ color:TEXT_PRIMARY }}>오류 영상 클립 ({clips.length}개)</p>
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                              {clips.map(clip => {
-                                const relAction = actions.find(a => a.clip?.id === clip.id);
-                                return (
-                                  <div key={clip.id} className="space-y-1.5">
-                                    <ClipThumbnail
-                                      clip={clip}
-                                      onClick={() => relAction && setOpenClip({ clip, action: relAction })}
-                                    />
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background:"rgba(239,68,68,0.10)", color:"#ef4444" }}>
-                                        {clip.errorLabel}
-                                      </span>
-                                      <span className="text-[8px]" style={{ color:TEXT_TERTIARY }}>{clip.ts}</span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-
-                    {phase === "idle" && (
+                    ) : (
                       <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <MousePointer className="w-8 h-8" style={{ color:"rgba(245,158,11,0.30)" }} />
-                        <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>AI가 직접 화면을 조작하며 사람처럼 QA를 진행합니다</p>
+                        <Monitor className="w-8 h-8" style={{ color:"rgba(245,158,11,0.30)" }} />
+                        <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>
+                          {hasQaTarget ? "Phase 1 완료 후 실제 test 태스크가 여기서 실행됩니다" : "Changes 페이지에서 변경사항을 스테이징하고 QA를 요청하면 여기서 실행됩니다"}
+                        </p>
                       </div>
                     )}
                   </>
@@ -1290,7 +839,7 @@ export function AIQAPage({
           {/* ════ 커밋별 QA 탭 ════ */}
           {activeTab === "commit" && (
             <div className="space-y-3">
-              {isLoading ? (
+              {commitReportsLoading ? (
                 /* [스켈레톤] 커밋 통계 및 목록 */
                 <>
                   <div className="grid grid-cols-4 gap-2.5">
@@ -1311,11 +860,15 @@ export function AIQAPage({
                     ))}
                   </div>
                 </>
+              ) : commitReportsError ? (
+                <div className="rounded-2xl p-6 text-center" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}` }}>
+                  <p className="text-[11px]" style={{ color:UI_RED }}>{commitReportsError}</p>
+                </div>
               ) : (
                 <>
                   {/* 통계 */}
                   <div className="grid grid-cols-4 gap-2.5">
-                    {([["passed","통과",COMMIT_QA_DATA.filter(c=>c.qaStatus==="passed").length,"#10b981"],["failed","실패",COMMIT_QA_DATA.filter(c=>c.qaStatus==="failed").length,"#ef4444"],["partial","부분",COMMIT_QA_DATA.filter(c=>c.qaStatus==="partial").length,"#f59e0b"],["pending","대기",COMMIT_QA_DATA.filter(c=>c.qaStatus==="pending").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
+                    {([["SUCCESS","성공",commitReports.filter(r=>r.status==="SUCCESS").length,"#10b981"],["FAILED","실패",commitReports.filter(r=>r.status==="FAILED").length,UI_RED],["RUNNING","진행중",commitReports.filter(r=>r.status==="RUNNING").length,UI_BLUE],["PENDING","대기",commitReports.filter(r=>r.status==="PENDING").length,"#9b9b9b"]] as const).map(([status,label,count,color]) => (
                       <button
                         key={status}
                         onClick={() => setCommitFilter(commitFilter === status ? "all" : status)}
@@ -1338,7 +891,17 @@ export function AIQAPage({
                       <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>커밋별 QA 현황</p>
                       <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>{filteredCommits.length}</span>
                     </div>
-                    {filteredCommits.map(c => <CommitQARow key={c.id} commit={c} />)}
+                    {filteredCommits.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-[10px]" style={{ color:TEXT_TERTIARY }}>표시할 QA 리포트가 없습니다.</p>
+                    ) : (
+                      filteredCommits.map(r => (
+                        <CommitQARow
+                          key={r.qaReportId}
+                          projectId={projectId ?? 0}
+                          report={r}
+                        />
+                      ))
+                    )}
                   </div>
                 </>
               )}
@@ -1347,15 +910,6 @@ export function AIQAPage({
 
         </div>
       </div>
-
-      {/* 클립 재생 모달 */}
-      {openClip && !isLoading && (
-        <ClipModal
-          clip={openClip.clip}
-          action={openClip.action}
-          onClose={() => setOpenClip(null)}
-        />
-      )}
       </div>
       )}
     </div>

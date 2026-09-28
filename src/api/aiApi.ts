@@ -1,5 +1,5 @@
 import { ApiError, request } from "../app/lib/api";
-import type { CommitFile } from "../app/components/commitData";
+import { callCustomEndpointIfEnabled } from "../app/lib/customEndpoint";
 
 export type DebateTurn = {
   round?: number;
@@ -44,8 +44,10 @@ export type AiAgent = {
   model: string;
 };
 
+export type ThinkingLevel = "LOW" | "DEFAULT" | "HIGH";
+
 export type EditorContextRequest = DebateRequest & {
-  ragMaxResults?: number;
+  level?: ThinkingLevel;
 };
 
 export type CustomDebateRequest = {
@@ -105,11 +107,14 @@ export type QaResponse = {
 export type AiChatRequest = {
   projectId?: number | null;
   question: string;
+  level?: ThinkingLevel;
 };
 
 export type AiChatResponse = {
   answer: string;
   contexts?: string[];
+  /** "custom-endpoint"면 프로젝트 문서 RAG 검색을 거치지 않은 응답이라는 뜻 (contexts는 항상 빈 배열) */
+  source?: "backend" | "custom-endpoint";
 };
 
 export class AiApiError extends Error {
@@ -192,11 +197,20 @@ export async function runAiQa(request: QaRequest): Promise<QaResponse> {
 }
 
 export async function runAiChat(request: AiChatRequest): Promise<AiChatResponse> {
+  // 커스텀 엔드포인트가 설정·활성화되어 있으면 우리 백엔드 대신 그쪽으로 직접 질의한다.
+  // 주의: 이 경로에서는 우리 백엔드가 해주는 프로젝트 문서 기반 RAG 컨텍스트 검색이
+  // 빠지므로 항상 contexts: []로 반환된다 — 호출부에서 이를 구분해 안내해야 한다.
+  const customResult = await callCustomEndpointIfEnabled(request.question);
+  if (customResult) {
+    return { answer: customResult.answer, contexts: [], source: "custom-endpoint" };
+  }
+
   return aiRequest<AiChatResponse>("/api/v1/ai/chat", {
     method: "POST",
     body: {
       projectId: resolveProjectId(request.projectId),
       question: request.question,
+      level: request.level,
     },
   });
 }
@@ -217,6 +231,34 @@ async function aiRequest<T>(
 
 export async function fetchAiAgents(): Promise<AiAgent[]> {
   return aiRequest<AiAgent[]>("/api/v1/ai/agents", { method: "GET" });
+}
+
+export type AgentMetrics = {
+  agent: AiAgentKey;
+  displayName: string;
+  role: string;
+  model: string;
+  totalInvocations: number;
+  successCount: number;
+  failureCount: number;
+  avgDurationMs: number;
+  lastInvokedAt: string | null;
+};
+
+export async function fetchAgentMetrics(): Promise<AgentMetrics[]> {
+  return aiRequest<AgentMetrics[]>("/api/v1/ai/agents/metrics", { method: "GET" });
+}
+
+export type AgentInvocation = {
+  projectId: number;
+  success: boolean;
+  durationMs: number;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+export async function fetchAgentInvocations(agent: AiAgentKey, limit = 20): Promise<AgentInvocation[]> {
+  return aiRequest<AgentInvocation[]>(`/api/v1/ai/agents/${agent}/invocations?limit=${limit}`, { method: "GET" });
 }
 
 export async function askAiAgent(agent: AiAgentKey, request: EditorContextRequest): Promise<SingleAgentResponse> {

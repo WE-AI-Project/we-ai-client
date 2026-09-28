@@ -1,4 +1,4 @@
-// ── WE&AI 프로필 저장소 ──
+﻿// ── SynAIpse 프로필 저장소 ──
 // localStorage 기반 프로필 데이터 관리
 
 export type TechEntry = {
@@ -19,30 +19,24 @@ export type ProfileData = {
 
 const STORAGE_KEY = "weai_profile_v2";
 
-export const AVATAR_GRADIENTS: Record<string, { from: string; via: string; to: string }> = {
-  olive:  { from: "#D4CC9E", via: "#AEB784", to: "#6B7040" },
-  sage:   { from: "#E8EDD4", via: "#C4CC9A", to: "#AEB784" },
-  warm:   { from: "#F8E8C8", via: "#E3DBBB", to: "#C4A860" },
-  forest: { from: "#C8D8A8", via: "#8CAE6A", to: "#5A8A4A" },
-  amber:  { from: "#FCE8C0", via: "#E8C46A", to: "#C09840" },
+// 아바타 배경색 — 그라디언트 대신 플랫 컬러
+export const AVATAR_GRADIENTS: Record<string, string> = {
+  olive:  "#6B7040",
+  sage:   "#8C9A5E",
+  warm:   "#C4A860",
+  forest: "#5A8A4A",
+  amber:  "#C09840",
 };
 
+// 실제 사용자 프로필이 아직 한 번도 로드되지 않았을 때(최초 실행, 또는 API 실패 시)
+// 화면이 깨지지 않도록 채우는 빈 틀일 뿐, 특정 인물을 흉내내는 값이 아니어야 한다.
 export const DEFAULT_PROFILE: ProfileData = {
-  displayName: "병권",
-  role:        "Student Developer",
-  email:       "user@example.com",
-  location:    "Seoul, Korea",
-  bio:         "Java/Spring Boot 백엔드 개발자. WE&AI 멀티에이전트 시스템 구축 중.",
-  techStack: [
-    { name: "Java",        slug: "java",        variant: "original" },
-    { name: "Spring",      slug: "spring",      variant: "original" },
-    { name: "Gradle",      slug: "gradle",      variant: "original" },
-    { name: "Git",         slug: "git",         variant: "original" },
-    { name: "Python",      slug: "python",      variant: "original" },
-    { name: "FastAPI",     slug: "fastapi",     variant: "original" },
-    { name: "Docker",      slug: "docker",      variant: "original" },
-    { name: "PostgreSQL",  slug: "postgresql",  variant: "original" },
-  ],
+  displayName: "",
+  role:        "",
+  email:       "",
+  location:    "",
+  bio:         "",
+  techStack:   [],
   avatarColor: "olive",
 };
 
@@ -59,7 +53,9 @@ export function loadProfile(): ProfileData {
       }
       return { ...DEFAULT_PROFILE, ...parsed };
     }
-  } catch {}
+  } catch (error) {
+    console.warn("로컬 프로필 캐시를 불러오지 못했습니다:", error);
+  }
   return { ...DEFAULT_PROFILE };
 }
 

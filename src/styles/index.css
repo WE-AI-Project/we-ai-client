@@ -15,6 +15,13 @@ html, body, #root {
   padding: 0;
 }
 
+/* Tailwind의 접미사 없는 기본 `rounded` 유틸리티는 --radius-* 변수를 참조하지 않고
+   0.25rem(4px)으로 고정되어 있어서, theme.css의 라디우스 스케일을 조정해도 반영되지
+   않는다. 프로젝트 전역의 작은 배지/태그들이 여기 해당하므로 --radius-sm에 맞춰준다. */
+.rounded {
+  border-radius: var(--radius-sm);
+}
+
 /* 2. 앱 전체 모든 요소의 스크롤바 완전히 숨기기 (스크롤 동작은 정상 유지) */
 * {
   -ms-overflow-style: none;  /* IE, Edge */

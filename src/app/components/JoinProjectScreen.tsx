@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowRight,
@@ -18,9 +19,6 @@ import {
   ShieldCheck,
   UserCircle2,
   X,
-  Trash2,
-  AlertTriangle,
-  FolderGit2
 } from "lucide-react";
 
 // 만들어둔 공통 알림창 컴포넌트 불러오기
@@ -40,9 +38,13 @@ import {
   ACCENT_BG,
   ACCENT_BORDER,
   BORDER,
+  LOGIN_BG,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_MUTED,
+  UI_RED,
 } from "../colors";
 import {
   CurrentUser,
@@ -133,7 +135,12 @@ function LocalPathInput({
   const [focused, setFocused] = useState(false);
 
   const handleOpenExplorer = async () => {
-    alert("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
+    if (window.electronAPI) {
+      const picked = await window.electronAPI.pickFolder();
+      if (picked) onChange(picked);
+      return;
+    }
+    toast.info("웹 브라우저는 보안 정책상 폴더의 절대경로를 전달하지 않습니다. 탐색기 주소창에서 경로를 복사한 뒤 이 입력란에 붙여 넣어 주세요. 개발 환경에서는 입력한 경로를 이 PC에서 직접 분석합니다.");
   };
 
   return (
@@ -145,8 +152,8 @@ function LocalPathInput({
       <div
         className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all hover:bg-black/[0.02]"
         style={{
-          background: "rgba(65,67,27,0.04)",
-          border: `1.5px solid ${focused ? "rgba(65,67,27,0.35)" : BORDER}`,
+          background: "rgba(112,130,56,0.04)",
+          border: `1.5px solid ${focused ? "rgba(112,130,56,0.35)" : BORDER}`,
         }}
       >
         <Folder className="h-4 w-4 shrink-0" style={{ color: value ? ACCENT : TEXT_TERTIARY }} />
@@ -176,7 +183,7 @@ function LocalPathInput({
           type="button"
           onClick={() => void handleOpenExplorer()}
           className="shrink-0 rounded p-1 hover:bg-black/[0.05]"
-          title="절대경로 입력 안내"
+          title={window.electronAPI ? "폴더 선택" : "절대경로 입력 안내"}
         >
           <FolderOpen className="h-3.5 w-3.5" style={{ color: TEXT_TERTIARY }} />
         </button>
@@ -187,9 +194,16 @@ function LocalPathInput({
 
 function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
   return (
-    <div className="space-y-2.5 rounded-xl p-3.5" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
+    <div
+      className="space-y-2.5 rounded-xl p-3.5"
+      style={{
+        background: "rgba(88, 101, 242, 0.10)",
+        border: "1px solid rgba(88, 101, 242, 0.32)",
+        boxShadow: "0 8px 20px rgba(88, 101, 242, 0.08)",
+      }}
+    >
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#5A8A4A" }} />
+        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: ACCENT }} />
         <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
           프로젝트 감지 완료
         </p>
@@ -214,7 +228,11 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
       </div>
       <div className="flex flex-wrap gap-1">
         {info.stack.map((stack) => (
-          <span key={stack} className="rounded px-1.5 py-0.5 text-[8px]" style={{ background: ACCENT_BG, color: ACCENT }}>
+          <span
+            key={stack}
+            className="rounded px-1.5 py-0.5 text-[8px]"
+            style={{ background: "rgba(88, 101, 242, 0.16)", color: ACCENT }}
+          >
             {stack}
           </span>
         ))}
@@ -222,39 +240,6 @@ function DetectResult({ info, path }: { info: DetectedInfo; path: string }) {
       <p className="text-[9px]" style={{ color: TEXT_SECONDARY }}>
         팀 구성 및 기술 스택은 <strong>Project Settings</strong>에서 세부 설정 가능합니다.
       </p>
-    </div>
-  );
-}
-
-function DepartmentPicker({
-  value,
-  onChange,
-  compact = false,
-}: {
-  value: ProjectDepartment;
-  onChange: (value: ProjectDepartment) => void;
-  compact?: boolean;
-}) {
-  return (
-    <div className={`grid gap-1.5 ${compact ? "grid-cols-4" : "grid-cols-2"}`}>
-      {DEPARTMENTS.map((department) => {
-        const selected = department === value;
-        return (
-          <button
-            key={department}
-            type="button"
-            onClick={() => onChange(department)}
-            className={`rounded-lg font-semibold transition-all ${compact ? "px-2 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"}`}
-            style={{
-              background: selected ? "rgba(65,67,27,0.10)" : "rgba(0,0,0,0.04)",
-              color: selected ? ACCENT : TEXT_TERTIARY,
-              border: `1px solid ${selected ? "rgba(65,67,27,0.18)" : "transparent"}`,
-            }}
-          >
-            {DEPARTMENT_LABELS[department]}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -286,9 +271,9 @@ function MultiDepartmentPicker({
             }}
             className={`rounded-lg font-semibold transition-all ${compact ? "px-2 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"}`}
             style={{
-              background: selected ? "rgba(65,67,27,0.10)" : "rgba(0,0,0,0.04)",
+              background: selected ? "rgba(112,130,56,0.10)" : "rgba(0,0,0,0.04)",
               color: selected ? ACCENT : TEXT_TERTIARY,
-              border: `1px solid ${selected ? "rgba(65,67,27,0.18)" : "transparent"}`,
+              border: `1px solid ${selected ? "rgba(112,130,56,0.18)" : "transparent"}`,
             }}
           >
             {DEPARTMENT_LABELS[department]}
@@ -416,7 +401,7 @@ function CreateProjectModal({
         }}
       >
         <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: "linear-gradient(135deg, #e0e7ff, #e8d5f5)" }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: ACCENT_BG }}>
             <FolderPlus className="h-4 w-4" style={{ color: ACCENT }} />
           </div>
           <div className="flex-1">
@@ -424,7 +409,7 @@ function CreateProjectModal({
               새 프로젝트 만들기
             </p>
             <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
-              WE&AI Project Office
+              SynAIpse Project Office
             </p>
           </div>
           <div className="mr-2 flex items-center gap-1.5">
@@ -450,7 +435,7 @@ function CreateProjectModal({
             <>
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
-                  프로젝트 이름 <span style={{ color: "#ef4444" }}>*</span>
+                  프로젝트 이름 <span style={{ color: UI_RED }}>*</span>
                 </label>
                 <input
                   autoFocus
@@ -459,11 +444,11 @@ function CreateProjectModal({
                     setName(event.target.value);
                     setErrorMessage("");
                   }}
-                  placeholder="예: WE&AI Backend Server"
+                  placeholder="예: SynAIpse Backend Server"
                   className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
                   style={{
                     background: "rgba(0,0,0,0.03)",
-                    border: `1.5px solid ${name ? "rgba(65,67,27,0.30)" : BORDER}`,
+                    border: `1.5px solid ${name ? "rgba(112,130,56,0.30)" : BORDER}`,
                     color: TEXT_PRIMARY,
                   }}
                 />
@@ -512,8 +497,8 @@ function CreateProjectModal({
                   min={new Date().toISOString().split("T")[0]}
                   className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
                   style={{
-                    background: deadline ? "rgba(65,67,27,0.04)" : "rgba(0,0,0,0.03)",
-                    border: `1.5px solid ${deadline ? "rgba(65,67,27,0.28)" : BORDER}`,
+                    background: deadline ? "rgba(112,130,56,0.04)" : "rgba(0,0,0,0.03)",
+                    border: `1.5px solid ${deadline ? "rgba(112,130,56,0.28)" : BORDER}`,
                     color: deadline ? TEXT_PRIMARY : TEXT_TERTIARY,
                   }}
                 />
@@ -560,7 +545,7 @@ function CreateProjectModal({
                 disabled={!localPath.trim() || detecting}
                 className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-all"
                 style={{
-                  background: localPath.trim() && !detecting ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
+                  background: localPath.trim() && !detecting ? "rgba(112,130,56,0.08)" : "rgba(0,0,0,0.06)",
                   color: localPath.trim() && !detecting ? ACCENT : TEXT_TERTIARY,
                   border: `1px solid ${localPath.trim() && !detecting ? ACCENT_BORDER : "transparent"}`,
                 }}
@@ -705,7 +690,7 @@ function CreateProjectModal({
               style={{
                 background: (step === 1 ? canNextStepOne : canNextStepTwo) ? ACCENT : "rgba(0,0,0,0.07)",
                 color: (step === 1 ? canNextStepOne : canNextStepTwo) ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-                boxShadow: (step === 1 ? canNextStepOne : canNextStepTwo) ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
+                boxShadow: (step === 1 ? canNextStepOne : canNextStepTwo) ? "0 4px 16px rgba(112,130,56,0.25)" : "none",
               }}
             >
               다음 <ChevronRight className="ml-1 inline h-3 w-3" />
@@ -716,7 +701,7 @@ function CreateProjectModal({
               onClick={() => void handleCreate()}
               disabled={creating}
               className="flex-1 rounded-xl py-2.5 text-xs font-semibold"
-              style={{ background: ACCENT, color: "rgba(255,255,255,0.95)", boxShadow: "0 4px 16px rgba(65,67,27,0.30)" }}
+              style={{ background: ACCENT, color: "rgba(255,255,255,0.95)", boxShadow: "0 4px 16px rgba(112,130,56,0.25)" }}
             >
               {creating ? (
                 <>
@@ -775,7 +760,7 @@ function StartModal({
 }) {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [localPath, setLocalPath] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [joining] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
   useEscapeToClose(onClose);
@@ -793,16 +778,12 @@ function StartModal({
       return;
     }
 
-    setJoining(true);
-    window.setTimeout(() => {
-      onSelect({
-        projectId: selectedProject.projectId,
-        projectName: selectedProject.projectName,
-        projectCode: selectedProject.projectCode,
-        localPath: localPath.trim() || undefined,
-      });
-      setJoining(false);
-    }, 300);
+    onSelect({
+      projectId: selectedProject.projectId,
+      projectName: selectedProject.projectName,
+      projectCode: selectedProject.projectCode,
+      localPath: localPath.trim() || undefined,
+    });
   };
 
   const handlePathDetect = async () => {
@@ -815,7 +796,7 @@ function StartModal({
       setDetected(await detectProjectStack(localPath.trim()));
     } catch (error) {
       setDetected(null);
-      alert(formatApiError(error));
+      toast.error(formatApiError(error));
     } finally {
       setDetecting(false);
     }
@@ -834,7 +815,7 @@ function StartModal({
       <div
         className="relative flex w-full flex-col overflow-hidden rounded-2xl"
         style={{
-          maxWidth: 440,
+          maxWidth: 680,
           maxHeight: "88vh",
           background: "rgba(255,255,255,0.97)",
           border: `1px solid ${BORDER}`,
@@ -842,7 +823,7 @@ function StartModal({
         }}
       >
         <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(65,67,27,0.10)" }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(112,130,56,0.10)" }}>
             <Play className="h-4 w-4" style={{ color: ACCENT }} />
           </div>
           <div className="flex-1">
@@ -881,12 +862,12 @@ function StartModal({
                     onClick={() => handleSelect(project)}
                     className="w-full rounded-xl px-4 py-3 text-left transition-all"
                     style={{
-                      background: selected ? "rgba(65,67,27,0.07)" : "rgba(0,0,0,0.03)",
+                      background: selected ? "rgba(112,130,56,0.07)" : "rgba(0,0,0,0.03)",
                       border: `1.5px solid ${selected ? ACCENT_BORDER : BORDER}`,
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: selected ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.06)" }}>
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: selected ? "rgba(112,130,56,0.12)" : "rgba(0,0,0,0.06)" }}>
                         <Bot className="h-4 w-4" style={{ color: selected ? ACCENT : TEXT_SECONDARY }} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -920,7 +901,7 @@ function StartModal({
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "rgba(65,67,27,0.08)" }}>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "rgba(112,130,56,0.08)" }}>
                     <Plus className="h-4 w-4" style={{ color: ACCENT }} />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -950,7 +931,7 @@ function StartModal({
                 disabled={!localPath.trim() || detecting}
                 className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-all"
                 style={{
-                  background: localPath.trim() && !detecting ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
+                  background: localPath.trim() && !detecting ? "rgba(112,130,56,0.08)" : "rgba(0,0,0,0.06)",
                   color: localPath.trim() && !detecting ? ACCENT : TEXT_TERTIARY,
                   border: `1px solid ${localPath.trim() && !detecting ? ACCENT_BORDER : "transparent"}`,
                 }}
@@ -984,7 +965,7 @@ function StartModal({
             style={{
               background: selectedProject ? ACCENT : "rgba(0,0,0,0.07)",
               color: selectedProject ? "rgba(255,255,255,0.95)" : TEXT_TERTIARY,
-              boxShadow: selectedProject ? "0 4px 16px rgba(65,67,27,0.28)" : "none",
+              boxShadow: selectedProject ? "0 4px 16px rgba(112,130,56,0.25)" : "none",
             }}
           >
             {joining ? (
@@ -1129,7 +1110,7 @@ export function JoinProjectScreen({
 
       {modal === "create" && <CreateProjectModal onClose={() => setModal("none")} onCreate={handleCreate} />}
 
-      <div className="relative flex size-full items-center justify-center overflow-hidden" style={{ background: "#F5F4F1" }}>
+      <div className="relative flex size-full items-center justify-center overflow-hidden" style={{ background: LOGIN_BG }}>
         <div className="absolute right-6 top-6 z-20 flex items-center gap-2">
           {currentUser && (
             <div
@@ -1151,22 +1132,22 @@ export function JoinProjectScreen({
           </button>
         </div>
 
-        <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center gap-7 px-6">
+        <div className="relative z-10 flex w-full max-w-[680px] flex-col items-center gap-7 px-6">
           <div className="text-center">
             <div
               className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-              style={{ background: "#41431B", boxShadow: "0 8px 24px rgba(65,67,27,0.25)" }}
+              style={{ background: ACCENT, boxShadow: "0 8px 24px rgba(88,101,242,0.30)" }}
             >
               <Bot className="h-7 w-7" style={{ color: "white" }} />
             </div>
-            <h1 className="mb-1.5 text-xl font-bold" style={{ color: TEXT_PRIMARY }}>
+            <h1 className="mb-1.5 text-xl font-bold" style={{ color: TEXT_ON_DARK }}>
               Welcome to SynAIpse Office
             </h1>
-            <p className="text-xs" style={{ color: TEXT_SECONDARY }}>
+            <p className="text-xs" style={{ color: TEXT_ON_DARK_MUTED }}>
               Intelligent Multi-Agent Project Office
             </p>
             {currentUser && (
-              <p className="mt-2 text-[11px]" style={{ color: TEXT_TERTIARY }}>
+              <p className="mt-2 text-[11px]" style={{ color: TEXT_ON_DARK_MUTED }}>
                 {currentUser.name}님, 프로젝트를 선택하거나 새로 만들어보세요.
               </p>
             )}
@@ -1179,15 +1160,15 @@ export function JoinProjectScreen({
               className="group flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left"
               style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.boxShadow = "0 6px 20px rgba(65,67,27,0.14)";
-                event.currentTarget.style.border = "1px solid rgba(65,67,27,0.18)";
+                event.currentTarget.style.boxShadow = "0 6px 20px rgba(88,101,242,0.22)";
+                event.currentTarget.style.border = `1px solid ${ACCENT_BORDER}`;
               }}
               onMouseLeave={(event) => {
                 event.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
                 event.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)";
               }}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(65,67,27,0.08)" }}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: ACCENT_BG }}>
                 <Play className="h-5 w-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
@@ -1207,15 +1188,15 @@ export function JoinProjectScreen({
               className="group flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left"
               style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", transition: "all 0.15s ease" }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.boxShadow = "0 6px 20px rgba(65,67,27,0.14)";
-                event.currentTarget.style.border = "1px solid rgba(65,67,27,0.18)";
+                event.currentTarget.style.boxShadow = "0 6px 20px rgba(88,101,242,0.22)";
+                event.currentTarget.style.border = `1px solid ${ACCENT_BORDER}`;
               }}
               onMouseLeave={(event) => {
                 event.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
                 event.currentTarget.style.border = "1px solid rgba(0,0,0,0.07)";
               }}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(174,183,132,0.15)" }}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(236,72,189,0.16)" }}>
                 <Plus className="h-5 w-5" style={{ color: ACCENT }} />
               </div>
               <div className="flex-1">
@@ -1234,7 +1215,7 @@ export function JoinProjectScreen({
               style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
             >
               <div className="mb-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(65,67,27,0.06)" }}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: ACCENT_BG }}>
                   <Hash className="h-5 w-5" style={{ color: ACCENT }} />
                 </div>
                 <div>
@@ -1281,7 +1262,7 @@ export function JoinProjectScreen({
                       disabled={codeInput.length !== 8}
                       className="shrink-0 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all"
                       style={{
-                        background: codeInput.length === 8 ? "#41431B" : "rgba(0,0,0,0.07)",
+                        background: codeInput.length === 8 ? ACCENT : "rgba(0,0,0,0.07)",
                         color: codeInput.length === 8 ? "white" : TEXT_TERTIARY,
                       }}
                     >
@@ -1327,7 +1308,7 @@ export function JoinProjectScreen({
                     disabled={!codePath.trim() || codeDetecting}
                     className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-all"
                     style={{
-                      background: codePath.trim() ? "rgba(65,67,27,0.08)" : "rgba(0,0,0,0.06)",
+                      background: codePath.trim() ? "rgba(112,130,56,0.08)" : "rgba(0,0,0,0.06)",
                       color: codePath.trim() ? ACCENT : TEXT_TERTIARY,
                       border: `1px solid ${codePath.trim() ? ACCENT_BORDER : "transparent"}`,
                     }}
@@ -1353,7 +1334,7 @@ export function JoinProjectScreen({
                       onClick={() => void handleCodeJoin()}
                       disabled={codeJoining}
                       className="flex-1 rounded-xl py-2 text-xs font-semibold"
-                      style={{ background: "#41431B", color: "white" }}
+                      style={{ background: ACCENT, color: "white" }}
                     >
                       {codeJoining ? "참여 중..." : "참여하기"}
                     </button>
@@ -1362,7 +1343,7 @@ export function JoinProjectScreen({
               )}
 
               {codeError && (
-                <p className="mt-2 text-[10px]" style={{ color: "#ef4444" }}>
+                <p className="mt-2 text-[10px]" style={{ color: UI_RED }}>
                   {codeError}
                 </p>
               )}
@@ -1374,10 +1355,10 @@ export function JoinProjectScreen({
               </div>
             )}
 
-            <div className="rounded-xl px-4 py-3 text-[10px]" style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.08)" }}>
+            <div className="rounded-xl px-4 py-3 text-[10px]" style={{ background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}` }}>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: ACCENT }} />
-                <span style={{ color: TEXT_SECONDARY }}>
+                <span style={{ color: TEXT_ON_DARK_MUTED }}>
                   내 프로젝트 {sortedProjects.length}개가 실제 서버 데이터로 연결되어 있습니다.
                 </span>
               </div>

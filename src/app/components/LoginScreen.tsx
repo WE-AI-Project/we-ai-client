@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   OLIVE_DARK,
   SAGE,
-  TEXT_PRIMARY,
   STATUS_ERROR,
   STATUS_SUCCESS,
   LOGIN_MUTED,
@@ -14,9 +14,16 @@ import {
   LOGIN_DISABLED_BG2,
   LOGIN_SHADOW_1,
   LOGIN_SHADOW_2,
+  TEXT_ON_DARK,
+  TEXT_PRIMARY,
   INPUT_BG,
-  TEXT_LABEL,
-  TEXT_SECONDARY,
+  SIDEBAR_DEEP,
+  LOGIN_BG,
+  CARD_BG,
+  PANEL_BG,
+  ACCENT_BG,
+  ACCENT_BORDER,
+  BORDER,
 } from "../colors";
 import {
   FolderGit2,
@@ -42,12 +49,13 @@ import {
   PasswordFindResponse,
   SocialProvider,
   VerificationCodeDispatchResponse,
-  createPublishingSession,
   fetchCurrentUser,
   formatApiError,
   login,
   loginWithEmailCode,
   sendEmailLoginCode,
+  sendSignupVerificationCode,
+  verifySignupVerificationCode,
   signUp,
   fetchSocialLoginUrl,
 } from "../lib/api";
@@ -111,17 +119,6 @@ const TERMS_CONTENT = {
 
 function buildMockSocialEmail(provider: SocialProvider) {
   return `${provider}.${Date.now()}@example.com`;
-}
-
-function createLocalVerificationDispatch(email: string): VerificationCodeDispatchResponse {
-  return {
-    purpose: "EMAIL_LOGIN",
-    deliveryChannel: "EMAIL",
-    deliveryTarget: email,
-    deliveryMode: "SIMULATED",
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    debugCode: null,
-  };
 }
 
 function KakaoIcon({ size = 20 }: { size?: number }) {
@@ -235,7 +232,7 @@ function OtpInput({
             border: `2px solid ${digit ? OLIVE_DARK : "rgba(0,0,0,0.08)"}`,
             color: TEXT_PRIMARY,
             transition: "all 0.15s",
-            boxShadow: digit ? "0 2px 8px rgba(65,67,27,0.12)" : "none",
+            boxShadow: digit ? "0 2px 8px rgba(112,130,56,0.12)" : "none",
           }}
         />
       ))}
@@ -361,7 +358,7 @@ function AgreeRow({
       {isExpanded && content && (
         <div
           className="mt-1 mb-2 ml-6 rounded-lg p-3 text-[10px] leading-relaxed"
-          style={{ background: "rgba(0,0,0,0.03)", color: TEXT_SECONDARY, whiteSpace: "pre-wrap" }}
+          style={{ background: "rgba(0,0,0,0.03)", color: LOGIN_OLIVE_TEXT, whiteSpace: "pre-wrap" }}
         >
           {content}
         </div>
@@ -436,7 +433,7 @@ function SocialBtn({
   );
 }
 
-async function resolveAuthenticatedUser(session: AuthSession) {
+async function resolveAuthenticatedUser(_session: AuthSession) {
   return fetchCurrentUser();
 }
 
@@ -447,7 +444,6 @@ function LoginForm({
   onSwitchToSignup,
   onSwitchToEmailCode,
   onSwitchToPasswordFind,
-  onSocialLogin,
 }: {
   initialEmail?: string;
   notice: Feedback | null;
@@ -477,12 +473,6 @@ function LoginForm({
     setError("");
     setLoading(true);
     try {
-      const publishingLogin = createPublishingSession(email, password);
-      if (publishingLogin) {
-        onAuthenticated(publishingLogin.session, publishingLogin.user);
-        return;
-      }
-
       const session = await login({
         email: email.trim(),
         password,
@@ -509,7 +499,7 @@ function LoginForm({
       }
     } catch (err) {
       console.error(`${provider} 로그인 연동 실패:`, err);
-      alert("소셜 로그인 서버와 연결할 수 없습니다.");
+      toast.error("소셜 로그인 서버와 연결할 수 없습니다.");
     } finally {
       setSocialLoading(null);
     }
@@ -573,19 +563,19 @@ function LoginForm({
                 ? "rgba(90,138,74,0.08)"
                 : notice.tone === "error"
                   ? "rgba(184,84,80,0.08)"
-                  : "rgba(65,67,27,0.06)",
+                  : "rgba(112,130,56,0.06)",
             color:
               notice.tone === "success"
                 ? STATUS_SUCCESS
                 : notice.tone === "error"
                   ? STATUS_ERROR
-                  : TEXT_SECONDARY,
+                  : LOGIN_OLIVE_TEXT,
             border: `1px solid ${
               notice.tone === "success"
                 ? "rgba(90,138,74,0.16)"
                 : notice.tone === "error"
                   ? "rgba(184,84,80,0.16)"
-                  : "rgba(65,67,27,0.12)"
+                  : "rgba(112,130,56,0.12)"
             }`,
           }}
         >
@@ -666,10 +656,6 @@ function LoginForm({
         )}
       </button>
 
-      <p className="text-center text-[10px]" style={{ color: LOGIN_ICON_MUTED }}>
-        퍼블리싱 테스트 계정: <strong style={{ color: OLIVE_DARK }}>publishing.backup.20260720@weai.local / 11!11111</strong>
-      </p>
-
       <button
         type="button"
         onClick={() => onSwitchToEmailCode(email.trim() || undefined)}
@@ -723,7 +709,7 @@ function SignupForm({
   const [verified, setVerified] = useState(false);
   const [otpError, setOtpError] = useState("");
   const [dispatchResult, setDispatchResult] = useState<VerificationCodeDispatchResponse | null>(null);
-  
+
   // 약관 동의 상태
   const [agreeAll, setAgreeAll] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
@@ -784,31 +770,35 @@ function SignupForm({
     setOtpError("");
 
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
-      const result = createLocalVerificationDispatch(email.trim());
+      const result = await sendSignupVerificationCode({ email: email.trim() });
       setDispatchResult(result);
       setOtpSent(true);
+    } catch (sendError) {
+      setOtpError(formatApiError(sendError));
     } finally {
       setSending(false);
     }
   };
 
-  const handleOtpComplete = (code: string) => {
+  const handleOtpComplete = async (code: string) => {
+    if (code.length !== 6) {
+      setVerified(false);
+      setOtpError("6자리 인증번호를 입력해주세요.");
+      return;
+    }
+
     setOtpError("");
     setOtpVerifying(true);
 
-    window.setTimeout(() => {
-      setOtpVerifying(false);
-
-      if (code.length === 6) {
-        setVerified(true);
-        setOtpError("");
-        return;
-      }
-
+    try {
+      await verifySignupVerificationCode({ email: email.trim(), verificationCode: code });
+      setVerified(true);
+    } catch (verifyError) {
       setVerified(false);
-      setOtpError("6자리 인증번호를 입력해주세요.");
-    }, 700);
+      setOtpError(formatApiError(verifyError));
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   const handleSignup = async () => {
@@ -875,7 +865,7 @@ function SignupForm({
           {socialProvider && (
             <div
               className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
-              style={{ background: "rgba(65,67,27,0.05)", border: "1.5px solid rgba(65,67,27,0.12)" }}
+              style={{ background: "rgba(112,130,56,0.05)", border: "1.5px solid rgba(112,130,56,0.12)" }}
             >
               <div
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
@@ -921,7 +911,7 @@ function SignupForm({
               style={{
                 background: INPUT_BG,
                 border: `1.5px solid ${
-                  verified ? STATUS_SUCCESS : otpSent ? "rgba(65,67,27,0.20)" : "transparent"
+                  verified ? STATUS_SUCCESS : otpSent ? "rgba(112,130,56,0.20)" : "transparent"
                 }`,
                 transition: "border-color 0.15s",
               }}
@@ -989,7 +979,7 @@ function SignupForm({
               <div className="space-y-3 pt-2">
                 <div
                   className="flex items-start gap-2 rounded-xl px-3 py-2.5"
-                  style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
+                  style={{ background: "rgba(112,130,56,0.04)", border: "1px solid rgba(112,130,56,0.10)" }}
                 >
                   <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: OLIVE_DARK }} />
                   <div>
@@ -999,9 +989,11 @@ function SignupForm({
                     <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
                       {email}로 전송된 6자리 코드를 입력하세요
                     </p>
-                    <p className="mt-0.5 text-[8px]" style={{ color: LOGIN_ICON_MUTED }}>
-                      로컬 mock 검증이라 아무 6자리 숫자나 입력하면 인증됩니다.
-                    </p>
+                    {import.meta.env.DEV && dispatchResult?.debugCode && (
+                      <p className="mt-0.5 text-[8px]" style={{ color: LOGIN_ICON_MUTED }}>
+                        dev mock code: {dispatchResult.debugCode}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1258,9 +1250,9 @@ function EmailCodeLoginForm({
         disabled={sending}
         className="w-full rounded-xl py-3 text-sm font-semibold"
         style={{
-          background: "rgba(65,67,27,0.08)",
+          background: "rgba(112,130,56,0.08)",
           color: OLIVE_DARK,
-          border: "1px solid rgba(65,67,27,0.10)",
+          border: "1px solid rgba(112,130,56,0.10)",
           opacity: sending ? 0.75 : 1,
         }}
       >
@@ -1270,7 +1262,7 @@ function EmailCodeLoginForm({
       {dispatchResult && (
         <div
           className="rounded-xl px-3.5 py-3"
-          style={{ background: "rgba(65,67,27,0.04)", border: "1px solid rgba(65,67,27,0.10)" }}
+          style={{ background: "rgba(112,130,56,0.04)", border: "1px solid rgba(112,130,56,0.10)" }}
         >
           <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>
             인증코드를 보냈습니다
@@ -1281,7 +1273,7 @@ function EmailCodeLoginForm({
           <p className="text-[9px]" style={{ color: LOGIN_MUTED }}>
             만료 시각: {dispatchResult.expiresAt}
           </p>
-          {dispatchResult.debugCode && (
+          {import.meta.env.DEV && dispatchResult.debugCode && (
             <p className="mt-1 text-[9px]" style={{ color: LOGIN_ICON_MUTED }}>
               dev mock code: {dispatchResult.debugCode}
             </p>
@@ -1486,9 +1478,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
 
   const handleAuthenticatedInternal = (session: AuthSession, user: CurrentUser) => {
     setExiting(true);
-    window.setTimeout(() => {
-      onAuthenticated(session, user);
-    }, 450);
+    window.setTimeout(() => onAuthenticated(session, user), 420);
   };
 
   const switchMode = (
@@ -1530,8 +1520,9 @@ export function LoginScreen({ onAuthenticated }: Props) {
 
   return (
     <div
-      className="relative flex size-full items-center justify-center overflow-hidden bg-[#F5F4F1]"
+      className="relative flex size-full items-center justify-center overflow-hidden"
       style={{
+        background: LOGIN_BG,
         opacity: exiting ? 0 : 1,
         transition: exiting ? "opacity 0.42s ease" : "none",
       }}
@@ -1559,7 +1550,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
               <FolderGit2 className="h-5.5 w-5.5" style={{ color: "white" }} />
             </div>
             <div>
-              <p className="text-xl font-bold" style={{ color: TEXT_PRIMARY }}>
+              <p className="text-xl font-bold" style={{ color: TEXT_ON_DARK }}>
                 SynAIpse
               </p>
               <p className="text-[10px]" style={{ color: LOGIN_MUTED }}>
@@ -1569,7 +1560,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           </div>
 
           <h1 className="mb-4 text-center text-[44px] font-bold leading-tight tracking-tight sm:text-[52px]">
-            <span style={{ color: "#1A1C06" }}>Welcome to</span>
+            <span style={{ color: TEXT_ON_DARK }}>Welcome to</span>
             <br />
             <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
           </h1>
@@ -1585,7 +1576,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
               <span
                 key={tag}
                 className="rounded-full px-3 py-1.5 text-[11px] font-medium"
-                style={{ background: "rgba(65,67,27,0.07)", color: OLIVE_DARK, border: "1px solid rgba(65,67,27,0.12)" }}
+                style={{ background: ACCENT_BG, color: LOGIN_OLIVE_TEXT, border: `1px solid ${ACCENT_BORDER}` }}
               >
                 {tag}
               </span>
@@ -1612,16 +1603,44 @@ export function LoginScreen({ onAuthenticated }: Props) {
           </p>
         </div>
 
-        {/* --- 💡 오른쪽 영역: 로그인 팝업 카드와 비슷한 크기의 사진 배치 --- */}
+        {/* --- 오른쪽 영역: 로그인 팝업 카드와 비슷한 크기의 브랜드 일러스트 --- */}
         <div className="hidden relative flex h-full w-full items-center justify-center lg:flex lg:w-1/2">
           {/* 로그인 창과 비슷한 크기(약 420px), 라운딩 처리 추가 */}
-          <div className="relative h-[65%] max-h-[580px] w-[420px] max-w-[90%] overflow-hidden rounded-[20px] shadow-2xl">
-            <img
-              src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1000"
-              alt="SynAIpse Technology Background"
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            {/* 그라데이션 및 오버레이 제거하여 사진 원본 노출 */}
+          <div
+            className="relative h-[65%] max-h-[580px] w-[420px] max-w-[90%] overflow-hidden rounded-2xl"
+            style={{ background: SIDEBAR_DEEP }}
+          >
+            <svg
+              className="absolute inset-0 h-full w-full"
+              viewBox="0 0 420 580"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <line x1="90" y1="150" x2="210" y2="230" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="330" y1="120" x2="210" y2="230" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="210" y1="230" x2="150" y2="380" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="210" y1="230" x2="300" y2="400" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="150" y1="380" x2="300" y2="400" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="300" y1="400" x2="260" y2="500" stroke="#3A3D18" strokeWidth="1.5" />
+              <line x1="90" y1="150" x2="60" y2="280" stroke="#3A3D18" strokeWidth="1.5" />
+
+              <circle cx="210" cy="230" r="10" fill="#708238" />
+              <circle cx="90" cy="150" r="6" fill="#A67B5B" />
+              <circle cx="330" cy="120" r="7" fill="#A67B5B" />
+              <circle cx="150" cy="380" r="7" fill="#C09840" />
+              <circle cx="300" cy="400" r="8" fill="#708238" />
+              <circle cx="260" cy="500" r="5" fill="#A67B5B" />
+              <circle cx="60" cy="280" r="5" fill="#5A6B2E" />
+            </svg>
+
+            <div className="absolute bottom-7 left-7 right-7">
+              <p className="text-[11px] font-semibold tracking-wide" style={{ color: "#A67B5B" }}>
+                MULTI-AGENT NETWORK
+              </p>
+              <p className="mt-1 text-sm" style={{ color: "rgba(248,245,242,0.65)" }}>
+                여러 에이전트가 하나의 프로젝트 오피스에서 함께 움직입니다.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -1629,7 +1648,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
       {cardOpen && (
         <div
           className="absolute inset-0 z-20"
-          style={{ background: "rgba(15,17,5,0.50)" }}
+          style={{ background: "rgba(10,13,58,0.72)" }}
           onClick={() => setCardOpen(false)}
         />
       )}
@@ -1653,17 +1672,17 @@ export function LoginScreen({ onAuthenticated }: Props) {
           type="button"
           onClick={() => setCardOpen(false)}
           className="absolute -right-3 -top-3 z-50 flex h-8 w-8 items-center justify-center rounded-full"
-          style={{ background: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.14)", color: TEXT_LABEL }}
+          style={{ background: PANEL_BG, boxShadow: "0 2px 12px rgba(0,0,0,0.32)", color: LOGIN_MUTED }}
         >
           <X className="h-4 w-4" />
         </button>
 
         <div
           style={{
-            background: "#FFFFFF",
-            borderRadius: 20,
+            background: CARD_BG,
+            borderRadius: "var(--radius-2xl)",
             boxShadow: THICK_SHADOW,
-            border: "1px solid rgba(0,0,0,0.05)",
+            border: `1px solid ${BORDER}`,
             overflow: "hidden",
             height: cardHeight != null ? cardHeight + 3 : "auto",
             transition: "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
@@ -1732,7 +1751,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
             right: 6,
             height: 12,
             background: LOGIN_SHADOW_1,
-            borderRadius: "0 0 20px 20px",
+            borderRadius: "0 0 var(--radius-2xl) var(--radius-2xl)",
             zIndex: -1,
           }}
         />
@@ -1744,7 +1763,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
             right: 12,
             height: 10,
             background: LOGIN_SHADOW_2,
-            borderRadius: "0 0 16px 16px",
+            borderRadius: "0 0 var(--radius-xl) var(--radius-xl)",
             zIndex: -2,
           }}
         />

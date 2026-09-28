@@ -1,12 +1,8 @@
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 const isDev = import.meta.env.DEV;
-const isPreview = import.meta.env.VITE_IS_PREVIEW === "true";
 
 const AUTH_SESSION_KEY = "weai_auth_session_v1";
-const PUBLISHING_ACCESS_TOKEN = "weai-publishing-preview";
-const publishingLoginEnabled =
-  import.meta.env.VITE_ENABLE_PUBLISHING_LOGIN?.trim().toLowerCase() !== "false";
 
 export const AUTH_SESSION_EVENT = "weai:auth-session-changed";
 
@@ -64,16 +60,8 @@ export type AuthSession = {
   role: UserRole;
 };
 
-export const PUBLISHING_USER: CurrentUser = {
-  id: 111,
-  username: "111",
-  name: "퍼블리싱 테스트",
-  email: "111",
-  role: "USER",
-};
-
 export type VerificationCodeDispatchResponse = {
-  purpose: "EMAIL_LOGIN";
+  purpose: "EMAIL_LOGIN" | "SIGNUP";
   deliveryChannel: VerificationDeliveryChannel;
   deliveryTarget: string;
   deliveryMode: string;
@@ -203,6 +191,7 @@ export type ProjectMember = {
   department: ProjectDepartment;
   status: ProjectMemberStatus;
   joinedAt: string;
+  lastAccessedAt?: string | null;
 };
 
 export type ProjectMemberList = {
@@ -386,13 +375,56 @@ export type NotificationItem = {  // 알림 목록 조회
   type: string;
   title: string;
   body: string;
-  createdAt: string; 
+  createdAt: string;
   isRead: boolean;
 };
 
+// 서버 응답(NotificationListResponse.NotificationResponse)의 원본 필드 이름
+type RawNotification = {
+  notificationId: number;
+  type: string;
+  title: string;
+  message: string;
+  targetType?: string | null;
+  targetId?: number | null;
+  linkUrl?: string | null;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+};
+
+type NotificationListApiResponse = {
+  projectId: number;
+  unreadCount: number;
+  totalCount: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  notifications: RawNotification[];
+};
+
+// 목록 조회 응답과 웹소켓 실시간 푸시 모두 동일한 아이템 형태를 사용하므로 매퍼를 공유한다.
+export function mapNotificationItem(raw: RawNotification): NotificationItem {
+  return {
+    id: raw.notificationId,
+    type: raw.type,
+    title: raw.title,
+    body: raw.message,
+    createdAt: raw.createdAt,
+    isRead: raw.isRead,
+  };
+}
+
 export async function fetchProjectNotifications(projectId: string | number): Promise<NotificationItem[]> {  //알림 목록 조회
-  return request<NotificationItem[]>(`/api/v1/projects/${projectId}/notifications`, {
+  const response = await request<NotificationListApiResponse>(`/api/v1/projects/${projectId}/notifications`, {
     method: "GET",
+  });
+  return (response.notifications ?? []).map(mapNotificationItem);
+}
+
+export async function markNotificationAsRead(projectId: string | number, notificationId: string | number) {  //알림 단일 읽음
+  return request(`/api/v1/projects/${projectId}/notifications/${notificationId}/read`, {
+    method: "PATCH",
   });
 }
 
@@ -404,7 +436,7 @@ export async function deleteNotification(projectId: string | number, notificatio
 
 export async function markAllNotificationsAsRead(projectId: string | number) {  //알림 전체 읽음
   return request(`/api/v1/projects/${projectId}/notifications/read-all`, {
-    method: "PATCH", 
+    method: "PATCH",
   });
 }
 
@@ -452,21 +484,196 @@ export async function sendChatMessage(  //채팅 메시지 전송
 }
 
 export type Department = {
-  departmentId: number;
-  name: string;
+  department: ProjectDepartment;
+  displayName: string;
+  memberCount: number;
   chatRoomExists: boolean;
+  selectable: boolean;
 };
 
 export async function fetchDepartments(projectId: number | string): Promise<Department[]> {  //채팅방 부서 목록 조회
-  return request<Department[]>(`/api/v1/projects/${projectId}/departments`, {
+  const res = await request<{ projectId: number; departments: Department[] }>(
+    `/api/v1/projects/${projectId}/departments`,
+    { method: "GET" }
+  );
+  return res?.departments ?? [];
+}
+
+export async function createChatRoom(
+  projectId: number | string,
+  name: string,
+  type: string,
+  department?: ProjectDepartment
+): Promise<ChatRoom> {  //채팅방 생성
+  return request<ChatRoom>(`/api/v1/projects/${projectId}/chat/rooms`, {
+    method: "POST",
+    body: { name, type, department } as any,
+  });
+}
+
+// ── 채팅 문서 업로드 & AI 브리핑 ──
+export type DocumentStatus = "UPLOADED" | "BRIEFING_CREATED" | "FAILED" | "DELETED";
+export type BriefingStatus = "PENDING" | "COMPLETED" | "FAILED";
+
+export type DocumentUploadResponse = {
+  documentId: number;
+  projectId: number;
+  originalFileName: string;
+  fileUrl: string;
+  fileSize: number;
+  fileContentType?: string | null;
+  extension: string;
+  status: DocumentStatus;
+  createdAt: string;
+};
+
+export type DocumentBriefingResponse = {
+  briefingId: number;
+  documentId: number;
+  projectId: number;
+  documentName: string;
+  summary: string;
+  keyPoints: string[];
+  actionItems: string[];
+  risks: string[];
+  keywords: string[];
+  status: BriefingStatus;
+  createdAt: string;
+};
+
+export type BriefingSummary = {
+  briefingId: number;
+  documentId: number;
+  documentName: string;
+  summary: string;
+  keyPoints: string[];
+  creatorId: number;
+  creatorName: string;
+  status: BriefingStatus;
+  createdAt: string;
+};
+
+export type DocumentBriefingListResponse = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  briefings: BriefingSummary[];
+};
+
+export async function uploadChatDocument(  //채팅 문서 업로드
+  projectId: number | string,
+  file: File,
+  description?: string
+): Promise<DocumentUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (description) formData.append("description", description);
+  return request<DocumentUploadResponse>(`/api/v1/projects/${projectId}/chat/documents`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function createDocumentBriefing(  //문서 브리핑 생성
+  projectId: number | string,
+  documentId: number
+): Promise<DocumentBriefingResponse> {
+  return request<DocumentBriefingResponse>(`/api/v1/projects/${projectId}/chat/documents/${documentId}/briefing`, {
+    method: "POST",
+  });
+}
+
+export async function fetchDocumentBriefings(  //문서 브리핑 목록 조회
+  projectId: number | string,
+  params: { page?: number; size?: number; keyword?: string; status?: string } = {}
+): Promise<DocumentBriefingListResponse> {
+  const queryString = buildQueryString(params as Record<string, string | number | null | undefined>);
+  return request<DocumentBriefingListResponse>(`/api/v1/projects/${projectId}/chat/document-briefings${queryString}`, {
     method: "GET",
   });
 }
 
-export async function createChatRoom(projectId: number | string, name: string, type: string): Promise<ChatRoom> {  //채팅방 생성
-  return request<ChatRoom>(`/api/v1/projects/${projectId}/chat/rooms`, {
+// ── 채팅 회의 모드 & 회의록 ──
+export type MeetingStatus = "IN_PROGRESS" | "ENDED" | "CANCELED";
+
+export type MeetingStartResponse = {
+  meetingId: number;
+  projectId: number;
+  chatRoomId: number | null;
+  title: string;
+  description?: string | null;
+  hostUserId: number;
+  hostUserName: string;
+  status: MeetingStatus;
+  startedAt: string;
+};
+
+export type MeetingEndResponse = {
+  meetingId: number;
+  minuteId: number;
+  projectId: number;
+  title: string;
+  content: string;
+  summary?: string | null;
+  actionItems: string[];
+  status: MeetingStatus;
+  startedAt: string;
+  endedAt: string;
+  createdAt: string;
+};
+
+export type MeetingMinuteSummary = {
+  minuteId: number;
+  meetingId: number;
+  title: string;
+  summary?: string | null;
+  writerId: number;
+  writerName: string;
+  participantCount: number;
+  startedAt: string;
+  endedAt: string;
+  createdAt: string;
+};
+
+export type MeetingMinuteListResponse = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  minutes: MeetingMinuteSummary[];
+};
+
+export async function startChatMeeting(  //회의 모드 시작
+  projectId: number | string,
+  payload: { title: string; description?: string; chatRoomId?: number }
+): Promise<MeetingStartResponse> {
+  return request<MeetingStartResponse>(`/api/v1/projects/${projectId}/chat/meetings/start`, {
     method: "POST",
-    body: { name, type } as any,
+    body: payload as any,
+  });
+}
+
+export async function endChatMeeting(  //회의 모드 종료 및 회의록 저장
+  projectId: number | string,
+  meetingId: number,
+  payload: { content: string; summary?: string; actionItems?: string[]; participants?: number[] }
+): Promise<MeetingEndResponse> {
+  return request<MeetingEndResponse>(`/api/v1/projects/${projectId}/chat/meetings/${meetingId}/end`, {
+    method: "POST",
+    body: payload as any,
+  });
+}
+
+export async function fetchMeetingMinutes(  //회의록 목록 조회
+  projectId: number | string,
+  params: { page?: number; size?: number; keyword?: string; startDate?: string; endDate?: string } = {}
+): Promise<MeetingMinuteListResponse> {
+  const queryString = buildQueryString(params as Record<string, string | number | null | undefined>);
+  return request<MeetingMinuteListResponse>(`/api/v1/projects/${projectId}/chat/meetings/minutes${queryString}`, {
+    method: "GET",
   });
 }
 
@@ -540,16 +747,20 @@ export async function fetchProjectMilestones(projectId: number): Promise<Project
   return request<ProjectMilestoneList>(`/api/v1/projects/${projectId}/dashboard/milestones`);
 }
 
-export type DepartmentStatusDetail = {  //프로젝트 파트별 현황 조회
+export type DepartmentStatusDetail = {
   department: ProjectDepartment;
   memberCount: number;
-  totalScheduleCount: number;
+  scheduleCount: number;
+  totalScheduleCount?: number;
   completedScheduleCount: number;
+  todoCount?: number;
+  inProgressCount?: number;
+  holdCount?: number;
   progressRate: number;
   status: string;
 };
 
-export type ProjectDepartmentStatusList = {  //프로젝트 파트별 현황 조회
+export type ProjectDepartmentStatusList = {
   projectId: number;
   departments: DepartmentStatusDetail[];
 };
@@ -625,8 +836,36 @@ export async function updateMyProfile(payload: ProfileUpdatePayload): Promise<vo
   });
 }
 
-export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {  //프로젝트 파트별 현황 조회
-  return request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
+export async function fetchProjectDepartmentStatus(projectId: number): Promise<ProjectDepartmentStatusList> {
+  const result = await request<ProjectDepartmentStatusList>(`/api/v1/projects/${projectId}/dashboard/departments`);
+  if (!result || !Array.isArray(result.departments)) {
+    return { projectId, departments: [] };
+  }
+
+  const normalized = result.departments.map((dept: any) => {
+    const totalCount = Number(dept.totalScheduleCount ?? dept.scheduleCount ?? 0);
+    const completed = Number(dept.completedScheduleCount ?? 0);
+    const rate = Number(dept.progressRate ?? (totalCount > 0 ? Math.round((completed * 100) / totalCount) : 0));
+    const rawStatus = dept.status;
+    const computedStatus =
+      rawStatus ||
+      (totalCount === 0 ? "READY" : rate >= 100 ? "COMPLETED" : "IN_PROGRESS");
+
+    return {
+      ...dept,
+      memberCount: Number(dept.memberCount ?? 0),
+      scheduleCount: totalCount,
+      totalScheduleCount: totalCount,
+      completedScheduleCount: completed,
+      todoCount: Number(dept.todoCount ?? 0),
+      inProgressCount: Number(dept.inProgressCount ?? 0),
+      holdCount: Number(dept.holdCount ?? 0),
+      progressRate: rate,
+      status: computedStatus,
+    };
+  });
+
+  return { projectId: result.projectId ?? projectId, departments: normalized };
 }
 
 export async function leaveProject(projectId: number | string): Promise<void> {  //프로젝트 나가기=탈퇴하기
@@ -638,55 +877,60 @@ export async function leaveProject(projectId: number | string): Promise<void> { 
 export async function fetchProjectCommits(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  limit = 20
+  limit = 20,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitList> {
-  return request<ProjectCommitList>(
-    `/api/v1/projects/${projectId}/commits${buildQueryString({ repositoryType, limit })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits${buildQueryString({ repositoryType, limit })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitList>(path);
 }
 
 export async function fetchFilteredProjectCommits(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  limit = 20
+  limit = 20,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitList> {
-  return request<ProjectCommitList>(
-    `/api/v1/projects/${projectId}/commits/filter${buildQueryString({ repositoryType, limit })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/filter${buildQueryString({ repositoryType, limit })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitList>(path);
 }
 
 export async function fetchProjectCommitDetail(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  commitHash: string
+  commitHash: string,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitDetail> {
-  return request<ProjectCommitDetail>(
-    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}${buildQueryString({ repositoryType })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}${buildQueryString({ repositoryType })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitDetail>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitDetail>(path);
 }
 
 export async function fetchProjectCommitFiles(
   projectId: number,
   repositoryType: ProjectRepositoryType,
-  commitHash: string
+  commitHash: string,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitFileList> {
-  return request<ProjectCommitFileList>(
-    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/files${buildQueryString({ repositoryType })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/files${buildQueryString({ repositoryType })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitFileList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitFileList>(path);
 }
 
 export async function fetchProjectCommitFileDiff(
   projectId: number,
   repositoryType: ProjectRepositoryType,
   commitHash: string,
-  filePath: string
+  filePath: string,
+  baseUrlOverride?: string
 ): Promise<ProjectCommitFileDiff> {
-  return request<ProjectCommitFileDiff>(
-    `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/diff${buildQueryString({
-      repositoryType,
-      filePath,
-    })}`
-  );
+  const path = `/api/v1/projects/${projectId}/commits/${encodeURIComponent(commitHash)}/diff${buildQueryString({
+    repositoryType,
+    filePath,
+  })}`;
+  if (baseUrlOverride) return requestFrom<ProjectCommitFileDiff>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectCommitFileDiff>(path);
 }
 
 export type LoginPayload = {
@@ -720,6 +964,15 @@ export type EmailCodeSendPayload = {
 };
 
 export type EmailCodeLoginPayload = {
+  email: string;
+  verificationCode: string;
+};
+
+export type SignupVerificationCodeSendPayload = {
+  email: string;
+};
+
+export type SignupVerificationCodeVerifyPayload = {
   email: string;
   verificationCode: string;
 };
@@ -859,8 +1112,7 @@ export async function request<T>(
   if (
     response.status === 401 &&
     options.retryOnAuthFailure !== false &&
-    normalizedPath !== "/api/v1/auth/refresh" &&
-    !isPublishingSession(session)
+    normalizedPath !== "/api/v1/auth/refresh"
   ) {
     const refreshToken = loadSession()?.refreshToken;
 
@@ -887,6 +1139,40 @@ export function buildApiUrl(path: string): string {
   return apiBaseUrl ? `${apiBaseUrl}${normalizedPath}` : normalizedPath;
 }
 
+// 첨부파일/문서/공유자료 다운로드용. 이 엔드포인트들은 더 이상 공개 정적 경로가 아니라
+// 인증 + 프로젝트 멤버십 검증을 거치는 API이므로, 반드시 Authorization 헤더를 실어서
+// fetch한 뒤 blob으로 받아 로컬 다운로드를 트리거해야 한다 (일반 <a href>/window.open은
+// 토큰을 실어주지 않아 401이 난다).
+export async function downloadAuthenticatedFile(path: string, fallbackFileName = "download"): Promise<void> {
+  const session = loadSession();
+  const headers = new Headers();
+  if (session?.accessToken) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
+  }
+
+  const response = await fetch(buildApiUrl(path), { headers });
+  if (!response.ok) {
+    throw new ApiError(`파일을 다운로드하지 못했습니다. (status ${response.status})`, "DOWNLOAD_FAILED", response.status);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const fileNameMatch = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition);
+  const fileName = decodeURIComponent(fileNameMatch?.[1] ?? fileNameMatch?.[2] ?? fallbackFileName);
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export function loadSession(): AuthSession | null {
   if (typeof window === "undefined") {
     return null;
@@ -907,33 +1193,6 @@ export function saveSession(session: AuthSession) {
 
   window.localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
   emitSessionEvent();
-}
-
-export function createPublishingSession(
-  id: string,
-  password: string
-): { session: AuthSession; user: CurrentUser } | null {
-  if (!publishingLoginEnabled || id.trim() !== "111" || password !== "111") {
-    return null;
-  }
-
-  const session: AuthSession = {
-    tokenType: "PublishingPreview",
-    accessToken: PUBLISHING_ACCESS_TOKEN,
-    accessTokenExpiresInSeconds: 0,
-    refreshToken: PUBLISHING_ACCESS_TOKEN,
-    refreshTokenExpiresInSeconds: 0,
-    username: PUBLISHING_USER.username,
-    email: PUBLISHING_USER.email,
-    role: PUBLISHING_USER.role,
-  };
-
-  saveSession(session);
-  return { session, user: PUBLISHING_USER };
-}
-
-export function isPublishingSession(session: AuthSession | null | undefined): boolean {
-  return session?.accessToken === PUBLISHING_ACCESS_TOKEN;
 }
 
 export function clearSession() {
@@ -973,25 +1232,6 @@ export async function signUp(payload: SignUpPayload): Promise<void> {
 }
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 이메일/비밀번호 로그인 성공");
-    await new Promise((resolve) => setTimeout(resolve, 500)); // 0.5초 로딩 딜레이
-    
-    const dummySession: AuthSession = {
-      tokenType: "Bearer",
-      accessToken: "preview_access_token_123",
-      accessTokenExpiresInSeconds: 3600,
-      refreshToken: "preview_refresh_token_456",
-      refreshTokenExpiresInSeconds: 86400,
-      username: payload.email.split("@")[0] || "preview_user",
-      email: payload.email,
-      role: "ADMIN",
-    };
-    
-    saveSession(dummySession);
-    return dummySession;
-  }
-  
   const session = await request<AuthSession>(
     "/api/v1/auth/login",
     {
@@ -1008,16 +1248,6 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
 export async function findPassword(
   payload: PasswordFindPayload
 ): Promise<PasswordFindResponse> {
-  if (isPreview) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return {
-      email: payload.email,
-      deliveryMode: "SIMULATED",
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      debugTemporaryPassword: "Ab3!x9MzQp7",
-    };
-  }
-
   return request<PasswordFindResponse>(
     "/api/v1/auth/password/find",
     {
@@ -1031,19 +1261,6 @@ export async function findPassword(
 export async function sendEmailLoginCode(
   payload: EmailCodeSendPayload
 ): Promise<VerificationCodeDispatchResponse> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 인증 코드(123456)가 발송되었습니다.");
-    await new Promise((resolve) => setTimeout(resolve, 500)); // 로딩 딜레이
-    return {
-      purpose: "EMAIL_LOGIN",
-      deliveryChannel: payload.deliveryChannel,
-      deliveryTarget: payload.email,
-      deliveryMode: "MOCK",
-      expiresAt: new Date(Date.now() + 300000).toISOString(),
-      debugCode: "123456", // 아무 번호나 입력해도 통과하게 하거나, 이 번호로 확인
-    };
-  }
-
   return request<VerificationCodeDispatchResponse>(
     "/api/v1/auth/email-login/code",
     {
@@ -1055,23 +1272,6 @@ export async function sendEmailLoginCode(
 }
 
 export async function loginWithEmailCode(payload: EmailCodeLoginPayload): Promise<AuthSession> {
-  if (isPreview) {
-    console.log("🛠️ [Preview Mode] 가짜 이메일 코드 로그인 성공");
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const dummySession: AuthSession = {
-      tokenType: "Bearer",
-      accessToken: "preview_access_token_123",
-      accessTokenExpiresInSeconds: 3600,
-      refreshToken: "preview_refresh_token_456",
-      refreshTokenExpiresInSeconds: 86400,
-      username: payload.email.split("@")[0] || "preview_user",
-      email: payload.email,
-      role: "ADMIN", // 교수님이 볼 때 모든 권한이 있도록 ADMIN 부여
-    };
-    saveSession(dummySession);
-    return dummySession;
-  }
-
   const session = await request<AuthSession>(
     "/api/v1/auth/email-login",
     {
@@ -1083,6 +1283,32 @@ export async function loginWithEmailCode(payload: EmailCodeLoginPayload): Promis
 
   saveSession(session);
   return session;
+}
+
+export async function sendSignupVerificationCode(
+  payload: SignupVerificationCodeSendPayload
+): Promise<VerificationCodeDispatchResponse> {
+  return request<VerificationCodeDispatchResponse>(
+    "/api/v1/auth/signup/verification-code",
+    {
+      method: "POST",
+      body: payload,
+    },
+    { auth: false, retryOnAuthFailure: false }
+  );
+}
+
+export async function verifySignupVerificationCode(
+  payload: SignupVerificationCodeVerifyPayload
+): Promise<void> {
+  await request<void>(
+    "/api/v1/auth/signup/verify",
+    {
+      method: "POST",
+      body: payload,
+    },
+    { auth: false, retryOnAuthFailure: false }
+  );
 }
 
 export async function fetchSocialLoginUrl(
@@ -1147,7 +1373,7 @@ export async function logout(): Promise<void> {
   clearSession();
 
   try {
-    if (refreshToken && !isPublishingSession(session)) {
+    if (refreshToken) {
       await request<void>(
         "/api/v1/auth/logout",
         {
@@ -1163,17 +1389,6 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
-  if (isPreview) {
-    const session = loadSession(); // 위에서 저장한 dummySession을 불러옴
-    return {
-      id: 9999, // 가짜 유저 ID
-      username: session?.username || "evaluator",
-      name: "SynAIpse 평가자", // 화면 우측 상단 등에 표시될 이름
-      email: session?.email || "preview@synaipse.com",
-      role: "ADMIN",
-    };
-  }
-
   return request<CurrentUser>("/api/v1/users/me");
 }
 
@@ -1189,6 +1404,10 @@ export async function createProject(payload: ProjectCreatePayload): Promise<Proj
 }
 
 export async function detectProjectStack(localPath: string): Promise<ProjectStackDetection> {
+  if (window.electronAPI) {
+    return window.electronAPI.detectStack(localPath);
+  }
+
   if (isDev) {
     const response = await fetch("/__local/detect-stack", {
       method: "POST",
@@ -1230,6 +1449,12 @@ export async function updateProject(
   return request<ProjectDetail>(`/api/v1/projects/${projectId}`, {
     method: "PATCH",
     body: payload,
+  });
+}
+
+export async function deleteProject(projectId: number | string): Promise<void> {
+  return request<void>(`/api/v1/projects/${projectId}`, {
+    method: "DELETE",
   });
 }
 
@@ -1352,7 +1577,7 @@ export async function fetchFilteredProjectSchedules(
 }
 
 export async function createProjectSchedule(
-  projectId: number,
+  projectId: number | string,
   payload: ProjectScheduleCreatePayload
 ): Promise<ProjectSchedule> {
   return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules`, {
@@ -1362,18 +1587,525 @@ export async function createProjectSchedule(
 }
 
 export async function updateProjectSchedule(
-  projectId: number,
-  scheduleId: number,
+  projectId: number | string,
+  scheduleId: number | string,
   payload: ProjectScheduleUpdatePayload
 ): Promise<ProjectSchedule> {
   return request<ProjectSchedule>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
-    method: "PATCH",
+    method: "PUT",
     body: payload,
   });
 }
 
-export async function deleteProjectSchedule(projectId: number, scheduleId: number): Promise<void> {
+export async function deleteProjectSchedule(projectId: number | string, scheduleId: number | string): Promise<void> {
   await request<void>(`/api/v1/projects/${projectId}/schedules/${scheduleId}`, {
     method: "DELETE",
   });
 }
+
+export type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG" | "STARTED" | "TRACE";
+
+export type ServerLogEntry = {
+  id: number;
+  time: string;
+  level: LogLevel;
+  thread: string;
+  logger: string;
+  message: string;
+};
+
+// baseUrlOverride가 주어지면 이 앱의 기본 백엔드 대신 그 주소로 직접 호출한다
+// (Server & Build 탭의 "다른 백엔드 링크" 연결 모드용).
+async function requestFrom<T>(baseUrlOverride: string, path: string, init: RequestInit = {}): Promise<T> {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${baseUrlOverride.replace(/\/+$/, "")}${normalizedPath}`;
+  const session = loadSession();
+  const headers = new Headers(init.headers);
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  if (session?.accessToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
+  }
+  const response = await fetch(url, { ...init, headers });
+  return parseResponse<T>(response);
+}
+
+export async function fetchRecentServerLogs(
+  projectId?: number | null,
+  baseUrlOverride?: string
+): Promise<ServerLogEntry[]> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/server/logs`
+    : `/api/v1/server/logs`;
+  if (baseUrlOverride) return requestFrom<ServerLogEntry[]>(baseUrlOverride, path, { method: "GET" });
+  return request<ServerLogEntry[]>(path, { method: "GET" });
+}
+
+export function getServerLogStreamUrl(projectId?: number | null, baseUrlOverride?: string): string {
+  const session = loadSession();
+  const token = session?.accessToken;
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/server/logs/stream`
+    : `/api/v1/server/logs/stream`;
+
+  const baseUrl = (baseUrlOverride ? baseUrlOverride.replace(/\/+$/, "") : apiBaseUrl) || "";
+  const fullUrl = `${baseUrl}${path}`;
+  if (token) {
+    const separator = fullUrl.includes("?") ? "&" : "?";
+    return `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
+  return fullUrl;
+}
+
+export type BuildTaskItem = {
+  taskName: string;
+  displayName: string;
+  description: string;
+  command: string;
+  category: string;
+  dangerous: boolean;
+  enabled: boolean;
+};
+
+export type BuildTaskListResponse = {
+  projectId: number;
+  buildTool: string;
+  tasks: BuildTaskItem[];
+};
+
+export type BuildTaskExecutionResponse = {
+  taskName: string;
+  command: string;
+  status: "SUCCESS" | "FAILED";
+  exitCode: number;
+  duration: string;
+  logs: string[];
+  executedAt: string;
+};
+
+export async function fetchBuildTasks(
+  projectId?: number | null,
+  baseUrlOverride?: string
+): Promise<BuildTaskListResponse> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/build/tasks`
+    : `/api/v1/build/tasks`;
+  if (baseUrlOverride) return requestFrom<BuildTaskListResponse>(baseUrlOverride, path, { method: "GET" });
+  return request<BuildTaskListResponse>(path, { method: "GET" });
+}
+
+export async function executeBuildTask(
+  taskName: string,
+  projectId?: number | null,
+  baseUrlOverride?: string
+): Promise<BuildTaskExecutionResponse> {
+  const path = projectId
+    ? `/api/v1/projects/${projectId}/build/execute`
+    : `/api/v1/build/execute`;
+  if (baseUrlOverride) {
+    return requestFrom<BuildTaskExecutionResponse>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskName }),
+    });
+  }
+  return request<BuildTaskExecutionResponse>(path, {
+    method: "POST",
+    body: { taskName },
+  });
+}
+
+// ── Git Changes & Staging API ──
+export type ChangedFileItem = {
+  filePath: string;
+  fileName: string;
+  extension: string;
+  changeType: string;
+  staged: boolean;
+  unstaged: boolean;
+  stagedStatus: string;
+  unstagedStatus: string;
+  displayStatus: string;
+};
+
+export type ProjectChangedFileList = {
+  projectId: number;
+  branchName: string;
+  totalChangedCount: number;
+  stagedCount: number;
+  unstagedCount: number;
+  untrackedCount: number;
+  files: ChangedFileItem[];
+};
+
+export type ProjectGitFileDiff = {
+  projectId: number;
+  filePath: string;
+  fileName: string;
+  extension: string;
+  staged: boolean;
+  changeType: string;
+  additions: number;
+  deletions: number;
+  diffContent: string;
+};
+
+export type ProjectGitCommitCreated = {
+  projectId: number;
+  commitHash: string;
+  shortCommitHash: string;
+  branchName: string;
+  message: string;
+  committedFileCount: number;
+  committedFiles: string[];
+  createdAt: string;
+};
+
+export type ProjectGitChangeResult = {
+  projectId: number;
+  stagedFileCount: number;
+  unstagedFileCount: number;
+  stagedAll?: boolean;
+  unstagedAll?: boolean;
+  filePaths?: string[];
+  stagedFiles: Array<{ path: string; status: string; staged: boolean; unstaged: boolean }>;
+  unstagedFiles: Array<{ path: string; status: string; staged: boolean; unstaged: boolean }>;
+};
+
+export async function fetchProjectChangedFiles(
+  projectId: number | string,
+  baseUrlOverride?: string
+): Promise<ProjectChangedFileList> {
+  const path = `/api/v1/projects/${projectId}/changes/files`;
+  if (baseUrlOverride) return requestFrom<ProjectChangedFileList>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectChangedFileList>(path, { method: "GET" });
+}
+
+export async function fetchProjectChangedFileDiff(
+  projectId: number | string,
+  filePath?: string,
+  staged?: boolean,
+  baseUrlOverride?: string
+): Promise<ProjectGitFileDiff> {
+  const params = new URLSearchParams();
+  if (filePath) params.set("filePath", filePath);
+  if (staged !== undefined) params.set("staged", String(staged));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const path = `/api/v1/projects/${projectId}/changes/diff${query}`;
+  if (baseUrlOverride) return requestFrom<ProjectGitFileDiff>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectGitFileDiff>(path, { method: "GET" });
+}
+
+export async function stageProjectFiles(
+  projectId: number | string,
+  filePaths: string[],
+  baseUrlOverride?: string
+): Promise<ProjectGitChangeResult> {
+  const path = `/api/v1/projects/${projectId}/changes/stage`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePaths }),
+    });
+  }
+  return request<ProjectGitChangeResult>(path, {
+    method: "POST",
+    body: { filePaths },
+  });
+}
+
+export async function unstageProjectFiles(
+  projectId: number | string,
+  filePaths: string[],
+  baseUrlOverride?: string
+): Promise<ProjectGitChangeResult> {
+  const path = `/api/v1/projects/${projectId}/changes/unstage`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePaths }),
+    });
+  }
+  return request<ProjectGitChangeResult>(path, {
+    method: "POST",
+    body: { filePaths },
+  });
+}
+
+export async function stageAllProjectFiles(
+  projectId: number | string,
+  baseUrlOverride?: string
+): Promise<ProjectGitChangeResult> {
+  const path = `/api/v1/projects/${projectId}/changes/stage-all`;
+  if (baseUrlOverride) return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, { method: "POST" });
+  return request<ProjectGitChangeResult>(path, { method: "POST" });
+}
+
+export async function unstageAllProjectFiles(
+  projectId: number | string,
+  baseUrlOverride?: string
+): Promise<ProjectGitChangeResult> {
+  const path = `/api/v1/projects/${projectId}/changes/unstage-all`;
+  if (baseUrlOverride) return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, { method: "POST" });
+  return request<ProjectGitChangeResult>(path, { method: "POST" });
+}
+
+export async function createProjectCommit(
+  projectId: number | string,
+  message: string,
+  description?: string,
+  baseUrlOverride?: string
+): Promise<ProjectGitCommitCreated> {
+  const path = `/api/v1/projects/${projectId}/changes/commit`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitCommitCreated>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, description }),
+    });
+  }
+  return request<ProjectGitCommitCreated>(path, {
+    method: "POST",
+    body: { message, description },
+  });
+}
+
+export type ProjectGitBranch = {
+  name: string;
+  current: boolean;
+  remote: boolean;
+  lastCommitHash: string | null;
+  lastCommitMessage: string | null;
+};
+
+export type ProjectGitCommitNode = {
+  commitHash: string;
+  shortCommitHash: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  committedAt: string;
+  branchNames: string[];
+  x: number | null;
+  y: number;
+};
+
+export type ProjectGitCommitEdge = {
+  from: string;
+  to: string;
+  type: string;
+};
+
+export type ProjectGitBranchGraph = {
+  projectId: number;
+  currentBranch: string | null;
+  branches: ProjectGitBranch[];
+  nodes: ProjectGitCommitNode[];
+  edges: ProjectGitCommitEdge[];
+};
+
+export async function fetchProjectBranchGraph(
+  projectId: number | string,
+  params?: { branch?: string; maxCount?: number; includeRemote?: boolean },
+  baseUrlOverride?: string
+): Promise<ProjectGitBranchGraph> {
+  const query = new URLSearchParams();
+  if (params?.branch) query.set("branch", params.branch);
+  if (params?.maxCount !== undefined) query.set("maxCount", String(params.maxCount));
+  if (params?.includeRemote !== undefined) query.set("includeRemote", String(params.includeRemote));
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  const path = `/api/v1/projects/${projectId}/changes/branches/graph${qs}`;
+  if (baseUrlOverride) return requestFrom<ProjectGitBranchGraph>(baseUrlOverride, path, { method: "GET" });
+  return request<ProjectGitBranchGraph>(path, { method: "GET" });
+}
+
+export type ConventionIssue = {
+  target: string;
+  code: string;
+  message: string;
+};
+
+export type ProjectGitCommitConventionCheck = {
+  valid: boolean;
+  type?: string;
+  scope?: string;
+  subject?: string;
+  normalizedMessage?: string;
+  errors: ConventionIssue[];
+  warnings: ConventionIssue[];
+  suggestions: string[];
+};
+
+export async function checkProjectCommitConvention(
+  projectId: number | string,
+  message: string,
+  description?: string,
+  baseUrlOverride?: string
+): Promise<ProjectGitCommitConventionCheck> {
+  const path = `/api/v1/projects/${projectId}/changes/commit-convention/check`;
+  if (baseUrlOverride) {
+    return requestFrom<ProjectGitCommitConventionCheck>(baseUrlOverride, path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, description }),
+    });
+  }
+  return request<ProjectGitCommitConventionCheck>(path, {
+    method: "POST",
+    body: { message, description },
+  });
+}
+
+// ── QA 리포트 (커밋별 AI QA 실행 이력) ──
+
+export type QaReportStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "CANCELED";
+
+export type QaReportSummary = {
+  qaReportId: number;
+  qaRunId: number | null;
+  commitId: string;
+  commitMessage: string;
+  status: QaReportStatus;
+  totalIssueCount: number;
+  criticalCount: number;
+  majorCount: number;
+  minorCount: number;
+  testPassCount: number;
+  testFailCount: number;
+  createdAt: string;
+};
+
+export type QaReportListResult = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  reports: QaReportSummary[];
+};
+
+export async function fetchQaReports(
+  projectId: number | string,
+  params?: { page?: number; size?: number; status?: string; commitId?: string }
+): Promise<QaReportListResult> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.status) query.set("status", params.status);
+  if (params?.commitId) query.set("commitId", params.commitId);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return request<QaReportListResult>(`/api/v1/projects/${projectId}/qa/reports${qs}`, { method: "GET" });
+}
+
+export type QaIssueSeverity = "CRITICAL" | "MAJOR" | "MINOR";
+export type QaIssueStatus = "OPEN" | "RESOLVED" | "IGNORED";
+
+export type QaIssueDetail = {
+  issueId: number;
+  severity: QaIssueSeverity;
+  title: string;
+  description: string;
+  filePath: string;
+  lineNumber: number | null;
+  suggestion: string;
+  status: QaIssueStatus;
+};
+
+export type QaTestResultDetail = {
+  testName: string;
+  testType: string;
+  status: "PASSED" | "FAILED" | "SKIPPED" | string;
+  message: string;
+  durationMs: number | null;
+};
+
+export type QaReportDetail = QaReportSummary & {
+  projectId: number;
+  summary: string;
+  issues: QaIssueDetail[];
+  testResults: QaTestResultDetail[];
+};
+
+export async function fetchQaReportDetail(
+  projectId: number | string,
+  qaReportId: number | string
+): Promise<QaReportDetail> {
+  return request<QaReportDetail>(`/api/v1/projects/${projectId}/qa/reports/${qaReportId}`, { method: "GET" });
+}
+
+// ── 공유 자료실 (Shared Library) ──
+
+export type LibraryResourceCategory = "DOCS" | "GUIDE" | "REFERENCE" | "TEMPLATE";
+export type LibraryResourceSource = "MANUAL" | "MEETING";
+
+export type LibraryResource = {
+  id: number;
+  title: string;
+  category: LibraryResourceCategory;
+  source: LibraryResourceSource;
+  description: string | null;
+  originalFileName: string;
+  fileUrl: string;
+  fileSize: number;
+  extension: string;
+  uploaderName: string;
+  viewCount: number;
+  createdAt: string;
+};
+
+export type LibraryResourceListResult = {
+  projectId: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  totalCount: number;
+  resources: LibraryResource[];
+};
+
+export async function fetchLibraryResources(
+  projectId: number | string,
+  params?: { page?: number; size?: number; category?: LibraryResourceCategory }
+): Promise<LibraryResourceListResult> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.category) query.set("category", params.category);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return request<LibraryResourceListResult>(`/api/v1/projects/${projectId}/library${qs}`, { method: "GET" });
+}
+
+export async function uploadLibraryResource(
+  projectId: number | string,
+  file: File,
+  title: string,
+  category: LibraryResourceCategory,
+  description?: string
+): Promise<LibraryResource> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("title", title);
+  formData.append("category", category);
+  if (description) formData.append("description", description);
+  return request<LibraryResource>(`/api/v1/projects/${projectId}/library`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function viewLibraryResource(
+  projectId: number | string,
+  resourceId: number
+): Promise<LibraryResource> {
+  return request<LibraryResource>(`/api/v1/projects/${projectId}/library/${resourceId}/view`, { method: "POST" });
+}
+
+export async function deleteLibraryResource(
+  projectId: number | string,
+  resourceId: number
+): Promise<void> {
+  await request<void>(`/api/v1/projects/${projectId}/library/${resourceId}`, { method: "DELETE" });
+}
+
+
+

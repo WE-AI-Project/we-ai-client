@@ -1,18 +1,19 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
   FileText, X, CheckCircle2, Download, Mic, MicOff,
   Hash, Globe, Server, ShieldCheck, Wrench, Loader2, Sparkles, Bot,
-  Code2, User, BookOpen, Plus, Building2, MessageSquarePlus,
+  Code2, User, BookOpen, Plus, Building2, MessageSquarePlus, LogOut, Trash2,
 } from "lucide-react";
 
 import {
   ChatMessage, MeetingDoc,
-  loadDocs, saveDocs,
-  generateMeetingSummary, formatTime, formatDate, genId,
-  generateDocBriefing, briefingToMeetingDoc,
+  buildMeetingTranscript, formatTime, formatDate, genId,
 } from "../data/chatStore";
+
+import { briefingSummaryToMeetingDoc, meetingMinuteSummaryToMeetingDoc } from "../lib/docMappers";
+import { subscribeToRoom } from "../lib/chatSocket";
 
 import {
   askAiAgent,
@@ -24,11 +25,12 @@ import {
   type AiChatResponse,
   type DebateResponse,
   type SingleAgentResponse,
+  type ThinkingLevel,
 } from "../../api/aiApi";
 
 import {
-  BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
-  UI_GREEN,
+  BORDER, BORDER_SUBTLE, BRIGHT_BEIGE, CREAM, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL, ACCENT,
+  UI_GREEN, UI_RED, UI_AMBER, UI_BLUE,
   OLIVE_DARK,
 } from "../colors";
 
@@ -39,11 +41,30 @@ import {
   fetchDepartments,
   createChatRoom,
   fetchProjectMembers,
+  uploadChatDocument,
+  createDocumentBriefing,
+  fetchDocumentBriefings,
+  startChatMeeting,
+  endChatMeeting,
+  fetchMeetingMinutes,
   type ChatRoom,
   type ChatMessageResponse,
   type Department,
   type ProjectMember
 } from "../lib/api";
+
+const ALLOWED_BRIEFING_EXTENSIONS = ["pdf", "txt", "md", "doc", "docx", "ppt", "pptx"];
+const CONTENT_BG = BRIGHT_BEIGE;
+const CHAT_CANVAS = BRIGHT_BEIGE;
+const NAVY_SURFACE = CREAM;
+const NAVY_SURFACE_STRONG = "#FFFFFF";
+const NAVY_BORDER = BORDER;
+const TEXT_ON_DARK = TEXT_PRIMARY;
+const TEXT_ON_DARK_MUTED = TEXT_SECONDARY;
+
+function normalizeChatRoomName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
+}
 
 // ══════════════════════════════════════════════════════════
 // UI 컴포넌트들
@@ -58,8 +79,8 @@ export type BriefingData = {
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-black/10 ${className || ""}`}
-      style={style}
+      className={`animate-pulse rounded-md ${className || ""}`}
+      style={{ background: "rgba(88,101,242,0.16)", ...style }}
     />
   );
 }
@@ -72,35 +93,35 @@ function DocBriefingBubble({ briefing, savedToDoc, onViewDoc, time }: { briefing
       </div>
       <div className="flex-1 max-w-[85%] flex flex-col gap-1">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-[9px] font-semibold" style={{ color: "#5A8A4A" }}>WE&AI Briefing</span>
-          <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-white border" style={{ borderColor: BORDER, color: TEXT_TERTIARY }}>System</span>
+          <span className="text-[9px] font-semibold" style={{ color: "#5A8A4A" }}>SynAIpse Briefing</span>
+          <span className="text-[8px] px-1.5 py-0.5 rounded-full border" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER, color: TEXT_ON_DARK_MUTED }}>System</span>
         </div>
-        <div className="rounded-2xl p-3" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}`, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-          <p className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: TEXT_PRIMARY }}>
-            <FileText className="w-3 h-3" style={{ color: TEXT_SECONDARY }} />
+        <div className="rounded-2xl p-3" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}`, boxShadow: "0 1px 4px rgba(0,0,0,0.20)" }}>
+          <p className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: TEXT_ON_DARK }}>
+            <FileText className="w-3 h-3" style={{ color: TEXT_ON_DARK_MUTED }} />
             {briefing.fileName} 분석 완료
           </p>
           <div className="space-y-2">
             <div>
-              <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1" style={{ color: TEXT_LABEL }}>핵심 요약</span>
-              <p className="text-[10px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>{briefing.summary}</p>
+              <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1" style={{ color: TEXT_ON_DARK_MUTED }}>핵심 요약</span>
+              <p className="text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{briefing.summary}</p>
             </div>
             {briefing.points && briefing.points.length > 0 && (
               <div>
-                <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1 mt-2" style={{ color: TEXT_LABEL }}>주요 포인트</span>
+                <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1 mt-2" style={{ color: TEXT_ON_DARK_MUTED }}>주요 포인트</span>
                 <ul className="list-disc pl-4 space-y-0.5">
                   {briefing.points.map((pt, i) => (
-                    <li key={i} className="text-[10px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>{pt}</li>
+                    <li key={i} className="text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{pt}</li>
                   ))}
                 </ul>
               </div>
             )}
           </div>
           {savedToDoc && (
-            <div className="mt-3 pt-2.5 flex items-center justify-between" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
+            <div className="mt-3 pt-2.5 flex items-center justify-between" style={{ borderTop: `1px solid ${NAVY_BORDER}` }}>
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3 h-3" style={{ color: "#5A8A4A" }} />
-                <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>Docs에 저장됨</span>
+                <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>Docs에 저장됨</span>
               </div>
               {onViewDoc && (
                 <button onClick={onViewDoc} className="text-[9px] font-semibold hover:underline" style={{ color: OLIVE_DARK }}>
@@ -110,7 +131,7 @@ function DocBriefingBubble({ briefing, savedToDoc, onViewDoc, time }: { briefing
             </div>
           )}
         </div>
-        {time && <span className="text-[8px] px-1" style={{ color: TEXT_TERTIARY }}>{formatTime(time)}</span>}
+        {time && <span className="text-[8px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{formatTime(time)}</span>}
       </div>
     </div>
   );
@@ -123,8 +144,8 @@ function BriefingLoadingBubble({ fileName }: { fileName: string }) {
         <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#5A8A4A" }} />
       </div>
       <div className="flex-1 max-w-[70%]">
-        <div className="rounded-2xl p-3 flex items-center gap-2" style={{ background: "rgba(255,255,255,0.90)", border: `1px solid ${BORDER}` }}>
-          <span className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
+        <div className="rounded-2xl p-3 flex items-center gap-2" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
+          <span className="text-[10px]" style={{ color: TEXT_ON_DARK_MUTED }}>
             <strong>{fileName}</strong> 문서를 AI가 읽고 있습니다...
           </span>
         </div>
@@ -143,19 +164,20 @@ interface AIMsg {
   data?: any;
 }
 
+// "rag" 모드(일반 대화)는 AiChatService(시스템 프롬프트: "You are Oracle...")가 항상 응답을
+// 생성하므로 언제나 Oracle 답변이다. "agent" 모드는 사용자가 고른 에이전트가 ORACLE일 때만.
+// "debate" 모드는 여러 에이전트가 함께 참여하므로(단일 AI 대화가 아님) 뱃지 대상에서 제외한다.
+function isOracleAnswer(msg: AIMsg): boolean {
+  if (msg.kind === "rag") return true;
+  if (msg.kind === "agent") return (msg.data as SingleAgentResponse | undefined)?.agent === "ORACLE";
+  return false;
+}
+
 function formatAiChatAnswer(response: AiChatResponse): string {
-  const answer = response.answer?.trim();
-  const contexts = (response.contexts ?? []).filter(Boolean);
-
-  if (!answer && contexts.length === 0) {
-    return "주의: 충분한 프로젝트의 표본이 없습니다.";
-  }
-
-  if (contexts.length === 0) {
-    return `주의: 충분한 프로젝트의 표본이 없습니다.\n\n${answer || "프로젝트 문서를 추가하면 더 정확한 답변을 받을 수 있습니다."}`;
-  }
-
-  return compactAiAnswer(answer || "답변");
+  // 서버(Oracle)는 프로젝트 문서 컨텍스트가 부족해도 답변을 중단하지 않고, 필요하면 그 사실을
+  // 답변 안에 짧게 안내한 뒤 자체 지식으로 답을 완결한다 - 여기서 별도로 "표본이 없습니다"
+  // 경고를 덧붙이면 같은 내용이 중복 표시된다.
+  return compactAiAnswer(response.answer?.trim() || "답변을 생성하지 못했습니다.");
 }
 
 function compactAiAnswer(text: string, maxLength = 900): string {
@@ -177,16 +199,22 @@ function compactAiAnswer(text: string, maxLength = 900): string {
   return `${shortened.slice(0, safeEnd).trim()}\n\n… 답변이 길어 핵심 내용만 표시했습니다.`;
 }
 
-function buildEditorContext(projectId: number | null | undefined, question: string, ragMaxResults: number) {
+function buildEditorContext(projectId: number | null | undefined, question: string, level: ThinkingLevel) {
   return {
     projectId,
     fileName: "SYNAIPSE Chat AI Console",
     currentCodeSnippet: "No editor selection was provided. Use the project RAG context and the user question.",
     cursorLine: 1,
     userQuery: question,
-    ragMaxResults,
+    level,
   };
 }
+
+const THINKING_LEVEL_OPTIONS: { value: ThinkingLevel; label: string; description: string }[] = [
+  { value: "LOW", label: "Low · 빠른 답변", description: "핵심 위주로 간결하게 즉시 답변" },
+  { value: "DEFAULT", label: "Default · 표준", description: "표준 RAG 검색과 심층 분석 결합" },
+  { value: "HIGH", label: "High · 심층 추론", description: "광범위한 컨텍스트로 다각도 심층 분석" },
+];
 
 function formatSingleAgentAnswer(response: SingleAgentResponse) {
   const warning = (response.ragContexts?.length ?? 0) === 0
@@ -199,7 +227,7 @@ function formatDebateSummary(response: DebateResponse) {
   const warning = (response.ragContexts?.length ?? 0) === 0
     ? "주의: 충분한 표본이 없습니다. · "
     : "";
-  return `${warning}선택한 에이전트 토론 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 라운드`;
+  return `${warning}선택한 에이전트 심층 분석 세션 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 단계`;
 }
 
 const DEFAULT_AI_AGENTS: AiAgent[] = [
@@ -225,12 +253,12 @@ function Avatar({ name, size = 7 }: { name: string; size?: number }) {
 }
 
 const FILE_COLOR: Record<string, { bg: string; color: string }> = {
-  java: { bg: "rgba(245,158,11,0.10)", color: "#f59e0b" },
-  ts: { bg: "rgba(59,130,246,0.10)", color: "#3b82f6" },
+  java: { bg: "rgba(245,158,11,0.10)", color: UI_AMBER },
+  ts: { bg: "rgba(59,130,246,0.10)", color: UI_BLUE },
   tsx: { bg: "rgba(6,182,212,0.10)", color: "#06b6d4" },
-  gradle: { bg: "rgba(99,91,255,0.10)", color: ACCENT },
+  gradle: { bg: "rgba(112,130,56,0.10)", color: ACCENT },
   yml: { bg: "rgba(16,185,129,0.10)", color: "#10b981" },
-  pdf: { bg: "rgba(239,68,68,0.10)", color: "#ef4444" },
+  pdf: { bg: "rgba(239,68,68,0.10)", color: UI_RED },
   md: { bg: "rgba(139,92,246,0.10)", color: "#8b5cf6" },
 };
 
@@ -251,7 +279,7 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
   if (msg.type === "system") {
     return (
       <div className="flex justify-center my-2">
-        <span className="text-[9px] px-3 py-1 rounded-full" style={{ background: "rgba(0,0,0,0.05)", color: TEXT_TERTIARY }}>
+        <span className="text-[9px] px-3 py-1 rounded-full" style={{ background: NAVY_SURFACE, color: TEXT_ON_DARK_MUTED }}>
           {msg.content}
         </span>
       </div>
@@ -264,25 +292,25 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
       <div className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} items-end mb-3`}>
         {!isMe && <Avatar name={msg.sender} />}
         <div className={`max-w-[70%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
-          {!isMe && <span className="text-[9px] px-1" style={{ color: TEXT_TERTIARY }}>{msg.sender}</span>}
+          {!isMe && <span className="text-[9px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{msg.sender}</span>}
           <div
             className="rounded-2xl px-3 py-2.5 flex items-center gap-2.5"
             style={{
-              background: isMe ? OLIVE_DARK : "rgba(255,255,255,0.90)",
-              border: isMe ? "none" : `1px solid ${BORDER}`,
-              boxShadow: isMe ? "0 2px 8px rgba(65,67,27,0.20)" : "0 1px 4px rgba(0,0,0,0.06)",
+              background: isMe ? OLIVE_DARK : NAVY_SURFACE,
+              border: isMe ? "none" : `1px solid ${NAVY_BORDER}`,
+              boxShadow: isMe ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
             }}
           >
             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: fc.bg }}>
               <FileText className="w-3.5 h-3.5" style={{ color: fc.color }} />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold truncate" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>{msg.fileName}</p>
-              <p className="text-[9px]" style={{ color: isMe ? "rgba(255,255,255,0.65)" : TEXT_TERTIARY }}>.{msg.fileType} 파일</p>
+              <p className="text-[11px] font-semibold truncate" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK }}>{msg.fileName}</p>
+              <p className="text-[9px]" style={{ color: isMe ? "rgba(255,255,255,0.65)" : TEXT_ON_DARK_MUTED }}>.{msg.fileType} 파일</p>
             </div>
-            <Download className="w-3.5 h-3.5 shrink-0" style={{ color: isMe ? "rgba(255,255,255,0.70)" : TEXT_TERTIARY }} />
+            <Download className="w-3.5 h-3.5 shrink-0" style={{ color: isMe ? "rgba(255,255,255,0.70)" : TEXT_ON_DARK_MUTED }} />
           </div>
-          <span className="text-[8px] px-1" style={{ color: TEXT_TERTIARY }}>{formatTime(msg.time)}</span>
+          <span className="text-[8px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{formatTime(msg.time)}</span>
         </div>
       </div>
     );
@@ -292,20 +320,20 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
     <div className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} items-end mb-3`}>
       {!isMe && <Avatar name={msg.sender} />}
       <div className={`max-w-[72%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
-        {!isMe && <span className="text-[9px] px-1" style={{ color: TEXT_TERTIARY }}>{msg.sender}</span>}
+        {!isMe && <span className="text-[9px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{msg.sender}</span>}
         <div
           className="rounded-2xl px-3.5 py-2.5"
           style={{
-            background: isMe ? OLIVE_DARK : "rgba(255,255,255,0.90)",
-            border: isMe ? "none" : `1px solid ${BORDER}`,
-            boxShadow: isMe ? "0 2px 8px rgba(65,67,27,0.20)" : "0 1px 4px rgba(0,0,0,0.06)",
+            background: isMe ? OLIVE_DARK : NAVY_SURFACE,
+            border: isMe ? "none" : `1px solid ${NAVY_BORDER}`,
+            boxShadow: isMe ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
           }}
         >
-          <p className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>
+          <p className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK }}>
             {msg.content}
           </p>
         </div>
-        <span className="text-[8px] px-1" style={{ color: TEXT_TERTIARY }}>{formatTime(msg.time)}</span>
+        <span className="text-[8px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{formatTime(msg.time)}</span>
       </div>
     </div>
   );
@@ -321,37 +349,46 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
         </div>
       )}
       {isUser && (
-        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "rgba(65,67,27,0.12)" }}>
+        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "rgba(112,130,56,0.12)" }}>
           <User className="w-3.5 h-3.5" style={{ color: OLIVE_DARK }} />
         </div>
       )}
       <div className={`flex-1 ${isUser ? "items-end" : "items-start"} flex flex-col gap-0.5 min-w-0`} style={{ maxWidth: "82%" }}>
         {!isUser && (
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>WE&AI Assistant</span>
-            <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(65,67,27,0.08)", color: OLIVE_DARK }}>AI</span>
+            <span className="text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>SynAIpse Assistant</span>
+            <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}>AI</span>
+            {isOracleAnswer(msg) && (
+              <span
+                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full tracking-wide"
+                style={{ background: "rgba(112,130,56,0.9)", color: "white" }}
+                title="Oracle 엔진(최고 권위 심층 분석 모델)이 생성한 답변입니다"
+              >
+                [ORACLE]
+              </span>
+            )}
           </div>
         )}
         <div
           className="rounded-2xl px-3.5 py-2.5"
           style={{
-            background: isUser ? OLIVE_DARK : "rgba(255,255,255,0.95)",
-            border: isUser ? "none" : `1px solid ${BORDER}`,
-            boxShadow: isUser ? "0 2px 8px rgba(65,67,27,0.20)" : "0 1px 6px rgba(0,0,0,0.06)",
+            background: isUser ? OLIVE_DARK : NAVY_SURFACE,
+            border: isUser ? "none" : `1px solid ${NAVY_BORDER}`,
+            boxShadow: isUser ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 6px rgba(0,0,0,0.06)",
             alignSelf: isUser ? "flex-end" : "flex-start",
           }}
         >
-          <p className="whitespace-pre-wrap text-[11px] leading-relaxed" style={{ color: isUser ? "rgba(255,255,255,0.95)" : TEXT_PRIMARY }}>
+          <p className="whitespace-pre-wrap text-[11px] leading-relaxed" style={{ color: isUser ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK }}>
             {msg.content.replace(/\*\*/g, "")}
           </p>
         </div>
         {!isUser && msg.kind === "rag" && msg.data && (msg.data.contexts?.length ?? 0) > 0 && (
-          <p className="mt-1 px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+          <p className="mt-1 px-1 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
             프로젝트 문서 {msg.data.contexts.length}개를 참고한 답변
           </p>
         )}
         {!isUser && msg.kind === "agent" && msg.data && (
-          <div className="mt-2 rounded-xl p-3" style={{ background: "rgba(65,67,27,0.04)", border: `1px solid ${BORDER}` }}>
+          <div className="mt-2 rounded-xl p-3" style={{ background: "rgba(112,130,56,0.04)", border: `1px solid ${BORDER}` }}>
             <div className="flex flex-wrap gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
               <span>{msg.data.agentName}</span><span>·</span><span>{msg.data.role}</span><span>·</span><span>{msg.data.model}</span>
             </div>
@@ -363,16 +400,16 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
         {!isUser && msg.kind === "debate" && msg.data && (
           <div className="mt-2 space-y-2">
             {(msg.data.turns ?? []).map((turn: any, index: number) => (
-              <div key={`${turn.round}-${turn.agent}-${index}`} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.92)", border: `1px solid ${BORDER}` }}>
+              <div key={`${turn.round}-${turn.agent}-${index}`} className="rounded-xl p-3" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
                 <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>
-                  <span>Round {turn.round}</span><span>·</span><span>{turn.agent}</span><span>·</span><span>{turn.role}</span>
-                  <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(65,67,27,0.08)" }}>{turn.model}</span>
+                  <span>{turn.round}단계</span><span>·</span><span>{turn.agent}</span><span>·</span><span>{turn.role}</span>
+                  <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(112,130,56,0.08)" }}>{turn.model}</span>
                 </div>
-                <p className="whitespace-pre-wrap text-[10px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>{compactAiAnswer(turn.message, 700)}</p>
+                <p className="whitespace-pre-wrap text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{compactAiAnswer(turn.message, 700)}</p>
               </div>
             ))}
             {(msg.data.ragContexts?.length ?? 0) > 0 && (
-              <p className="px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 · 실행 {msg.data.executedRounds}/{msg.data.maxRounds} 라운드</p>
+              <p className="px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 · 실행 {msg.data.executedRounds}/{msg.data.maxRounds} 단계</p>
             )}
           </div>
         )}
@@ -388,17 +425,17 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
     <div
       className="rounded-xl p-3 cursor-pointer transition-all"
       style={{
-        background: "rgba(255,255,255,0.85)",
-        border: `1px solid ${isAI ? "rgba(65,67,27,0.15)" : BORDER}`,
+        background: NAVY_SURFACE,
+        border: `1px solid ${isAI ? "rgba(112,130,56,0.30)" : NAVY_BORDER}`,
       }}
       onClick={onOpen}
-      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.98)")}
-      onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.85)")}
+      onMouseEnter={e => (e.currentTarget.style.background = NAVY_SURFACE_STRONG)}
+      onMouseLeave={e => (e.currentTarget.style.background = NAVY_SURFACE)}
     >
       <div className="flex items-start gap-2 mb-1.5">
         <div
           className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: isAI ? "rgba(65,67,27,0.10)" : "rgba(65,67,27,0.08)" }}
+          style={{ background: isAI ? "rgba(112,130,56,0.10)" : "rgba(112,130,56,0.08)" }}
         >
           {isAI
             ? <Sparkles className="w-3 h-3" style={{ color: OLIVE_DARK }} />
@@ -406,24 +443,24 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
           }
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold leading-snug" style={{ color: TEXT_PRIMARY }}>{doc.title}</p>
+          <p className="text-[11px] font-semibold leading-snug" style={{ color: TEXT_ON_DARK }}>{doc.title}</p>
           {isAI && (
             <span className="text-[8px] px-1.5 py-0.5 rounded-full mt-0.5 inline-block" style={{ background: "rgba(90,138,74,0.10)", color: "#5A8A4A" }}>
-              🌐 AI 한글화
+              AI 한글화
             </span>
           )}
         </div>
       </div>
-      <p className="text-[9px] leading-relaxed line-clamp-2 mb-2" style={{ color: TEXT_SECONDARY }}>
+      <p className="text-[9px] leading-relaxed line-clamp-2 mb-2" style={{ color: TEXT_ON_DARK_MUTED }}>
         {doc.summary.split("\n")[0]}
       </p>
       <div className="flex items-center gap-1.5 flex-wrap">
         {doc.tags.map(tag => (
-          <span key={tag} className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(65,67,27,0.06)", color: OLIVE_DARK }}>
+          <span key={tag} className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(112,130,56,0.06)", color: OLIVE_DARK }}>
             #{tag}
           </span>
         ))}
-        <span className="ml-auto text-[8px]" style={{ color: TEXT_TERTIARY }}>{formatDate(doc.createdAt)}</span>
+        <span className="ml-auto text-[8px]" style={{ color: TEXT_ON_DARK_MUTED }}>{formatDate(doc.createdAt)}</span>
       </div>
     </div>
   );
@@ -442,16 +479,16 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
       >
         <div
           className="flex items-center gap-3 px-5 py-4 shrink-0"
-          style={{ background: "rgba(65,67,27,0.06)", borderBottom: `1px solid ${BORDER_SUBTLE}` }}
+          style={{ background: "rgba(112,130,56,0.06)", borderBottom: `1px solid ${BORDER_SUBTLE}` }}
         >
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(65,67,27,0.12)" }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(112,130,56,0.12)" }}>
             <FileText className="w-4 h-4" style={{ color: OLIVE_DARK }} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>{doc.title}</p>
             <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{formatDate(doc.createdAt)} · {doc.messages.length}개 메시지</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/[0.06]">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/6">
             <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
           </button>
         </div>
@@ -461,13 +498,13 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
               <Sparkles className="w-3.5 h-3.5" style={{ color: OLIVE_DARK }} />
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>AI 요약</p>
             </div>
-            <div className="rounded-xl p-3.5 text-[11px] leading-relaxed whitespace-pre-line" style={{ background: "rgba(65,67,27,0.05)", border: `1px solid rgba(65,67,27,0.10)`, color: TEXT_SECONDARY }}>
+            <div className="rounded-xl p-3.5 text-[11px] leading-relaxed whitespace-pre-line" style={{ background: "rgba(112,130,56,0.05)", border: `1px solid rgba(112,130,56,0.10)`, color: TEXT_SECONDARY }}>
               {doc.summary}
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {doc.tags.map(tag => (
-              <span key={tag} className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(65,67,27,0.06)", color: OLIVE_DARK }}>
+              <span key={tag} className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(112,130,56,0.06)", color: OLIVE_DARK }}>
                 #{tag}
               </span>
             ))}
@@ -485,7 +522,7 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
                         <span className="text-[8px]" style={{ color: TEXT_TERTIARY }}>{formatTime(m.time)}</span>
                       </div>
                       <p className="text-[10px]" style={{ color: TEXT_SECONDARY }}>
-                        {m.type === "file" ? `📎 ${m.fileName}` : m.content}
+                        {m.type === "file" ? m.fileName : m.content}
                       </p>
                     </div>
                   </div>
@@ -506,7 +543,7 @@ export function ChatPage({
   projectId = 0,
   currentUserId,
   onDocsUpdate,
-  onUnreadUpdate,
+  onUnreadUpdate: _onUnreadUpdate,
 }: {
   projectId?: number | null;
   currentUserId?: number;
@@ -534,13 +571,14 @@ export function ChatPage({
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
-  const [docs, setDocs] = useState<MeetingDoc[]>(() => loadDocs());
+  const [docs, setDocs] = useState<MeetingDoc[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [input, setInput] = useState("");
   const [aiInput, setAIInput] = useState("");
 
   const [isMeeting, setIsMeeting] = useState(false);
+  const [activeMeetingId, setActiveMeetingId] = useState<number | null>(null);
   const [meetingStart, setMeetingStart] = useState<Date | null>(null);
-  const [meetingMsgs, setMeetingMsgs] = useState<ChatMessage[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [savingDoc, setSavingDoc] = useState(false);
   const [docSaved, setDocSaved] = useState(false);
@@ -555,7 +593,7 @@ export function ChatPage({
   const [selectedAgents, setSelectedAgents] = useState<AiAgentKey[]>(["ORACLE", "BACKEND"]);
   const [singleAgent, setSingleAgent] = useState<AiAgentKey>("ORACLE");
   const [maxRounds, setMaxRounds] = useState(2);
-  const [ragMaxResults, setRagMaxResults] = useState(4);
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("DEFAULT");
   const [briefingLoading, setBriefingLoading] = useState<string | null>(null);
 
   const briefFileRef = useRef<HTMLInputElement>(null);
@@ -596,7 +634,7 @@ export function ChatPage({
     loadChatData();
   }, [loadChatData]);
 
-  // 2. 방 선택 시 메시지 불러오기 API 연동
+  // 2. 방 선택 시 메시지 불러오기 API 연동 + 실시간 수신 구독
   useEffect(() => {
     if (!projectId || !activeRoomId) return;
     setIsLoadingMessages(true);
@@ -615,6 +653,15 @@ export function ChatPage({
         setServerMessages([]);
       })
       .finally(() => setIsLoadingMessages(false));
+
+    const subscription = subscribeToRoom(projectId, activeRoomId, (incoming: ChatMessageResponse) => {
+      setServerMessages(prev => {
+        if (prev.some(m => m.messageId === incoming.messageId)) return prev;
+        return [...prev, incoming];
+      });
+    });
+
+    return () => { subscription.unsubscribe(); };
   }, [projectId, activeRoomId]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [serverMessages, localMessages, activeRoomId]);
@@ -631,6 +678,29 @@ export function ChatPage({
 
   useEffect(() => { onDocsUpdate?.(docs.length); }, [docs.length]);
 
+  // 3. 문서 브리핑 / 회의록 불러오기 API 연동
+  const loadDocsData = useCallback(async () => {
+    if (!projectId) return;
+    setIsLoadingDocs(true);
+    try {
+      const [briefingsRes, minutesRes] = await Promise.all([
+        fetchDocumentBriefings(projectId),
+        fetchMeetingMinutes(projectId),
+      ]);
+      const merged = [
+        ...(briefingsRes?.briefings ?? []).map(briefingSummaryToMeetingDoc),
+        ...(minutesRes?.minutes ?? []).map(meetingMinuteSummaryToMeetingDoc),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setDocs(merged);
+    } catch (error) {
+      toast.error("문서를 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => { loadDocsData(); }, [loadDocsData]);
+
   useEffect(() => {
     if (!projectId) return;
     void fetchAiAgents()
@@ -646,13 +716,8 @@ export function ChatPage({
     if (type === "DEPARTMENT" && projectId) {
       setIsLoadingDepts(true);
       try {
-        const res = await fetchDepartments(projectId);
-        const deptsArray = Array.isArray(res)
-          ? res
-          : (Array.isArray((res as any)?.data) ? (res as any).data
-            : (Array.isArray((res as any)?.departments) ? (res as any).departments : []));
-
-        setDepartments(deptsArray);
+        const list = await fetchDepartments(projectId);
+        setDepartments(list);
       } catch (error) {
         toast.error("부서 목록을 불러오지 못했습니다.");
       } finally {
@@ -665,25 +730,30 @@ export function ChatPage({
     e.preventDefault();
     if (!projectId) return;
 
-    let targetName = "";
     if (createType === "GENERAL") {
       if (!newRoomName.trim()) {
         toast.error("채팅방 이름을 입력해 주세요.");
         return;
       }
-      targetName = newRoomName.trim();
-    } else {
-      if (!selectedDept) {
-        toast.error("생성할 부서를 선택해 주세요.");
+      const targetName = newRoomName.trim();
+      const hasDuplicateName = chatRooms.some(
+        (room) => normalizeChatRoomName(room.name) === normalizeChatRoomName(targetName),
+      );
+      if (hasDuplicateName) {
+        toast.error("이미 같은 이름의 채팅방이 있습니다.");
         return;
       }
-      targetName = selectedDept.name;
+    } else if (!selectedDept) {
+      toast.error("생성할 부서를 선택해 주세요.");
+      return;
     }
 
     setIsCreatingRoom(true);
     try {
-      const newRoom = await createChatRoom(projectId, targetName, createType);
-      const actualName = newRoom?.name || (newRoom as any)?.data?.name || targetName;
+      const newRoom = createType === "GENERAL"
+        ? await createChatRoom(projectId, newRoomName.trim(), createType)
+        : await createChatRoom(projectId, "", createType, selectedDept!.department);
+      const actualName = newRoom?.name || (newRoom as any)?.data?.name || selectedDept?.displayName || newRoomName.trim();
       const actualRoomId = newRoom?.chatRoomId || (newRoom as any)?.data?.chatRoomId;
 
       toast.success(`'${actualName}' 채팅방이 생성되었습니다.`);
@@ -707,23 +777,25 @@ export function ChatPage({
   const getRoomStyle = (name: string) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes("프론트") || lowerName.includes("frontend")) return { icon: Code2, color: "#5A8A4A", bg: "rgba(90,138,74,0.08)" };
-    if (lowerName.includes("백엔드") || lowerName.includes("backend")) return { icon: Server, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
+    if (lowerName.includes("백엔드") || lowerName.includes("backend")) return { icon: Server, color: "#708238", bg: "rgba(112,130,56,0.08)" };
     if (lowerName.includes("qa")) return { icon: ShieldCheck, color: "#B85450", bg: "rgba(184,84,80,0.08)" };
     if (lowerName.includes("devops")) return { icon: Wrench, color: "#C09840", bg: "rgba(192,152,64,0.08)" };
-    if (lowerName.includes("전체") || lowerName.includes("all")) return { icon: Globe, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
-    return { icon: Hash, color: "#41431B", bg: "rgba(65,67,27,0.08)" };
+    if (lowerName.includes("전체") || lowerName.includes("all")) return { icon: Globe, color: "#708238", bg: "rgba(112,130,56,0.08)" };
+    return { icon: Hash, color: "#708238", bg: "rgba(112,130,56,0.08)" };
   };
 
   const activeRoom = Array.isArray(chatRooms)
     ? chatRooms.find(r => r.chatRoomId === activeRoomId)
     : undefined;
+  const currentMemberRole = projectMembers.find((member) => member.userId === currentUserId)?.role;
+  const canLeaveChatRoom = currentMemberRole === "MEMBER" && Boolean(activeRoom);
+  const canDeleteChatRoom = currentMemberRole === "LEADER" && Boolean(activeRoom);
 
   const addLocalMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
     setLocalMessages(prev => [...prev, full]);
-    if (isMeeting) setMeetingMsgs(prev => [...prev, full]);
     return full;
-  }, [isMeeting]);
+  }, []);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -740,19 +812,10 @@ export function ChatPage({
     try {
       const newMsg = await sendChatMessage(projectId, activeRoomId, text);
       if (newMsg) {
-        setServerMessages(prev => [...prev, newMsg]);
-
-        if (isMeeting) {
-          setMeetingMsgs(prev => [...prev, {
-            id: (newMsg.messageId ?? genId()).toString(),
-            sender: newMsg.senderName || "나",
-            avatar: (newMsg.senderName?.[0]) || "나",
-            role: (newMsg.senderId === currentUserId ? "me" : "other") as "me" | "other",
-            content: newMsg.content,
-            time: newMsg.createdAt || new Date().toISOString(),
-            type: "text",
-          }]);
-        }
+        // 이 REST 응답이 도착하기 전에 같은 메시지의 WebSocket 브로드캐스트(자기 자신에게도
+        // 옴)가 먼저 도착해있을 수 있다 - messageId로 중복 여부를 확인하지 않으면 메시지가
+        // 화면에 두 번 찍힌다.
+        setServerMessages(prev => prev.some(m => m.messageId === newMsg.messageId) ? prev : [...prev, newMsg]);
       }
     } catch (error: any) {
       console.error("메시지 전송 실패 상세:", error);
@@ -770,15 +833,15 @@ export function ChatPage({
     try {
       let aiMsg: AIMsg;
       if (aiMode === "rag") {
-        const response = await runAiChat({ projectId, question: text });
+        const response = await runAiChat({ projectId, question: text, level: thinkingLevel });
         aiMsg = { id: genId(), role: "ai", content: formatAiChatAnswer(response), time: new Date().toISOString(), kind: "rag", data: response };
       } else if (aiMode === "agent") {
-        const response = await askAiAgent(singleAgent, buildEditorContext(projectId, text, ragMaxResults));
+        const response = await askAiAgent(singleAgent, buildEditorContext(projectId, text, thinkingLevel));
         aiMsg = { id: genId(), role: "ai", content: formatSingleAgentAnswer(response), time: new Date().toISOString(), kind: "agent", data: response };
       } else {
         if (selectedAgents.length === 0) throw new Error("토론에 참여할 에이전트를 한 명 이상 선택해 주세요.");
         const response = await runCustomAiDebate({
-          context: buildEditorContext(projectId, text, ragMaxResults),
+          context: buildEditorContext(projectId, text, thinkingLevel),
           agents: selectedAgents,
           maxRounds,
         });
@@ -830,11 +893,20 @@ export function ChatPage({
     e.target.value = "";
   };
 
-  const handleBriefingFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBriefingFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "file";
     e.target.value = "";
+
+    if (!ALLOWED_BRIEFING_EXTENSIONS.includes(ext)) {
+      toast.error("지원하지 않는 파일 형식입니다 (pdf, txt, md, doc, docx, ppt, pptx만 가능)");
+      return;
+    }
+    if (!projectId) {
+      toast.error("프로젝트 정보가 없습니다.");
+      return;
+    }
 
     addLocalMessage({
       sender: "나", avatar: "나", role: "me",
@@ -845,50 +917,61 @@ export function ChatPage({
     setBriefingLoading(file.name);
     setTimeout(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, 80);
 
-    const delay = 2200 + Math.random() * 800;
-    setTimeout(() => {
-      const briefing = generateDocBriefing(file.name, ext);
-      const meetingDoc = briefingToMeetingDoc(briefing);
+    try {
+      const uploaded = await uploadChatDocument(projectId, file);
+      const briefingRes = await createDocumentBriefing(projectId, uploaded.documentId);
 
       setBriefingLoading(null);
       addLocalMessage({
-        sender: "WE&AI", avatar: "AI", role: "other",
-        content: `📋 **${file.name}** 한글 브리핑이 완료됐습니다.`,
+        sender: "SynAIpse", avatar: "AI", role: "other",
+        content: `**${file.name}** 한글 브리핑이 완료됐습니다.`,
         type: "briefing",
-        briefing,
+        briefing: { fileName: file.name, summary: briefingRes.summary, points: briefingRes.keyPoints },
       });
 
-      setTimeout(() => {
-        setDocs(prev => {
-          const next = [meetingDoc, ...prev];
-          saveDocs(next);
-          return next;
-        });
-      }, 1200);
-    }, delay);
+      await loadDocsData();
+    } catch (error) {
+      setBriefingLoading(null);
+      toast.error(error instanceof Error ? error.message : "문서 분석에 실패했습니다.");
+    }
   };
 
-  const startMeeting = () => {
-    setIsMeeting(true); setMeetingStart(new Date()); setMeetingMsgs([]); setElapsed(0); setDocSaved(false);
-    addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "🎙️ 회의 모드가 시작되었습니다.", type: "system" });
+  const startMeeting = async () => {
+    if (!projectId) { toast.error("프로젝트 정보가 없습니다."); return; }
+    const now = new Date();
+    const title = `${now.toLocaleDateString("ko-KR")} 회의 — ${now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
+    try {
+      const res = await startChatMeeting(projectId, { title, chatRoomId: activeRoomId ?? undefined });
+      setActiveMeetingId(res.meetingId);
+      setIsMeeting(true); setMeetingStart(new Date()); setElapsed(0); setDocSaved(false);
+      addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "회의 모드가 시작되었습니다.", type: "system" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "회의 시작에 실패했습니다.");
+    }
   };
 
-  const endMeeting = () => {
+  const endMeeting = async () => {
+    if (!projectId || !activeMeetingId) { setIsMeeting(false); setMicOn(false); return; }
     setIsMeeting(false); setMicOn(false);
     addLocalMessage({ sender: "System", avatar: "S", role: "other", content: "⏹️ 회의 모드 종료. 문서로 저장 중...", type: "system" });
     setSavingDoc(true);
-    setTimeout(() => {
-      const now = new Date();
-      const title = `${now.toLocaleDateString("ko-KR")} 회의 — ${now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
-      const newDoc: MeetingDoc = {
-        id: genId(), title, createdAt: now.toISOString(),
-        summary: generateMeetingSummary(meetingMsgs),
-        messages: meetingMsgs,
-        tags: ["회의", "자동저장", now.toLocaleDateString("ko-KR").replace(/\. /g, "-").replace(".", "")],
-      };
-      setDocs(prev => { const next = [newDoc, ...prev]; saveDocs(next); return next; });
-      setSavingDoc(false); setDocSaved(true); setMainTab("docs");
-    }, 1500);
+    try {
+      // meetingMsgs 같은 별도 상태를 안 쓰고 serverMessages(전체 참여자 메시지가 WebSocket으로
+      // 실시간 반영되는, 이미 messageId로 중복 제거된 목록)에서 회의 시작 이후 것만 걸러 쓴다 -
+      // 이전 방식은 "내가 보낸" 메시지만 REST 응답 시점에 따로 쌓아서 다른 참여자 발언이
+      // 회의록에서 통째로 빠지는 문제가 있었다.
+      const meetingMessages = meetingStart
+        ? serverMessages.filter(m => new Date(m.createdAt).getTime() >= meetingStart.getTime())
+        : serverMessages;
+      const content = buildMeetingTranscript(meetingMessages);
+      await endChatMeeting(projectId, activeMeetingId, { content });
+      await loadDocsData();
+      setMainTab("docs");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "회의록 저장에 실패했습니다.");
+    } finally {
+      setSavingDoc(false); setDocSaved(true); setActiveMeetingId(null);
+    }
   };
 
   const formatElapsed = (s: number) =>
@@ -998,34 +1081,40 @@ export function ChatPage({
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                       {departments.map((dept) => {
                         const isExists = dept.chatRoomExists;
-                        const isSelected = selectedDept?.departmentId === dept.departmentId;
+                        const canSelect = !isExists && dept.selectable;
+                        const isSelected = selectedDept?.department === dept.department;
 
                         return (
                           <div
-                            key={dept.departmentId}
+                            key={dept.department}
                             onClick={() => {
-                              if (!isExists && !isCreatingRoom) {
+                              if (canSelect && !isCreatingRoom) {
                                 setSelectedDept(dept);
                               }
                             }}
-                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${isExists
-                              ? "opacity-50 cursor-not-allowed bg-black/[0.02]"
-                              : "cursor-pointer hover:border-black/20"
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${canSelect
+                              ? "cursor-pointer hover:border-black/20"
+                              : "opacity-50 cursor-not-allowed bg-black/2"
                               }`}
                             style={{
                               borderColor: isSelected ? OLIVE_DARK : BORDER_SUBTLE,
-                              background: isSelected ? "rgba(65,67,27,0.06)" : isExists ? "rgba(0,0,0,0.02)" : "white",
+                              background: isSelected ? "rgba(65,67,27,0.06)" : !canSelect ? "rgba(0,0,0,0.02)" : "white",
                             }}
                           >
                             <div className="flex items-center gap-2">
                               <Building2 className="w-3.5 h-3.5" style={{ color: isSelected ? OLIVE_DARK : TEXT_TERTIARY }} />
                               <span className="font-semibold" style={{ color: isSelected ? OLIVE_DARK : TEXT_PRIMARY }}>
-                                {dept.name}
+                                {dept.displayName}
                               </span>
+                              <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{dept.memberCount}명</span>
                             </div>
                             {isExists ? (
                               <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_TERTIARY }}>
                                 이미 생성됨
+                              </span>
+                            ) : !dept.selectable ? (
+                              <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,0.06)", color: TEXT_TERTIARY }}>
+                                멤버 없음
                               </span>
                             ) : (
                               <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: isSelected ? OLIVE_DARK : "rgba(65,67,27,0.08)", color: isSelected ? "white" : OLIVE_DARK }}>
@@ -1070,13 +1159,13 @@ export function ChatPage({
         </div>
       )}
 
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(160deg, #f5f4ef 0%, #f0efe8 40%, #ede9df 100%)" }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: CONTENT_BG }} />
 
       <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
         {/* ══ 메인 탭 바 ══ */}
         <div
           className="flex items-center gap-0 px-3 h-11 shrink-0"
-          style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}
+          style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
         >
           <div className="flex items-center gap-0.5 mr-3">
             {isLoadingRooms ? (
@@ -1097,15 +1186,15 @@ export function ChatPage({
                   className="flex items-center gap-1.5 px-3 h-full text-[11px] font-semibold transition-all border-b-2"
                   style={{
                     height: 44,
-                    color: mainTab === tab.id ? OLIVE_DARK : TEXT_TERTIARY,
+                    color: mainTab === tab.id ? ACCENT : TEXT_ON_DARK_MUTED,
                     borderBottomColor: mainTab === tab.id ? OLIVE_DARK : "transparent",
-                    background: tab.id === "ai" && mainTab === "ai" ? "rgba(65,67,27,0.05)" : "transparent",
+                    background: tab.id === "ai" && mainTab === "ai" ? NAVY_SURFACE : "transparent",
                   }}
                 >
                   <tab.icon className="w-3.5 h-3.5" />
                   {tab.label}
                   {tab.id === "ai" && (
-                    <span className="ml-0.5 text-[8px] px-1 py-0.5 rounded-full font-bold" style={{ background: "rgba(65,67,27,0.12)", color: OLIVE_DARK }}>AI</span>
+                    <span className="ml-0.5 text-[8px] px-1 py-0.5 rounded-full font-bold" style={{ background: "rgba(112,130,56,0.12)", color: OLIVE_DARK }}>AI</span>
                   )}
                 </button>
               ))
@@ -1118,11 +1207,11 @@ export function ChatPage({
                 {isMeeting && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.10)" }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                    <span className="text-[10px] font-semibold" style={{ color: "#ef4444" }}>REC {formatElapsed(elapsed)}</span>
+                    <span className="text-[10px] font-semibold" style={{ color: UI_RED }}>REC {formatElapsed(elapsed)}</span>
                   </div>
                 )}
                 {savingDoc && (
-                  <div className="flex items-center gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                  <div className="flex items-center gap-1.5 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
                     <Loader2 className="w-3 h-3 animate-spin" /> 저장 중…
                   </div>
                 )}
@@ -1133,8 +1222,8 @@ export function ChatPage({
                 )}
                 {isMeeting && (
                   <button onClick={() => setMicOn(m => !m)} className="p-1.5 rounded-lg transition-all"
-                    style={{ background: micOn ? "rgba(16,185,129,0.12)" : "rgba(0,0,0,0.05)" }}>
-                    {micOn ? <Mic className="w-3.5 h-3.5" style={{ color: "#10b981" }} /> : <MicOff className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />}
+                    style={{ background: micOn ? "rgba(16,185,129,0.12)" : NAVY_SURFACE }}>
+                    {micOn ? <Mic className="w-3.5 h-3.5" style={{ color: "#10b981" }} /> : <MicOff className="w-3.5 h-3.5" style={{ color: TEXT_ON_DARK_MUTED }} />}
                   </button>
                 )}
                 {mainTab === "chat" && (
@@ -1142,9 +1231,9 @@ export function ChatPage({
                     onClick={isMeeting ? endMeeting : startMeeting}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                     style={{
-                      background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(65,67,27,0.08)",
-                      color: isMeeting ? "#ef4444" : OLIVE_DARK,
-                      border: `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(65,67,27,0.15)"}`,
+                      background: isMeeting ? "rgba(239,68,68,0.10)" : "rgba(112,130,56,0.08)",
+                      color: isMeeting ? UI_RED : OLIVE_DARK,
+                      border: `1px solid ${isMeeting ? "rgba(239,68,68,0.2)" : "rgba(112,130,56,0.15)"}`,
                     }}
                   >
                     {isMeeting ? <><VideoOff className="w-3.5 h-3.5" /> 회의 종료</> : <><Video className="w-3.5 h-3.5" /> 회의 시작</>}
@@ -1160,7 +1249,7 @@ export function ChatPage({
           <>
             <div
               className="flex items-center gap-2 px-3 h-10 shrink-0"
-              style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}
+              style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
             >
               {/* 1. [맨 왼쪽] + 채팅방 추가 버튼 */}
               {!isLoadingRooms && (
@@ -1170,12 +1259,44 @@ export function ChatPage({
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-black/10"
                   title="채팅방 추가"
                   style={{
-                    background: "rgba(65,67,27,0.08)",
+                    background: "rgba(112,130,56,0.08)",
                     color: OLIVE_DARK,
-                    border: "1px solid rgba(65,67,27,0.15)",
+                    border: "1px solid rgba(112,130,56,0.15)",
                   }}
                 >
                   <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {canLeaveChatRoom && (
+                <button
+                  type="button"
+                  title="채팅방 나가기"
+                  aria-label="채팅방 나가기"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                  style={{
+                    background: "rgba(184,84,80,0.08)",
+                    color: "#B85450",
+                    border: "1px solid rgba(184,84,80,0.18)",
+                  }}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {canDeleteChatRoom && (
+                <button
+                  type="button"
+                  title="채팅방 삭제"
+                  aria-label="채팅방 삭제"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                  style={{
+                    background: "rgba(184,84,80,0.08)",
+                    color: "#B85450",
+                    border: "1px solid rgba(184,84,80,0.18)",
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
 
@@ -1199,15 +1320,15 @@ export function ChatPage({
                           className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 transition-all whitespace-nowrap"
                           style={{
                             background: isActive ? bg : "transparent",
-                            color: isActive ? color : TEXT_TERTIARY,
-                            border: `1px solid ${isActive ? "rgba(0,0,0,0.08)" : "transparent"}`,
+                            color: isActive ? color : TEXT_ON_DARK_MUTED,
+                            border: `1px solid ${isActive ? NAVY_BORDER : "transparent"}`,
                           }}
                         >
                           <Icon className="w-3 h-3" />
                           {room.name}
                           <span
                             className="text-[8px] px-1 py-0.5 rounded-full ml-0.5"
-                            style={{ background: isActive ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)", color: isActive ? color : TEXT_TERTIARY }}
+                            style={{ background: isActive ? NAVY_SURFACE_STRONG : NAVY_SURFACE, color: isActive ? color : TEXT_ON_DARK_MUTED }}
                           >
                             {room.memberCount ?? 0}
                           </span>
@@ -1258,8 +1379,8 @@ export function ChatPage({
 
                     {/* 마우스 호버 시 전체 팀원 목록 팝업창 */}
                     {displayMembers.length > 0 && (
-                      <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 p-3 bg-white rounded-xl shadow-xl border border-black/10 z-50 min-w-[150px]">
-                        <div className="text-[10px] font-bold pb-1.5 border-b border-black/5 text-gray-500 flex items-center justify-between">
+                      <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col gap-1.5 p-3 rounded-xl shadow-xl z-50 min-w-37.5" style={{ background: CONTENT_BG, border: `1px solid ${NAVY_BORDER}` }}>
+                        <div className="text-[10px] font-bold pb-1.5 border-b flex items-center justify-between" style={{ borderColor: BORDER, color: TEXT_PRIMARY }}>
                           <span>전체 팀원 목록</span>
                           <span className="text-[9px] font-normal text-gray-400">{displayMembers.length}명</span>
                         </div>
@@ -1275,8 +1396,8 @@ export function ChatPage({
                                 >
                                   {name[0]}
                                 </div>
-                                <span className="text-[11px] font-semibold text-gray-700 truncate">{name}</span>
-                                {role && <span className="text-[9px] text-gray-400 ml-auto shrink-0">{role}</span>}
+                                <span className="text-[11px] font-semibold truncate" style={{ color: TEXT_PRIMARY }}>{name}</span>
+                                {role && <span className="text-[9px] ml-auto shrink-0" style={{ color: TEXT_TERTIARY }}>{role}</span>}
                               </div>
                             );
                           })}
@@ -1288,7 +1409,7 @@ export function ChatPage({
               })()}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: "rgba(248,247,244,0.50)" }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
               {isLoadingMessages ? (
                 <div className="space-y-4">
                   {Array.from({ length: 4 }).map((_, i) => {
@@ -1328,8 +1449,8 @@ export function ChatPage({
               )}
             </div>
 
-            <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}>
-              <div className="flex items-end gap-2 rounded-2xl px-3 py-2" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}` }}>
+            <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}>
+              <div className="flex items-end gap-2 rounded-2xl px-3 py-2" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
                 <textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
@@ -1338,15 +1459,15 @@ export function ChatPage({
                   placeholder={isLoadingMessages ? "채팅 불러오는 중..." : `${activeRoom?.name || ""} 채널에 메시지 입력...`}
                   rows={2}
                   className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
-                  style={{ background: "transparent", color: TEXT_PRIMARY }}
+                  style={{ background: "transparent", color: TEXT_ON_DARK }}
                 />
                 <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isLoadingMessages}
-                    className="p-1.5 rounded-lg hover:bg-black/[0.05] disabled:opacity-50"
+                    className="p-1.5 rounded-lg hover:bg-black/5 disabled:opacity-50"
                   >
-                    <Paperclip className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+                    <Paperclip className="w-3.5 h-3.5" style={{ color: TEXT_ON_DARK_MUTED }} />
                   </button>
                   <input ref={fileInputRef} type="file" className="hidden" onChange={handleFile} />
 
@@ -1355,9 +1476,9 @@ export function ChatPage({
                     disabled={!!briefingLoading || isLoadingMessages}
                     className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-semibold transition-all disabled:opacity-50"
                     style={{
-                      background: briefingLoading ? "rgba(0,0,0,0.04)" : "rgba(65,67,27,0.08)",
-                      color: briefingLoading ? TEXT_TERTIARY : OLIVE_DARK,
-                      border: `1px solid ${briefingLoading ? BORDER : "rgba(65,67,27,0.18)"}`,
+                      background: briefingLoading ? NAVY_SURFACE : "rgba(112,130,56,0.14)",
+                      color: briefingLoading ? TEXT_ON_DARK_MUTED : OLIVE_DARK,
+                      border: `1px solid ${briefingLoading ? NAVY_BORDER : "rgba(112,130,56,0.35)"}`,
                       cursor: briefingLoading || isLoadingMessages ? "not-allowed" : "pointer",
                     }}
                   >
@@ -1370,9 +1491,9 @@ export function ChatPage({
                     onClick={handleSend}
                     disabled={!input.trim() || isLoadingMessages || typing}
                     className="w-7 h-7 rounded-xl flex items-center justify-center transition-all disabled:opacity-50"
-                    style={{ background: input.trim() ? OLIVE_DARK : "rgba(0,0,0,0.06)" }}
+                    style={{ background: input.trim() ? OLIVE_DARK : NAVY_SURFACE }}
                   >
-                    <Send className="w-3.5 h-3.5" style={{ color: input.trim() ? "white" : TEXT_TERTIARY }} />
+                    <Send className="w-3.5 h-3.5" style={{ color: input.trim() ? "white" : TEXT_ON_DARK_MUTED }} />
                   </button>
                 </div>
               </div>
@@ -1385,27 +1506,27 @@ export function ChatPage({
           <>
             <div
               className="flex items-center gap-3 px-4 py-3 shrink-0"
-              style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(65,67,27,0.05)" }}
+              style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
             >
               <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: OLIVE_DARK }}>
                 <Bot className="w-4 h-4" style={{ color: "white" }} />
               </div>
               <div>
-                <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>WE&AI Project Assistant</p>
-                <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
+                <p className="text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }}>SynAIpse Project Assistant</p>
+                <p className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
                   {aiMode === "rag" && "프로젝트 RAG 질의"}
                   {aiMode === "agent" && "선택 에이전트 단독 분석"}
-                  {aiMode === "debate" && `${selectedAgents.length}명 · 최대 ${maxRounds}라운드 심화 토론`}
+                  {aiMode === "debate" && `${selectedAgents.length}명 · 최대 ${maxRounds}단계 심층 분석 세션`}
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: UI_GREEN }} />
-                <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>온라인</span>
+                <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>온라인</span>
               </div>
             </div>
 
-            <div className="shrink-0 px-3 py-2.5 space-y-2" style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.95)" }}>
-              <div className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ background: "rgba(65,67,27,0.07)" }}>
+            <div className="shrink-0 px-3 py-2.5 space-y-2" style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}>
+              <div className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ background: NAVY_SURFACE }}>
                 {([
                   ["rag", "RAG 질문"],
                   ["agent", "단일 AI"],
@@ -1417,7 +1538,7 @@ export function ChatPage({
                     disabled={aiTyping}
                     className="rounded-lg px-2 py-1.5 text-[9px] font-semibold transition-all disabled:opacity-50"
                     style={{
-                      color: aiMode === mode ? "white" : TEXT_SECONDARY,
+                      color: aiMode === mode ? "white" : TEXT_ON_DARK_MUTED,
                       background: aiMode === mode ? OLIVE_DARK : "transparent",
                     }}
                   >
@@ -1435,12 +1556,12 @@ export function ChatPage({
                       disabled={aiTyping}
                       className="rounded-xl px-2.5 py-2 text-left transition-all disabled:opacity-50"
                       style={{
-                        border: `1px solid ${singleAgent === agent.agent ? OLIVE_DARK : BORDER}`,
-                        background: singleAgent === agent.agent ? "rgba(65,67,27,0.09)" : "rgba(255,255,255,0.8)",
+                        border: `1px solid ${singleAgent === agent.agent ? OLIVE_DARK : NAVY_BORDER}`,
+                        background: singleAgent === agent.agent ? "rgba(112,130,56,0.16)" : NAVY_SURFACE,
                       }}
                     >
-                      <span className="block text-[9px] font-bold" style={{ color: TEXT_PRIMARY }}>{agent.name}</span>
-                      <span className="block truncate text-[8px]" style={{ color: TEXT_TERTIARY }}>{agent.role} · {agent.model}</span>
+                      <span className="block text-[9px] font-bold" style={{ color: TEXT_ON_DARK }}>{agent.name}</span>
+                      <span className="block truncate text-[8px]" style={{ color: TEXT_ON_DARK_MUTED }}>{agent.role} · {agent.model}</span>
                     </button>
                   ))}
                 </div>
@@ -1449,40 +1570,40 @@ export function ChatPage({
               {aiMode === "debate" && (
                 <>
                   <div className="grid grid-cols-3 gap-1.5">
-                    <label className="text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
+                    <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
                       참여 인원
                       <select
                         value={selectedAgents.length}
                         onChange={event => updateDebateAgentCount(Number(event.target.value))}
                         disabled={aiTyping}
                         className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
-                        style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                        style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
                       >
                         {availableAgents.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1}명</option>)}
                       </select>
                     </label>
-                    <label className="text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
-                      심화 토론
+                    <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
+                      탐구 단계
                       <select
                         value={maxRounds}
                         onChange={event => setMaxRounds(Number(event.target.value))}
                         disabled={aiTyping}
                         className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
-                        style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                        style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
                       >
-                        {[1, 2, 3, 4, 5].map(round => <option key={round} value={round}>{round}라운드</option>)}
+                        {[1, 2, 3, 4, 5].map(round => <option key={round} value={round}>{round}단계</option>)}
                       </select>
                     </label>
-                    <label className="text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
-                      RAG 문서
+                    <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
+                      추론 강도
                       <select
-                        value={ragMaxResults}
-                        onChange={event => setRagMaxResults(Number(event.target.value))}
+                        value={thinkingLevel}
+                        onChange={event => setThinkingLevel(event.target.value as ThinkingLevel)}
                         disabled={aiTyping}
                         className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
-                        style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                        style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
                       >
-                        {[2, 4, 6, 8, 10, 12].map(count => <option key={count} value={count}>{count}개</option>)}
+                        {THINKING_LEVEL_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                     </label>
                   </div>
@@ -1497,9 +1618,9 @@ export function ChatPage({
                           title={`${agent.role} · ${agent.model}`}
                           className="rounded-lg px-1.5 py-1.5 text-[8px] font-semibold transition-all disabled:opacity-50"
                           style={{
-                            border: `1px solid ${selected ? OLIVE_DARK : BORDER}`,
-                            color: selected ? OLIVE_DARK : TEXT_TERTIARY,
-                            background: selected ? "rgba(65,67,27,0.10)" : "white",
+                            border: `1px solid ${selected ? OLIVE_DARK : NAVY_BORDER}`,
+                            color: selected ? OLIVE_DARK : TEXT_ON_DARK_MUTED,
+                            background: selected ? "rgba(112,130,56,0.16)" : NAVY_SURFACE,
                           }}
                         >
                           {agent.name}
@@ -1510,65 +1631,57 @@ export function ChatPage({
                 </>
               )}
 
-              {aiMode === "agent" && (
-                <label className="flex items-center justify-between text-[8px] font-medium" style={{ color: TEXT_SECONDARY }}>
-                  RAG 검색 문서 수
+              {(aiMode === "agent" || aiMode === "rag") && (
+                <label className="flex items-center justify-between text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
+                  답변 심층도
                   <select
-                    value={ragMaxResults}
-                    onChange={event => setRagMaxResults(Number(event.target.value))}
+                    value={thinkingLevel}
+                    onChange={event => setThinkingLevel(event.target.value as ThinkingLevel)}
                     disabled={aiTyping}
+                    title={THINKING_LEVEL_OPTIONS.find(opt => opt.value === thinkingLevel)?.description}
                     className="rounded-lg px-2 py-1 text-[9px] outline-none"
-                    style={{ border: `1px solid ${BORDER}`, background: "white", color: TEXT_PRIMARY }}
+                    style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
                   >
-                    {[2, 4, 6, 8, 10, 12].map(count => <option key={count} value={count}>{count}개</option>)}
+                    {THINKING_LEVEL_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </label>
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {isLoadingRooms ? (
-                <div className="flex gap-2.5 items-start mb-4">
-                  <Skeleton className="w-7 h-7 rounded-full shrink-0" />
-                  <Skeleton className="h-16 w-3/4 rounded-2xl" />
+            <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
+              {aiMessages.length === 0 && (
+                <div className="mx-auto mt-8 max-w-xs rounded-2xl px-4 py-5 text-center" style={{ border: `1px dashed ${NAVY_BORDER}`, background: NAVY_SURFACE }}>
+                  <Bot className="mx-auto mb-2 h-5 w-5" style={{ color: OLIVE_DARK }} />
+                  <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>실제 AI 응답만 표시됩니다</p>
+                  <p className="mt-1 text-[9px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>
+                    모드를 고르고 질문을 입력하세요. 단일 AI와 토론 모드에서는 에이전트별 역할과 모델도 함께 확인할 수 있습니다.
+                  </p>
                 </div>
-              ) : (
-                <>
-                  {aiMessages.length === 0 && (
-                    <div className="mx-auto mt-8 max-w-xs rounded-2xl px-4 py-5 text-center" style={{ border: `1px dashed ${BORDER}`, background: "rgba(255,255,255,0.65)" }}>
-                      <Bot className="mx-auto mb-2 h-5 w-5" style={{ color: OLIVE_DARK }} />
-                      <p className="text-[10px] font-semibold" style={{ color: TEXT_PRIMARY }}>실제 AI 응답만 표시됩니다</p>
-                      <p className="mt-1 text-[9px] leading-relaxed" style={{ color: TEXT_TERTIARY }}>
-                        모드를 고르고 질문을 입력하세요. 단일 AI와 토론 모드에서는 에이전트별 역할과 모델도 함께 확인할 수 있습니다.
-                      </p>
-                    </div>
-                  )}
-                  {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
-                  {aiTyping && (
-                    <div className="flex gap-2.5 items-start mb-4">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
-                        <Bot className="w-3.5 h-3.5" style={{ color: "white" }} />
-                      </div>
-                      <div className="rounded-2xl px-4 py-3 mt-0.5" style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${BORDER}` }}>
-                        <div className="flex gap-1 items-center">
-                          {[0, 1, 2].map(i => (
-                            <div key={i} className="w-1.5 h-1.5 rounded-full"
-                              style={{ background: OLIVE_DARK, opacity: 0.5, animation: `bounce 1s ${i * 0.15}s infinite` }} />
-                          ))}
-                          <span className="ml-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>분석 중...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={aiBottomRef} />
-                </>
               )}
+              {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
+              {aiTyping && (
+                <div className="flex gap-2.5 items-start mb-4">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
+                    <Bot className="w-3.5 h-3.5" style={{ color: "white" }} />
+                  </div>
+                  <div className="rounded-2xl px-4 py-3 mt-0.5" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
+                    <div className="flex gap-1 items-center">
+                      {[0, 1, 2].map(i => (
+                        <div key={i} className="w-1.5 h-1.5 rounded-full"
+                          style={{ background: OLIVE_DARK, opacity: 0.5, animation: `bounce 1s ${i * 0.15}s infinite` }} />
+                      ))}
+                      <span className="ml-2 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>분석 중...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={aiBottomRef} />
             </div>
 
-            <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}>
+            <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}>
               <div
                 className="flex items-end gap-2 rounded-2xl px-3 py-2"
-                style={{ background: "rgba(255,255,255,0.95)", border: `1.5px solid rgba(65,67,27,0.15)` }}
+                style={{ background: NAVY_SURFACE, border: `1.5px solid rgba(112,130,56,0.35)` }}
               >
                 <Bot className="w-4 h-4 shrink-0 mb-1.5" style={{ color: OLIVE_DARK, opacity: 0.5 }} />
                 <textarea
@@ -1585,15 +1698,15 @@ export function ChatPage({
                   }
                   rows={2}
                   className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
-                  style={{ background: "transparent", color: TEXT_PRIMARY }}
+                  style={{ background: "transparent", color: TEXT_ON_DARK }}
                 />
                 <button
                   onClick={handleAISend}
                   disabled={!aiInput.trim() || aiTyping || isLoadingRooms}
                   className="w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0 mb-0.5 disabled:opacity-50"
-                  style={{ background: aiInput.trim() && !aiTyping ? OLIVE_DARK : "rgba(0,0,0,0.06)" }}
+                  style={{ background: aiInput.trim() && !aiTyping ? OLIVE_DARK : NAVY_SURFACE }}
                 >
-                  <Send className="w-3.5 h-3.5" style={{ color: aiInput.trim() && !aiTyping ? "white" : TEXT_TERTIARY }} />
+                  <Send className="w-3.5 h-3.5" style={{ color: aiInput.trim() && !aiTyping ? "white" : TEXT_ON_DARK_MUTED }} />
                 </button>
               </div>
             </div>
@@ -1605,25 +1718,25 @@ export function ChatPage({
           <div className="flex-1 flex flex-col overflow-hidden">
             <div
               className="flex items-center gap-3 px-4 py-3 shrink-0"
-              style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(250,249,246,0.98)" }}
+              style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}
             >
               <FileText className="w-4 h-4 shrink-0" style={{ color: OLIVE_DARK }} />
-              <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Meeting Docs</p>
+              <p className="text-xs font-semibold" style={{ color: TEXT_ON_DARK }}>Meeting Docs</p>
               {!isLoadingRooms && (
-                <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(65,67,27,0.08)", color: OLIVE_DARK }}>
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}>
                   {docs.length}개 문서
                 </span>
               )}
               <div className="ml-auto flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3" style={{ color: OLIVE_DARK, opacity: 0.6 }} />
-                <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>AI 한글화 문서 포함</span>
+                <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>AI 한글화 문서 포함</span>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: "rgba(248,247,244,0.50)" }}>
-              {isLoadingRooms ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: CHAT_CANVAS }}>
+              {isLoadingDocs ? (
                 /* [스켈레톤] 문서 카드들 */
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-xl p-3 border bg-white/50 border-black/5 space-y-2">
+                  <div key={i} className="rounded-xl p-3 border space-y-2" style={{ background: NAVY_SURFACE, borderColor: BORDER }}>
                     <div className="flex gap-2 items-center">
                       <Skeleton className="w-6 h-6 rounded-lg" />
                       <Skeleton className="h-4 w-1/2" />
@@ -1634,9 +1747,9 @@ export function ChatPage({
                 ))
               ) : docs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
-                  <FileText className="w-10 h-10" style={{ color: "rgba(65,67,27,0.15)" }} />
-                  <p className="text-[12px] font-semibold" style={{ color: TEXT_TERTIARY }}>저장된 문서가 없습니다</p>
-                  <p className="text-[10px]" style={{ color: TEXT_LABEL }}>AI 문서 분석 버튼으로 파일을 업로드하거나 회의를 시작하세요</p>
+                  <FileText className="w-10 h-10" style={{ color: "rgba(112,130,56,0.15)" }} />
+                  <p className="text-[12px] font-semibold" style={{ color: TEXT_ON_DARK_MUTED }}>저장된 문서가 없습니다</p>
+                  <p className="text-[10px]" style={{ color: TEXT_ON_DARK_MUTED }}>AI 문서 분석 버튼으로 파일을 업로드하거나 회의를 시작하세요</p>
                 </div>
               ) : (
                 docs.map(doc => (
