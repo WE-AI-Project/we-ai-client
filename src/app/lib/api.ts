@@ -1501,24 +1501,13 @@ export async function updateProjectMemberDepartment(
   });
 }
 
-export async function deleteProjectMember(projectId: number, memberId: number): Promise<void> {
-  try {
-    await request<void>(`/api/v1/projects/${projectId}/members/${memberId}/status`, {
-      method: "PATCH",
-      body: { status: "KICKED" },
-    });
-  } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 405)) {
-      await request<void>(`/api/v1/projects/${projectId}/members/${memberId}`, {
-        method: "PATCH",
-        body: { status: "KICKED" },
-      });
-      return;
-    }
-
-    throw error;
-  }
+export async function kickProjectMember(projectId: number, memberId: number): Promise<void> {
+  return request<void>(`/api/v1/projects/${projectId}/members/${memberId}/kick`, {
+    method: "PATCH",
+  });
 }
+
+export const deleteProjectMember = kickProjectMember;
 
 export async function fetchProjectTechStacks(projectId: number): Promise<ProjectTechStackList> {
   return request<ProjectTechStackList>(`/api/v1/projects/${projectId}/tech-stacks`);
