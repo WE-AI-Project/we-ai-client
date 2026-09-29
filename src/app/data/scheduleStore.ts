@@ -24,20 +24,20 @@ export const DEPT_COLOR: Record<Dept, { color: string; bg: string; light: string
   Frontend: { color: "#06b6d4", bg: "rgba(6,182,212,0.15)",   light: "rgba(6,182,212,0.07)"  },
   Backend:  { color: "#635bff", bg: "rgba(99,91,255,0.15)",   light: "rgba(99,91,255,0.07)"  },
   Agent:    { color: "#8b5cf6", bg: "rgba(139,92,246,0.15)",  light: "rgba(139,92,246,0.07)" },
-  DevOps:   { color: "#f59e0b", bg: "rgba(245,158,11,0.15)",  light: "rgba(245,158,11,0.07)" },
+  DevOps:   { color: "#00B0F4", bg: "rgba(0,176,244,0.15)",   light: "rgba(0,176,244,0.07)"  },
   QA:       { color: "#10b981", bg: "rgba(16,185,129,0.15)",  light: "rgba(16,185,129,0.07)" },
   Design:   { color: "#ec4899", bg: "rgba(236,72,153,0.15)",  light: "rgba(236,72,153,0.07)" },
 };
 
 export const STATUS_META: Record<ScheduleStatus, { label: string; color: string }> = {
   "todo":        { label: "예정",     color: "#9b9b9b" },
-  "in-progress": { label: "진행 중",  color: "#f59e0b" },
+  "in-progress": { label: "진행 중",  color: "#5865F2" },
   "done":        { label: "완료",     color: "#10b981" },
 };
 
 export const PRIORITY_META: Record<SchedulePriority, { label: string; color: string }> = {
   high:   { label: "높음", color: "#ef4444" },
-  medium: { label: "중간", color: "#f59e0b" },
+  medium: { label: "중간", color: "#5865F2" },
   low:    { label: "낮음", color: "#10b981" },
 };
 

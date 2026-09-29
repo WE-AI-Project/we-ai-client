@@ -162,8 +162,8 @@ const DEPT_STATUS_META: Record<
 > = {
   COMPLETED: {
     label: "완료",
-    color: "#5A8A4A",
-    bg: "rgba(90,138,74,0.12)",
+    color: "#10b981",
+    bg: "rgba(16,185,129,0.12)",
     icon: CheckCircle2,
   },
   IN_PROGRESS: {
@@ -180,14 +180,14 @@ const DEPT_STATUS_META: Record<
   },
   READY: {
     label: "준비",
-    color: "#888A62",
-    bg: "rgba(136,138,98,0.12)",
+    color: TEXT_TERTIARY,
+    bg: "rgba(101,107,145,0.10)",
     icon: Clock,
   },
   IDLE: {
     label: "대기",
-    color: "#888A62",
-    bg: "rgba(136,138,98,0.12)",
+    color: TEXT_TERTIARY,
+    bg: "rgba(101,107,145,0.10)",
     icon: Clock,
   },
 };
@@ -204,11 +204,11 @@ const DEPARTMENT_LABELS: Record<ProjectDepartment, string> = {
 };
 
 const STATUS_COLORS: Record<ProjectScheduleStatus, { color: string; bg: string }> = {
-  TODO: { color: "#C09840", bg: "rgba(192,152,64,0.12)" },
+  TODO: { color: ACCENT, bg: ACCENT_BG },
   IN_PROGRESS: { color: ACCENT, bg: ACCENT_BG },
-  DONE: { color: "#5A8A4A", bg: "rgba(90,138,74,0.12)" },
-  COMPLETED: { color: "#5A8A4A", bg: "rgba(90,138,74,0.12)" },
-  HOLD: { color: "#888A62", bg: "rgba(136,138,98,0.12)" },
+  DONE: { color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  COMPLETED: { color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  HOLD: { color: TEXT_TERTIARY, bg: "rgba(101,107,145,0.10)" },
 };
 
 function StatCard({
@@ -451,12 +451,12 @@ export function DashboardPage({ projectId, projectName }: Props) {
                         <Hash className="h-3.5 w-3.5" />
                         {dashboard.projectCode}
                       </span>
-                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(90,138,74,0.12)" }}>
+                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(16,185,129,0.12)", color: "#10b981" }}>
                         <Activity className="h-3.5 w-3.5" />
                         {dashboard.status}
                       </span>
                       {dashboard.targetDate && (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(192,152,64,0.12)" }}>
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: ACCENT_BG, color: ACCENT }}>
                           <CalendarDays className="h-3.5 w-3.5" />
                           {dashboard.targetDate}
                         </span>
@@ -481,8 +481,8 @@ export function DashboardPage({ projectId, projectName }: Props) {
             ) : dashboard && (
               <>
                 <StatCard label="Members" value={`${dashboard.memberCount}`} tone={ACCENT} />
-                <StatCard label="Schedules" value={`${dashboard.scheduleCount}`} tone="#C09840" />
-                <StatCard label="Completed" value={`${dashboard.completedScheduleCount}`} tone="#5A8A4A" />
+                <StatCard label="Schedules" value={`${dashboard.scheduleCount}`} tone={ACCENT} />
+                <StatCard label="Completed" value={`${dashboard.completedScheduleCount}`} tone="#10b981" />
                 <StatCard label="Progress" value={progressLabel} tone={ACCENT} />
               </>
             )}
@@ -502,14 +502,14 @@ export function DashboardPage({ projectId, projectName }: Props) {
             <div className="grid gap-4 md:grid-cols-3">
               {showSkeleton ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div key={i} className="rounded-2xl border px-4 py-4" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                     <Skeleton className="w-20 h-3 mb-4" />
                     <Skeleton className="w-16 h-7" />
                   </div>
                 ))
               ) : mySummary ? (
                 <>
-                  <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
                       My Total Tasks
                     </p>
@@ -517,19 +517,19 @@ export function DashboardPage({ projectId, projectName }: Props) {
                       {mySummary.totalTasks ?? 0} 개
                     </p>
                   </div>
-                  <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
                       My Completed Tasks
                     </p>
-                    <p className="mt-3 text-2xl font-bold" style={{ color: "#5A8A4A" }}>
+                    <p className="mt-3 text-2xl font-bold" style={{ color: "#10b981" }}>
                       {mySummary.completedTasks ?? 0} 개
                     </p>
                   </div>
-                  <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div className="rounded-2xl border px-4 py-4" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
                       My Recent Commits
                     </p>
-                    <p className="mt-3 text-2xl font-bold" style={{ color: "#C09840" }}>
+                    <p className="mt-3 text-2xl font-bold" style={{ color: ACCENT }}>
                       {mySummary.recentCommitsCount ?? 0} 회
                     </p>
                   </div>
@@ -666,7 +666,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
               <div className="space-y-3">
                 {showSkeleton ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="rounded-2xl border px-4 py-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                    <div key={i} className="rounded-2xl border px-4 py-3" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-2 flex-1 pt-1">
                           <Skeleton className="w-3/4 h-3.5" />
@@ -688,7 +688,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                       <div
                         key={schedule.scheduleId}
                         className="rounded-2xl border px-4 py-3"
-                        style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                        style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -757,7 +757,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
               {showSkeleton ? (
                 Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl border px-4 py-4 space-y-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div key={i} className="rounded-2xl border px-4 py-4 space-y-3" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                     <div className="flex justify-between">
                       <Skeleton className="w-16 h-4" />
                       <Skeleton className="w-10 h-4 rounded-full" />
@@ -801,7 +801,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                         onClick={() => handleOpenDeptDetail(item)}
                         className="group rounded-2xl border p-4 flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer relative"
                         style={{
-                          background: "rgba(248,243,225,0.55)",
+                          background: "rgba(247,248,255,0.75)",
                           borderColor: BORDER_SUBTLE,
                         }}
                       >
@@ -910,7 +910,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                   const DeptIcon = meta.icon;
 
                   return (
-                    <div className="px-6 py-5 border-b border-black/5 flex items-center justify-between shrink-0 bg-[#FAF9F5]">
+                    <div className="px-6 py-5 border-b border-black/5 flex items-center justify-between shrink-0 bg-[#F7F8FF]">
                       <div className="flex items-center gap-3">
                         <div
                           className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -1012,12 +1012,12 @@ export function DashboardPage({ projectId, projectName }: Props) {
                         {deptMembers.map((m) => (
                           <div
                             key={m.projectMemberId}
-                            className="p-2.5 rounded-xl border border-black/5 bg-[#FAFAF8] flex items-center justify-between"
+                            className="p-2.5 rounded-xl border border-black/5 bg-[#F7F8FF] flex items-center justify-between"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
                                 className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] text-white shrink-0"
-                                style={{ background: m.role === "LEADER" ? ACCENT : "#6B7A50" }}
+                                style={{ background: m.role === "LEADER" ? ACCENT : "#656B91" }}
                               >
                                 {m.name.slice(0, 1)}
                               </div>
@@ -1029,7 +1029,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                             <span
                               className="text-[9px] font-semibold px-2 py-0.5 rounded-full shrink-0"
                               style={{
-                                background: m.role === "LEADER" ? "rgba(65,67,27,0.12)" : "rgba(0,0,0,0.05)",
+                                background: m.role === "LEADER" ? ACCENT_BG : "rgba(0,0,0,0.05)",
                                 color: m.role === "LEADER" ? ACCENT : "#666",
                               }}
                             >
@@ -1065,7 +1065,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                           return (
                             <div
                               key={s.scheduleId}
-                              className="p-2.5 rounded-xl border border-black/5 bg-[#FAFAF8] flex items-center justify-between gap-3 text-xs"
+                              className="p-2.5 rounded-xl border border-black/5 bg-[#F7F8FF] flex items-center justify-between gap-3 text-xs"
                             >
                               <div className="min-w-0">
                                 <p className="font-semibold text-gray-800 truncate">{s.title}</p>
@@ -1102,7 +1102,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                 </div>
 
                 {/* 모달 푸터 */}
-                <div className="px-6 py-3.5 border-t border-black/5 bg-[#FAF9F5] flex justify-end shrink-0">
+                <div className="px-6 py-3.5 border-t border-black/5 bg-[#F7F8FF] flex justify-end shrink-0">
                   <button
                     onClick={handleCloseDeptDetail}
                     className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
@@ -1129,7 +1129,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
               {showSkeleton ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl border px-4 py-3.5 space-y-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div key={i} className="rounded-2xl border px-4 py-3.5 space-y-3" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                     <div className="flex justify-between">
                       <Skeleton className="w-1/2 h-4" />
                       <Skeleton className="w-12 h-4 rounded-full" />
@@ -1147,7 +1147,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                   <div
                     key={milestone.milestoneId}
                     className="rounded-2xl border p-4 flex flex-col justify-between"
-                    style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                    style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2 mb-2">
@@ -1157,8 +1157,8 @@ export function DashboardPage({ projectId, projectName }: Props) {
                         <span
                           className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
                           style={{
-                            color: milestone.status === "COMPLETED" ? "#5A8A4A" : milestone.status === "IN_PROGRESS" ? ACCENT : "#C09840",
-                            background: milestone.status === "COMPLETED" ? "rgba(90,138,74,0.12)" : milestone.status === "IN_PROGRESS" ? ACCENT_BG : "rgba(192,152,64,0.12)",
+                            color: milestone.status === "COMPLETED" ? "#10b981" : milestone.status === "IN_PROGRESS" ? ACCENT : TEXT_TERTIARY,
+                            background: milestone.status === "COMPLETED" ? "rgba(16,185,129,0.12)" : milestone.status === "IN_PROGRESS" ? ACCENT_BG : "rgba(101,107,145,0.10)",
                           }}
                         >
                           {milestone.status}
@@ -1178,7 +1178,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                       <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all"
-                          style={{ width: `${milestone.progressRate}%`, background: milestone.status === "COMPLETED" ? "#5A8A4A" : ACCENT }}
+                          style={{ width: `${milestone.progressRate}%`, background: milestone.status === "COMPLETED" ? "#10b981" : ACCENT }}
                         />
                       </div>
                       {milestone.dueDate && (
@@ -1208,7 +1208,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
             <div className="space-y-3">
               {showSkeleton ? (
                 Array.from({ length: 2 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl border px-4 py-3" style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}>
+                  <div key={i} className="rounded-2xl border px-4 py-3" style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-2 flex-1 pt-1">
                         <Skeleton className="w-2/3 h-3.5" />
@@ -1227,7 +1227,7 @@ export function DashboardPage({ projectId, projectName }: Props) {
                   <div
                     key={activity.activityId}
                     className="rounded-2xl border px-4 py-3"
-                    style={{ background: "rgba(248,243,225,0.55)", borderColor: BORDER_SUBTLE }}
+                    style={{ background: "rgba(247,248,255,0.75)", borderColor: BORDER_SUBTLE }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
