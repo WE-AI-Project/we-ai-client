@@ -18,10 +18,13 @@ import {
   fetchQaReports,
   fetchQaReportDetail,
   executeBuildTask,
+  fetchProjectChangedFiles,
+  fetchProjectChangedFileDiff,
   type QaReportSummary,
   type QaReportDetail,
   type QaReportStatus,
   type BuildTaskExecutionResponse,
+  type ChangedFileItem,
 } from "../lib/api";
 import {
   loadConnectionConfig,
@@ -53,6 +56,35 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 // ── 타입 ──
 type Severity   = "critical" | "warning" | "passed";
 type QAPhase    = "idle" | "phase1" | "phase2" | "done";
+type QaScope    = "backend" | "frontend" | "ai" | "full";
+
+// ── QA 검사 범위 선택지 ──
+const QA_SCOPE_OPTIONS: { id: QaScope; label: string; shortLabel: string }[] = [
+  { id: "backend",  label: "백엔드만",     shortLabel: "백엔드" },
+  { id: "frontend", label: "프론트엔드만", shortLabel: "프론트엔드" },
+  { id: "ai",       label: "AI 파트만",    shortLabel: "AI 파트" },
+  { id: "full",     label: "전체 검사",    shortLabel: "전체" },
+];
+
+const BACKEND_EXTENSIONS  = new Set(["java", "kt", "kts", "gradle", "sql", "xml", "properties", "py"]);
+const FRONTEND_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "css", "scss", "html", "vue"]);
+const AI_PATH_KEYWORDS = ["/ai/", "\\ai\\", "rag", "debate", "chroma", "ollama", "embedding", "langchain", "llm", "prompt"];
+
+// ── 파일 경로/확장자로 백엔드·프론트엔드·AI 파트 분류 ──
+function classifyFileScope(file: { path: string; ext: string }): Exclude<QaScope, "full"> {
+  const lowerPath = file.path.toLowerCase();
+  if (AI_PATH_KEYWORDS.some((keyword) => lowerPath.includes(keyword))) return "ai";
+  const ext = file.ext.toLowerCase();
+  if (BACKEND_EXTENSIONS.has(ext)) return "backend";
+  if (FRONTEND_EXTENSIONS.has(ext)) return "frontend";
+  // 확장자로 판단이 안 되면 경로 컨벤션으로 보조 판단
+  if (lowerPath.includes("server") || lowerPath.includes("backend")) return "backend";
+  return "frontend";
+}
+
+// QA 대상 파일을 소스(Changes 스테이징 / 이 페이지가 직접 조회한 실시간 변경사항)에 관계없이
+// 동일한 모양으로 다루기 위한 공통 타입.
+type QaSourceFile = { path: string; ext: string; staged: boolean };
 
 type StaticError = {
   id:       string;
@@ -243,11 +275,44 @@ export function AIQAPage({
 
   const isLoading = false;
 
-  // ── 커밋 정보 (Changes 페이지에서 스테이징된 실제 변경 파일을 넘겨받음 - 없으면 QA를 돌릴 대상이 없다) ──
+  // ── 커밋 정보 (Changes 페이지에서 스테이징된 실제 변경 파일을 넘겨받음) ──
   const pendingQA  = getPendingQA();
   const [commitInfo] = useState(pendingQA);
   useEffect(() => { clearPendingQA(); }, []);
-  const hasQaTarget = Boolean(commitInfo?.diffFiles?.length);
+
+  // Changes 페이지를 거치지 않고 AI QA로 바로 들어온 경우에도 항상 실행할 수 있도록, 이 페이지가
+  // 직접 프로젝트의 현재 git 변경사항(staged+unstaged)을 조회한다. Changes에서 넘어온 스테이징
+  // diff가 있으면 그걸 우선 사용하고, 없을 때만 이 실시간 조회 결과를 쓴다.
+  const usingLiveFiles = !commitInfo?.diffFiles?.length;
+  const [liveFiles,        setLiveFiles]        = useState<ChangedFileItem[]>([]);
+  const [liveFilesLoading, setLiveFilesLoading]  = useState(false);
+  const [liveFilesError,   setLiveFilesError]    = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!usingLiveFiles || !projectId) return;
+    let cancelled = false;
+    setLiveFilesLoading(true);
+    setLiveFilesError(null);
+    fetchProjectChangedFiles(projectId)
+      .then((res) => { if (!cancelled) setLiveFiles(res.files); })
+      .catch((err: any) => { if (!cancelled) setLiveFilesError(err?.message || "변경 파일 목록을 불러오지 못했습니다."); })
+      .finally(() => { if (!cancelled) setLiveFilesLoading(false); });
+    return () => { cancelled = true; };
+  }, [usingLiveFiles, projectId]);
+
+  // ── QA 검사 범위 (백엔드만/프론트엔드만/AI 파트만/전체) ──
+  const [qaScope, setQaScope] = useState<QaScope>("full");
+
+  const sourceFiles: QaSourceFile[] = usingLiveFiles
+    ? liveFiles.map((file) => ({ path: file.filePath, ext: file.extension, staged: file.staged }))
+    : (commitInfo!.diffFiles as CommitFile[]).map((file) => ({ path: file.path, ext: file.ext, staged: true }));
+
+  const scopedFiles = qaScope === "full"
+    ? sourceFiles
+    : sourceFiles.filter((file) => classifyFileScope(file) === qaScope);
+
+  const hasQaTarget = sourceFiles.length > 0;
+  const hasScopedTarget = scopedFiles.length > 0;
 
   // ── Phase 1: 정적 분석 (실제 AI QA 백엔드 호출) ──
   const [scanFiles,    setScanFiles]    = useState<string[]>([]);
@@ -305,7 +370,12 @@ export function AIQAPage({
   // ── QA 시작 ──
   const startQA = () => {
     if (!hasQaTarget) {
-      toast.error("먼저 Changes 페이지에서 변경된 파일을 스테이징하고 QA를 요청해 주세요.");
+      toast.error(usingLiveFiles ? "현재 프로젝트에서 감지된 변경 파일이 없습니다." : "먼저 Changes 페이지에서 변경된 파일을 스테이징하고 QA를 요청해 주세요.");
+      return;
+    }
+    if (!hasScopedTarget) {
+      const scopeLabel = QA_SCOPE_OPTIONS.find((option) => option.id === qaScope)?.label ?? qaScope;
+      toast.error(`선택한 범위(${scopeLabel})에 해당하는 변경 파일이 없습니다.`);
       return;
     }
     if (phase !== "idle" && phase !== "done") return;
@@ -334,12 +404,11 @@ export function AIQAPage({
   };
 
   // ── Phase 1: 정적 코드 분석 ──
-  // Changes 페이지에서 실제로 스테이징된 변경 파일(commitInfo.diffFiles)의 diff를 그대로
-  // 백엔드 AI QA(/api/v1/ai/qa)에 보낸다. 분석 대상이 없으면 QA를 시작조차 하지 않는다
-  // (예전에는 데모용 목업 커밋으로 조용히 대체했었다).
+  // Changes 페이지에서 스테이징된 diff가 있으면 그대로 쓰고, 없으면(=Changes를 거치지 않고
+  // 바로 들어온 경우) 선택된 범위(qaScope)에 해당하는 파일들의 diff를 이 페이지가 직접
+  // 조회해서 백엔드 AI QA(/api/v1/ai/qa)에 보낸다. 분석 대상이 없으면 QA를 시작조차 하지 않는다.
   const runPhase1FromApi = async () => {
-    const filesForQa: CommitFile[] = commitInfo?.diffFiles ?? [];
-    const scanTargets = filesForQa.map((file) => file.path);
+    const scanTargets = scopedFiles.map((file) => file.path);
 
     setScanFiles([]);
     setScanCurrent(scanTargets[0] || "");
@@ -367,7 +436,15 @@ export function AIQAPage({
     };
 
     try {
-      const diff = buildDiffFromCommitFiles(filesForQa);
+      const diffSourceFiles = usingLiveFiles
+        ? await Promise.all(scopedFiles.map(async (file) => {
+            const fileDiff = await fetchProjectChangedFileDiff(projectId, file.path, file.staged);
+            return { path: file.path, diff: fileDiff.diffContent };
+          }))
+        : (commitInfo!.diffFiles as CommitFile[]).filter((file) =>
+            scopedFiles.some((scoped) => scoped.path === file.path)
+          );
+      const diff = buildDiffFromCommitFiles(diffSourceFiles);
       const response = await runAiQa({ projectId, diff });
 
       const errors = mapQaResponseToErrors(response, scanTargets);
@@ -543,7 +620,10 @@ export function AIQAPage({
                   {phase === "phase1" ? `파일 스캔 중… ${scanFiles.length}개 완료 · ${elapsedSec}s`
                   : phase === "phase2" ? `자동화 테스트 실행 중… ${elapsedSec}s`
                   : phase === "done"   ? `완료 — 코드 분석 오류 ${criticalCount + warningCount}건 · 테스트 ${testError ? "실행 실패" : testPassed ? "통과" : "실패"} · ${elapsedSec}s`
-                  : hasQaTarget ? "QA를 시작하거나 커밋별 현황을 확인하세요"
+                  : liveFilesLoading ? "변경된 파일을 불러오는 중…"
+                  : liveFilesError ? liveFilesError
+                  : hasQaTarget ? `검사 범위를 고르고 실행하세요 (대상 ${scopedFiles.length}개 파일)`
+                  : usingLiveFiles ? "현재 프로젝트에서 감지된 변경 파일이 없습니다"
                   : "Changes 페이지에서 변경사항을 스테이징하고 QA를 요청하면 여기서 실행됩니다"}
                 </p>
               )}
@@ -563,26 +643,69 @@ export function AIQAPage({
                       <RotateCw className="w-3 h-3" /> 검사 초기화
                     </button>
                   )}
-                  {activeTab === "run" && (
-                    <button
-                      onClick={startQA}
-                      disabled={(phase !== "idle" && phase !== "done") || !hasQaTarget}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
-                      style={{
-                        background: (phase !== "idle" && phase !== "done") || !hasQaTarget ? "rgba(0,0,0,0.07)" : ACCENT,
-                        color:      (phase !== "idle" && phase !== "done") || !hasQaTarget ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
-                        boxShadow:  (phase !== "idle" && phase !== "done") || !hasQaTarget ? "none" : "0 4px 14px rgba(112,130,56,0.25)",
-                        cursor:     (phase !== "idle" && phase !== "done") || !hasQaTarget ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {phase !== "idle" && phase !== "done" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                      {phase !== "idle" && phase !== "done" ? "검사 진행 중…" : "AI QA 전체 검사 실행"}
-                    </button>
-                  )}
+                  {activeTab === "run" && (() => {
+                    const running = phase !== "idle" && phase !== "done";
+                    const runDisabled = running || !hasScopedTarget || liveFilesLoading;
+                    const scopeLabel = QA_SCOPE_OPTIONS.find((option) => option.id === qaScope)?.shortLabel ?? "";
+                    return (
+                      <button
+                        onClick={startQA}
+                        disabled={runDisabled}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all"
+                        style={{
+                          background: runDisabled ? "rgba(0,0,0,0.07)" : ACCENT,
+                          color:      runDisabled ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
+                          boxShadow:  runDisabled ? "none" : "0 4px 14px rgba(112,130,56,0.25)",
+                          cursor:     runDisabled ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                        {running ? "검사 진행 중…" : `${scopeLabel} QA 실행`}
+                      </button>
+                    );
+                  })()}
                 </>
               )}
             </div>
           </div>
+
+          {/* ── QA 검사 범위 선택 (백엔드만 / 프론트엔드만 / AI 파트만 / 전체 검사) ── */}
+          {!isLoading && activeTab === "run" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[9px] font-semibold uppercase tracking-wider shrink-0" style={{ color:TEXT_LABEL }}>검사 범위</span>
+              <div className="flex rounded-xl overflow-hidden p-0.5 gap-0.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
+                {QA_SCOPE_OPTIONS.map((option) => {
+                  const count = option.id === "full"
+                    ? sourceFiles.length
+                    : sourceFiles.filter((file) => classifyFileScope(file) === option.id).length;
+                  const active = qaScope === option.id;
+                  const disabled = phase !== "idle" && phase !== "done";
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => !disabled && setQaScope(option.id)}
+                      disabled={disabled}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                      style={{
+                        background: active ? "rgba(112,130,56,0.10)" : "transparent",
+                        color:      active ? ACCENT : TEXT_SECONDARY,
+                        cursor:     disabled ? "not-allowed" : "pointer",
+                        opacity:    disabled && !active ? 0.5 : 1,
+                      }}
+                    >
+                      {option.label}
+                      <span
+                        className="text-[8px] font-bold px-1 rounded-full"
+                        style={{ background: active ? ACCENT_BG : "rgba(0,0,0,0.06)", color: active ? ACCENT : TEXT_TERTIARY }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── 탭 ── */}
           <div className="flex rounded-xl overflow-hidden p-0.5 gap-0.5" style={{ background:"rgba(255,255,255,0.60)", border:`1px solid ${BORDER}` }}>
