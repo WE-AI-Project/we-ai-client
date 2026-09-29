@@ -19,7 +19,6 @@ import {
   askAiAgent,
   fetchAiAgents,
   runAiChat,
-  runCustomAiDebate,
   runCustomAiDebateStream,
   type AiAgent,
   type AiAgentKey,
