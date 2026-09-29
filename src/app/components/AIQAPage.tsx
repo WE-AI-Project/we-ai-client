@@ -578,8 +578,8 @@ export function AIQAPage({
                       </span>
                     )}
                     {phase === "phase2" && (
-                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background:"rgba(245,158,11,0.10)", color:UI_AMBER }}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" /> PHASE 2 · 자동화 테스트
+                      <span className="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: ACCENT_BG, color: ACCENT }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#5865F2] animate-pulse inline-block" /> PHASE 2 · 자동화 테스트
                       </span>
                     )}
                     {phase === "done" && (
@@ -602,7 +602,7 @@ export function AIQAPage({
               ) : commitInfo ? (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:ACCENT_BG, border:`1px solid ${ACCENT_BORDER}` }}>
-                    <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background:"rgba(112,130,56,0.10)" }}>
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: ACCENT_BG }}>
                       <span className="text-[7px] font-bold" style={{ color:ACCENT }}>{commitInfo.author[0]}</span>
                     </div>
                     <span className="text-[10px] font-semibold" style={{ color:ACCENT }}>{commitInfo.author}</span>
@@ -656,11 +656,11 @@ export function AIQAPage({
                         style={{
                           background: runDisabled ? "rgba(0,0,0,0.07)" : ACCENT,
                           color:      runDisabled ? TEXT_TERTIARY : "rgba(255,255,255,0.95)",
-                          boxShadow:  runDisabled ? "none" : "0 4px 14px rgba(112,130,56,0.25)",
+                          boxShadow:  runDisabled ? "none" : "0 4px 14px rgba(88,101,242,0.25)",
                           cursor:     runDisabled ? "not-allowed" : "pointer",
                         }}
                       >
-                        {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                        {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                         {running ? "검사 진행 중…" : `${scopeLabel} QA 실행`}
                       </button>
                     );
@@ -688,7 +688,7 @@ export function AIQAPage({
                       disabled={disabled}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
                       style={{
-                        background: active ? "rgba(112,130,56,0.10)" : "transparent",
+                        background: active ? ACCENT_BG : "transparent",
                         color:      active ? ACCENT : TEXT_SECONDARY,
                         cursor:     disabled ? "not-allowed" : "pointer",
                         opacity:    disabled && !active ? 0.5 : 1,
@@ -724,9 +724,9 @@ export function AIQAPage({
                 <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
                   style={{
-                    background: activeTab === tab.id ? "rgba(112,130,56,0.08)" : "transparent",
+                    background: activeTab === tab.id ? ACCENT_BG : "transparent",
                     color:      activeTab === tab.id ? ACCENT : TEXT_SECONDARY,
-                    boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(112,130,56,0.12)" : "none",
+                    boxShadow:  activeTab === tab.id ? "0 2px 8px rgba(88,101,242,0.15)" : "none",
                   }}
                 >
                   <tab.icon className="w-3.5 h-3.5" />{tab.label}
@@ -757,7 +757,7 @@ export function AIQAPage({
                   <>
                     <div
                       className="flex items-center gap-2.5 px-4 py-3"
-                      style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}
+                      style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,248,255,0.85)" }}
                     >
                       <div
                         className="w-6 h-6 rounded-lg flex items-center justify-center"
@@ -841,7 +841,7 @@ export function AIQAPage({
 
                     {phase === "idle" && (
                       <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <Code2 className="w-8 h-8" style={{ color:"rgba(112,130,56,0.25)" }} />
+                        <Code2 className="w-8 h-8" style={{ color:"rgba(88,101,242,0.25)" }} />
                         <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>QA 시작 시 파일을 읽고 문법 오류, 런타임 오류를 분석합니다</p>
                       </div>
                     )}
@@ -867,13 +867,13 @@ export function AIQAPage({
                   <>
                     <div
                       className="flex items-center gap-2.5 px-4 py-3"
-                      style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}
+                      style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,248,255,0.85)" }}
                     >
                       <div
                         className="w-6 h-6 rounded-lg flex items-center justify-center"
-                        style={{ background: testRun?.status === "SUCCESS" ? "rgba(16,185,129,0.10)" : (testRun?.status === "FAILED" || testError) ? "rgba(239,68,68,0.10)" : (phase === "phase2" || testRunning) ? "rgba(245,158,11,0.10)" : "rgba(0,0,0,0.05)" }}
+                        style={{ background: testRun?.status === "SUCCESS" ? "rgba(16,185,129,0.10)" : (testRun?.status === "FAILED" || testError) ? "rgba(239,68,68,0.10)" : (phase === "phase2" || testRunning) ? ACCENT_BG : "rgba(0,0,0,0.05)" }}
                       >
-                        {(phase === "phase2" || testRunning) ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color:UI_AMBER }} />
+                        {(phase === "phase2" || testRunning) ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color:ACCENT }} />
                           : testRun?.status === "SUCCESS" ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color:"#10b981" }} />
                           : (testRun?.status === "FAILED" || testError) ? <XCircle className="w-3.5 h-3.5" style={{ color:UI_RED }} />
                           : <Monitor className="w-3.5 h-3.5" style={{ color:TEXT_TERTIARY }} />}
@@ -905,7 +905,7 @@ export function AIQAPage({
                           </div>
                         ) : (phase === "phase2" || testRunning) ? (
                           <div className="flex flex-col items-center justify-center py-8 gap-2">
-                            <Loader2 className="w-6 h-6 animate-spin" style={{ color:UI_AMBER }} />
+                            <Loader2 className="w-6 h-6 animate-spin" style={{ color: ACCENT }} />
                             <p className="text-[11px]" style={{ color:TEXT_SECONDARY }}>
                               {connection.mode === "ssh" ? buildSshTaskCommand(connection.ssh.buildTool, "test") : "test 태스크"} 실행 중… {elapsedSec}s
                             </p>
@@ -948,7 +948,7 @@ export function AIQAPage({
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <Monitor className="w-8 h-8" style={{ color:"rgba(245,158,11,0.30)" }} />
+                        <Monitor className="w-8 h-8" style={{ color: "rgba(88,101,242,0.30)" }} />
                         <p className="text-[11px]" style={{ color:TEXT_TERTIARY }}>
                           {hasQaTarget ? "Phase 1 완료 후 실제 test 태스크가 여기서 실행됩니다" : "Changes 페이지에서 변경사항을 스테이징하고 QA를 요청하면 여기서 실행됩니다"}
                         </p>
@@ -1010,7 +1010,7 @@ export function AIQAPage({
 
                   {/* 커밋 목록 */}
                   <div className="rounded-2xl overflow-hidden" style={{ background:"rgba(255,255,255,0.82)", border:`1px solid ${BORDER}`, backdropFilter:"blur(12px)" }}>
-                    <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,247,245,0.8)" }}>
+                    <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom:`1px solid ${BORDER_SUBTLE}`, background:"rgba(247,248,255,0.85)" }}>
                       <GitCommit className="w-3.5 h-3.5" style={{ color:ACCENT }} />
                       <p className="text-xs font-semibold" style={{ color:TEXT_PRIMARY }}>커밋별 QA 현황</p>
                       <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full" style={{ background:ACCENT_BG, color:ACCENT }}>{filteredCommits.length}</span>
