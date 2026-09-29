@@ -6,6 +6,16 @@ export function genId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+export type BriefingData = {
+  fileName: string;
+  summary: string;
+  points?: string[];
+  actionItems?: string[];
+  risks?: string[];
+  keywords?: string[];
+  documentId?: number;
+};
+
 export type ChatMessage = {
   id:        string;
   sender:    string;
@@ -16,17 +26,25 @@ export type ChatMessage = {
   type:      "text" | "file" | "system" | "briefing";
   fileName?: string;
   fileType?: string;
-  briefing?: { fileName: string; summary: string; points?: string[] };   // type="briefing" 일 때 — AI 브리핑 API 응답 요약
+  fileUrl?:  string;
+  fileSize?: number;
+  briefing?: BriefingData;   // type="briefing" 일 때 — AI 브리핑 API 응답 요약
 };
 
 export type MeetingDoc = {
-  id:        string;
-  title:     string;
-  createdAt: string;
-  summary:   string;
-  messages:  ChatMessage[];
-  tags:      string[];
+  id:          string;
+  title:       string;
+  createdAt:   string;
+  summary:     string;
+  messages:    ChatMessage[];
+  tags:        string[];
   sourceFile?: string;        // 원본 파일명 (AI 분석 결과)
+  documentId?: number;        // 문서 ID (브리핑 재생성 등에 사용)
+  briefingId?: number;
+  actionItems?: string[];
+  risks?:      string[];
+  keywords?:   string[];
+  status?:     string;
 };
 
 const CHAT_KEY = "weai_chat_messages_v1";

@@ -471,9 +471,9 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
             disabled={!form.title?.trim()}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold"
             style={{
-              background: form.title?.trim() ? "linear-gradient(135deg, #708238, #6B7040)" : BEIGE,
-              color: form.title?.trim() ? "rgba(254,252,245,0.95)" : TEXT_TERTIARY,
-              boxShadow: form.title?.trim() ? "0 4px 14px rgba(112,130,56,0.22)" : "none",
+              background: form.title?.trim() ? ACCENT : BEIGE,
+              color: form.title?.trim() ? "#FFFFFF" : TEXT_TERTIARY,
+              boxShadow: form.title?.trim() ? "0 4px 14px rgba(88,101,242,0.25)" : "none",
             }}
           >
             <Save className="w-3.5 h-3.5" />
@@ -797,7 +797,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
   }, [schedules, deptColors]);
 
   const getDeptColor = (dept: string) => {
-    return deptColors[dept as Dept] || { bg: "#F1F2E9", color: "#6B7040", light: "#F1F2E9" };
+    return deptColors[dept as Dept] || { bg: "rgba(88,101,242,0.10)", color: ACCENT, light: "rgba(88,101,242,0.05)" };
   };
 
   const handleDeptColorChange = (dept: string, color: { bg: string; color: string }) => {
@@ -821,7 +821,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
         {/* ══ 왼쪽: 사이드 패널 ══ */}
         <div
           className="relative flex flex-col shrink-0 overflow-hidden"
-          style={{ width: schedulePanelWidth, borderRight: `1px solid ${BORDER}`, background: `rgba(254,252,245,0.92)` }}
+          style={{ width: schedulePanelWidth, borderRight: `1px solid ${BORDER}`, background: "rgba(255,255,255,0.92)" }}
         >
           <div
             className="flex items-center gap-2 px-4 py-3 shrink-0"
@@ -901,9 +901,9 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
             ) : (
               <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { id: "todo" as const, label: "예정", value: stats.todo, color: "#898989" },
-                  { id: "in-progress" as const, label: "진행", value: stats.inProgress, color: "#f1cc9c" },
-                  { id: "done" as const, label: "완료", value: stats.done, color: "#809678" },
+                  { id: "todo" as const, label: "예정", value: stats.todo, color: "#767DA6" },
+                  { id: "in-progress" as const, label: "진행", value: stats.inProgress, color: ACCENT },
+                  { id: "done" as const, label: "완료", value: stats.done, color: "#10b981" },
                 ].map(s => {
                   const isSelected = statusFilter === s.id;
                   return (
@@ -1083,7 +1083,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               onClick={() => setEditSchedule("new")}
               disabled={isLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all ml-2 disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #708238, #6B7040)", color: "rgba(254,252,245,0.95)", boxShadow: "0 4px 12px rgba(112,130,56,0.22)" }}
+              style={{ background: ACCENT, color: "#FFFFFF", boxShadow: "0 4px 12px rgba(88,101,242,0.25)" }}
             >
               <Plus className="w-3.5 h-3.5" /> 일정 추가
             </button>
@@ -1097,7 +1097,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                 <div
                   key={d}
                   className="text-center py-1.5 text-[10px] font-semibold"
-                  style={{ color: i === 0 ? "#B85450" : i === 6 ? "#6B7A50" : TEXT_LABEL }}
+                  style={{ color: i === 0 ? "#ef4444" : i === 6 ? "#3b82f6" : TEXT_LABEL }}
                 >
                   {d}
                 </div>
@@ -1152,7 +1152,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                       onClick={() => isValid && setSelectedDay(isSel ? null : ds)}
                       className="relative p-1 transition-all overflow-hidden flex flex-col"
                       style={{
-                        background: !isValid ? `rgba(254,252,245,0.45)` : BRIGHT_BEIGE,
+                        background: !isValid ? "rgba(0,0,0,0.02)" : BRIGHT_BEIGE,
                         cursor: isValid ? "pointer" : "default",
                         height: "100%",
                         minHeight: 0,
@@ -1166,7 +1166,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                             <span
                               className="text-[11px] font-semibold w-6 h-6 flex items-center justify-center rounded-full"
                               style={{
-                                color: isToday ? "rgba(254,252,245,0.98)" : isSun ? "#B85450" : isSat ? "#6B7A50" : TEXT_PRIMARY,
+                                color: isToday ? "#FFFFFF" : isSun ? "#ef4444" : isSat ? "#3b82f6" : TEXT_PRIMARY,
                                 background: isToday ? ACCENT : "transparent",
                               }}
                             >

@@ -201,7 +201,7 @@ export function QAReportsPage({ projectId }: { projectId: number }) {
           {/* ── 이슈 목록 ── */}
           <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.78)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
             {/* 이슈 목록 헤더 + 필터 */}
-            <div className="px-4 py-3 flex items-center justify-between shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,247,245,0.8)" }}>
+            <div className="px-4 py-3 flex items-center justify-between shrink-0" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}`, background: "rgba(247,248,255,0.85)" }}>
               {isLoading ? (
                 <Skeleton className="h-4 w-20" />
               ) : (

@@ -452,8 +452,28 @@ export type ChatMessageResponse = {
   chatRoomId: number;
   senderId: number;
   senderName: string;
+  senderProfileImageUrl?: string | null;
   content: string;
   messageType: string;
+  fileUrl?: string | null;
+  originalFileName?: string | null;
+  fileSize?: number | null;
+  fileContentType?: string | null;
+  isMine?: boolean;
+  createdAt: string;
+};
+
+export type ChatFileUploadResponse = {
+  messageId: number;
+  chatRoomId: number;
+  senderId: number;
+  senderName: string;
+  messageType: string;
+  content?: string | null;
+  fileUrl: string;
+  originalFileName: string;
+  fileSize: number;
+  fileContentType?: string | null;
   createdAt: string;
 };
 
@@ -481,6 +501,26 @@ export async function sendChatMessage(  //채팅 메시지 전송
     method: "POST",
     body: { content },
   });
+}
+
+export async function uploadChatFile(  //채팅 파일 업로드
+  projectId: number | string,
+  chatRoomId: number | string,
+  file: File,
+  content?: string
+): Promise<ChatFileUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (content) {
+    formData.append("content", content);
+  }
+  return request<ChatFileUploadResponse>(
+    `/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/files`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
 }
 
 export type Department = {
@@ -578,7 +618,7 @@ export async function uploadChatDocument(  //채팅 문서 업로드
 
 export async function createDocumentBriefing(  //문서 브리핑 생성
   projectId: number | string,
-  documentId: number
+  documentId: number | string
 ): Promise<DocumentBriefingResponse> {
   return request<DocumentBriefingResponse>(`/api/v1/projects/${projectId}/chat/documents/${documentId}/briefing`, {
     method: "POST",

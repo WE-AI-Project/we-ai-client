@@ -12,7 +12,7 @@ import type { ProjectStackDetection } from "../lib/api";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
-  ACCENT, ACCENT_BG,
+  ACCENT, ACCENT_BG, ACCENT_MID,
   BRIGHT_BEIGE,
   TERM_BG, TERM_TEXT, TERM_MUTED, TERM_GREEN, TERM_DIM, TERM_RED, BTN_DARK, UI_RED, UI_AMBER,
 } from "../colors";
@@ -321,24 +321,24 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
           <div
             className="flex items-center gap-3 px-4 py-3 rounded-2xl border"
             style={{
-              background: "#DCFCE7",
-              borderColor: "#86EFAC",
-              boxShadow: "0 4px 14px rgba(22, 163, 74, 0.12)",
+              background: "rgba(88,101,242,0.06)",
+              borderColor: "rgba(88,101,242,0.18)",
+              boxShadow: "0 4px 14px rgba(88,101,242,0.06)",
             }}
           >
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#BBF7D0" }}>
-              <ShieldCheck className="w-4 h-4" style={{ color: "#15803D" }} />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(88,101,242,0.12)" }}>
+              <ShieldCheck className="w-4 h-4" style={{ color: ACCENT }} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold" style={{ color: "#14532D" }}>
+                <span className="text-[11px] font-bold" style={{ color: TEXT_PRIMARY }}>
                   🔒 실제 로컬 .env 파일을 직접 읽고 씁니다
                 </span>
-                <span className="text-[8px] font-semibold px-1.5 py-0.2 rounded" style={{ background: "#86EFAC", color: "#14532D" }}>
+                <span className="text-[8px] font-semibold px-1.5 py-0.2 rounded" style={{ background: ACCENT_BG, color: ACCENT }}>
                   서버 전송 없음
                 </span>
               </div>
-              <p className="text-[10px] mt-0.5 leading-normal font-mono truncate" style={{ color: "#166534" }} title={filePath}>
+              <p className="text-[10px] mt-0.5 leading-normal font-mono truncate" style={{ color: TEXT_TERTIARY }} title={filePath}>
                 {filePath || "프로젝트 로컬 경로 미설정"}
                 {usedExample && " (실제 .env 없음 — .env.example 기반으로 표시 중, 저장 시 새로 생성됩니다)"}
               </p>
@@ -370,13 +370,13 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
                   onClick={() => setShowEnvFile(true)}
                   disabled={loading}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50"
-                  style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+                  style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
                 >
                   <FileText className="w-3 h-3" /> .env 미리보기
                 </button>
                 <label
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer"
-                  style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+                  style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
                 >
                   <Upload className="w-3 h-3" /> 다른 파일 불러오기
                   <input type="file" accept=".env,text/plain" className="hidden" onChange={handleFileUpload} />
@@ -385,7 +385,7 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
                   onClick={loadReal}
                   disabled={loading}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50"
-                  style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
+                  style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}`, color: TEXT_SECONDARY }}
                 >
                   <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} /> 다시 불러오기
                 </button>
@@ -425,7 +425,7 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
           ) : (
             <>
               {/* ── Runtime Environment (실제 감지값) ── */}
-              <div className="rounded-2xl p-4" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+              <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
                 <div className="flex items-center gap-2 mb-3">
                   <RefreshCw className="w-3.5 h-3.5" style={{ color: ACCENT }} />
                   <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>Runtime Environment</p>
@@ -439,7 +439,7 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
                     <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>감지 중...</p>
                   ) : (
                     runtimeRows.map(r => (
-                      <div key={r.label} className="flex items-start justify-between gap-2">
+                       <div key={r.label} className="flex items-start justify-between gap-2">
                         <span className="text-[10px] shrink-0" style={{ color: TEXT_LABEL }}>{r.label}</span>
                         <div className="flex items-center gap-1 min-w-0">
                           <span className="text-[10px] font-mono truncate text-right" style={{ color: TEXT_PRIMARY }}>{r.value}</span>
@@ -452,13 +452,13 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
               </div>
 
               {/* ── 환경 변수 테이블 ── */}
-              <div className="rounded-2xl overflow-hidden flex flex-col" style={{ background: "rgba(248,243,225,0.80)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
+              <div className="rounded-2xl overflow-hidden flex flex-col" style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${BORDER}`, backdropFilter: "blur(12px)" }}>
                 <div
                   className="grid px-4 py-2.5 text-[10px] font-semibold shrink-0"
                   style={{
                     gridTemplateColumns: "220px 1fr 180px 40px",
                     borderBottom: `1px solid ${BORDER}`,
-                    background: "rgba(237,232,210,0.8)",
+                    background: "rgba(243,244,255,0.85)",
                     color: TEXT_LABEL,
                   }}
                 >
@@ -492,7 +492,7 @@ export function EnvironmentSettingsPage({ localPath }: EnvironmentSettingsPagePr
                           >
                             <div className="flex items-center gap-1.5 min-w-0 pr-2">
                               {isSecret && (
-                                <span className="text-[8px] font-semibold px-1 py-0.5 rounded shrink-0" style={{ background: "rgba(245,158,11,0.10)", color: "#d97706" }}>
+                                <span className="text-[8px] font-semibold px-1 py-0.5 rounded shrink-0" style={{ background: "rgba(236,72,189,0.10)", color: ACCENT_MID }}>
                                   SECRET
                                 </span>
                               )}
