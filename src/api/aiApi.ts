@@ -1,4 +1,4 @@
-import { ApiError, request } from "../app/lib/api";
+import { ApiError, request, loadSession, buildApiUrl } from "../app/lib/api";
 import { callCustomEndpointIfEnabled } from "../app/lib/customEndpoint";
 
 export type DebateTurn = {
@@ -284,4 +284,122 @@ export async function runCustomAiDebate(request: CustomDebateRequest): Promise<D
     },
   });
 }
-
+
+export type DebateStreamStart = {
+  projectId: number;
+  ragContextCount: number;
+  agents: AiAgentKey[];
+  maxRounds: number;
+};
+
+export type DebateStreamHandlers = {
+  onStart?: (info: DebateStreamStart) => void;
+  onTurn: (turn: DebateTurn) => void;
+  onDone: (response: DebateResponse) => void;
+  onError?: (message: string) => void;
+};
+
+// /debate/custom(한 번에 통째로 응답)은 라운드 x 에이전트 수만큼 Ollama 호출이 누적되어
+// Cloudflare/브라우저 게이트웨이 타임아웃을 넘기기 쉽다. 이 함수는 같은 토론을 SSE로 받아서
+// 에이전트가 응답할 때마다 즉시 콜백을 호출한다 - 타임아웃 회피 + 실시간 대화형 표시 둘 다 해결.
+// fetch의 ReadableStream을 직접 파싱한다 (EventSource는 POST/커스텀 Authorization 헤더를
+// 지원하지 않아서 여기서는 쓸 수 없다).
+export async function runCustomAiDebateStream(
+  request: CustomDebateRequest,
+  handlers: DebateStreamHandlers
+): Promise<void> {
+  const session = loadSession();
+  const response = await fetch(buildApiUrl("/api/v1/ai/debate/stream"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream",
+      ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+    },
+    body: JSON.stringify({
+      context: {
+        ...request.context,
+        projectId: resolveProjectId(request.context.projectId),
+      },
+      agents: request.agents,
+      maxRounds: request.maxRounds,
+    }),
+  });
+
+  if (!response.ok || !response.body) {
+    let message = `AI 토론 스트림 요청이 실패했습니다 (${response.status}).`;
+    try {
+      const payload = await response.json();
+      if (payload?.message) message = payload.message;
+    } catch {
+      // 응답 본문이 JSON이 아니면 기본 메시지를 그대로 사용한다.
+    }
+    throw new AiApiError(message, response.status, "AI_DEBATE_STREAM_FAILED");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const dispatch = (eventName: string, dataStr: string) => {
+    if (!dataStr) return;
+    let parsed: any;
+    try {
+      parsed = JSON.parse(dataStr);
+    } catch {
+      parsed = dataStr;
+    }
+    if (eventName === "start") handlers.onStart?.(parsed);
+    else if (eventName === "turn") handlers.onTurn(parsed);
+    else if (eventName === "done") handlers.onDone(parsed);
+    else if (eventName === "error") {
+      handlers.onError?.(typeof parsed === "string" ? parsed : (parsed?.message ?? "AI 토론 중 오류가 발생했습니다."));
+    }
+  };
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let separatorIndex: number;
+    while ((separatorIndex = buffer.indexOf("\n\n")) !== -1) {
+      const rawEvent = buffer.slice(0, separatorIndex);
+      buffer = buffer.slice(separatorIndex + 2);
+      if (!rawEvent.trim()) continue;
+
+      let eventName = "message";
+      const dataLines: string[] = [];
+      for (const line of rawEvent.split("\n")) {
+        if (line.startsWith("event:")) eventName = line.slice(6).trim();
+        else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+      }
+      dispatch(eventName, dataLines.join("\n"));
+    }
+  }
+}
+
+// 🟢 이 줄을 추가해 주세요! (구글, 카카오, 네이버만 들어올 수 있다고 못 박아두는 역할입니다)
+export type SocialProvider = "google" | "kakao" | "naver";
+/**
+ * 소셜 로그인(Kakao, Naver, Google) 인증 URL을 백엔드에서 받아옵니다.
+ */
+export async function fetchSocialLoginUrl(
+  provider: SocialProvider
+): Promise<{ authorizationUrl: string }> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+  const response = await fetch(`${baseUrl}/api/v1/auth/${provider}/url`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`${provider} 로그인 주소를 가져오는 데 실패했습니다.`);
+  }
+
+  const json = await response.json();
+  return json?.data ?? json;
+}
+

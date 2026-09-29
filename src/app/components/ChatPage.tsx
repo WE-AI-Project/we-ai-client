@@ -20,10 +20,12 @@ import {
   fetchAiAgents,
   runAiChat,
   runCustomAiDebate,
+  runCustomAiDebateStream,
   type AiAgent,
   type AiAgentKey,
   type AiChatResponse,
   type DebateResponse,
+  type DebateTurn,
   type SingleAgentResponse,
   type ThinkingLevel,
 } from "../../api/aiApi";
@@ -155,6 +157,7 @@ function BriefingLoadingBubble({ fileName }: { fileName: string }) {
 }
 
 type AIResponseKind = "text" | "rag" | "agent" | "debate";
+type AiMode = "rag" | "agent" | "debate";
 interface AIMsg {
   id: string;
   role: "user" | "ai";
@@ -217,17 +220,11 @@ const THINKING_LEVEL_OPTIONS: { value: ThinkingLevel; label: string; description
 ];
 
 function formatSingleAgentAnswer(response: SingleAgentResponse) {
-  const warning = (response.ragContexts?.length ?? 0) === 0
-    ? "주의: 충분한 프로젝트의 표본이 없습니다.\n\n"
-    : "";
-  return `${warning}${compactAiAnswer(response.answer)}`;
+  return compactAiAnswer(response.answer);
 }
 
 function formatDebateSummary(response: DebateResponse) {
-  const warning = (response.ragContexts?.length ?? 0) === 0
-    ? "주의: 충분한 표본이 없습니다. · "
-    : "";
-  return `${warning}선택한 에이전트 심층 분석 세션 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 단계`;
+  return `선택한 에이전트 심층 분석 세션 완료 · ${response.executedRounds ?? 0}/${response.maxRounds ?? 0} 단계`;
 }
 
 const DEFAULT_AI_AGENTS: AiAgent[] = [
@@ -587,9 +584,23 @@ export function ChatPage({
   const [micOn, setMicOn] = useState(false);
 
   const [typing, setTyping] = useState(false);
-  const [aiTyping, setAITyping] = useState(false);
-  const [aiMessages, setAIMessages] = useState<AIMsg[]>([]);
-  const [aiMode, setAiMode] = useState<"rag" | "agent" | "debate">("rag");
+  // RAG 질문 / 단일 AI 대화 / AI 토론을 각자 독립된 채팅방처럼 분리한다 - 모드를 전환해도
+  // 다른 모드의 대화 내역과 섞이지 않고, 각자 자기 히스토리와 타이핑 상태를 유지한다.
+  const [aiMessagesByMode, setAiMessagesByMode] = useState<Record<AiMode, AIMsg[]>>({ rag: [], agent: [], debate: [] });
+  const [aiTypingByMode, setAiTypingByMode] = useState<Record<AiMode, boolean>>({ rag: false, agent: false, debate: false });
+  const [aiMode, setAiMode] = useState<AiMode>("rag");
+  const aiMessages = aiMessagesByMode[aiMode];
+  const aiTyping = aiTypingByMode[aiMode];
+
+  const appendAiMessage = useCallback((mode: AiMode, msg: AIMsg) => {
+    setAiMessagesByMode(prev => ({ ...prev, [mode]: [...prev[mode], msg] }));
+  }, []);
+  const updateAiMessage = useCallback((mode: AiMode, id: string, updater: (msg: AIMsg) => AIMsg) => {
+    setAiMessagesByMode(prev => ({ ...prev, [mode]: prev[mode].map(m => (m.id === id ? updater(m) : m)) }));
+  }, []);
+  const setTypingForMode = useCallback((mode: AiMode, value: boolean) => {
+    setAiTypingByMode(prev => ({ ...prev, [mode]: value }));
+  }, []);
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [selectedAgents, setSelectedAgents] = useState<AiAgentKey[]>(["ORACLE", "BACKEND"]);
   const [singleAgent, setSingleAgent] = useState<AiAgentKey>("ORACLE");
@@ -666,7 +677,7 @@ export function ChatPage({
   }, [projectId, activeRoomId]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [serverMessages, localMessages, activeRoomId]);
-  useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages]);
+  useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages, aiMode]);
 
   useEffect(() => {
     if (isMeeting) {
@@ -827,32 +838,98 @@ export function ChatPage({
   };
 
   const sendAiQuestion = async (text: string) => {
+    const targetMode = aiMode;
     const userMsg: AIMsg = { id: genId(), role: "user", content: text, time: new Date().toISOString() };
-    setAIMessages(prev => [...prev, userMsg]);
-    setAITyping(true);
+    appendAiMessage(targetMode, userMsg);
+    setTypingForMode(targetMode, true);
+
+    if (targetMode === "debate") {
+      if (selectedAgents.length === 0) {
+        setTypingForMode(targetMode, false);
+        toast.error("토론에 참여할 에이전트를 한 명 이상 선택해 주세요.");
+        return;
+      }
+      void streamAiDebate(text);
+      return;
+    }
 
     try {
       let aiMsg: AIMsg;
-      if (aiMode === "rag") {
+      if (targetMode === "rag") {
         const response = await runAiChat({ projectId, question: text, level: thinkingLevel });
         aiMsg = { id: genId(), role: "ai", content: formatAiChatAnswer(response), time: new Date().toISOString(), kind: "rag", data: response };
-      } else if (aiMode === "agent") {
+      } else {
         const response = await askAiAgent(singleAgent, buildEditorContext(projectId, text, thinkingLevel));
         aiMsg = { id: genId(), role: "ai", content: formatSingleAgentAnswer(response), time: new Date().toISOString(), kind: "agent", data: response };
-      } else {
-        if (selectedAgents.length === 0) throw new Error("토론에 참여할 에이전트를 한 명 이상 선택해 주세요.");
-        const response = await runCustomAiDebate({
-          context: buildEditorContext(projectId, text, thinkingLevel),
-          agents: selectedAgents,
-          maxRounds,
-        });
-        aiMsg = { id: genId(), role: "ai", content: formatDebateSummary(response), time: new Date().toISOString(), kind: "debate", data: response };
       }
-      setAIMessages(prev => [...prev, aiMsg]);
+      appendAiMessage(targetMode, aiMsg);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "AI 채팅 요청에 실패했습니다.");
     } finally {
-      setAITyping(false);
+      setTypingForMode(targetMode, false);
+    }
+  };
+
+  // ── AI 토론을 SSE로 스트리밍하면서, 에이전트가 응답할 때마다 실시간으로 대화창에 반영한다 ──
+  // (한 번에 통째로 기다리는 runCustomAiDebate 대신 이걸 쓰면 여러 라운드짜리 토론도 게이트웨이
+  // 타임아웃 없이 끝까지 진행되고, 사용자에게는 AI들이 실제로 대화하는 것처럼 보인다.)
+  const streamAiDebate = async (text: string) => {
+    const debateMsgId = genId();
+    const turns: DebateTurn[] = [];
+    let receivedAnyEvent = false;
+
+    appendAiMessage("debate", {
+      id: debateMsgId,
+      role: "ai",
+      content: "AI 에이전트들이 토론을 시작합니다…",
+      time: new Date().toISOString(),
+      kind: "debate",
+      data: { turns: [], ragContexts: [], executedRounds: 0, maxRounds },
+    });
+
+    const updateDebateMsg = (content: string, dataPatch: Record<string, unknown>) => {
+      updateAiMessage("debate", debateMsgId, msg => ({ ...msg, content, data: { ...msg.data, ...dataPatch } }));
+    };
+
+    try {
+      await runCustomAiDebateStream(
+        {
+          context: buildEditorContext(projectId, text, thinkingLevel),
+          agents: selectedAgents,
+          maxRounds,
+        },
+        {
+          onStart: (info) => {
+            receivedAnyEvent = true;
+            setTypingForMode("debate", false);
+            updateDebateMsg(`${info.agents.length}명의 AI가 토론 중입니다…`, { maxRounds: info.maxRounds });
+          },
+          onTurn: (turn) => {
+            receivedAnyEvent = true;
+            setTypingForMode("debate", false);
+            turns.push(turn);
+            updateDebateMsg(
+              `${turn.agent}이(가) 방금 의견을 냈습니다 · 지금까지 ${turns.length}개 응답`,
+              { turns: [...turns], executedRounds: turn.round }
+            );
+          },
+          onDone: (response) => {
+            updateAiMessage("debate", debateMsgId, msg => ({ ...msg, content: formatDebateSummary(response), data: response }));
+          },
+          onError: (message) => {
+            updateDebateMsg(`토론 중 오류가 발생했습니다: ${message}`, {});
+            toast.error(message);
+          },
+        }
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI 토론 요청에 실패했습니다.";
+      if (!receivedAnyEvent) {
+        updateDebateMsg(`토론을 시작하지 못했습니다: ${message}`, {});
+      }
+      toast.error(message);
+    } finally {
+      setTypingForMode("debate", false);
     }
   };
 
