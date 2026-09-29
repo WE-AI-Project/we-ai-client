@@ -1800,6 +1800,29 @@ export type ProjectGitChangeResult = {
   unstagedFiles: Array<{ path: string; status: string; staged: boolean; unstaged: boolean }>;
 };
 
+// ── SmartCommit (Syn Add / Syn Commit) - replaces the old local-git "Changed Files" API above for
+// screens that only need "what's staged and its diff", since the backend no longer runs a real git
+// checkout on the server. ──
+export type SmartCommitPendingItem = {
+  filePath: string;
+  diffContent: string;
+  updatedAt: string;
+};
+
+export type SmartCommitPendingList = {
+  projectId: number;
+  files: SmartCommitPendingItem[];
+};
+
+export async function fetchSmartCommitPending(
+  projectId: number | string,
+  baseUrlOverride?: string
+): Promise<SmartCommitPendingList> {
+  const path = `/api/v1/smart-commit/${projectId}/pending`;
+  if (baseUrlOverride) return requestFrom<SmartCommitPendingList>(baseUrlOverride, path, { method: "GET" });
+  return request<SmartCommitPendingList>(path, { method: "GET" });
+}
+
 export async function fetchProjectChangedFiles(
   projectId: number | string,
   baseUrlOverride?: string
