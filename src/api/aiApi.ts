@@ -284,28 +284,4 @@ export async function runCustomAiDebate(request: CustomDebateRequest): Promise<D
     },
   });
 }
-
-
-// 🟢 이 줄을 추가해 주세요! (구글, 카카오, 네이버만 들어올 수 있다고 못 박아두는 역할입니다)
-export type SocialProvider = "google" | "kakao" | "naver";
-/**
- * 소셜 로그인(Kakao, Naver, Google) 인증 URL을 백엔드에서 받아옵니다.
- */
-export async function fetchSocialLoginUrl(
-  provider: SocialProvider
-): Promise<{ authorizationUrl: string }> {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-  const response = await fetch(`${baseUrl}/api/v1/auth/${provider}/url`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`${provider} 로그인 주소를 가져오는 데 실패했습니다.`);
-  }
-
-  const json = await response.json();
-  return json?.data ?? json;
-}
+
