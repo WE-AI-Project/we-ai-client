@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, ChevronDown, ChevronUp,
@@ -136,7 +136,7 @@ function TypedText({ text, speed = 18 }: { text: string; speed?: number }) {
 // 메인 컴포넌트
 // ─────────────────────────────────────────────────────────────
 export function AICommitGenerator({
-  projectId = 0,
+  projectId: rawProjectId = 0,
   stagedFiles,
   onApply,
 }: {
@@ -144,6 +144,7 @@ export function AICommitGenerator({
   stagedFiles:  CommitFile[];
   onApply:      (msg: string) => void;
 }) {
+  const projectId = rawProjectId ?? 0;
   const [open,       setOpen]       = useState(false);
   const [loading,    setLoading]    = useState(false);
   const [messages,   setMessages]   = useState<GeneratedMsg[]>([]);

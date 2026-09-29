@@ -368,12 +368,13 @@ function parseUnifiedDiff(rawDiff: string) {
 }
 
 export function ChangesPage({
-  projectId = 0,
+  projectId: rawProjectId = 0,
   onNavigateQA,
 }: {
   projectId?: number | null;
   onNavigateQA?: () => void;
 }) {
+  const projectId = rawProjectId ?? 0;
   const [isLoading, setIsLoading] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [repoType, setRepoType] = useState<ProjectRepositoryType>("BACKEND");

@@ -540,7 +540,7 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
 // 메인 ChatPage
 // ══════════════════════════════════════════════════════════
 export function ChatPage({
-  projectId = 0,
+  projectId: rawProjectId = 0,
   currentUserId,
   onDocsUpdate,
   onUnreadUpdate: _onUnreadUpdate,
@@ -550,6 +550,7 @@ export function ChatPage({
   onDocsUpdate?: (count: number) => void;
   onUnreadUpdate?: (count: number | ((prev: number) => number)) => void;
 }) {
+  const projectId = rawProjectId ?? 0;
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [serverMessages, setServerMessages] = useState<ChatMessageResponse[]>([]);
