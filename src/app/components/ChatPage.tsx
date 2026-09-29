@@ -12,6 +12,16 @@ import {
   ChatMessage, MeetingDoc, BriefingData,
   buildMeetingTranscript, formatTime, formatDate, genId,
 } from "../data/chatStore";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 import { briefingSummaryToMeetingDoc, meetingMinuteSummaryToMeetingDoc } from "../lib/docMappers";
 import { subscribeToRoom } from "../lib/chatSocket";
@@ -77,9 +87,21 @@ function normalizeChatRoomName(name: string) {
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
-      className={`animate-pulse rounded-md ${className || ""}`}
-      style={{ background: "rgba(88,101,242,0.16)", ...style }}
+      className={`animate-pulse rounded-lg ${className || ""}`}
+      style={{ background: "rgba(88,101,242,0.14)", ...style }}
     />
+  );
+}
+
+function ActionTooltip({ label }: { label: string }) {
+  return (
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md px-2 py-1 text-[9px] font-semibold opacity-0 shadow-md transition-opacity group-hover:opacity-100"
+      style={{ background: TEXT_PRIMARY, color: "#FFFFFF" }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -905,6 +927,7 @@ export function ChatPage({
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [isLoadingDepts, setIsLoadingDepts] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
   const [docs, setDocs] = useState<MeetingDoc[]>([]);
@@ -1167,7 +1190,7 @@ export function ChatPage({
     ? chatRooms.find(r => r.chatRoomId === activeRoomId)
     : undefined;
   const currentMemberRole = projectMembers.find((member) => member.userId === currentUserId)?.role;
-  const canLeaveChatRoom = currentMemberRole === "MEMBER" && Boolean(activeRoom);
+  const canLeaveChatRoom = (currentMemberRole === "MEMBER" || currentMemberRole === "LEADER") && Boolean(activeRoom);
   const canDeleteChatRoom = currentMemberRole === "LEADER" && Boolean(activeRoom);
 
   const addLocalMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
@@ -1518,6 +1541,26 @@ export function ChatPage({
         />
       )}
 
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>채팅방을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {activeRoom?.name ? `‘${activeRoom.name}’ 채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다.` : "채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => toast.info("채팅방 삭제 API 연동 후 삭제가 완료됩니다.")}
+              style={{ background: UI_RED, color: "#FFFFFF" }}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* 채팅방 생성 모달 */}
       {isCreateModalOpen && (
         <div
@@ -1693,10 +1736,10 @@ export function ChatPage({
         >
           <div className="flex items-center gap-0.5 mr-3">
             {isLoadingRooms ? (
-              <div className="flex items-center gap-2">
-                <Skeleton className="w-16 h-7 rounded-lg" />
-                <Skeleton className="w-16 h-7 rounded-lg" />
-                <Skeleton className="w-20 h-7 rounded-lg" />
+              <div className="flex items-center gap-1.5">
+                <Skeleton className="w-16 h-7" />
+                <Skeleton className="w-14 h-7" />
+                <Skeleton className="w-20 h-7" />
               </div>
             ) : (
               [
@@ -1793,43 +1836,51 @@ export function ChatPage({
               )}
 
               {canLeaveChatRoom && (
-                <button
-                  type="button"
-                  title="채팅방 나가기"
-                  aria-label="채팅방 나가기"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
-                  style={{
-                    background: "rgba(184,84,80,0.08)",
-                    color: "#B85450",
-                    border: "1px solid rgba(184,84,80,0.18)",
-                  }}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </button>
+                <div className="relative group shrink-0">
+                  <button
+                    type="button"
+                    aria-label="채팅방 나가기"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                    style={{
+                      background: "rgba(184,84,80,0.08)",
+                      color: "#B85450",
+                      border: "1px solid rgba(184,84,80,0.18)",
+                    }}
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                  </button>
+                  <ActionTooltip label="채팅방 나가기" />
+                </div>
               )}
 
               {canDeleteChatRoom && (
-                <button
-                  type="button"
-                  title="채팅방 삭제"
-                  aria-label="채팅방 삭제"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-red-50"
-                  style={{
-                    background: "rgba(184,84,80,0.08)",
-                    color: "#B85450",
-                    border: "1px solid rgba(184,84,80,0.18)",
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="relative group shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    aria-label="채팅방 삭제"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:bg-red-50"
+                    style={{
+                      background: "rgba(184,84,80,0.08)",
+                      color: "#B85450",
+                      border: "1px solid rgba(184,84,80,0.18)",
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <ActionTooltip label="채팅방 삭제" />
+                </div>
               )}
 
               {/* 2. [중앙] 채팅방 목록 (가로 스크롤 영역) */}
               <div className="flex-1 flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
                 {isLoadingRooms ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="w-20 h-6 rounded-lg shrink-0" />
-                  ))
+                  <>
+                    <Skeleton className="w-7 h-7 shrink-0" />
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className={`${i === 0 ? "w-24" : "w-20"} h-7 shrink-0`} />
+                    ))}
+                  </>
                 ) : (
                   <>
                     {/* 방 목록 렌더링 */}
@@ -1864,7 +1915,13 @@ export function ChatPage({
               </div>
 
               {/* 3. [맨 오른쪽] 팀원 목록 (4명 제한 + 마우스 호버 시 팝업) */}
-              {!isLoadingRooms && (() => {
+              {isLoadingRooms ? (
+                <div className="shrink-0 flex items-center -space-x-1.5 pl-2.5 border-l border-black/10">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="w-6 h-6 rounded-full ring-2 ring-white" />
+                  ))}
+                </div>
+              ) : (() => {
                 const displayMembers = projectMembers || [];
                 const visibleMembers = displayMembers.slice(0, 4);
                 const remainingCount = displayMembers.length - 4;
@@ -1935,13 +1992,20 @@ export function ChatPage({
 
             <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
               {isLoadingMessages ? (
-                <div className="space-y-4">
+                <div className="space-y-5 py-1">
                   {Array.from({ length: 4 }).map((_, i) => {
                     const isMe = i % 2 !== 0;
                     return (
                       <div key={i} className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} items-end`}>
-                        {!isMe && <Skeleton className="w-7 h-7 rounded-full shrink-0" />}
-                        <Skeleton className={`h-12 rounded-2xl ${isMe ? "w-48" : "w-64"}`} />
+                        {!isMe && <Skeleton className="w-7 h-7 rounded-full shrink-0 mb-1" />}
+                        <div className={`flex flex-col gap-1.5 ${isMe ? "items-end" : "items-start"}`}>
+                          {!isMe && <Skeleton className="w-14 h-2" />}
+                          <div className={`rounded-2xl px-3 py-3 space-y-2 ${isMe ? "w-48" : "w-64"}`} style={{ background: "rgba(88,101,242,0.10)" }}>
+                            <Skeleton className={isMe ? "w-28 h-2.5" : "w-40 h-2.5"} />
+                            <Skeleton className={isMe ? "w-20 h-2.5" : "w-28 h-2.5"} />
+                          </div>
+                          <Skeleton className="w-8 h-2" />
+                        </div>
                       </div>
                     );
                   })}
