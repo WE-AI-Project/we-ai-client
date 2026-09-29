@@ -572,6 +572,191 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
   );
 }
 
+function DocUploadModal({
+  projectId,
+  onClose,
+  onUploaded,
+}: {
+  projectId: number;
+  onClose: () => void;
+  onUploaded: () => Promise<void>;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [description, setDescription] = useState("");
+  const [autoBriefing, setAutoBriefing] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    if (selected.size > 30 * 1024 * 1024) {
+      toast.error("문서 크기는 최대 30MB까지 업로드할 수 있습니다.");
+      return;
+    }
+    const ext = selected.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!ALLOWED_BRIEFING_EXTENSIONS.includes(ext)) {
+      toast.error("지원하지 않는 문서 형식입니다 (pdf, txt, md, doc, docx, ppt, pptx만 가능)");
+      return;
+    }
+    setFile(selected);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) {
+      toast.error("업로드할 파일을 선택해 주세요.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const uploaded = await uploadChatDocument(projectId, file, description.trim() || undefined);
+      toast.success(`${file.name} 문서가 업로드되었습니다.`);
+
+      if (autoBriefing) {
+        try {
+          await createDocumentBriefing(projectId, uploaded.documentId);
+          toast.success(`${file.name} AI 브리핑 생성이 완료되었습니다.`);
+        } catch {
+          toast.info("문서는 업로드되었으나 AI 브리핑 생성에는 실패했습니다.");
+        }
+      }
+
+      await onUploaded();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || "문서 업로드에 실패했습니다.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget && !uploading) onClose(); }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-5 shadow-2xl transition-all"
+        style={{ background: "#FCFCFB", border: `1px solid ${BORDER}` }}
+      >
+        <div className="flex items-center justify-between pb-3 mb-4" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(112,130,56,0.12)" }}>
+              <FileText className="w-3.5 h-3.5" style={{ color: OLIVE_DARK }} />
+            </div>
+            <h3 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>채팅 문서 업로드</h3>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={uploading}
+            className="p-1 rounded-lg hover:bg-black/5 disabled:opacity-50"
+          >
+            <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-semibold mb-1.5" style={{ color: TEXT_SECONDARY }}>
+              문서 파일 <span className="text-red-500">*</span>
+            </label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all hover:border-black/20"
+              style={{
+                borderColor: file ? OLIVE_DARK : BORDER,
+                background: file ? "rgba(112,130,56,0.04)" : "rgba(0,0,0,0.02)",
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.txt,.md,.doc,.docx,.ppt,.pptx"
+                onChange={handleFileChange}
+              />
+              <FileText className="w-6 h-6 mx-auto mb-1.5" style={{ color: file ? OLIVE_DARK : TEXT_TERTIARY }} />
+              {file ? (
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>{file.name}</p>
+                  <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
+                    {(file.size / 1024 > 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${(file.size / 1024).toFixed(1)} KB`)} · 클릭하여 변경
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>파일을 선택하세요</p>
+                  <p className="text-[10px]" style={{ color: TEXT_TERTIARY }}>
+                    PDF, TXT, MD, DOC, DOCX, PPT, PPTX (최대 30MB)
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold mb-1" style={{ color: TEXT_SECONDARY }}>
+              문서 설명 (선택)
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="예: 2026 1차 기획안 회의 자료"
+              maxLength={500}
+              disabled={uploading}
+              className="w-full text-xs px-3 py-2 rounded-xl outline-none transition-all disabled:opacity-50"
+              style={{ background: "white", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
+            />
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer text-[11px]" style={{ color: TEXT_SECONDARY }}>
+            <input
+              type="checkbox"
+              checked={autoBriefing}
+              onChange={(e) => setAutoBriefing(e.target.checked)}
+              disabled={uploading}
+              className="rounded"
+            />
+            <span>업로드 완료 후 AI 요약 브리핑 자동 생성</span>
+          </label>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={uploading}
+              className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
+              style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={!file || uploading}
+              className="flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+              style={{ background: OLIVE_DARK, color: "white" }}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>업로드 중...</span>
+                </>
+              ) : (
+                "업로드"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════
 // 메인 ChatPage
 // ══════════════════════════════════════════════════════════
@@ -610,6 +795,7 @@ export function ChatPage({
   const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
   const [docs, setDocs] = useState<MeetingDoc[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+  const [isDocUploadModalOpen, setIsDocUploadModalOpen] = useState(false);
   const [input, setInput] = useState("");
   const [aiInput, setAIInput] = useState("");
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -1062,6 +1248,10 @@ export function ChatPage({
       toast.error("지원하지 않는 파일 형식입니다 (pdf, txt, md, doc, docx, ppt, pptx만 가능)");
       return;
     }
+    if (file.size > 30 * 1024 * 1024) {
+      toast.error("문서 크기는 최대 30MB까지 업로드할 수 있습니다.");
+      return;
+    }
     if (!projectId) {
       toast.error("프로젝트 정보가 없습니다.");
       return;
@@ -1162,6 +1352,15 @@ export function ChatPage({
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {openDoc && <DocDetailModal doc={openDoc} onClose={() => setOpenDoc(null)} />}
+
+      {/* 채팅 문서 업로드 모달 */}
+      {isDocUploadModalOpen && !!projectId && (
+        <DocUploadModal
+          projectId={projectId}
+          onClose={() => setIsDocUploadModalOpen(false)}
+          onUploaded={loadDocsData}
+        />
+      )}
 
       {/* 채팅방 생성 모달 */}
       {isCreateModalOpen && (
@@ -1665,7 +1864,7 @@ export function ChatPage({
                     {briefingLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <BookOpen className="w-3 h-3" />}
                     {briefingLoading ? "분석 중..." : "AI 문서 분석"}
                   </button>
-                  <input ref={briefFileRef} type="file" className="hidden" accept=".java,.ts,.tsx,.yml,.yaml,.gradle,.env,.pdf,.md,.mdx,.css,.txt,.json" onChange={handleBriefingFile} />
+                  <input ref={briefFileRef} type="file" className="hidden" accept=".pdf,.txt,.md,.doc,.docx,.ppt,.pptx" onChange={handleBriefingFile} />
 
                   <button
                     onClick={handleSend}
@@ -1907,9 +2106,19 @@ export function ChatPage({
                   {docs.length}개 문서
                 </span>
               )}
-              <div className="ml-auto flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3" style={{ color: OLIVE_DARK, opacity: 0.6 }} />
-                <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>AI 한글화 문서 포함</span>
+              <div className="ml-auto flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-1.5 mr-1">
+                  <Sparkles className="w-3 h-3" style={{ color: OLIVE_DARK, opacity: 0.6 }} />
+                  <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>AI 한글화 문서 포함</span>
+                </div>
+                <button
+                  onClick={() => setIsDocUploadModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+                  style={{ background: OLIVE_DARK, color: "white" }}
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>문서 업로드</span>
+                </button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5" style={{ background: CHAT_CANVAS }}>
@@ -1926,10 +2135,18 @@ export function ChatPage({
                   </div>
                 ))
               ) : docs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3">
+                <div className="flex flex-col items-center justify-center h-full gap-3 py-10">
                   <FileText className="w-10 h-10" style={{ color: "rgba(112,130,56,0.15)" }} />
                   <p className="text-[12px] font-semibold" style={{ color: TEXT_ON_DARK_MUTED }}>저장된 문서가 없습니다</p>
-                  <p className="text-[10px]" style={{ color: TEXT_ON_DARK_MUTED }}>AI 문서 분석 버튼으로 파일을 업로드하거나 회의를 시작하세요</p>
+                  <p className="text-[10px]" style={{ color: TEXT_ON_DARK_MUTED }}>문서를 업로드하면 AI가 핵심 내용을 요약 분석해 드립니다</p>
+                  <button
+                    onClick={() => setIsDocUploadModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold mt-1 transition-all hover:opacity-90 active:scale-[0.98]"
+                    style={{ background: OLIVE_DARK, color: "white" }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>문서 업로드하기</span>
+                  </button>
                 </div>
               ) : (
                 docs.map(doc => (
