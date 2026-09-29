@@ -10,11 +10,9 @@ import {
 } from "../lib/serverConnection";
 import {
   BORDER,
-  BORDER_SUBTLE,
   BRIGHT_BEIGE,
   ACCENT_BG_10,
   ACCENT,
-  TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "../colors";
 

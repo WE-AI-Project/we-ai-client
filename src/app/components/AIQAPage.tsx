@@ -260,12 +260,13 @@ function CommitQARow({
 // 메인 AIQAPage
 // ════════════════════════════════════════
 export function AIQAPage({
-  projectId = 0,
+  projectId: rawProjectId = 0,
   autoStart = false,
 }: {
   projectId?: number | null;
   autoStart?: boolean;
 }) {
+  const projectId = rawProjectId ?? 0;
   // ── 최상단 탭: AI QA / QA Reports ── (Agent Control은 Project Settings로 이동)
   const [mainTab,      setMainTab]      = useState<"qa" | "reports">("qa");
   const [activeTab,    setActiveTab]    = useState<"run" | "commit">("run");

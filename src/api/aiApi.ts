@@ -379,7 +379,6 @@ export async function runCustomAiDebateStream(
   }
 }
 
-
 // 🟢 이 줄을 추가해 주세요! (구글, 카카오, 네이버만 들어올 수 있다고 못 박아두는 역할입니다)
 export type SocialProvider = "google" | "kakao" | "naver";
 /**
@@ -388,7 +387,7 @@ export type SocialProvider = "google" | "kakao" | "naver";
 export async function fetchSocialLoginUrl(
   provider: SocialProvider
 ): Promise<{ authorizationUrl: string }> {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
   const response = await fetch(`${baseUrl}/api/v1/auth/${provider}/url`, {
     method: "GET",
     headers: {
@@ -403,3 +402,4 @@ export async function fetchSocialLoginUrl(
   const json = await response.json();
   return json?.data ?? json;
 }
+

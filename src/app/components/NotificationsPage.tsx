@@ -41,13 +41,27 @@ function formatTime(dateStr: string): string {
     : d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
 }
 
-function NotifItem({ notif, onRead }: { notif: NotificationItem; onRead: (id: number) => void }) {
+import { toast } from "sonner";
+
+function NotifItem({
+  notif,
+  onRead,
+  onDelete,
+}: {
+  notif: NotificationItem;
+  onRead: (id: number) => void;
+  onDelete?: (e: React.MouseEvent, id: number) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
   const meta = getNotificationStyle(notif.type);
   const Icon = meta.icon;
   return (
     <div
       onClick={() => onRead(notif.id)}
-      className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-black/[0.02] cursor-pointer relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex items-start gap-3 px-4 py-3.5 transition-colors cursor-pointer relative group"
+      style={{ background: hovered ? "rgba(0,0,0,0.025)" : "transparent" }}
     >
       {!notif.isRead && (
         <div className="absolute left-2 top-4 w-1.5 h-1.5 rounded-full" style={{ background: UI_INDIGO }} />
@@ -55,7 +69,7 @@ function NotifItem({ notif, onRead }: { notif: NotificationItem; onRead: (id: nu
       <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
         <Icon className="w-4 h-4" style={{ color: meta.color }} />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pr-2">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: meta.bg, color: meta.color }}>
             {notif.type}
@@ -67,7 +81,28 @@ function NotifItem({ notif, onRead }: { notif: NotificationItem; onRead: (id: nu
         <p className="text-xs font-medium" style={{ color: notif.isRead ? TEXT_SECONDARY : TEXT_PRIMARY }}>{notif.title}</p>
         <p className="text-[10px] mt-0.5 line-clamp-2" style={{ color: TEXT_TERTIARY }}>{notif.body}</p>
       </div>
-      <span className="text-[10px] shrink-0 mt-0.5" style={{ color: TEXT_TERTIARY }}>{formatTime(notif.createdAt)}</span>
+      <span className="text-[10px] shrink-0 mt-0.5 mr-1" style={{ color: TEXT_TERTIARY }}>{formatTime(notif.createdAt)}</span>
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(e, notif.id);
+          }}
+          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 self-center"
+          style={{
+            opacity: hovered ? 1 : 0,
+            pointerEvents: hovered ? "auto" : "none",
+            transform: hovered ? "scale(1)" : "scale(0.9)",
+            transition: "opacity 0.15s ease, transform 0.15s ease, color 0.15s ease, background-color 0.15s ease",
+          }}
+          title="알림 삭제"
+          aria-label="알림 삭제"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -145,17 +180,36 @@ export function NotificationsPage({ projectId }: { projectId: number | string | 
     }
   };
 
+  const deleteSingle = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (!projectId) return;
+    const prev = notifs;
+    setNotifs((ns) => ns.filter((n) => n.id !== id));
+    try {
+      await deleteNotification(projectId, id);
+      toast.success("알림이 삭제되었습니다.");
+    } catch (error) {
+      console.error("알림 삭제 실패:", error);
+      toast.error("알림 삭제에 실패했습니다.");
+      setNotifs(prev);
+    }
+  };
+
   const clearAll = async () => {
     if (!projectId || notifs.length === 0) return;
+    if (!window.confirm("모든 알림을 삭제하시겠습니까?")) return;
     const prev = notifs;
     setNotifs([]);
     try {
       await Promise.all(notifs.map((n) => deleteNotification(projectId, n.id)));
+      toast.success("모든 알림을 삭제했습니다.");
     } catch (error) {
       console.error("알림을 삭제하는 도중 문제가 발생했습니다:", error);
       setNotifs(prev);
+      toast.error("일부 알림을 삭제하지 못했습니다.");
     }
   };
+
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: CONTENT_BG }}>
@@ -256,7 +310,7 @@ export function NotificationsPage({ projectId }: { projectId: number | string | 
                   </div>
                   {todayNotifs.map((n, i) => (
                     <div key={n.id} style={{ borderBottom: i < todayNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                      <NotifItem notif={n} onRead={markRead} />
+                      <NotifItem notif={n} onRead={markRead} onDelete={deleteSingle} />
                     </div>
                   ))}
                 </div>
@@ -270,7 +324,7 @@ export function NotificationsPage({ projectId }: { projectId: number | string | 
                   </div>
                   {earlierNotifs.map((n, i) => (
                     <div key={n.id} style={{ borderBottom: i < earlierNotifs.length - 1 ? `1px solid ${BORDER_SUBTLE}` : "none" }}>
-                      <NotifItem notif={n} onRead={markRead} />
+                      <NotifItem notif={n} onRead={markRead} onDelete={deleteSingle} />
                     </div>
                   ))}
                 </div>
