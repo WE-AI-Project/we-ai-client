@@ -9,6 +9,9 @@ export function briefingSummaryToMeetingDoc(b: BriefingSummary): MeetingDoc {
     summary: [b.summary, "", "핵심 포인트", b.keyPoints.map(p => `• ${p}`).join("\n")].join("\n"),
     messages: [],
     sourceFile: b.documentName,
+    documentId: b.documentId,
+    briefingId: b.briefingId,
+    status: b.status,
     tags: ["AI브리핑", b.status],
   };
 }

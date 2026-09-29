@@ -618,7 +618,7 @@ export async function uploadChatDocument(  //채팅 문서 업로드
 
 export async function createDocumentBriefing(  //문서 브리핑 생성
   projectId: number | string,
-  documentId: number
+  documentId: number | string
 ): Promise<DocumentBriefingResponse> {
   return request<DocumentBriefingResponse>(`/api/v1/projects/${projectId}/chat/documents/${documentId}/briefing`, {
     method: "POST",

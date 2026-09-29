@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 import {
-  ChatMessage, MeetingDoc,
+  ChatMessage, MeetingDoc, BriefingData,
   buildMeetingTranscript, formatTime, formatDate, genId,
 } from "../data/chatStore";
 
@@ -73,12 +73,6 @@ function normalizeChatRoomName(name: string) {
 // UI 컴포넌트들
 // ══════════════════════════════════════════════════════════
 
-export type BriefingData = {
-  fileName: string;
-  summary: string;
-  points?: string[];
-};
-
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
@@ -117,6 +111,35 @@ function DocBriefingBubble({ briefing, savedToDoc, onViewDoc, time }: { briefing
                     <li key={i} className="text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{pt}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {briefing.actionItems && briefing.actionItems.length > 0 && (
+              <div>
+                <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1 mt-2" style={{ color: TEXT_ON_DARK_MUTED }}>할 일 (Action Items)</span>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {briefing.actionItems.map((item, i) => (
+                    <li key={i} className="text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {briefing.risks && briefing.risks.length > 0 && (
+              <div>
+                <span className="text-[9px] font-semibold uppercase tracking-wider block mb-1 mt-2" style={{ color: "#ef4444" }}>위험 요소 (Risks)</span>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {briefing.risks.map((risk, i) => (
+                    <li key={i} className="text-[10px] leading-relaxed text-red-500/90">{risk}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {briefing.keywords && briefing.keywords.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap pt-1">
+                {briefing.keywords.map((kw, i) => (
+                  <span key={i} className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}>
+                    #{kw}
+                  </span>
+                ))}
               </div>
             )}
           </div>
@@ -502,12 +525,62 @@ function DocCard({ doc, onOpen }: { doc: MeetingDoc; onOpen: () => void }) {
   );
 }
 
-function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void }) {
+function DocDetailModal({
+  doc,
+  projectId,
+  onClose,
+  onBriefingUpdated,
+}: {
+  doc: MeetingDoc;
+  projectId?: number | null;
+  onClose: () => void;
+  onBriefingUpdated?: () => Promise<void>;
+}) {
+  const [currentDoc, setCurrentDoc] = useState<MeetingDoc>(doc);
+  const [isRecreating, setIsRecreating] = useState(false);
+
+  const handleRecreateBriefing = async () => {
+    if (!projectId || !currentDoc.documentId) {
+      toast.error("브리핑을 생성할 문서 정보가 없습니다.");
+      return;
+    }
+    setIsRecreating(true);
+    try {
+      const res = await createDocumentBriefing(projectId, currentDoc.documentId);
+      toast.success(`${currentDoc.sourceFile || "문서"}의 AI 브리핑이 새로 생성되었습니다.`);
+
+      const parts: string[] = [res.summary];
+      if (res.keyPoints && res.keyPoints.length > 0) {
+        parts.push("", "핵심 포인트", res.keyPoints.map(p => `• ${p}`).join("\n"));
+      }
+      if (res.actionItems && res.actionItems.length > 0) {
+        parts.push("", "할 일 (Action Items)", res.actionItems.map(p => `• ${p}`).join("\n"));
+      }
+      if (res.risks && res.risks.length > 0) {
+        parts.push("", "위험 요소 (Risks)", res.risks.map(p => `• ${p}`).join("\n"));
+      }
+
+      setCurrentDoc(prev => ({
+        ...prev,
+        summary: parts.join("\n"),
+        briefingId: res.briefingId,
+        status: res.status,
+        tags: ["AI브리핑", res.status],
+      }));
+
+      await onBriefingUpdated?.();
+    } catch (err: any) {
+      toast.error(err.message || "AI 브리핑 생성에 실패했습니다.");
+    } finally {
+      setIsRecreating(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ background: "rgba(0,0,0,0.32)", backdropFilter: "blur(8px)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => { if (e.target === e.currentTarget && !isRecreating) onClose(); }}
     >
       <div
         className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
@@ -521,12 +594,37 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
             <FileText className="w-4 h-4" style={{ color: OLIVE_DARK }} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>{doc.title}</p>
-            <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{formatDate(doc.createdAt)} · {doc.messages.length}개 메시지</p>
+            <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>{currentDoc.title}</p>
+            <p className="text-[9px]" style={{ color: TEXT_TERTIARY }}>
+              {formatDate(currentDoc.createdAt)} {currentDoc.messages.length > 0 ? `· ${currentDoc.messages.length}개 메시지` : ""}
+            </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/6">
-            <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
-          </button>
+          <div className="flex items-center gap-2">
+            {currentDoc.documentId && !!projectId && (
+              <button
+                onClick={handleRecreateBriefing}
+                disabled={isRecreating}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: OLIVE_DARK, color: "white" }}
+                title="AI 브리핑 다시 생성"
+              >
+                {isRecreating ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>브리핑 생성 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    <span>브리핑 다시 생성</span>
+                  </>
+                )}
+              </button>
+            )}
+            <button onClick={onClose} disabled={isRecreating} className="p-1.5 rounded-lg hover:bg-black/6 disabled:opacity-50">
+              <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div>
@@ -535,21 +633,21 @@ function DocDetailModal({ doc, onClose }: { doc: MeetingDoc; onClose: () => void
               <p className="text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>AI 요약</p>
             </div>
             <div className="rounded-xl p-3.5 text-[11px] leading-relaxed whitespace-pre-line" style={{ background: "rgba(112,130,56,0.05)", border: `1px solid rgba(112,130,56,0.10)`, color: TEXT_SECONDARY }}>
-              {doc.summary}
+              {currentDoc.summary}
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            {doc.tags.map(tag => (
+            {currentDoc.tags.map(tag => (
               <span key={tag} className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(112,130,56,0.06)", color: OLIVE_DARK }}>
                 #{tag}
               </span>
             ))}
           </div>
-          {doc.messages.length > 0 && (
+          {currentDoc.messages.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: TEXT_LABEL }}>채팅 기록</p>
               <div className="space-y-2">
-                {doc.messages.map(m => (
+                {currentDoc.messages.map(m => (
                   <div key={m.id} className="flex items-start gap-2 rounded-lg p-2" style={{ background: "rgba(0,0,0,0.025)" }}>
                     <Avatar name={m.sender} size={5} />
                     <div className="flex-1 min-w-0">
@@ -1275,7 +1373,15 @@ export function ChatPage({
         sender: "SynAIpse", avatar: "AI", role: "other",
         content: `**${file.name}** 한글 브리핑이 완료됐습니다.`,
         type: "briefing",
-        briefing: { fileName: file.name, summary: briefingRes.summary, points: briefingRes.keyPoints },
+        briefing: {
+          fileName: file.name,
+          summary: briefingRes.summary,
+          points: briefingRes.keyPoints,
+          actionItems: briefingRes.actionItems,
+          risks: briefingRes.risks,
+          keywords: briefingRes.keywords,
+          documentId: uploaded.documentId,
+        },
       });
 
       await loadDocsData();
@@ -1351,7 +1457,14 @@ export function ChatPage({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
-      {openDoc && <DocDetailModal doc={openDoc} onClose={() => setOpenDoc(null)} />}
+      {openDoc && (
+        <DocDetailModal
+          doc={openDoc}
+          projectId={projectId}
+          onClose={() => setOpenDoc(null)}
+          onBriefingUpdated={loadDocsData}
+        />
+      )}
 
       {/* 채팅 문서 업로드 모달 */}
       {isDocUploadModalOpen && !!projectId && (
