@@ -18,13 +18,12 @@ import {
   fetchQaReports,
   fetchQaReportDetail,
   executeBuildTask,
-  fetchProjectChangedFiles,
-  fetchProjectChangedFileDiff,
+  fetchSmartCommitPending,
   type QaReportSummary,
   type QaReportDetail,
   type QaReportStatus,
   type BuildTaskExecutionResponse,
-  type ChangedFileItem,
+  type SmartCommitPendingItem,
 } from "../lib/api";
 import {
   loadConnectionConfig,
@@ -69,6 +68,13 @@ const QA_SCOPE_OPTIONS: { id: QaScope; label: string; shortLabel: string }[] = [
 const BACKEND_EXTENSIONS  = new Set(["java", "kt", "kts", "gradle", "sql", "xml", "properties", "py"]);
 const FRONTEND_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "css", "scss", "html", "vue"]);
 const AI_PATH_KEYWORDS = ["/ai/", "\\ai\\", "rag", "debate", "chroma", "ollama", "embedding", "langchain", "llm", "prompt"];
+
+// SmartCommit pending 항목은 filePath만 주므로, 확장자는 경로에서 직접 뽑아낸다.
+function extractFileExtension(filePath: string): string {
+  const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
+  const dotIndex = fileName.lastIndexOf(".");
+  return dotIndex > 0 ? fileName.slice(dotIndex + 1) : "";
+}
 
 // ── 파일 경로/확장자로 백엔드·프론트엔드·AI 파트 분류 ──
 function classifyFileScope(file: { path: string; ext: string }): Exclude<QaScope, "full"> {
@@ -282,10 +288,12 @@ export function AIQAPage({
   useEffect(() => { clearPendingQA(); }, []);
 
   // Changes 페이지를 거치지 않고 AI QA로 바로 들어온 경우에도 항상 실행할 수 있도록, 이 페이지가
-  // 직접 프로젝트의 현재 git 변경사항(staged+unstaged)을 조회한다. Changes에서 넘어온 스테이징
-  // diff가 있으면 그걸 우선 사용하고, 없을 때만 이 실시간 조회 결과를 쓴다.
+  // 직접 프로젝트의 SmartCommit(syn add) 대기 변경사항을 조회한다. 서버가 더 이상 실제 git
+  // 워킹트리를 갖고 있지 않으므로(로컬 git 연동 제거, SmartCommit으로 대체) "staged/unstaged"
+  // 구분 없이 "syn add로 등록된 diff" 전체를 대상으로 삼는다. Changes에서 넘어온 스테이징 diff가
+  // 있으면 그걸 우선 사용하고, 없을 때만 이 실시간 조회 결과를 쓴다.
   const usingLiveFiles = !commitInfo?.diffFiles?.length;
-  const [liveFiles,        setLiveFiles]        = useState<ChangedFileItem[]>([]);
+  const [liveFiles,        setLiveFiles]        = useState<SmartCommitPendingItem[]>([]);
   const [liveFilesLoading, setLiveFilesLoading]  = useState(false);
   const [liveFilesError,   setLiveFilesError]    = useState<string | null>(null);
 
@@ -294,7 +302,7 @@ export function AIQAPage({
     let cancelled = false;
     setLiveFilesLoading(true);
     setLiveFilesError(null);
-    fetchProjectChangedFiles(projectId)
+    fetchSmartCommitPending(projectId)
       .then((res) => { if (!cancelled) setLiveFiles(res.files); })
       .catch((err: any) => { if (!cancelled) setLiveFilesError(err?.message || "변경 파일 목록을 불러오지 못했습니다."); })
       .finally(() => { if (!cancelled) setLiveFilesLoading(false); });
@@ -305,7 +313,7 @@ export function AIQAPage({
   const [qaScope, setQaScope] = useState<QaScope>("full");
 
   const sourceFiles: QaSourceFile[] = usingLiveFiles
-    ? liveFiles.map((file) => ({ path: file.filePath, ext: file.extension, staged: file.staged }))
+    ? liveFiles.map((file) => ({ path: file.filePath, ext: extractFileExtension(file.filePath), staged: true }))
     : (commitInfo!.diffFiles as CommitFile[]).map((file) => ({ path: file.path, ext: file.ext, staged: true }));
 
   const scopedFiles = qaScope === "full"
@@ -438,9 +446,9 @@ export function AIQAPage({
 
     try {
       const diffSourceFiles = usingLiveFiles
-        ? await Promise.all(scopedFiles.map(async (file) => {
-            const fileDiff = await fetchProjectChangedFileDiff(projectId, file.path, file.staged);
-            return { path: file.path, diff: fileDiff.diffContent };
+        ? scopedFiles.map((file) => ({
+            path: file.path,
+            diff: liveFiles.find((pending) => pending.filePath === file.path)?.diffContent ?? "",
           }))
         : (commitInfo!.diffFiles as CommitFile[]).filter((file) =>
             scopedFiles.some((scoped) => scoped.path === file.path)
