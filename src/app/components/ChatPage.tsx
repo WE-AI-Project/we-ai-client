@@ -39,6 +39,8 @@ import {
   fetchChatRooms,
   fetchChatMessages,
   sendChatMessage,
+  uploadChatFile,
+  downloadAuthenticatedFile,
   fetchDepartments,
   createChatRoom,
   fetchProjectMembers,
@@ -282,34 +284,72 @@ function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () =>
     );
   }
 
-  if (msg.type === "file") {
-    const fc = FILE_COLOR[msg.fileType ?? ""] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY };
-    return (
-      <div className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} items-end mb-3`}>
-        {!isMe && <Avatar name={msg.sender} />}
-        <div className={`max-w-[70%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
-          {!isMe && <span className="text-[9px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{msg.sender}</span>}
-          <div
-            className="rounded-2xl px-3 py-2.5 flex items-center gap-2.5"
-            style={{
-              background: isMe ? OLIVE_DARK : NAVY_SURFACE,
-              border: isMe ? "none" : `1px solid ${NAVY_BORDER}`,
-              boxShadow: isMe ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
-            }}
-          >
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: fc.bg }}>
-              <FileText className="w-3.5 h-3.5" style={{ color: fc.color }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold truncate" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK }}>{msg.fileName}</p>
-              <p className="text-[9px]" style={{ color: isMe ? "rgba(255,255,255,0.65)" : TEXT_ON_DARK_MUTED }}>.{msg.fileType} 파일</p>
-            </div>
-            <Download className="w-3.5 h-3.5 shrink-0" style={{ color: isMe ? "rgba(255,255,255,0.70)" : TEXT_ON_DARK_MUTED }} />
+function FileBubble({ msg, isMe }: { msg: ChatMessage; isMe: boolean }) {
+  const [downloading, setDownloading] = useState(false);
+  const fc = FILE_COLOR[msg.fileType ?? ""] ?? { bg: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY };
+
+  const handleDownload = async () => {
+    if (!msg.fileUrl) {
+      toast.info("다운로드할 수 있는 파일 링크가 없습니다.");
+      return;
+    }
+    setDownloading(true);
+    try {
+      await downloadAuthenticatedFile(msg.fileUrl, msg.fileName || "download");
+    } catch (err: any) {
+      toast.error(err.message || "파일 다운로드에 실패했습니다.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const fileSizeLabel = msg.fileSize
+    ? msg.fileSize > 1024 * 1024
+      ? `${(msg.fileSize / (1024 * 1024)).toFixed(1)} MB`
+      : `${(msg.fileSize / 1024).toFixed(1)} KB`
+    : null;
+
+  return (
+    <div className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} items-end mb-3`}>
+      {!isMe && <Avatar name={msg.sender} />}
+      <div className={`max-w-[70%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
+        {!isMe && <span className="text-[9px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{msg.sender}</span>}
+        {msg.content && (
+          <p className="text-[12px] mb-1 px-1 whitespace-pre-wrap" style={{ color: TEXT_ON_DARK }}>{msg.content}</p>
+        )}
+        <div
+          onClick={handleDownload}
+          className={`rounded-2xl px-3 py-2.5 flex items-center gap-2.5 transition-all ${msg.fileUrl ? "cursor-pointer hover:opacity-90 active:scale-[0.98]" : ""}`}
+          style={{
+            background: isMe ? OLIVE_DARK : NAVY_SURFACE,
+            border: isMe ? "none" : `1px solid ${NAVY_BORDER}`,
+            boxShadow: isMe ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
+          }}
+          title={msg.fileUrl ? "클릭하여 다운로드" : undefined}
+        >
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: fc.bg }}>
+            <FileText className="w-3.5 h-3.5" style={{ color: fc.color }} />
           </div>
-          <span className="text-[8px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{formatTime(msg.time)}</span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold truncate" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK }}>{msg.fileName}</p>
+            <p className="text-[9px]" style={{ color: isMe ? "rgba(255,255,255,0.65)" : TEXT_ON_DARK_MUTED }}>
+              {fileSizeLabel ? `${fileSizeLabel} · ` : ""}.{msg.fileType} 파일
+            </p>
+          </div>
+          {downloading ? (
+            <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" style={{ color: isMe ? "rgba(255,255,255,0.70)" : TEXT_ON_DARK_MUTED }} />
+          ) : (
+            <Download className="w-3.5 h-3.5 shrink-0" style={{ color: isMe ? "rgba(255,255,255,0.70)" : TEXT_ON_DARK_MUTED }} />
+          )}
         </div>
+        <span className="text-[8px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{formatTime(msg.time)}</span>
       </div>
-    );
+    </div>
+  );
+}
+
+  if (msg.type === "file") {
+    return <FileBubble msg={msg} isMe={isMe} />;
   }
 
   return (
@@ -572,6 +612,7 @@ export function ChatPage({
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [input, setInput] = useState("");
   const [aiInput, setAIInput] = useState("");
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
 
   const [isMeeting, setIsMeeting] = useState(false);
   const [activeMeetingId, setActiveMeetingId] = useState<number | null>(null);
@@ -962,12 +1003,53 @@ export function ChatPage({
     });
   };
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const ext = file.name.split(".").pop() ?? "file";
-    addLocalMessage({ sender: "나", avatar: "나", role: "me", content: "", type: "file", fileName: file.name, fileType: ext });
     e.target.value = "";
+
+    if (!projectId || !activeRoomId) {
+      toast.error("선택된 채팅방 정보가 없습니다.");
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("파일 크기는 최대 20MB까지 업로드할 수 있습니다.");
+      return;
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const allowed = ["png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip"];
+    if (!allowed.includes(ext)) {
+      toast.error("지원하지 않는 파일 형식입니다. (이미지, 문서, 압축 파일만 가능)");
+      return;
+    }
+
+    setIsUploadingFile(true);
+    try {
+      const res = await uploadChatFile(projectId, activeRoomId, file);
+      setServerMessages(prev => {
+        if (prev.some(m => m.messageId === res.messageId)) return prev;
+        return [...prev, {
+          messageId: res.messageId,
+          chatRoomId: res.chatRoomId,
+          senderId: res.senderId,
+          senderName: res.senderName,
+          content: res.content ?? "",
+          messageType: res.messageType,
+          fileUrl: res.fileUrl,
+          originalFileName: res.originalFileName,
+          fileSize: res.fileSize,
+          fileContentType: res.fileContentType,
+          createdAt: res.createdAt,
+        }];
+      });
+      toast.success(`${file.name} 업로드 완료`);
+    } catch (err: any) {
+      toast.error(err.message || "파일 업로드에 실패했습니다.");
+    } finally {
+      setIsUploadingFile(false);
+    }
   };
 
   const handleBriefingFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1055,15 +1137,25 @@ export function ChatPage({
     `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
   const displayMessages: ChatMessage[] = [
-    ...serverMessages.map(m => ({
-      id: m.messageId.toString(),
-      sender: m.senderName,
-      avatar: m.senderName?.[0] || "?",
-      role: (m.senderId === currentUserId ? "me" : "other") as "me" | "other",
-      content: m.content,
-      time: m.createdAt,
-      type: "text" as const,
-    })),
+    ...serverMessages.map(m => {
+      const isFile = m.messageType === "FILE" || m.messageType === "IMAGE" || !!m.fileUrl;
+      const fileExt = m.originalFileName
+        ? m.originalFileName.split(".").pop()?.toLowerCase()
+        : (m.fileUrl ? m.fileUrl.split(".").pop()?.toLowerCase() : undefined);
+      return {
+        id: m.messageId.toString(),
+        sender: m.senderName,
+        avatar: m.senderName?.[0] || "?",
+        role: ((m.isMine !== undefined ? m.isMine : m.senderId === currentUserId) ? "me" : "other") as "me" | "other",
+        content: m.content || "",
+        time: m.createdAt,
+        type: isFile ? ("file" as const) : ("text" as const),
+        fileName: m.originalFileName || (isFile ? "첨부파일" : undefined),
+        fileType: fileExt,
+        fileUrl: m.fileUrl ?? undefined,
+        fileSize: m.fileSize ?? undefined,
+      };
+    }),
     ...localMessages,
   ].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
@@ -1541,12 +1633,23 @@ export function ChatPage({
                 <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoadingMessages}
+                    disabled={isLoadingMessages || isUploadingFile}
+                    title="파일 첨부 (최대 20MB)"
                     className="p-1.5 rounded-lg hover:bg-black/5 disabled:opacity-50"
                   >
-                    <Paperclip className="w-3.5 h-3.5" style={{ color: TEXT_ON_DARK_MUTED }} />
+                    {isUploadingFile ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: TEXT_ON_DARK_MUTED }} />
+                    ) : (
+                      <Paperclip className="w-3.5 h-3.5" style={{ color: TEXT_ON_DARK_MUTED }} />
+                    )}
                   </button>
-                  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFile} />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                    onChange={handleFile}
+                  />
 
                   <button
                     onClick={() => briefFileRef.current?.click()}

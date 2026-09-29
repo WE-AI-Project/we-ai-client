@@ -16,6 +16,8 @@ export type ChatMessage = {
   type:      "text" | "file" | "system" | "briefing";
   fileName?: string;
   fileType?: string;
+  fileUrl?:  string;
+  fileSize?: number;
   briefing?: { fileName: string; summary: string; points?: string[] };   // type="briefing" 일 때 — AI 브리핑 API 응답 요약
 };
 
