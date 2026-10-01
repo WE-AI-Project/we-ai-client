@@ -92,11 +92,6 @@ const SIDEBAR_MIN = 44;
 const SIDEBAR_MAX = 340;
 const COLLAPSE_THRESHOLD = 100;
 
-function genProjectCode(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-}
-
 function buildSidebarProfile(user: CurrentUser) {
   const cachedProfile = loadProfile();
   return {
@@ -682,7 +677,7 @@ export default function App() {
   const handleJoin = (project: ProjectLaunchTarget) => {
     setProjectId(project.projectId);
     setProject(project.projectName);
-    setProjectCode(project.projectCode ?? genProjectCode());
+    setProjectCode(project.projectCode);
     setLocalPath(project.localPath ?? "");
     setScreen("workspace");
     saveLastActiveProject(project);

@@ -108,11 +108,6 @@ function useEscapeToClose(onClose: () => void, enabled = true) {
 
 type DetectedInfo = ProjectStackDetection;
 
-function genCode(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-}
-
 function mapDetectedInfoToTechStacks(info: DetectedInfo | null): ProjectTechStackInput[] | undefined {
   return info?.techStacks.map((stack) => ({
     ...stack,
@@ -301,7 +296,6 @@ function CreateProjectModal({
 
   const [detecting, setDetecting] = useState(false);
   const [detected, setDetected] = useState<DetectedInfo | null>(null);
-  const [previewCode] = useState(genCode());
   const [creating, setCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -592,19 +586,16 @@ function CreateProjectModal({
             <>
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold" style={{ color: TEXT_SECONDARY }}>
-                  참여 코드 (생성 후 서버 발급)
+                  참여 코드
                 </label>
                 <div className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: "rgba(0,0,0,0.04)", border: `1px solid ${BORDER}` }}>
                   <Hash className="h-4 w-4 shrink-0" style={{ color: TEXT_TERTIARY }} />
-                  <span className="flex-1 font-mono text-2xl font-bold tracking-[0.4em]" style={{ color: ACCENT }}>
-                    {previewCode}
-                  </span>
-                  <span className="rounded px-2 py-0.5 text-[9px]" style={{ background: ACCENT_BG, color: ACCENT }}>
-                    8자리
+                  <span className="flex-1 text-[11px] font-semibold" style={{ color: TEXT_SECONDARY }}>
+                    프로젝트 생성 후 서버에서 발급됩니다.
                   </span>
                 </div>
                 <p className="mt-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
-                  실제 참여 코드는 생성 시 서버가 발급한 값으로 자동 대체됩니다.
+                  생성 완료 후 대시보드와 프로젝트 설정에서 실제 참여 코드를 확인할 수 있습니다.
                 </p>
               </div>
 

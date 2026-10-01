@@ -1256,56 +1256,6 @@ export function DashboardPage({ projectId, projectName }: Props) {
             </div>
           </section>
 
-          {/* ── 하단 요약 ── */}
-          <section
-            className="rounded-xl border px-5 py-5"
-            style={{ background: "rgba(255,255,255,0.9)", borderColor: BORDER }}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" style={{ color: ACCENT }} />
-              <h2 className="text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-                요약
-              </h2>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {showSkeleton ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
-                    <Skeleton className="w-24 h-3 mb-3" />
-                    <Skeleton className="w-20 h-6" />
-                  </div>
-                ))
-              ) : dashboard && (
-                <>
-                  <div className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
-                      Start Date
-                    </p>
-                    <p className="mt-2 text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-                      {dashboard.startDate ?? "-"}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
-                      Target Date
-                    </p>
-                    <p className="mt-2 text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-                      {dashboard.targetDate ?? "-"}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl px-4 py-4" style={{ background: ACCENT_BG }}>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: TEXT_LABEL }}>
-                      Completion Ratio
-                    </p>
-                    <p className="mt-2 text-lg font-bold" style={{ color: TEXT_PRIMARY }}>
-                      {dashboard.completedScheduleCount}/{dashboard.scheduleCount}
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-          </section>
         </div>
       </StateViewWrapper>
     </div>
