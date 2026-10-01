@@ -340,6 +340,7 @@ export async function runCustomAiDebateStream(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let doneReceived = false;
 
   const dispatch = (eventName: string, dataStr: string) => {
     if (!dataStr) return;
@@ -351,14 +352,27 @@ export async function runCustomAiDebateStream(
     }
     if (eventName === "start") handlers.onStart?.(parsed);
     else if (eventName === "turn") handlers.onTurn(parsed);
-    else if (eventName === "done") handlers.onDone(parsed);
+    else if (eventName === "done") {
+      doneReceived = true;
+      handlers.onDone(parsed);
+    }
     else if (eventName === "error") {
       handlers.onError?.(typeof parsed === "string" ? parsed : (parsed?.message ?? "AI 토론 중 오류가 발생했습니다."));
     }
   };
 
   for (;;) {
-    const { value, done } = await reader.read();
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch (error) {
+      // The tunnel/proxy sometimes cuts the chunked stream right after the final "done" event
+      // (curl: "transfer closed with outstanding read data"); the debate already finished, so
+      // don't surface that as a failure.
+      if (doneReceived) return;
+      throw error;
+    }
+    const { value, done } = chunk;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
