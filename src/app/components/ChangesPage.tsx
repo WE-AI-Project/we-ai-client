@@ -13,6 +13,9 @@ import {
   FileCode2,
   Server,
   Monitor,
+  FolderGit2,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import type { CommitFile } from "./commitData";
 import { isSecurityRiskFile } from "./commitData";
@@ -30,8 +33,14 @@ import {
   stageAllProjectFiles,
   unstageAllProjectFiles,
   createProjectCommit,
+  fetchProjectLocalGitState,
+  initProjectLocalGit,
+  pushToSyncHub,
+  isLocalGitAvailable,
+  DESKTOP_ONLY_CHANGES_MESSAGE,
   loadSession,
   ProjectRepositoryType,
+  type LocalGitProbe,
 } from "../lib/api";
 
 import {
@@ -175,10 +184,14 @@ function QAModal({
 function CommittedModal({
   show,
   msg,
+  branch,
+  pushError,
   onClose,
 }: {
   show: boolean;
   msg: string;
+  branch: string;
+  pushError: string | null;
   onClose: () => void;
 }) {
   if (!show) return null;
@@ -210,18 +223,22 @@ function CommittedModal({
             <CheckCircle2 className="w-7 h-7" style={{ color: "#10b981" }} />
           </div>
           <h3 className="text-sm font-bold mb-1" style={{ color: TEXT_PRIMARY }}>
-            커밋 &amp; 푸시 완료!
+            {pushError ? "커밋 완료 (SyncHub push 실패)" : "커밋 & SyncHub push 완료!"}
           </h3>
-          <p className="text-[11px] mb-4" style={{ color: TEXT_SECONDARY }}>
-            변경사항이 원격 저장소에 반영되었습니다.
+          <p className="text-[11px] mb-4" style={{ color: pushError ? UI_RED_DARK : TEXT_SECONDARY }}>
+            {pushError
+              ? `로컬 커밋은 저장되었습니다. 나중에 "SyncHub로 push"를 다시 시도해 주세요. (${pushError})`
+              : "변경사항이 SyncHub 저장소에 반영되었습니다."}
           </p>
           <div
             className="text-left px-3 py-2.5 rounded-xl font-mono text-[10px] mb-5"
             style={{ background: TERM_BG, color: TERM_GREEN }}
           >
-            [main a3f9d21] {msg}
+            [{branch}] {msg}
             <br />
-            <span style={{ color: TERM_MUTED }}>→ remote: origin/main ✓</span>
+            <span style={{ color: pushError ? UI_RED : TERM_MUTED }}>
+              {pushError ? `→ synchub/${branch} ✗` : `→ synchub/${branch} ✓`}
+            </span>
           </div>
           <button
             onClick={onClose}
@@ -339,7 +356,11 @@ function FileRow({
 
 function parseUnifiedDiff(rawDiff: string) {
   if (!rawDiff) return [];
-  const lines = rawDiff.split("\n");
+  // "diff --git", "index", "--- a/…", "+++ b/…" 같은 파일 헤더는 첫 hunk(@@) 전까지 건너뛴다
+  // (그대로 두면 "---"/"+++" 줄이 삭제/추가 줄로 잘못 표시된다).
+  const allLines = rawDiff.replace(/\n$/, "").split("\n");
+  const firstHunk = allLines.findIndex((line) => line.startsWith("@@"));
+  const lines = firstHunk >= 0 ? allLines.slice(firstHunk) : allLines;
   let oldLine = 1;
   let newLine = 1;
 
@@ -367,6 +388,102 @@ function parseUnifiedDiff(rawDiff: string) {
   });
 }
 
+// ── 로컬 폴더/저장소가 준비되지 않았을 때의 안내 화면 ──
+function LocalGitEmptyState({
+  desktopOnly,
+  localPath,
+  probe,
+  initializing,
+  onInit,
+  onRetry,
+}: {
+  desktopOnly: boolean;
+  localPath: string;
+  probe: LocalGitProbe | null;
+  initializing: boolean;
+  onInit: () => void;
+  onRetry: () => void;
+}) {
+  let title: string;
+  let description: string;
+  let canInit = false;
+
+  if (desktopOnly) {
+    title = DESKTOP_ONLY_CHANGES_MESSAGE;
+    description = "변경 파일 확인·스테이징·커밋은 내 PC의 프로젝트 폴더에서 이루어지므로 SynAIpse 데스크톱 앱에서 열어 주세요.";
+  } else if (!localPath) {
+    title = "프로젝트 로컬 폴더가 지정되지 않았습니다";
+    description = "프로젝트 설정에서 이 프로젝트의 로컬 폴더 경로를 먼저 지정해 주세요.";
+  } else if (!probe?.exists) {
+    title = "프로젝트 로컬 폴더를 찾을 수 없습니다";
+    description = "아래 경로에 폴더가 없습니다. 경로를 확인하거나, 여기서 새 Git 저장소를 만들고 SyncHub에 연결할 수 있습니다.";
+    canInit = true;
+  } else {
+    title = "아직 Git 저장소가 아닙니다";
+    description = "이 폴더를 Git 저장소로 초기화(git init)하고 SyncHub 원격 저장소(synchub)를 연결하면 커밋과 push를 할 수 있습니다.";
+    canInit = true;
+  }
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: ACCENT_BG }}>
+        {desktopOnly ? (
+          <Monitor className="w-8 h-8" style={{ color: ACCENT }} />
+        ) : canInit ? (
+          <FolderGit2 className="w-8 h-8" style={{ color: ACCENT }} />
+        ) : (
+          <AlertTriangle className="w-8 h-8" style={{ color: ACCENT }} />
+        )}
+      </div>
+      <div className="max-w-md">
+        <p className="text-[13px] font-semibold mb-1.5" style={{ color: TEXT_PRIMARY }}>
+          {title}
+        </p>
+        <p className="text-[11px] leading-relaxed" style={{ color: TEXT_SECONDARY }}>
+          {description}
+        </p>
+        {!desktopOnly && localPath && (
+          <p
+            className="mt-3 px-3 py-1.5 rounded-lg font-mono text-[10px] break-all"
+            style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
+          >
+            {localPath}
+          </p>
+        )}
+      </div>
+      {!desktopOnly && (
+        <div className="flex items-center gap-2">
+          {canInit && (
+            <button
+              onClick={onInit}
+              disabled={initializing}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+              style={{
+                background: ACCENT,
+                color: "#FFFFFF",
+                opacity: initializing ? 0.6 : 1,
+                cursor: initializing ? "wait" : "pointer",
+              }}
+            >
+              <FolderGit2 className="w-3.5 h-3.5" />
+              {initializing ? "초기화 중..." : "Git 저장소 만들고 SyncHub 연결"}
+            </button>
+          )}
+          <button
+            onClick={onRetry}
+            disabled={initializing}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+            style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            다시 확인
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ChangesPage({
   projectId: rawProjectId = 0,
   onNavigateQA,
@@ -385,6 +502,14 @@ export function ChangesPage({
   const [staged, setStaged] = useState<Set<string>>(() => new Set());
   const [selectedFile, setSelectedFile] = useState<CommitFile | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // 로컬 git 상태: 데스크톱 앱 여부, 로컬 폴더/저장소 연결 상태, SyncHub 대비 앞선 커밋 수
+  const [desktopOnly, setDesktopOnly] = useState(false);
+  const [gitProbe, setGitProbe] = useState<LocalGitProbe | null>(null);
+  const [projectLocalPath, setProjectLocalPath] = useState("");
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [donePushError, setDonePushError] = useState<string | null>(null);
+  const [doneBranch, setDoneBranch] = useState("main");
 
   const [message, setMessage] = useState("");
   const [showQA, setShowQA] = useState(false);
@@ -412,8 +537,31 @@ export function ChangesPage({
       return;
     }
 
+    if (!isLocalGitAvailable()) {
+      // 일반 브라우저: 로컬 폴더에 접근할 수 없으므로 데스크톱 앱 안내만 보여준다.
+      setDesktopOnly(true);
+      setChangedFiles([]);
+      setStaged(new Set());
+      setSelectedFile(null);
+      setIsLoading(false);
+      return;
+    }
+    setDesktopOnly(false);
+
     try {
-      // 1. 실제 백엔드 Git 변경 파일 목록 조회 (/changes/files)
+      // 0. 로컬 폴더/저장소 연결 상태 확인 (폴더 없음·git 저장소 아님은 에러가 아니라 안내 화면)
+      const localState = await fetchProjectLocalGitState(projectId);
+      setProjectLocalPath(localState.localPath);
+      setGitProbe(localState.probe);
+      if (!localState.localPath || !localState.probe.exists || !localState.probe.isRepo) {
+        setChangedFiles([]);
+        setStaged(new Set());
+        setSelectedFile(null);
+        setIsLoading(false);
+        return;
+      }
+
+      // 1. 로컬 git 변경 파일 목록 조회 (Electron → git status)
       const changeRes = await fetchProjectChangedFiles(projectId);
 
       if (!changeRes || !Array.isArray(changeRes.files)) {
@@ -463,8 +611,8 @@ export function ChangesPage({
       }
       setIsLoading(false);
     } catch (e) {
-      console.error("실제 Git 변경 파일 조회에 실패했습니다:", e);
-      toast.error("변경된 파일 목록을 불러오지 못했습니다.");
+      console.error("로컬 Git 변경 파일 조회에 실패했습니다:", e);
+      toast.error(e instanceof Error && e.message ? e.message : "변경된 파일 목록을 불러오지 못했습니다.");
       setChangedFiles([]);
       setStaged(new Set());
       setSelectedFile(null);
@@ -595,14 +743,20 @@ export function ChangesPage({
       try {
         const commitRes = await createProjectCommit(projectId, msg);
         const shortHash = commitRes.shortCommitHash || commitRes.commitHash.slice(0, 7);
+        const pushError = commitRes.syncHubPush.ok ? null : commitRes.syncHubPush.message;
         setHistory((prev) => [`[${new Date().toLocaleTimeString()}] ${shortHash} - ${msg}`, ...prev.slice(0, 4)]);
-        setDoneMsg(`[${shortHash}] ${msg}`);
+        setDoneMsg(`${shortHash} ${msg}`);
+        setDoneBranch(commitRes.branchName || currentBranch);
+        setDonePushError(pushError);
         setMessage("");
         setStaged(new Set());
         setSelectedFile(null);
         setShowQA(false);
         setShowDone(true);
         toast.success(`커밋이 성공적으로 생성되었습니다 (${shortHash})`);
+        if (pushError) {
+          toast.warning(`커밋은 완료됐지만 SyncHub로 push하지 못했습니다: ${pushError}`);
+        }
         void loadCommitData();
         return;
       } catch (err: any) {
@@ -614,6 +768,8 @@ export function ChangesPage({
       // 로컬 Mock 모드
       setHistory((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
       setDoneMsg(msg);
+      setDoneBranch(currentBranch);
+      setDonePushError(null);
       setMessage("");
       setStaged(new Set());
       setSelectedFile(null);
@@ -621,6 +777,51 @@ export function ChangesPage({
       setShowDone(true);
     }
   };
+
+  // 로컬 폴더를 git 저장소로 초기화하고 SyncHub remote를 연결 (사용자가 버튼을 눌렀을 때만)
+  const handleInitRepository = async () => {
+    if (!projectId) return;
+    setIsInitializing(true);
+    try {
+      const result = await initProjectLocalGit(projectId);
+      if (result.created) {
+        toast.success("Git 저장소를 만들었습니다.");
+      }
+      if (result.remoteError) {
+        toast.warning(`SyncHub 연결에 실패했습니다: ${result.remoteError}`);
+      } else if (result.remote) {
+        toast.success("SyncHub 연결이 설정되었습니다.");
+      }
+      await loadCommitData();
+    } catch (err: any) {
+      toast.error(err?.message || "Git 저장소를 초기화하지 못했습니다.");
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  // SyncHub에 아직 올라가지 않은 로컬 커밋 push
+  const handlePushToSyncHub = async () => {
+    if (!projectId) return;
+    setIsPushing(true);
+    try {
+      const result = await pushToSyncHub(projectId);
+      toast.success(
+        result.upToDate
+          ? "SyncHub가 이미 최신 상태입니다."
+          : `SyncHub로 push했습니다 (synchub/${result.branchName}).`
+      );
+      await loadCommitData();
+    } catch (err: any) {
+      toast.error(err?.message || "SyncHub로 push하지 못했습니다.");
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
+  const needsSetup =
+    !desktopOnly && !isLoading && !loadError && gitProbe !== null && (!projectLocalPath || !gitProbe.exists || !gitProbe.isRepo);
+  const aheadCount = gitProbe?.isRepo ? gitProbe.aheadCount : 0;
 
   const totalAdd = changedFiles.reduce((s, f) => s + f.additions, 0);
   const totalDel = changedFiles.reduce((s, f) => s + f.deletions, 0);
@@ -634,7 +835,13 @@ export function ChangesPage({
         onQANo={doCommit}
         onClose={() => setShowQA(false)}
       />
-      <CommittedModal show={showDone} msg={doneMsg} onClose={() => setShowDone(false)} />
+      <CommittedModal
+        show={showDone}
+        msg={doneMsg}
+        branch={doneBranch}
+        pushError={donePushError}
+        onClose={() => setShowDone(false)}
+      />
 
       <div className="flex-1 flex flex-col overflow-hidden" style={{ background: CONTENT_BG }}>
         {/* ── 타이틀바 ── */}
@@ -686,6 +893,28 @@ export function ChangesPage({
           </span>
 
           <div className="ml-auto flex items-center gap-2">
+            {aheadCount > 0 && (
+              <button
+                onClick={() => void handlePushToSyncHub()}
+                disabled={isPushing}
+                title={
+                  gitProbe?.remoteTrackingRef
+                    ? `${gitProbe.remoteTrackingRef}보다 ${aheadCount}개 커밋 앞서 있습니다`
+                    : `아직 SyncHub에 올라가지 않은 커밋 ${aheadCount}개`
+                }
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                style={{
+                  background: ACCENT,
+                  color: "#FFFFFF",
+                  border: `1px solid ${ACCENT}`,
+                  opacity: isPushing ? 0.6 : 1,
+                  cursor: isPushing ? "wait" : "pointer",
+                }}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {isPushing ? "push 중..." : `SyncHub로 push (${aheadCount})`}
+              </button>
+            )}
             <button
               onClick={() => setShowBranch((v) => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
@@ -702,7 +931,16 @@ export function ChangesPage({
         </div>
 
         {/* ── 본문 영역 ── */}
-        {showBranch ? (
+        {desktopOnly || needsSetup ? (
+          <LocalGitEmptyState
+            desktopOnly={desktopOnly}
+            localPath={projectLocalPath}
+            probe={gitProbe}
+            initializing={isInitializing}
+            onInit={() => void handleInitRepository()}
+            onRetry={() => void loadCommitData()}
+          />
+        ) : showBranch ? (
           <div className="flex-1 flex overflow-hidden">
             <BranchVisualization projectId={projectId} />
           </div>
@@ -948,7 +1186,7 @@ export function ChangesPage({
                       }}
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      {isCommitting ? "커밋 생성 중..." : `Commit & Push to ${currentBranch}`}
+                      {isCommitting ? "커밋 생성 중..." : `Commit & Push to SyncHub (${currentBranch})`}
                     </button>
                   </>
                 )}

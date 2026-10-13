@@ -33,6 +33,8 @@ import {
   DEFAULT_CONNECTION_CONFIG,
   type ConnectionConfig,
 } from "../lib/serverConnection";
+import { ScreenTestPanel } from "./ScreenTestPanel";
+import type { ScreenTestResult } from "../lib/screenTest";
 
 import {
   BORDER, BORDER_SUBTLE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_LABEL,
@@ -335,6 +337,8 @@ export function AIQAPage({
   const [testRunning,   setTestRunning]   = useState(false);
   const [testError,     setTestError]     = useState<string | null>(null);
   const [logsExpanded,  setLogsExpanded]  = useState(true);
+  // 화면 자동화 테스트 결과 (최종 리포트 요약에 함께 표시)
+  const [screenResult,  setScreenResult]  = useState<ScreenTestResult | null>(null);
 
   const connectionKey = connectionKeyForProject(projectId);
   useEffect(() => {
@@ -628,7 +632,7 @@ export function AIQAPage({
                 <p className="text-[11px] mt-1" style={{ color:TEXT_TERTIARY }}>
                   {phase === "phase1" ? `파일 스캔 중… ${scanFiles.length}개 완료 · ${elapsedSec}s`
                   : phase === "phase2" ? `자동화 테스트 실행 중… ${elapsedSec}s`
-                  : phase === "done"   ? `완료 — 코드 분석 오류 ${criticalCount + warningCount}건 · 테스트 ${testError ? "실행 실패" : testPassed ? "통과" : "실패"} · ${elapsedSec}s`
+                  : phase === "done"   ? `완료 — 코드 분석 오류 ${criticalCount + warningCount}건 · 테스트 ${testError ? "실행 실패" : testPassed ? "통과" : "실패"}${screenResult ? ` · 화면 ${screenResult.totals.pages}개 (FAIL ${screenResult.totals.fail} · WARN ${screenResult.totals.warn})` : ""} · ${elapsedSec}s`
                   : liveFilesLoading ? "변경된 파일을 불러오는 중…"
                   : liveFilesError ? liveFilesError
                   : hasQaTarget ? `검사 범위를 고르고 실행하세요 (대상 ${scopedFiles.length}개 파일)`
@@ -962,6 +966,9 @@ export function AIQAPage({
                         </p>
                       </div>
                     )}
+
+                    {/* ── Phase 2 (계속): 화면 자동화 테스트 - test 태스크와 별개로 언제든 실행 가능 ── */}
+                    <ScreenTestPanel projectId={projectId} onResult={setScreenResult} />
                   </>
                 )}
               </div>

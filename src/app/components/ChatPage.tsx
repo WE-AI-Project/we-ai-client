@@ -1076,7 +1076,7 @@ export function ChatPage({
       if (kw) {
         const lowerKw = kw.toLowerCase();
         minutesList = minutesList.filter(
-          m => m.title.toLowerCase().includes(lowerKw) || m.creatorName?.toLowerCase().includes(lowerKw)
+          m => m.title.toLowerCase().includes(lowerKw) || m.writerName?.toLowerCase().includes(lowerKw)
         );
       }
 

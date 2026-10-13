@@ -104,6 +104,108 @@ ipcMain.handle("stack:detect", async (_event, localPath) => {
   return detectLocalStack(localPath);
 });
 
+// ── Changes 탭: 로컬 git 작업 (SyncHub) ──
+// working tree 작업은 서버가 아니라 사용자 PC의 git CLI로 한다 (electron/localGit.cjs 참고).
+// Electron IPC는 Error의 커스텀 필드(code)를 렌더러로 전달하지 않으므로, 모든 git:* 핸들러는
+// { ok: true, data } | { ok: false, error: { code, message } } 형태로 응답하고 렌더러(api.ts)가 풀어서 던진다.
+const localGit = require("./localGit.cjs");
+
+function handleGit(channel, fn) {
+  ipcMain.handle(channel, async (_event, ...args) => {
+    try {
+      return { ok: true, data: await fn(...args) };
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: error?.code && typeof error.code === "string" ? error.code : "LOCAL_GIT_ERROR",
+          message: error?.message || "로컬 git 작업에 실패했습니다.",
+        },
+      };
+    }
+  });
+}
+
+handleGit("git:probe", (localPath) => localGit.probe(localPath));
+handleGit("git:init", (localPath, options) => localGit.init(localPath, options || {}));
+handleGit("git:status", (projectId, localPath) => localGit.status(projectId, localPath));
+handleGit("git:diff", (projectId, localPath, filePath, staged) => localGit.diff(projectId, localPath, filePath, Boolean(staged)));
+handleGit("git:stage", (projectId, localPath, filePaths) => localGit.stage(projectId, localPath, filePaths));
+handleGit("git:unstage", (projectId, localPath, filePaths) => localGit.unstage(projectId, localPath, filePaths));
+handleGit("git:stage-all", (projectId, localPath) => localGit.stageAll(projectId, localPath));
+handleGit("git:unstage-all", (projectId, localPath) => localGit.unstageAll(projectId, localPath));
+handleGit("git:commit", (projectId, localPath, message, options) => localGit.commit(projectId, localPath, message, options || {}));
+handleGit("git:ensure-remote", (localPath, remoteUrl) => localGit.ensureRemote(localPath, remoteUrl));
+handleGit("git:push", (localPath, options) => localGit.push(localPath, options || {}));
+
+// ── AI QA: 화면 자동화 테스트 (electron/screenTest.cjs) ──
+// 숨겨진 BrowserWindow(격리된 세션 파티션)로 사용자의 실행 중인 앱을 크롤링하며 콘솔/예외/요청 실패/
+// UI 휴리스틱/스크린샷을 수집한다. 한 번에 하나의 실행만 허용하고, 진행 상황은 screen-test:progress로 보낸다.
+const screenTest = require("./screenTest.cjs");
+let activeScreenTest = null; // { token, runId? }
+
+function screenTestRoot() {
+  return path.join(app.getPath("userData"), "screen-tests");
+}
+
+ipcMain.handle("screen-test:check", async (_event, url) => {
+  try {
+    return { ok: true, data: await screenTest.checkReachable(url) };
+  } catch (error) {
+    return { ok: false, error: { code: error?.code || "SCREEN_TEST_ERROR", message: error?.message || "URL을 확인할 수 없습니다." } };
+  }
+});
+
+ipcMain.handle("screen-test:run", async (event, options) => {
+  if (activeScreenTest) {
+    return { ok: false, error: { code: "SCREEN_TEST_BUSY", message: "이미 화면 자동화 테스트가 실행 중입니다." } };
+  }
+  const token = screenTest.createCancelToken();
+  activeScreenTest = { token };
+  const sender = event.sender;
+  try {
+    const data = await screenTest.runScreenTest(options || {}, {
+      token,
+      onProgress: (progress) => {
+        if (!sender.isDestroyed()) sender.send("screen-test:progress", progress);
+      },
+    });
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, error: { code: error?.code || "SCREEN_TEST_ERROR", message: error?.message || "화면 자동화 테스트에 실패했습니다." } };
+  } finally {
+    activeScreenTest = null;
+  }
+});
+
+ipcMain.handle("screen-test:cancel", async () => {
+  if (!activeScreenTest) return { ok: true, data: { cancelled: false } };
+  activeScreenTest.token.cancel();
+  return { ok: true, data: { cancelled: true } };
+});
+
+// 결과 폴더 열기 - screen-tests 루트 아래 경로만 허용 (runId 또는 그 안의 절대 경로)
+ipcMain.handle("screen-test:open-folder", async (_event, target) => {
+  const root = path.resolve(screenTestRoot());
+  let candidate = root;
+  if (typeof target === "string" && target.trim()) {
+    candidate = path.isAbsolute(target) ? path.resolve(target) : path.resolve(root, target);
+  }
+  const relative = path.relative(root, candidate);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return { ok: false, error: { code: "INVALID_PATH", message: "화면 테스트 결과 폴더만 열 수 있습니다." } };
+  }
+  try {
+    const stat = await fs.stat(candidate);
+    const folder = stat.isDirectory() ? candidate : path.dirname(candidate);
+    const message = await shell.openPath(folder);
+    if (message) return { ok: false, error: { code: "OPEN_FAILED", message } };
+    return { ok: true, data: { path: folder } };
+  } catch {
+    return { ok: false, error: { code: "NOT_FOUND", message: "결과 폴더를 찾을 수 없습니다." } };
+  }
+});
+
 // ── Environment Settings 탭: 실제 로컬 프로젝트의 .env 파일 읽기/쓰기 ──
 // 예전에는 이 화면 전체가 localStorage에만 저장되는 가짜 메모장이라, 값이 프로젝트의
 // 실제 .env와 전혀 무관했다. 여기서는 실제로 프로젝트 로컬 경로의 .env(없으면 .env.example)
@@ -176,7 +278,7 @@ ipcMain.handle("dialog:pick-file", async () => {
 // 도는 백엔드였기 때문에 "지금 뭘 대상으로 돌아가는지" 알 방법이 없었다. 이제 프로젝트별로
 // (1) 기본 백엔드(local), (2) 다른 백엔드 인스턴스의 주소(link), (3) SSH로 원격 머신에 직접
 // 접속해 로그를 tail하고 빌드 커맨드를 실행(ssh) 중 하나를 선택해 저장할 수 있다.
-// 비밀번호/키 패스프레이즈는 custom-endpoint와 동일하게 safeStorage로 암호화해 저장하고
+// 비밀번호/키 패스프레이즈는 safeStorage로 암호화해 저장하고
 // 렌더러로는 평문을 절대 돌려주지 않는다.
 const CONNECTIONS_FILE = path.join(app.getPath("userData"), "server-build-connections.json");
 const CONNECTION_DEFAULTS = {
@@ -479,175 +581,11 @@ app.on("before-quit", () => {
   activeLogStreams.clear();
 });
 
-// ── 커스텀 AI 엔드포인트 (사용자가 지정한 타 Ollama/OpenAI 호환 서버) ──
-// 설정 파일은 앱 설치 위치가 아니라 사용자별 userData 디렉토리에 저장되므로
-// 설치 프로그램을 업데이트/재설치해도 유지된다. API 키는 파일에 절대 평문으로
-// 남기지 않고, OS 자격 증명 저장소(safeStorage: Windows DPAPI / macOS Keychain /
-// libsecret)로 암호화한 뒤 base64로 인코딩해 저장한다.
-const CUSTOM_ENDPOINT_FILE = path.join(app.getPath("userData"), "custom-endpoint.json");
-const CUSTOM_ENDPOINT_DEFAULTS = {
-  enabled: false,
-  baseUrl: "",
-  dialect: "ollama-native", // "ollama-native" | "openai-compatible"
-  healthPath: "/api/tags",
-  model: "llama3.1",
-};
-
-async function readCustomEndpointFile() {
-  try {
-    const raw = await fs.readFile(CUSTOM_ENDPOINT_FILE, "utf-8");
-    return { ...CUSTOM_ENDPOINT_DEFAULTS, ...JSON.parse(raw) };
-  } catch {
-    return { ...CUSTOM_ENDPOINT_DEFAULTS };
-  }
-}
-
-function decryptApiKey(stored) {
-  if (!stored?.apiKeyEncrypted) return "";
-  try {
-    return safeStorage.decryptString(Buffer.from(stored.apiKeyEncrypted, "base64"));
-  } catch {
-    // 다른 사용자 계정/머신에서 암호화된 값이라 복호화 불가한 경우 등 — 키 없는 것으로 취급
-    return "";
-  }
-}
-
-function buildHealthUrl(baseUrl, healthPath) {
-  const trimmedBase = baseUrl.replace(/\/+$/, "");
-  const trimmedPath = (healthPath || "/api/tags").startsWith("/") ? healthPath : `/${healthPath}`;
-  return `${trimmedBase}${trimmedPath}`;
-}
-
-async function fetchWithTimeout(url, options, timeoutMs) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// 렌더러(설정 화면)에는 평문 API 키를 절대 돌려주지 않는다 — hasApiKey만 알려준다.
-ipcMain.handle("custom-endpoint:load", async () => {
-  const stored = await readCustomEndpointFile();
-  const { apiKeyEncrypted, ...safe } = stored;
-  return { ...safe, hasApiKey: Boolean(apiKeyEncrypted) };
-});
-
-ipcMain.handle("custom-endpoint:save", async (_event, draft) => {
-  if (typeof draft?.baseUrl !== "string") {
-    throw new Error("baseUrl is required.");
-  }
-  const previous = await readCustomEndpointFile();
-  const next = {
-    enabled: Boolean(draft.enabled),
-    baseUrl: draft.baseUrl.trim(),
-    dialect: draft.dialect === "openai-compatible" ? "openai-compatible" : "ollama-native",
-    healthPath: (draft.healthPath || CUSTOM_ENDPOINT_DEFAULTS.healthPath).trim(),
-    model: (draft.model || CUSTOM_ENDPOINT_DEFAULTS.model).trim(),
-    apiKeyEncrypted: previous.apiKeyEncrypted, // 기본은 기존 키 유지
-  };
-
-  // apiKey는 저장 폼에서 값이 입력됐을 때만 전달됨 (빈 문자열=변경 안 함, null=삭제)
-  let keySaveFailed = false;
-  if (draft.apiKey === null) {
-    next.apiKeyEncrypted = undefined;
-  } else if (typeof draft.apiKey === "string" && draft.apiKey.length > 0) {
-    if (safeStorage.isEncryptionAvailable()) {
-      next.apiKeyEncrypted = safeStorage.encryptString(draft.apiKey).toString("base64");
-    } else {
-      // 이 머신에서 OS 자격 증명 저장소를 못 쓰는 경우 — 평문 저장 대신 아예 저장하지 않고,
-      // 렌더러가 사용자에게 알릴 수 있도록 실패 사실을 응답에 명시한다.
-      next.apiKeyEncrypted = undefined;
-      keySaveFailed = true;
-    }
-  }
-
-  await fs.mkdir(path.dirname(CUSTOM_ENDPOINT_FILE), { recursive: true });
-  await fs.writeFile(CUSTOM_ENDPOINT_FILE, JSON.stringify(next, null, 2), "utf-8");
-
-  const { apiKeyEncrypted, ...safe } = next;
-  return { ...safe, hasApiKey: Boolean(apiKeyEncrypted), keySaveFailed };
-});
-
-// 저장 "전" 테스트 — 폼에 입력된(아직 저장 안 된) 값을 그대로 검증한다.
-ipcMain.handle("custom-endpoint:test", async (_event, draft) => {
-  if (typeof draft?.baseUrl !== "string" || !draft.baseUrl.trim()) {
-    return { ok: false, reason: "주소를 입력해 주세요." };
-  }
-  const url = buildHealthUrl(draft.baseUrl, draft.healthPath);
-  const started = Date.now();
-  try {
-    const res = await fetchWithTimeout(
-      url,
-      { method: "GET", headers: draft.apiKey ? { Authorization: `Bearer ${draft.apiKey}` } : undefined },
-      3000
-    );
-    if (!res.ok) {
-      return { ok: false, reason: `서버가 ${res.status} ${res.statusText}로 응답했습니다.` };
-    }
-    const data = await res.json().catch(() => null);
-    return {
-      ok: true,
-      latencyMs: Date.now() - started,
-      modelsFound: Array.isArray(data?.models) ? data.models.length : undefined,
-    };
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      return { ok: false, reason: "3초 내 응답이 없습니다. 주소나 포트, 터널 상태를 확인해 주세요." };
-    }
-    return { ok: false, reason: `연결할 수 없습니다: ${err?.message || "알 수 없는 오류"}` };
-  }
-});
-
-// 실제 채팅 호출 — main 프로세스에서 수행하므로 렌더러 쪽 CORS 제약이 없고,
-// 복호화된 API 키도 렌더러로 나가지 않는다.
-ipcMain.handle("custom-endpoint:call", async (_event, prompt) => {
-  const cfg = await readCustomEndpointFile();
-  if (!cfg.enabled || !cfg.baseUrl) {
-    throw new Error("커스텀 엔드포인트가 설정되어 있지 않습니다.");
-  }
-  const apiKey = decryptApiKey(cfg);
-  const headers = { "Content-Type": "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) };
-  const baseUrl = cfg.baseUrl.replace(/\/+$/, "");
-
-  try {
-    if (cfg.dialect === "openai-compatible") {
-      const res = await fetchWithTimeout(
-        `${baseUrl}/v1/chat/completions`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ model: cfg.model, messages: [{ role: "user", content: prompt }], stream: false }),
-        },
-        60000
-      );
-      if (!res.ok) throw new Error(`커스텀 엔드포인트 응답 실패 (${res.status})`);
-      const data = await res.json().catch(() => {
-        throw new Error("커스텀 엔드포인트가 JSON이 아닌 응답을 반환했습니다.");
-      });
-      return { answer: data?.choices?.[0]?.message?.content ?? "" };
-    }
-
-    const res = await fetchWithTimeout(
-      `${baseUrl}/api/generate`,
-      { method: "POST", headers, body: JSON.stringify({ model: cfg.model, prompt, stream: false }) },
-      60000
-    );
-    if (!res.ok) throw new Error(`커스텀 엔드포인트 응답 실패 (${res.status})`);
-    const data = await res.json().catch(() => {
-      throw new Error("커스텀 엔드포인트가 JSON이 아닌 응답을 반환했습니다.");
-    });
-    return { answer: data?.response ?? "" };
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      throw new Error("커스텀 엔드포인트가 60초 내 응답하지 않았습니다. 서버 상태나 모델 크기를 확인해 주세요.");
-    }
-    if (err instanceof Error) throw err;
-    throw new Error("커스텀 엔드포인트 호출 중 알 수 없는 오류가 발생했습니다.");
-  }
-});
+// 커스텀 AI 백엔드(개인/프로젝트 공용) 설정은 서버 DB에 저장되고 /api/v1/ai/backend/*
+// REST API로 다뤄진다(we-ai-server의 AiBackendSettingController) - 이전에는 여기 Electron
+// 메인 프로세스가 로컬 파일에 저장하고 렌더러의 CORS 없이 직접 호출까지 대신해줬지만,
+// 그 방식은 서버의 프로젝트 문서 RAG 검색을 건너뛰었다. 지금은 서버가 RAG 검색은 항상
+// 수행한 뒤 답변 생성 단계만 사용자가 고른 백엔드로 보내므로, 이 IPC들은 더 이상 필요 없다.
 
 app.whenReady().then(() => {
   createWindow();

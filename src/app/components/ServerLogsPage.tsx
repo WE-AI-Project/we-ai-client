@@ -8,6 +8,8 @@ import {
 import {
   LogLevel,
   ServerLogEntry,
+  type ServerLogApiItem,
+  toServerLogEntry,
   fetchRecentServerLogs,
   getServerLogStreamUrl,
 } from "../lib/api";
@@ -181,6 +183,13 @@ export function ServerLogsPage({ projectId, connectionVersion = 0 }: ServerLogsP
       return;
     }
 
+    if (!projectId) {
+      // 서버 로그 SSE는 프로젝트 단위로만 제공된다.
+      setConnectionState("offline");
+      setIsLoading(false);
+      return;
+    }
+
     setConnectionState("connecting");
     const baseUrlOverride = connection.mode === "link" ? connection.linkBaseUrl : undefined;
 
@@ -201,9 +210,9 @@ export function ServerLogsPage({ projectId, connectionVersion = 0 }: ServerLogsP
       // init 이벤트: 서버 버퍼에 쌓여있던 최근 로그 일괄 수신
       es.addEventListener("init", (event: MessageEvent) => {
         try {
-          const initialLogs: ServerLogEntry[] = JSON.parse(event.data);
+          const initialLogs: ServerLogApiItem[] = JSON.parse(event.data);
           if (Array.isArray(initialLogs)) {
-            setLogs(initialLogs);
+            setLogs(initialLogs.map(toServerLogEntry));
           }
         } catch (e) {
           console.error("Failed to parse initial logs", e);
@@ -215,7 +224,7 @@ export function ServerLogsPage({ projectId, connectionVersion = 0 }: ServerLogsP
       // log 이벤트: 실시간 신규 발생 로그 수신
       es.addEventListener("log", (event: MessageEvent) => {
         try {
-          const newLog: ServerLogEntry = JSON.parse(event.data);
+          const newLog = toServerLogEntry(JSON.parse(event.data) as ServerLogApiItem);
           setLogs((prev) => {
             // 중복 방지 (id 기준)
             if (prev.some((l) => l.id === newLog.id)) {
@@ -231,9 +240,9 @@ export function ServerLogsPage({ projectId, connectionVersion = 0 }: ServerLogsP
       // fallback 일반 메시지 핸들러
       es.onmessage = (event: MessageEvent) => {
         try {
-          const parsed: ServerLogEntry = JSON.parse(event.data);
-          if (parsed && typeof parsed === "object" && "level" in parsed) {
-            setLogs((prev) => [...prev.slice(-999), parsed]);
+          const parsed = JSON.parse(event.data);
+          if (parsed && typeof parsed === "object" && "level" in parsed && "logId" in parsed) {
+            setLogs((prev) => [...prev.slice(-999), toServerLogEntry(parsed as ServerLogApiItem)]);
           }
         } catch {
           // ignore

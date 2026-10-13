@@ -65,6 +65,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
   const [range, setRange] = useState<string>("14 Days");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [commitWarning, setCommitWarning] = useState<string | null>(null);
   const [commitDates, setCommitDates] = useState<string[]>([]);
   const [schedules, setSchedules] = useState<ProjectSchedule[]>([]);
 
@@ -73,16 +74,30 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
-    Promise.all([
+    setCommitWarning(null);
+    // 커밋 데이터(SyncHub branch graph)와 일정 데이터는 독립적으로 불러온다 - 커밋 그래프가 실패해도
+    // (SyncHub 미연결/서버 오류 등) 일정 분석은 그대로 보여주고, 커밋 지표만 "사용 불가"로 표시한다.
+    Promise.allSettled([
       fetchProjectBranchGraph(projectId, { maxCount: 300 }),
       fetchProjectSchedules(projectId),
     ])
-      .then(([graph, scheduleList]) => {
+      .then(([graphResult, scheduleResult]) => {
         if (cancelled) return;
-        setCommitDates(graph.nodes.map(n => n.committedAt));
-        setSchedules(scheduleList.schedules);
+        if (graphResult.status === "fulfilled") {
+          setCommitDates((graphResult.value?.nodes ?? []).map(n => n.committedAt));
+        } else {
+          setCommitDates([]);
+          const reason: any = graphResult.reason;
+          setCommitWarning(`커밋 데이터를 불러올 수 없어 커밋 지표는 표시되지 않습니다.${reason?.message ? ` (${reason.message})` : ""}`);
+        }
+        if (scheduleResult.status === "fulfilled") {
+          setSchedules(scheduleResult.value.schedules);
+        } else {
+          const reason: any = scheduleResult.reason;
+          setSchedules([]);
+          setError(reason?.message || "분석 데이터를 불러오지 못했습니다.");
+        }
       })
-      .catch((err: any) => { if (!cancelled) setError(err?.message || "분석 데이터를 불러오지 못했습니다."); })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
   }, [projectId]);
@@ -200,6 +215,12 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
             </div>
           )}
 
+          {!error && commitWarning && (
+            <div className="rounded-xl p-3 text-[11px]" style={{ background: "rgba(192,152,64,0.08)", color: "#8A6A20", border: `1px solid ${BORDER}` }}>
+              {commitWarning}
+            </div>
+          )}
+
           {/* ── 요약 통계 ── */}
           <div className="grid grid-cols-4 gap-2.5">
             {isLoading ? (
@@ -212,7 +233,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
               ))
             ) : (
               [
-                { label: "Commits",         value: totalCommits,        color: ACCENT,    bg: "rgba(88,101,242,0.14)",  icon: GitCommit   },
+                { label: "Commits",         value: commitWarning ? "—" : totalCommits, color: ACCENT,    bg: "rgba(88,101,242,0.14)",  icon: GitCommit   },
                 { label: "Tasks Done",      value: totalTasksDone,      color: "#15803D", bg: "rgba(22,163,74,0.14)",  icon: CheckSquare },
                 { label: "Open Tasks",      value: openTasks,           color: "#C2410C", bg: "rgba(234,88,12,0.14)",  icon: ListTodo    },
                 { label: "Completion Rate", value: `${completionRate}%`, color: "#6D28D9", bg: "rgba(109,40,217,0.13)", icon: TrendingUp },

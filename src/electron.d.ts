@@ -1,6 +1,8 @@
 export {};
 
 declare global {
+  type LocalGitResponse<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
+
   interface Window {
     electronAPI?: {
       isElectron: true;
@@ -11,6 +13,68 @@ declare global {
         read: (localPath: string) => Promise<{ exists: boolean; usedExample: boolean; path: string; content: string }>;
         write: (localPath: string, content: string) => Promise<{ path: string }>;
       };
+      git: {
+        probe: (localPath: string) => Promise<LocalGitResponse<import("./app/lib/api").LocalGitProbe>>;
+        init: (
+          localPath: string,
+          options?: { remoteUrl?: string; defaultBranch?: string }
+        ) => Promise<LocalGitResponse<import("./app/lib/api").LocalGitInitResult>>;
+        status: (
+          projectId: number,
+          localPath: string
+        ) => Promise<LocalGitResponse<import("./app/lib/api").ProjectChangedFileList>>;
+        diff: (
+          projectId: number,
+          localPath: string,
+          filePath: string,
+          staged: boolean
+        ) => Promise<LocalGitResponse<import("./app/lib/api").ProjectGitFileDiff>>;
+        stage: (
+          projectId: number,
+          localPath: string,
+          filePaths: string[]
+        ) => Promise<LocalGitResponse<import("./app/lib/api").ProjectGitChangeResult>>;
+        unstage: (
+          projectId: number,
+          localPath: string,
+          filePaths: string[]
+        ) => Promise<LocalGitResponse<import("./app/lib/api").ProjectGitChangeResult>>;
+        stageAll: (
+          projectId: number,
+          localPath: string
+        ) => Promise<LocalGitResponse<import("./app/lib/api").ProjectGitChangeResult>>;
+        unstageAll: (
+          projectId: number,
+          localPath: string
+        ) => Promise<LocalGitResponse<import("./app/lib/api").ProjectGitChangeResult>>;
+        commit: (
+          projectId: number,
+          localPath: string,
+          message: string,
+          options?: { description?: string; author?: { name?: string; email?: string } }
+        ) => Promise<LocalGitResponse<import("./app/lib/api").ProjectGitCommitCreated>>;
+        ensureRemote: (
+          localPath: string,
+          remoteUrl: string
+        ) => Promise<LocalGitResponse<import("./app/lib/api").LocalGitRemoteResult>>;
+        push: (
+          localPath: string,
+          options?: { accessToken?: string }
+        ) => Promise<LocalGitResponse<import("./app/lib/api").LocalGitPushResult>>;
+      };
+      screenTest: {
+        check: (
+          url: string
+        ) => Promise<import("./app/lib/screenTest").ScreenTestIpcResponse<import("./app/lib/screenTest").ScreenTestReachability>>;
+        run: (
+          options: import("./app/lib/screenTest").ScreenTestOptions
+        ) => Promise<import("./app/lib/screenTest").ScreenTestIpcResponse<import("./app/lib/screenTest").ScreenTestResult>>;
+        cancel: () => Promise<import("./app/lib/screenTest").ScreenTestIpcResponse<{ cancelled: boolean }>>;
+        openFolder: (
+          target?: string
+        ) => Promise<import("./app/lib/screenTest").ScreenTestIpcResponse<{ path: string }>>;
+        onProgress: (callback: (progress: import("./app/lib/screenTest").ScreenTestProgress) => void) => () => void;
+      };
       runtimeInfo: () => Promise<{
         platform: string;
         arch: string;
@@ -18,14 +82,6 @@ declare global {
         electronVersion: string;
         chromeVersion: string;
       }>;
-      loadCustomEndpoint: () => Promise<import("./app/lib/customEndpoint").CustomEndpointConfig>;
-      saveCustomEndpoint: (
-        draft: import("./app/lib/customEndpoint").CustomEndpointSaveDraft
-      ) => Promise<import("./app/lib/customEndpoint").CustomEndpointConfig>;
-      testCustomEndpoint: (
-        draft: import("./app/lib/customEndpoint").CustomEndpointTestDraft
-      ) => Promise<import("./app/lib/customEndpoint").CustomEndpointTestResult>;
-      callCustomEndpoint: (prompt: string) => Promise<{ answer: string }>;
       connection: {
         load: (key: string) => Promise<import("./app/lib/serverConnection").ConnectionConfig>;
         save: (

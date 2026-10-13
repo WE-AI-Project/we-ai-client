@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import { Hammer, Play, CheckCircle2, XCircle, Clock, RotateCw, Circle, RefreshCw } from "lucide-react";
 
 import {
@@ -225,13 +226,24 @@ export function BuildManagementPage({ projectId, connectionVersion = 0 }: BuildM
       }
 
       const errorMsg = error?.message || "빌드 태스크 실행 중 오류가 발생했습니다.";
+      // WORKSPACE_400_6: 서버에 빌드할 워크스페이스가 없음(SyncHub 저장소가 비어 있고 업로드된 스냅샷도 없음).
+      // 서버 메시지가 "앱에서 커밋 & push 먼저"를 안내하므로 일반 오류 문구 대신 그대로 보여준다.
+      const isWorkspaceMissing = error?.code === "WORKSPACE_400_6";
       setBuildLogs((prev) => ({
         ...prev,
-        [taskName]: [
-          `[ERROR] Build execution failed: ${errorMsg}`,
-          `Please ensure the server or local workspace is accessible.`,
-        ],
+        [taskName]: isWorkspaceMissing
+          ? [
+              `[ERROR] ${errorMsg}`,
+              `Changes 탭에서 변경사항을 커밋하고 SyncHub로 push한 뒤 다시 빌드해 주세요.`,
+            ]
+          : [
+              `[ERROR] Build execution failed: ${errorMsg}`,
+              `Please ensure the server or local workspace is accessible.`,
+            ],
       }));
+      if (isWorkspaceMissing) {
+        toast.error(errorMsg);
+      }
 
       setTasks((prev) =>
         prev.map((t) =>

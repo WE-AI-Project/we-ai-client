@@ -10,10 +10,32 @@ contextBridge.exposeInMainWorld("electronAPI", {
     write: (localPath, content) => ipcRenderer.invoke("env:write", localPath, content),
   },
   runtimeInfo: () => ipcRenderer.invoke("runtime:info"),
-  loadCustomEndpoint: () => ipcRenderer.invoke("custom-endpoint:load"),
-  saveCustomEndpoint: (draft) => ipcRenderer.invoke("custom-endpoint:save", draft),
-  testCustomEndpoint: (draft) => ipcRenderer.invoke("custom-endpoint:test", draft),
-  callCustomEndpoint: (prompt) => ipcRenderer.invoke("custom-endpoint:call", prompt),
+  // AI QA 화면 자동화 테스트. 응답은 { ok, data } | { ok: false, error: { code, message } }.
+  screenTest: {
+    check: (url) => ipcRenderer.invoke("screen-test:check", url),
+    run: (options) => ipcRenderer.invoke("screen-test:run", options),
+    cancel: () => ipcRenderer.invoke("screen-test:cancel"),
+    openFolder: (target) => ipcRenderer.invoke("screen-test:open-folder", target),
+    onProgress: (callback) => {
+      const handler = (_event, payload) => callback(payload);
+      ipcRenderer.on("screen-test:progress", handler);
+      return () => ipcRenderer.removeListener("screen-test:progress", handler);
+    },
+  },
+  // 로컬 git (Changes 탭 / SyncHub push). 응답은 { ok, data } | { ok: false, error: { code, message } }.
+  git: {
+    probe: (localPath) => ipcRenderer.invoke("git:probe", localPath),
+    init: (localPath, options) => ipcRenderer.invoke("git:init", localPath, options),
+    status: (projectId, localPath) => ipcRenderer.invoke("git:status", projectId, localPath),
+    diff: (projectId, localPath, filePath, staged) => ipcRenderer.invoke("git:diff", projectId, localPath, filePath, staged),
+    stage: (projectId, localPath, filePaths) => ipcRenderer.invoke("git:stage", projectId, localPath, filePaths),
+    unstage: (projectId, localPath, filePaths) => ipcRenderer.invoke("git:unstage", projectId, localPath, filePaths),
+    stageAll: (projectId, localPath) => ipcRenderer.invoke("git:stage-all", projectId, localPath),
+    unstageAll: (projectId, localPath) => ipcRenderer.invoke("git:unstage-all", projectId, localPath),
+    commit: (projectId, localPath, message, options) => ipcRenderer.invoke("git:commit", projectId, localPath, message, options),
+    ensureRemote: (localPath, remoteUrl) => ipcRenderer.invoke("git:ensure-remote", localPath, remoteUrl),
+    push: (localPath, options) => ipcRenderer.invoke("git:push", localPath, options),
+  },
   connection: {
     load: (key) => ipcRenderer.invoke("connection:load", key),
     save: (key, draft) => ipcRenderer.invoke("connection:save", key, draft),

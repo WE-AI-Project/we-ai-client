@@ -1443,7 +1443,14 @@ export async function createProject(payload: ProjectCreatePayload): Promise<Proj
   });
 }
 
-export async function detectProjectStack(localPath: string): Promise<ProjectStackDetection> {
+// 스택 감지는 데스크톱 앱(Electron)에서 로컬 폴더를 직접 읽는 방식을 우선한다. 서버는 더 이상
+// 클라이언트 로컬 경로를 읽지 않으므로(기존 POST /api/v1/projects/detect-stack 제거), 브라우저에서는
+// 이미 만들어진 프로젝트(projectId)에 한해 서버에 업로드된 워크스페이스 기준 감지
+// (POST /api/v1/projects/{projectId}/detect-stack)로만 대체할 수 있다.
+export async function detectProjectStack(
+  localPath: string,
+  projectId?: number | null
+): Promise<ProjectStackDetection> {
   if (window.electronAPI) {
     return window.electronAPI.detectStack(localPath);
   }
@@ -1461,10 +1468,17 @@ export async function detectProjectStack(localPath: string): Promise<ProjectStac
     return payload as ProjectStackDetection;
   }
 
-  return request<ProjectStackDetection>("/api/v1/projects/detect-stack", {
-    method: "POST",
-    body: { localPath },
-  });
+  if (projectId) {
+    return request<ProjectStackDetection>(`/api/v1/projects/${projectId}/detect-stack`, {
+      method: "POST",
+    });
+  }
+
+  throw new ApiError(
+    "로컬 폴더의 기술 스택 감지는 데스크톱 앱에서만 사용할 수 있습니다.",
+    "DESKTOP_ONLY",
+    0
+  );
 }
 
 export async function joinProject(payload: ProjectJoinPayload): Promise<ProjectJoinResponse> {
@@ -1658,23 +1672,58 @@ async function requestFrom<T>(baseUrlOverride: string, path: string, init: Reque
   return parseResponse<T>(response);
 }
 
+// 서버 ServerLogResponse(GET /server-logs 의 logs[] 항목, SSE "log" 이벤트 data) 형태
+export type ServerLogApiItem = {
+  logId: number;
+  level: string;
+  source: string;
+  message: string;
+  threadName: string | null;
+  loggerName: string | null;
+  traceId: string | null;
+  createdAt: string;
+};
+
+type ServerLogListApiResponse = {
+  projectId: number;
+  totalCount: number;
+  logs: ServerLogApiItem[];
+};
+
+export function toServerLogEntry(item: ServerLogApiItem): ServerLogEntry {
+  const createdAt = new Date(item.createdAt);
+  return {
+    id: item.logId,
+    time: Number.isNaN(createdAt.getTime()) ? item.createdAt : createdAt.toLocaleTimeString("en-GB"),
+    level: (item.level?.toUpperCase() as LogLevel) || "INFO",
+    thread: item.threadName ?? item.source ?? "",
+    logger: item.loggerName ?? "",
+    message: item.message ?? "",
+  };
+}
+
+function requireServerLogProjectId(projectId?: number | null): number {
+  // 서버 로그 API는 프로젝트 단위(/api/v1/projects/{projectId}/server-logs)로만 제공된다.
+  if (!projectId) throw new Error("서버 로그를 조회할 프로젝트가 선택되지 않았습니다.");
+  return projectId;
+}
+
 export async function fetchRecentServerLogs(
   projectId?: number | null,
   baseUrlOverride?: string
 ): Promise<ServerLogEntry[]> {
-  const path = projectId
-    ? `/api/v1/projects/${projectId}/server/logs`
-    : `/api/v1/server/logs`;
-  if (baseUrlOverride) return requestFrom<ServerLogEntry[]>(baseUrlOverride, path, { method: "GET" });
-  return request<ServerLogEntry[]>(path, { method: "GET" });
+  const path = `/api/v1/projects/${requireServerLogProjectId(projectId)}/server-logs?size=200`;
+  const response = baseUrlOverride
+    ? await requestFrom<ServerLogListApiResponse>(baseUrlOverride, path, { method: "GET" })
+    : await request<ServerLogListApiResponse>(path, { method: "GET" });
+  // 서버는 최신순으로 내려주므로 터미널 표시용으로 오래된 순으로 뒤집는다.
+  return (response?.logs ?? []).map(toServerLogEntry).reverse();
 }
 
 export function getServerLogStreamUrl(projectId?: number | null, baseUrlOverride?: string): string {
   const session = loadSession();
   const token = session?.accessToken;
-  const path = projectId
-    ? `/api/v1/projects/${projectId}/server/logs/stream`
-    : `/api/v1/server/logs/stream`;
+  const path = `/api/v1/projects/${requireServerLogProjectId(projectId)}/server-logs/stream`;
 
   const baseUrl = (baseUrlOverride ? baseUrlOverride.replace(/\/+$/, "") : apiBaseUrl) || "";
   const fullUrl = `${baseUrl}${path}`;
@@ -1823,104 +1872,285 @@ export async function fetchSmartCommitPending(
   return request<SmartCommitPendingList>(path, { method: "GET" });
 }
 
-export async function fetchProjectChangedFiles(
-  projectId: number | string,
-  baseUrlOverride?: string
-): Promise<ProjectChangedFileList> {
-  const path = `/api/v1/projects/${projectId}/changes/files`;
-  if (baseUrlOverride) return requestFrom<ProjectChangedFileList>(baseUrlOverride, path, { method: "GET" });
-  return request<ProjectChangedFileList>(path, { method: "GET" });
+// ── Changes 탭: 로컬 git (Electron) + SyncHub push ──
+// working tree 작업(status/diff/stage/unstage/commit)은 서버가 아니라 데스크톱 앱(Electron)이 사용자
+// PC의 git CLI로 프로젝트 로컬 폴더에서 직접 수행한다 (electron/localGit.cjs). 커밋 후에는 서버가
+// 호스팅하는 프로젝트 저장소(SyncHub)의 remote `synchub`로 현재 브랜치를 push 한다.
+// 일반 브라우저에서는 로컬 폴더에 접근할 수 없으므로 명확한 에러를 던진다.
+export const DESKTOP_ONLY_CHANGES_MESSAGE = "Changes 탭은 데스크톱 앱에서만 사용할 수 있습니다.";
+
+export type LocalGitProbe = {
+  localPath: string;
+  exists: boolean;
+  isRepo: boolean;
+  topLevel: string | null;
+  branchName: string | null;
+  detached: boolean;
+  hasCommits: boolean;
+  remoteName: string;
+  remoteUrl: string | null;
+  remoteTrackingRef: string | null;
+  aheadCount: number;
+  changedCount: number;
+};
+
+export type LocalGitRemoteResult = {
+  remoteName: string;
+  remoteUrl: string;
+  action: "added" | "updated" | "unchanged";
+};
+
+export type LocalGitInitResult = {
+  localPath: string;
+  created: boolean;
+  remote: LocalGitRemoteResult | null;
+};
+
+export type LocalGitPushResult = {
+  remoteName: string;
+  branchName: string;
+  headCommitHash: string;
+  upToDate: boolean;
+  output: string;
+};
+
+export type SyncHubRepository = {
+  projectId: number;
+  remoteUrl: string;
+  remoteName: string;
+  initialized: boolean;
+  empty: boolean;
+  defaultBranch: string;
+  headCommitHash: string | null;
+  branches: string[];
+};
+
+export type SyncHubPushOutcome =
+  | { ok: true; result: LocalGitPushResult }
+  | { ok: false; code: string; message: string };
+
+export type ProjectGitCommitWithPush = ProjectGitCommitCreated & {
+  syncHubPush: SyncHubPushOutcome;
+};
+
+export type ProjectLocalGitState = {
+  localPath: string;
+  probe: LocalGitProbe;
+};
+
+export function isLocalGitAvailable(): boolean {
+  return typeof window !== "undefined" && Boolean(window.electronAPI?.git);
+}
+
+function requireLocalGit() {
+  const git = typeof window !== "undefined" ? window.electronAPI?.git : undefined;
+  if (!git) {
+    throw new ApiError(DESKTOP_ONLY_CHANGES_MESSAGE, "DESKTOP_ONLY", 0);
+  }
+  return git;
+}
+
+async function unwrapLocalGit<T>(pending: Promise<LocalGitResponse<T>>): Promise<T> {
+  const response = await pending;
+  if (!response || typeof response !== "object") {
+    throw new ApiError("로컬 git 응답이 올바르지 않습니다.", "LOCAL_GIT_ERROR", 0);
+  }
+  if (!response.ok) {
+    throw new ApiError(response.error.message, response.error.code, 0);
+  }
+  return response.data;
+}
+
+function toNumericProjectId(projectId: number | string): number {
+  const numeric = Number(projectId);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw new ApiError("프로젝트가 선택되지 않았습니다.", "PROJECT_REQUIRED", 0);
+  }
+  return numeric;
+}
+
+// 프로젝트 로컬 경로는 서버의 프로젝트 상세(localPath)에서 가져온다. Changes 탭은 한 번 로드할 때
+// status + diff를 연달아 부르므로 짧게 캐시한다. 설정에서 경로를 바꾸면 forgetProjectLocalPath로 비운다.
+const LOCAL_PATH_CACHE_TTL_MS = 10_000;
+const localPathCache = new Map<number, { localPath: string; cachedAt: number }>();
+
+export function forgetProjectLocalPath(projectId?: number | string) {
+  if (projectId === undefined) {
+    localPathCache.clear();
+    return;
+  }
+  localPathCache.delete(Number(projectId));
+}
+
+async function readProjectLocalPath(projectId: number): Promise<string> {
+  const cached = localPathCache.get(projectId);
+  if (cached && Date.now() - cached.cachedAt < LOCAL_PATH_CACHE_TTL_MS) {
+    return cached.localPath;
+  }
+  const detail = await fetchProjectDetail(projectId);
+  const localPath = (detail.localPath ?? "").trim();
+  localPathCache.set(projectId, { localPath, cachedAt: Date.now() });
+  return localPath;
+}
+
+async function resolveProjectLocalPath(projectId: number): Promise<string> {
+  const localPath = await readProjectLocalPath(projectId);
+  if (!localPath) {
+    throw new ApiError(
+      "프로젝트 로컬 경로가 설정되어 있지 않습니다. 프로젝트 설정에서 로컬 폴더를 지정해 주세요.",
+      "LOCAL_PATH_REQUIRED",
+      0
+    );
+  }
+  return localPath;
+}
+
+/** 로컬 폴더/저장소 상태 (폴더 없음·git 저장소 아님은 에러가 아니라 probe 값으로 돌려준다). */
+export async function fetchProjectLocalGitState(projectId: number | string): Promise<ProjectLocalGitState> {
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  forgetProjectLocalPath(id);
+  const localPath = await readProjectLocalPath(id);
+  const probe = await unwrapLocalGit(git.probe(localPath));
+  return { localPath, probe };
+}
+
+/** SyncHub 저장소 정보 (remote 주소 등). */
+export async function fetchSyncHubRepository(projectId: number | string): Promise<SyncHubRepository> {
+  return request<SyncHubRepository>(`/api/v1/projects/${projectId}/git/repository`, { method: "GET" });
+}
+
+/**
+ * 로컬 폴더를 git 저장소로 초기화하고 remote `synchub`를 연결한다 (사용자가 명시적으로 요청한 경우에만 호출).
+ * SyncHub 정보 조회가 실패해도 git init 자체는 진행하고, remote 연결 실패는 remoteError로 돌려준다.
+ */
+export async function initProjectLocalGit(
+  projectId: number | string
+): Promise<LocalGitInitResult & { remoteError?: string }> {
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+
+  let repository: SyncHubRepository | null = null;
+  let remoteError: string | undefined;
+  try {
+    repository = await fetchSyncHubRepository(id);
+  } catch (error) {
+    remoteError = error instanceof Error ? error.message : "SyncHub 저장소 정보를 가져오지 못했습니다.";
+  }
+
+  const initResult = await unwrapLocalGit(
+    git.init(localPath, { defaultBranch: repository?.defaultBranch || "main" })
+  );
+  if (repository?.remoteUrl) {
+    try {
+      const remote = await unwrapLocalGit(git.ensureRemote(localPath, repository.remoteUrl));
+      return { ...initResult, remote };
+    } catch (error) {
+      remoteError = error instanceof Error ? error.message : "SyncHub remote 설정에 실패했습니다.";
+    }
+  }
+  return { ...initResult, ...(remoteError ? { remoteError } : {}) };
+}
+
+/** 현재 브랜치를 SyncHub(remote `synchub`)로 push 한다. remote 주소는 항상 서버가 알려주는 값을 쓴다. */
+export async function pushToSyncHub(projectId: number | string): Promise<LocalGitPushResult> {
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  // 저장소 정보 조회는 인증 API라서, 액세스 토큰이 만료됐으면 여기서 refresh 된다.
+  const repository = await fetchSyncHubRepository(id);
+  if (!repository?.remoteUrl) {
+    throw new ApiError("SyncHub 저장소 주소를 확인할 수 없습니다.", "SYNCHUB_REMOTE_UNKNOWN", 0);
+  }
+  await unwrapLocalGit(git.ensureRemote(localPath, repository.remoteUrl));
+  const accessToken = loadSession()?.accessToken;
+  return unwrapLocalGit(git.push(localPath, { accessToken }));
+}
+
+export async function fetchProjectChangedFiles(projectId: number | string): Promise<ProjectChangedFileList> {
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  return unwrapLocalGit(git.status(id, localPath));
 }
 
 export async function fetchProjectChangedFileDiff(
   projectId: number | string,
-  filePath?: string,
-  staged?: boolean,
-  baseUrlOverride?: string
+  filePath: string,
+  staged?: boolean
 ): Promise<ProjectGitFileDiff> {
-  const params = new URLSearchParams();
-  if (filePath) params.set("filePath", filePath);
-  if (staged !== undefined) params.set("staged", String(staged));
-  const query = params.toString() ? `?${params.toString()}` : "";
-  const path = `/api/v1/projects/${projectId}/changes/diff${query}`;
-  if (baseUrlOverride) return requestFrom<ProjectGitFileDiff>(baseUrlOverride, path, { method: "GET" });
-  return request<ProjectGitFileDiff>(path, { method: "GET" });
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  return unwrapLocalGit(git.diff(id, localPath, filePath, Boolean(staged)));
 }
 
 export async function stageProjectFiles(
   projectId: number | string,
-  filePaths: string[],
-  baseUrlOverride?: string
+  filePaths: string[]
 ): Promise<ProjectGitChangeResult> {
-  const path = `/api/v1/projects/${projectId}/changes/stage`;
-  if (baseUrlOverride) {
-    return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePaths }),
-    });
-  }
-  return request<ProjectGitChangeResult>(path, {
-    method: "POST",
-    body: { filePaths },
-  });
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  return unwrapLocalGit(git.stage(id, localPath, filePaths));
 }
 
 export async function unstageProjectFiles(
   projectId: number | string,
-  filePaths: string[],
-  baseUrlOverride?: string
+  filePaths: string[]
 ): Promise<ProjectGitChangeResult> {
-  const path = `/api/v1/projects/${projectId}/changes/unstage`;
-  if (baseUrlOverride) {
-    return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePaths }),
-    });
-  }
-  return request<ProjectGitChangeResult>(path, {
-    method: "POST",
-    body: { filePaths },
-  });
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  return unwrapLocalGit(git.unstage(id, localPath, filePaths));
 }
 
-export async function stageAllProjectFiles(
-  projectId: number | string,
-  baseUrlOverride?: string
-): Promise<ProjectGitChangeResult> {
-  const path = `/api/v1/projects/${projectId}/changes/stage-all`;
-  if (baseUrlOverride) return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, { method: "POST" });
-  return request<ProjectGitChangeResult>(path, { method: "POST" });
+export async function stageAllProjectFiles(projectId: number | string): Promise<ProjectGitChangeResult> {
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  return unwrapLocalGit(git.stageAll(id, localPath));
 }
 
-export async function unstageAllProjectFiles(
-  projectId: number | string,
-  baseUrlOverride?: string
-): Promise<ProjectGitChangeResult> {
-  const path = `/api/v1/projects/${projectId}/changes/unstage-all`;
-  if (baseUrlOverride) return requestFrom<ProjectGitChangeResult>(baseUrlOverride, path, { method: "POST" });
-  return request<ProjectGitChangeResult>(path, { method: "POST" });
+export async function unstageAllProjectFiles(projectId: number | string): Promise<ProjectGitChangeResult> {
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  return unwrapLocalGit(git.unstageAll(id, localPath));
 }
 
+/**
+ * 스테이징된 변경을 로컬에서 커밋한 뒤 SyncHub로 push 한다.
+ * 커밋은 이미 성공했으므로 push 실패는 던지지 않고 syncHubPush.ok=false로 돌려준다(경고로 표시).
+ */
 export async function createProjectCommit(
   projectId: number | string,
   message: string,
-  description?: string,
-  baseUrlOverride?: string
-): Promise<ProjectGitCommitCreated> {
-  const path = `/api/v1/projects/${projectId}/changes/commit`;
-  if (baseUrlOverride) {
-    return requestFrom<ProjectGitCommitCreated>(baseUrlOverride, path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, description }),
-    });
+  description?: string
+): Promise<ProjectGitCommitWithPush> {
+  const git = requireLocalGit();
+  const id = toNumericProjectId(projectId);
+  const localPath = await resolveProjectLocalPath(id);
+  const session = loadSession();
+  const created = await unwrapLocalGit(
+    git.commit(id, localPath, message, {
+      description,
+      author: { name: session?.username, email: session?.email },
+    })
+  );
+
+  let syncHubPush: SyncHubPushOutcome;
+  try {
+    syncHubPush = { ok: true, result: await pushToSyncHub(id) };
+  } catch (error) {
+    syncHubPush = {
+      ok: false,
+      code: error instanceof ApiError ? error.code : "SYNCHUB_PUSH_FAILED",
+      message: error instanceof Error ? error.message : "SyncHub로 push하지 못했습니다.",
+    };
   }
-  return request<ProjectGitCommitCreated>(path, {
-    method: "POST",
-    body: { message, description },
-  });
+  return { ...created, syncHubPush };
 }
 
 export type ProjectGitBranch = {
