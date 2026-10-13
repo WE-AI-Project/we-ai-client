@@ -5,7 +5,7 @@ import {
   FileText, X, CheckCircle2, Download, Mic, MicOff,
   Hash, Globe, Server, ShieldCheck, Wrench, Loader2, Sparkles, Bot,
   Code2, User, BookOpen, Plus, Building2, MessageSquarePlus, LogOut, Trash2,
-  Search, RotateCw,
+  Search, RotateCw, ChevronDown, Check, Users,
 } from "lucide-react";
 
 import {
@@ -205,6 +205,7 @@ function BriefingLoadingBubble({ fileName }: { fileName: string }) {
 
 type AIResponseKind = "text" | "rag" | "agent" | "debate";
 type AiMode = "rag" | "agent" | "debate";
+const AI_MODE_ORDER: AiMode[] = ["rag", "agent", "debate"];
 interface AIMsg {
   id: string;
   role: "user" | "ai";
@@ -212,6 +213,115 @@ interface AIMsg {
   time: string;
   kind?: AIResponseKind;
   data?: any;
+  /** 메시지를 만든 모드 식별자: "rag" | "agent:BACKEND" | "debate" — 모드 전환 감지에 쓴다. */
+  modeKey?: string;
+  /** 말풍선에 표시할 모드/에이전트/모델 뱃지 (예: "RAG · llama3.1", "Backend AI · qwen2.5-coder"). */
+  badge?: string;
+  /** 모드 전환 직후 요청이라 이전 대화 요약을 함께 보냈는지 여부. */
+  withRecap?: boolean;
+  /** 아직 스트리밍 중인 응답(AI 토론). 앱을 다시 열었을 때 중단 표시에 쓴다. */
+  pending?: boolean;
+}
+
+// ── 통합 AI 대화 스레드: 프로젝트별로 localStorage에 보관 ──
+// (예전에는 모드별 대화가 메모리에만 있었으므로 옮겨올 이전 저장분이 없다.)
+const AI_THREAD_STORAGE_PREFIX = "weai_ai_thread_v1_";
+const AI_THREAD_MAX_MESSAGES = 200;
+const AI_RECAP_MESSAGE_COUNT = 6;
+const AI_RECAP_ITEM_MAX_CHARS = 280;
+// 서버 ChatRequest.question / EditorContextDto.userQuery 둘 다 4000자 제한이다.
+const AI_QUESTION_MAX_CHARS = 4000;
+const EMPTY_AI_MESSAGES: AIMsg[] = [];
+
+function aiContextCount(msg: AIMsg): number {
+  const data = msg.data;
+  if (!data) return 0;
+  if (typeof data.contextCount === "number") return data.contextCount;
+  return data.contexts?.length ?? data.ragContexts?.length ?? 0;
+}
+
+// 저장 용량을 아끼려고 화면에 쓰지 않는 큰 필드(RAG 원문, 마크다운, 토론 원본 기록)는 버리고 개수만 남긴다.
+function slimAiMsgForStorage(msg: AIMsg): AIMsg {
+  if (!msg.data || typeof msg.data !== "object") return msg;
+  const {
+    contexts: _contexts, ragContexts: _ragContexts, markdown: _markdown, debateHistory: _debateHistory,
+    oracleAnalysis: _oracle, backendOpinion: _backend, frontendOpinion: _frontend, inspectorOpinion: _inspector,
+    ...rest
+  } = msg.data;
+  return { ...msg, data: { ...rest, contextCount: aiContextCount(msg) } };
+}
+
+function aiThreadStorageKey(projectId: number) {
+  return `${AI_THREAD_STORAGE_PREFIX}${projectId}`;
+}
+
+function loadAiThread(projectId: number): AIMsg[] {
+  if (!projectId) return [];
+  try {
+    const raw = window.localStorage.getItem(aiThreadStorageKey(projectId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((m: any): m is AIMsg =>
+        m && typeof m.id === "string" && (m.role === "user" || m.role === "ai") && typeof m.content === "string" && typeof m.time === "string")
+      // 시간순 정렬 - 여러 출처(이전 저장분 등)가 섞여 있어도 하나의 타임라인이 되도록 한다.
+      .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+      .map(m => (m.pending
+        ? { ...m, pending: false, content: `${m.content}\n\n(앱을 다시 열면서 진행 중이던 응답이 중단되었습니다)` }
+        : m))
+      .slice(-AI_THREAD_MAX_MESSAGES);
+  } catch {
+    return [];
+  }
+}
+
+function saveAiThread(projectId: number, messages: AIMsg[]) {
+  if (!projectId) return;
+  try {
+    const key = aiThreadStorageKey(projectId);
+    if (messages.length === 0) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, JSON.stringify(messages.slice(-AI_THREAD_MAX_MESSAGES).map(slimAiMsgForStorage)));
+  } catch {
+    // 저장 공간 부족/차단 등은 무시한다 - 대화 자체는 메모리에서 계속 진행된다.
+  }
+}
+
+function aiModeKey(mode: AiMode, agent: AiAgentKey): string {
+  return mode === "agent" ? `agent:${agent}` : mode;
+}
+
+function recapSourceText(msg: AIMsg): string {
+  if (msg.kind === "debate" && Array.isArray(msg.data?.turns) && msg.data.turns.length > 0) {
+    const last = msg.data.turns[msg.data.turns.length - 1] as DebateTurn;
+    if (last?.message) return `${last.agent ?? "AI"}: ${last.message}`;
+  }
+  return msg.content;
+}
+
+// 모드를 바꾼 직후 요청에 붙일 최근 대화 요약 (최근 6개 메시지, 항목별 280자 제한).
+function buildAiRecap(history: AIMsg[]): string {
+  const items = history.filter(m => !m.pending && m.content.trim()).slice(-AI_RECAP_MESSAGE_COUNT);
+  return items.map(m => {
+    const who = m.role === "user" ? "사용자" : (m.badge ?? "AI");
+    let text = recapSourceText(m).replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
+    if (text.length > AI_RECAP_ITEM_MAX_CHARS) text = `${text.slice(0, AI_RECAP_ITEM_MAX_CHARS)}…`;
+    return `- ${who}: ${text}`;
+  }).join("\n");
+}
+
+const AI_RECAP_HEADER = "[이전 대화 요약 · 다른 AI 모드에서 이어지는 대화입니다. 참고만 하고 아래 현재 질문에 답하세요]";
+
+// RAG(/ai/chat)는 question 필드 하나뿐이라 요약을 질문 앞에 붙인다 (4000자 제한 안에서).
+function withRecapInQuestion(question: string, recap: string): string {
+  if (!recap) return question;
+  const budget = AI_QUESTION_MAX_CHARS - question.length - AI_RECAP_HEADER.length - 40;
+  if (budget < 200) return question;
+  const body = recap.length > budget ? `${recap.slice(0, budget)}…` : recap;
+  return `${AI_RECAP_HEADER}\n${body}\n\n[현재 질문]\n${question}`;
 }
 
 // "rag" 모드(일반 대화)는 AiChatService(시스템 프롬프트: "You are Oracle...")가 항상 응답을
@@ -249,11 +359,14 @@ function compactAiAnswer(text: string, maxLength = 900): string {
   return `${shortened.slice(0, safeEnd).trim()}\n\n… 답변이 길어 핵심 내용만 표시했습니다.`;
 }
 
-function buildEditorContext(projectId: number | null | undefined, question: string, level: ThinkingLevel) {
+// 단일 AI / AI 토론은 EditorContextDto를 쓰므로, 모드 전환 요약은 질문(userQuery)을 건드리지 않고
+// 기존 currentCodeSnippet 필드(에디터 선택이 없는 채팅에서는 원래 안내 문구만 들어가던 자리)에 넣는다.
+function buildEditorContext(projectId: number | null | undefined, question: string, level: ThinkingLevel, recap = "") {
+  const noSelection = "No editor selection was provided. Use the project RAG context and the user question.";
   return {
     projectId,
     fileName: "SYNAIPSE Chat AI Console",
-    currentCodeSnippet: "No editor selection was provided. Use the project RAG context and the user question.",
+    currentCodeSnippet: recap ? `${AI_RECAP_HEADER}\n${recap}\n\n${noSelection}` : noSelection,
     cursorLine: 1,
     userQuery: question,
     level,
@@ -439,7 +552,15 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
         {!isUser && (
           <div className="flex items-center gap-1.5 mb-0.5">
             <span className="text-[9px] font-semibold" style={{ color: OLIVE_DARK }}>SynAIpse Assistant</span>
-            <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}>AI</span>
+            <span
+              data-testid="ai-reply-badge"
+              className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full"
+              style={{ background: "rgba(112,130,56,0.08)", color: OLIVE_DARK }}
+              title="이 답변을 생성한 AI 모드 · 에이전트 · 모델"
+            >
+              {msg.badge ?? "AI"}
+            </span>
+            {msg.pending && <Loader2 className="w-3 h-3 animate-spin" style={{ color: OLIVE_DARK }} />}
             {isOracleAnswer(msg) && (
               <span
                 className="text-[8px] font-bold px-1.5 py-0.5 rounded-full tracking-wide"
@@ -464,9 +585,12 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
             {msg.content.replace(/\*\*/g, "")}
           </p>
         </div>
-        {!isUser && msg.kind === "rag" && msg.data && (msg.data.contexts?.length ?? 0) > 0 && (
+        {isUser && msg.withRecap && (
+          <p className="mt-0.5 px-1 text-[8px]" style={{ color: TEXT_TERTIARY }}>이전 대화 맥락 포함</p>
+        )}
+        {!isUser && msg.kind === "rag" && msg.data && aiContextCount(msg) > 0 && (
           <p className="mt-1 px-1 text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
-            프로젝트 문서 {msg.data.contexts.length}개를 참고한 답변
+            프로젝트 문서 {aiContextCount(msg)}개를 참고한 답변
           </p>
         )}
         {!isUser && msg.kind === "agent" && msg.data && (
@@ -474,8 +598,8 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
             <div className="flex flex-wrap gap-1.5 text-[9px]" style={{ color: TEXT_TERTIARY }}>
               <span>{msg.data.agentName}</span><span>·</span><span>{msg.data.role}</span><span>·</span><span>{msg.data.model}</span>
             </div>
-            {(msg.data.ragContexts?.length ?? 0) > 0 && (
-              <p className="mt-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 사용</p>
+            {aiContextCount(msg) > 0 && (
+              <p className="mt-2 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {aiContextCount(msg)}개 사용</p>
             )}
           </div>
         )}
@@ -490,13 +614,237 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
                 <p className="whitespace-pre-wrap text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{compactAiAnswer(turn.message, 700)}</p>
               </div>
             ))}
-            {(msg.data.ragContexts?.length ?? 0) > 0 && (
-              <p className="px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {msg.data.ragContexts.length}개 · 실행 {msg.data.executedRounds}/{msg.data.maxRounds} 단계</p>
+            {aiContextCount(msg) > 0 && (
+              <p className="px-1 text-[9px]" style={{ color: TEXT_TERTIARY }}>RAG 컨텍스트 {aiContextCount(msg)}개 · 실행 {msg.data.executedRounds}/{msg.data.maxRounds} 단계</p>
             )}
           </div>
         )}
         <span className="text-[8px] px-1 mt-0.5" style={{ color: TEXT_TERTIARY }}>{formatTime(msg.time)}</span>
       </div>
+    </div>
+  );
+}
+
+// 모드 전환 지점에 대화 중간 구분선을 그린다 (모드를 바꿔도 대화는 한 스레드로 이어진다).
+function AIModeSwitchDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 my-3" data-testid="ai-mode-switch-divider">
+      <div className="flex-1 h-px" style={{ background: NAVY_BORDER }} />
+      <span className="text-[8px] px-2 py-0.5 rounded-full" style={{ background: NAVY_SURFACE, color: TEXT_ON_DARK_MUTED, border: `1px solid ${NAVY_BORDER}` }}>
+        모드 전환 · {label}
+      </span>
+      <div className="flex-1 h-px" style={{ background: NAVY_BORDER }} />
+    </div>
+  );
+}
+
+function AiPickerOption({
+  selected, icon, title, description, onClick, testId,
+}: {
+  selected: boolean;
+  icon?: React.ReactNode;
+  title: React.ReactNode;
+  description: string;
+  onClick: () => void;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      data-testid={testId}
+      onClick={onClick}
+      className="w-full flex items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-all"
+      style={{ background: selected ? "rgba(112,130,56,0.12)" : "transparent" }}
+      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "rgba(112,130,56,0.06)"; }}
+      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
+    >
+      <span className="mt-0.5 w-3.5 shrink-0 flex justify-center">{icon}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>{title}</span>
+        <span className="block text-[8.5px] leading-snug" style={{ color: TEXT_ON_DARK_MUTED }}>{description}</span>
+      </span>
+      {selected && <Check className="w-3 h-3 mt-0.5 shrink-0" style={{ color: OLIVE_DARK }} />}
+    </button>
+  );
+}
+
+const THINKING_LEVEL_SHORT: Record<ThinkingLevel, string> = { LOW: "Low", DEFAULT: "Default", HIGH: "High" };
+
+// Claude의 모델 선택처럼, 입력창 옆에서 RAG / 단일 AI / AI 토론 모드와 답변 심층도를 고르는 드롭다운.
+function AiModePicker({
+  mode, singleAgent, agents, selectedAgents, maxRounds, thinkingLevel,
+  onSelectRag, onSelectAgent, onSelectDebate, onToggleDebateAgent, onMaxRounds, onThinkingLevel,
+}: {
+  mode: AiMode;
+  singleAgent: AiAgentKey;
+  agents: AiAgent[];
+  selectedAgents: AiAgentKey[];
+  maxRounds: number;
+  thinkingLevel: ThinkingLevel;
+  onSelectRag: () => void;
+  onSelectAgent: (agent: AiAgentKey) => void;
+  onSelectDebate: () => void;
+  onToggleDebateAgent: (agent: AiAgentKey) => void;
+  onMaxRounds: (rounds: number) => void;
+  onThinkingLevel: (level: ThinkingLevel) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const current = agents.find(a => a.agent === singleAgent);
+  const label = mode === "rag"
+    ? "RAG 지식비서"
+    : mode === "agent"
+      ? `${current?.name ?? "단일 AI"} · ${current?.model ?? ""}`
+      : `AI 토론 · ${selectedAgents.length}명 · ${maxRounds}단계`;
+  const ModeIcon = mode === "rag" ? BookOpen : mode === "agent" ? Bot : Users;
+  const sectionLabel = "px-2 pt-1.5 pb-0.5 text-[8px] font-semibold uppercase tracking-wider";
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        data-testid="ai-mode-picker"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+        title="AI 모드 바꾸기 (Ctrl+Shift+M)"
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[9px] font-semibold transition-all hover:opacity-90"
+        style={{ background: "rgba(112,130,56,0.10)", color: OLIVE_DARK, border: "1px solid rgba(112,130,56,0.25)" }}
+      >
+        <ModeIcon className="w-3 h-3 shrink-0" />
+        <span className="max-w-[170px] truncate">{label}</span>
+        <span className="opacity-60">· {THINKING_LEVEL_SHORT[thinkingLevel]}</span>
+        <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          data-testid="ai-mode-menu"
+          className="absolute bottom-full right-0 mb-2 z-40 w-[290px] max-h-[70vh] overflow-y-auto rounded-xl p-1.5"
+          style={{ background: NAVY_SURFACE_STRONG, border: `1px solid ${NAVY_BORDER}`, boxShadow: "0 12px 32px rgba(0,0,0,0.14)" }}
+        >
+          <p className={sectionLabel} style={{ color: TEXT_TERTIARY }}>RAG</p>
+          <AiPickerOption
+            testId="ai-mode-option-rag"
+            selected={mode === "rag"}
+            icon={<BookOpen className="w-3 h-3" style={{ color: OLIVE_DARK }} />}
+            title="RAG 지식비서"
+            description="프로젝트 문서를 검색해 근거 있는 답변"
+            onClick={() => { onSelectRag(); setOpen(false); }}
+          />
+
+          <p className={sectionLabel} style={{ color: TEXT_TERTIARY }}>단일 AI</p>
+          {agents.map(agent => (
+            <AiPickerOption
+              key={agent.agent}
+              testId={`ai-mode-option-agent-${agent.agent}`}
+              selected={mode === "agent" && singleAgent === agent.agent}
+              icon={<Bot className="w-3 h-3" style={{ color: OLIVE_DARK }} />}
+              title={<>{agent.name} <span className="font-normal" style={{ color: TEXT_TERTIARY }}>· {agent.model}</span></>}
+              description={`${agent.role} 단독 분석`}
+              onClick={() => { onSelectAgent(agent.agent); setOpen(false); }}
+            />
+          ))}
+
+          <p className={sectionLabel} style={{ color: TEXT_TERTIARY }}>AI 토론</p>
+          <AiPickerOption
+            testId="ai-mode-option-debate"
+            selected={mode === "debate"}
+            icon={<Users className="w-3 h-3" style={{ color: OLIVE_DARK }} />}
+            title="AI 토론"
+            description={`여러 에이전트가 단계별로 토론 · 현재 ${selectedAgents.length}명 · 최대 ${maxRounds}단계`}
+            onClick={onSelectDebate}
+          />
+          {mode === "debate" && (
+            <div className="mx-2 mb-1 mt-1 space-y-1.5 rounded-lg p-2" style={{ background: NAVY_SURFACE, border: `1px solid ${NAVY_BORDER}` }}>
+              <p className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>참여 에이전트</p>
+              <div className="grid grid-cols-4 gap-1">
+                {agents.map(agent => {
+                  const selected = selectedAgents.includes(agent.agent);
+                  return (
+                    <button
+                      key={agent.agent}
+                      type="button"
+                      onClick={() => onToggleDebateAgent(agent.agent)}
+                      title={`${agent.role} · ${agent.model}`}
+                      className="rounded-md px-1 py-1 text-[8px] font-semibold transition-all"
+                      style={{
+                        border: `1px solid ${selected ? OLIVE_DARK : NAVY_BORDER}`,
+                        color: selected ? OLIVE_DARK : TEXT_ON_DARK_MUTED,
+                        background: selected ? "rgba(112,130,56,0.16)" : NAVY_SURFACE_STRONG,
+                      }}
+                    >
+                      {agent.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[8px] font-medium pt-0.5" style={{ color: TEXT_ON_DARK_MUTED }}>탐구 단계 (최대 라운드)</p>
+              <div className="grid grid-cols-5 gap-1">
+                {[1, 2, 3, 4, 5].map(round => (
+                  <button
+                    key={round}
+                    type="button"
+                    onClick={() => onMaxRounds(round)}
+                    className="rounded-md py-1 text-[8px] font-semibold transition-all"
+                    style={{
+                      border: `1px solid ${maxRounds === round ? OLIVE_DARK : NAVY_BORDER}`,
+                      color: maxRounds === round ? OLIVE_DARK : TEXT_ON_DARK_MUTED,
+                      background: maxRounds === round ? "rgba(112,130,56,0.16)" : NAVY_SURFACE_STRONG,
+                    }}
+                  >
+                    {round}단계
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-1.5 px-2 pt-1.5 pb-1" style={{ borderTop: `1px solid ${NAVY_BORDER}` }}>
+            <p className="text-[8px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_TERTIARY }}>답변 심층도</p>
+            <div className="grid grid-cols-3 gap-1">
+              {THINKING_LEVEL_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onThinkingLevel(opt.value)}
+                  title={opt.description}
+                  className="rounded-md py-1 text-[8.5px] font-semibold transition-all"
+                  style={{
+                    border: `1px solid ${thinkingLevel === opt.value ? OLIVE_DARK : NAVY_BORDER}`,
+                    color: thinkingLevel === opt.value ? OLIVE_DARK : TEXT_ON_DARK_MUTED,
+                    background: thinkingLevel === opt.value ? "rgba(112,130,56,0.16)" : NAVY_SURFACE,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[8px]" style={{ color: TEXT_TERTIARY }}>
+              {THINKING_LEVEL_OPTIONS.find(opt => opt.value === thinkingLevel)?.description}
+            </p>
+          </div>
+          <p className="px-2 pb-0.5 text-[8px]" style={{ color: TEXT_TERTIARY }}>Ctrl/⌘ + Shift + M 으로 모드 순환</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -950,23 +1298,38 @@ export function ChatPage({
   const [micOn, setMicOn] = useState(false);
 
   const [typing, setTyping] = useState(false);
-  // RAG 질문 / 단일 AI 대화 / AI 토론을 각자 독립된 채팅방처럼 분리한다 - 모드를 전환해도
-  // 다른 모드의 대화 내역과 섞이지 않고, 각자 자기 히스토리와 타이핑 상태를 유지한다.
-  const [aiMessagesByMode, setAiMessagesByMode] = useState<Record<AiMode, AIMsg[]>>({ rag: [], agent: [], debate: [] });
-  const [aiTypingByMode, setAiTypingByMode] = useState<Record<AiMode, boolean>>({ rag: false, agent: false, debate: false });
+  // RAG 질문 / 단일 AI / AI 토론이 하나의 대화 스레드를 공유한다 (Claude에서 모델을 바꾸듯 모드만
+  // 전환). 스레드는 프로젝트별로 localStorage에 저장되고, 응답이 늦게 도착해도 다른 프로젝트의
+  // 스레드에 섞이지 않도록 projectId와 함께 묶어서 관리한다.
+  const [aiThread, setAiThread] = useState<{ projectId: number; messages: AIMsg[] }>(
+    () => ({ projectId, messages: loadAiThread(projectId) })
+  );
+  const [aiTyping, setAiTyping] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [aiMode, setAiMode] = useState<AiMode>("rag");
-  const aiMessages = aiMessagesByMode[aiMode];
-  const aiTyping = aiTypingByMode[aiMode];
+  const aiMessages = aiThread.projectId === projectId ? aiThread.messages : EMPTY_AI_MESSAGES;
 
-  const appendAiMessage = useCallback((mode: AiMode, msg: AIMsg) => {
-    setAiMessagesByMode(prev => ({ ...prev, [mode]: [...prev[mode], msg] }));
+  useEffect(() => {
+    setAiThread(prev => (prev.projectId === projectId ? prev : { projectId, messages: loadAiThread(projectId) }));
+  }, [projectId]);
+  useEffect(() => {
+    saveAiThread(aiThread.projectId, aiThread.messages);
+  }, [aiThread]);
+
+  const appendAiMessage = useCallback((pid: number, msg: AIMsg) => {
+    setAiThread(prev => (prev.projectId !== pid
+      ? prev
+      : { ...prev, messages: [...prev.messages, msg].slice(-AI_THREAD_MAX_MESSAGES) }));
   }, []);
-  const updateAiMessage = useCallback((mode: AiMode, id: string, updater: (msg: AIMsg) => AIMsg) => {
-    setAiMessagesByMode(prev => ({ ...prev, [mode]: prev[mode].map(m => (m.id === id ? updater(m) : m)) }));
+  const updateAiMessage = useCallback((pid: number, id: string, updater: (msg: AIMsg) => AIMsg) => {
+    setAiThread(prev => (prev.projectId !== pid
+      ? prev
+      : { ...prev, messages: prev.messages.map(m => (m.id === id ? updater(m) : m)) }));
   }, []);
-  const setTypingForMode = useCallback((mode: AiMode, value: boolean) => {
-    setAiTypingByMode(prev => ({ ...prev, [mode]: value }));
-  }, []);
+  const clearAiThread = () => {
+    if (aiMessages.length > 0 && !window.confirm("현재 AI 대화를 지우고 새 대화를 시작할까요?")) return;
+    setAiThread({ projectId, messages: [] });
+  };
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [selectedAgents, setSelectedAgents] = useState<AiAgentKey[]>(["ORACLE", "BACKEND"]);
   const [singleAgent, setSingleAgent] = useState<AiAgentKey>("ORACLE");
@@ -1043,7 +1406,21 @@ export function ChatPage({
   }, [projectId, activeRoomId]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [serverMessages, localMessages, activeRoomId]);
-  useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages, aiMode]);
+  useEffect(() => { aiBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages, aiTyping, mainTab]);
+
+  // Ctrl/Cmd + Shift + M: RAG → 단일 AI → AI 토론 순서로 모드 순환 (AI 탭에서만).
+  // e.code로 판별해야 한글 입력 상태(e.key가 "ㅡ")에서도 동작한다.
+  useEffect(() => {
+    if (mainTab !== "ai") return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyM") {
+        e.preventDefault();
+        setAiMode(current => AI_MODE_ORDER[(AI_MODE_ORDER.indexOf(current) + 1) % AI_MODE_ORDER.length]);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mainTab]);
 
   useEffect(() => {
     if (isMeeting) {
@@ -1227,76 +1604,136 @@ export function ChatPage({
     }
   };
 
+  const availableAgents = agents.length > 0 ? agents : DEFAULT_AI_AGENTS;
+  const oracleModel = availableAgents.find(a => a.agent === "ORACLE")?.model ?? "llama3.1";
+
+  // 현재 선택된 모드를 사람이 읽을 이름으로 (사용자 말풍선 구분선 / 다음 모드 요약의 화자 이름에 사용)
+  const describeAiMode = (mode: AiMode, agentKey: AiAgentKey, agentCount: number, rounds: number) => {
+    if (mode === "rag") return "RAG 지식비서";
+    if (mode === "agent") {
+      const info = availableAgents.find(a => a.agent === agentKey);
+      return `${info?.name ?? agentKey} AI · ${info?.model ?? ""}`.trim();
+    }
+    return `AI 토론 · ${agentCount}명 · ${rounds}단계`;
+  };
+
+  const ragBadge = (response: AiChatResponse) => {
+    if (response.backendSource === "PERSONAL") return "RAG · 개인 AI 백엔드";
+    if (response.backendSource === "PROJECT") return "RAG · 프로젝트 AI 백엔드";
+    return `RAG · ${oracleModel}`;
+  };
+
   const sendAiQuestion = async (text: string) => {
+    // 요청 시점의 설정을 고정해 둔다 - 응답을 기다리는 동안 사용자가 모드를 바꿔도 이 요청은 영향받지 않는다.
+    const pid = projectId;
     const targetMode = aiMode;
-    const userMsg: AIMsg = { id: genId(), role: "user", content: text, time: new Date().toISOString() };
-    appendAiMessage(targetMode, userMsg);
-    setTypingForMode(targetMode, true);
+    const agentKey = singleAgent;
+    const level = thinkingLevel;
+    const debateAgents = [...selectedAgents];
+    const rounds = maxRounds;
+    const modeKey = aiModeKey(targetMode, agentKey);
+
+    if (targetMode === "debate" && debateAgents.length === 0) {
+      toast.error("토론에 참여할 에이전트를 한 명 이상 선택해 주세요.");
+      return;
+    }
+
+    // 모드 전환 감지: 마지막 AI 답변을 만든 모드와 지금 모드가 다르면, 새 모드는 앞 대화를 모르므로
+    // 최근 대화 요약을 기존 요청 필드에 실어 보낸다 (RAG: question 앞, 단일 AI/토론: currentCodeSnippet).
+    const history = aiMessages;
+    const lastAiModeKey = [...history].reverse().find(m => m.role === "ai" && m.modeKey)?.modeKey;
+    const recap = lastAiModeKey && lastAiModeKey !== modeKey ? buildAiRecap(history) : "";
+
+    const userMsg: AIMsg = {
+      id: genId(),
+      role: "user",
+      content: text,
+      time: new Date().toISOString(),
+      modeKey,
+      badge: describeAiMode(targetMode, agentKey, debateAgents.length, rounds),
+      withRecap: Boolean(recap),
+    };
+    appendAiMessage(pid, userMsg);
+    setAiTyping(true);
+    setAiBusy(true);
 
     if (targetMode === "debate") {
-      if (selectedAgents.length === 0) {
-        setTypingForMode(targetMode, false);
-        toast.error("토론에 참여할 에이전트를 한 명 이상 선택해 주세요.");
-        return;
-      }
-      void streamAiDebate(text);
+      void streamAiDebate(pid, text, recap, level, debateAgents, rounds, modeKey);
       return;
     }
 
     try {
       let aiMsg: AIMsg;
       if (targetMode === "rag") {
-        const response = await runAiChat({ projectId, question: text, level: thinkingLevel });
-        aiMsg = { id: genId(), role: "ai", content: formatAiChatAnswer(response), time: new Date().toISOString(), kind: "rag", data: response };
+        const response = await runAiChat({ projectId: pid, question: withRecapInQuestion(text, recap), level });
+        aiMsg = {
+          id: genId(), role: "ai", content: formatAiChatAnswer(response), time: new Date().toISOString(),
+          kind: "rag", data: response, modeKey, badge: ragBadge(response),
+        };
       } else {
-        const response = await askAiAgent(singleAgent, buildEditorContext(projectId, text, thinkingLevel));
-        aiMsg = { id: genId(), role: "ai", content: formatSingleAgentAnswer(response), time: new Date().toISOString(), kind: "agent", data: response };
+        const response = await askAiAgent(agentKey, buildEditorContext(pid, text, level, recap));
+        aiMsg = {
+          id: genId(), role: "ai", content: formatSingleAgentAnswer(response), time: new Date().toISOString(),
+          kind: "agent", data: response, modeKey, badge: `${response.agentName || agentKey} AI · ${response.model}`,
+        };
       }
-      appendAiMessage(targetMode, aiMsg);
+      appendAiMessage(pid, aiMsg);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "AI 채팅 요청에 실패했습니다.");
     } finally {
-      setTypingForMode(targetMode, false);
+      setAiTyping(false);
+      setAiBusy(false);
     }
   };
 
   // ── AI 토론을 SSE로 스트리밍하면서, 에이전트가 응답할 때마다 실시간으로 대화창에 반영한다 ──
   // (한 번에 통째로 기다리는 runCustomAiDebate 대신 이걸 쓰면 여러 라운드짜리 토론도 게이트웨이
   // 타임아웃 없이 끝까지 진행되고, 사용자에게는 AI들이 실제로 대화하는 것처럼 보인다.)
-  const streamAiDebate = async (text: string) => {
+  const streamAiDebate = async (
+    pid: number,
+    text: string,
+    recap: string,
+    level: ThinkingLevel,
+    debateAgents: AiAgentKey[],
+    rounds: number,
+    modeKey: string,
+  ) => {
     const debateMsgId = genId();
     const turns: DebateTurn[] = [];
     let receivedAnyEvent = false;
 
-    appendAiMessage("debate", {
+    appendAiMessage(pid, {
       id: debateMsgId,
       role: "ai",
       content: "AI 에이전트들이 토론을 시작합니다…",
       time: new Date().toISOString(),
       kind: "debate",
-      data: { turns: [], ragContexts: [], executedRounds: 0, maxRounds },
+      data: { turns: [], ragContexts: [], executedRounds: 0, maxRounds: rounds },
+      modeKey,
+      badge: `AI 토론 · ${debateAgents.length}명 · ${rounds}단계`,
+      pending: true,
     });
 
     const updateDebateMsg = (content: string, dataPatch: Record<string, unknown>) => {
-      updateAiMessage("debate", debateMsgId, msg => ({ ...msg, content, data: { ...msg.data, ...dataPatch } }));
+      updateAiMessage(pid, debateMsgId, msg => ({ ...msg, content, data: { ...msg.data, ...dataPatch } }));
     };
 
     try {
       await runCustomAiDebateStream(
         {
-          context: buildEditorContext(projectId, text, thinkingLevel),
-          agents: selectedAgents,
-          maxRounds,
+          context: buildEditorContext(pid, text, level, recap),
+          agents: debateAgents,
+          maxRounds: rounds,
         },
         {
           onStart: (info) => {
             receivedAnyEvent = true;
-            setTypingForMode("debate", false);
+            setAiTyping(false);
             updateDebateMsg(`${info.agents.length}명의 AI가 토론 중입니다…`, { maxRounds: info.maxRounds });
           },
           onTurn: (turn) => {
             receivedAnyEvent = true;
-            setTypingForMode("debate", false);
+            setAiTyping(false);
             turns.push(turn);
             updateDebateMsg(
               `${turn.agent}이(가) 방금 의견을 냈습니다 · 지금까지 ${turns.length}개 응답`,
@@ -1304,7 +1741,7 @@ export function ChatPage({
             );
           },
           onDone: (response) => {
-            updateAiMessage("debate", debateMsgId, msg => ({ ...msg, content: formatDebateSummary(response), data: response }));
+            updateAiMessage(pid, debateMsgId, msg => ({ ...msg, content: formatDebateSummary(response), data: response, pending: false }));
           },
           onError: (message) => {
             updateDebateMsg(`토론 중 오류가 발생했습니다: ${message}`, {});
@@ -1319,29 +1756,17 @@ export function ChatPage({
       }
       toast.error(message);
     } finally {
-      setTypingForMode("debate", false);
+      updateAiMessage(pid, debateMsgId, msg => (msg.pending ? { ...msg, pending: false } : msg));
+      setAiTyping(false);
+      setAiBusy(false);
     }
   };
 
   const handleAISend = () => {
     const text = aiInput.trim();
-    if (!text || aiTyping) return;
+    if (!text || aiBusy) return;
     setAIInput("");
     void sendAiQuestion(text);
-  };
-
-  const availableAgents = agents.length > 0 ? agents : DEFAULT_AI_AGENTS;
-
-  const updateDebateAgentCount = (count: number) => {
-    const ordered = availableAgents.map(agent => agent.agent);
-    setSelectedAgents(current => {
-      const next = current.filter(agent => ordered.includes(agent)).slice(0, count);
-      for (const agent of ordered) {
-        if (next.length >= count) break;
-        if (!next.includes(agent)) next.push(agent);
-      }
-      return next;
-    });
   };
 
   const toggleDebateAgent = (agent: AiAgentKey) => {
@@ -2110,141 +2535,30 @@ export function ChatPage({
               <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: OLIVE_DARK }}>
                 <Bot className="w-4 h-4" style={{ color: "white" }} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[11px] font-semibold" style={{ color: TEXT_ON_DARK }}>SynAIpse Project Assistant</p>
-                <p className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>
-                  {aiMode === "rag" && "프로젝트 RAG 질의"}
-                  {aiMode === "agent" && "선택 에이전트 단독 분석"}
-                  {aiMode === "debate" && `${selectedAgents.length}명 · 최대 ${maxRounds}단계 심층 분석 세션`}
+                <p className="text-[9px] truncate" style={{ color: TEXT_ON_DARK_MUTED }}>
+                  {describeAiMode(aiMode, singleAgent, selectedAgents.length, maxRounds)} · 하나의 대화에서 모드를 바꿔가며 질문하세요
                 </p>
               </div>
-              <div className="ml-auto flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: UI_GREEN }} />
-                <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>온라인</span>
-              </div>
-            </div>
-
-            <div className="shrink-0 px-3 py-2.5 space-y-2" style={{ borderBottom: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}>
-              <div className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ background: NAVY_SURFACE }}>
-                {([
-                  ["rag", "RAG 질문"],
-                  ["agent", "단일 AI"],
-                  ["debate", "AI 토론"],
-                ] as const).map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    onClick={() => setAiMode(mode)}
-                    disabled={aiTyping}
-                    className="rounded-lg px-2 py-1.5 text-[9px] font-semibold transition-all disabled:opacity-50"
-                    style={{
-                      color: aiMode === mode ? "white" : TEXT_ON_DARK_MUTED,
-                      background: aiMode === mode ? OLIVE_DARK : "transparent",
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {aiMode === "agent" && (
-                <div className="grid grid-cols-2 gap-1.5">
-                  {availableAgents.map(agent => (
-                    <button
-                      key={agent.agent}
-                      onClick={() => setSingleAgent(agent.agent)}
-                      disabled={aiTyping}
-                      className="rounded-xl px-2.5 py-2 text-left transition-all disabled:opacity-50"
-                      style={{
-                        border: `1px solid ${singleAgent === agent.agent ? OLIVE_DARK : NAVY_BORDER}`,
-                        background: singleAgent === agent.agent ? "rgba(112,130,56,0.16)" : NAVY_SURFACE,
-                      }}
-                    >
-                      <span className="block text-[9px] font-bold" style={{ color: TEXT_ON_DARK }}>{agent.name}</span>
-                      <span className="block truncate text-[8px]" style={{ color: TEXT_ON_DARK_MUTED }}>{agent.role} · {agent.model}</span>
-                    </button>
-                  ))}
+              <div className="ml-auto flex items-center gap-3">
+                <button
+                  type="button"
+                  data-testid="ai-new-conversation"
+                  onClick={clearAiThread}
+                  disabled={aiBusy || aiMessages.length === 0}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-semibold transition-all hover:opacity-90 disabled:opacity-40"
+                  style={{ border: `1px solid ${NAVY_BORDER}`, background: NAVY_SURFACE, color: OLIVE_DARK }}
+                  title="현재 AI 대화를 지우고 새로 시작"
+                >
+                  <MessageSquarePlus className="w-3 h-3" />
+                  새 대화
+                </button>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: UI_GREEN }} />
+                  <span className="text-[9px]" style={{ color: TEXT_ON_DARK_MUTED }}>온라인</span>
                 </div>
-              )}
-
-              {aiMode === "debate" && (
-                <>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
-                      참여 인원
-                      <select
-                        value={selectedAgents.length}
-                        onChange={event => updateDebateAgentCount(Number(event.target.value))}
-                        disabled={aiTyping}
-                        className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
-                        style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
-                      >
-                        {availableAgents.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1}명</option>)}
-                      </select>
-                    </label>
-                    <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
-                      탐구 단계
-                      <select
-                        value={maxRounds}
-                        onChange={event => setMaxRounds(Number(event.target.value))}
-                        disabled={aiTyping}
-                        className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
-                        style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
-                      >
-                        {[1, 2, 3, 4, 5].map(round => <option key={round} value={round}>{round}단계</option>)}
-                      </select>
-                    </label>
-                    <label className="text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
-                      추론 강도
-                      <select
-                        value={thinkingLevel}
-                        onChange={event => setThinkingLevel(event.target.value as ThinkingLevel)}
-                        disabled={aiTyping}
-                        className="mt-1 w-full rounded-lg px-2 py-1.5 text-[9px] outline-none"
-                        style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
-                      >
-                        {THINKING_LEVEL_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1">
-                    {availableAgents.map(agent => {
-                      const selected = selectedAgents.includes(agent.agent);
-                      return (
-                        <button
-                          key={agent.agent}
-                          onClick={() => toggleDebateAgent(agent.agent)}
-                          disabled={aiTyping}
-                          title={`${agent.role} · ${agent.model}`}
-                          className="rounded-lg px-1.5 py-1.5 text-[8px] font-semibold transition-all disabled:opacity-50"
-                          style={{
-                            border: `1px solid ${selected ? OLIVE_DARK : NAVY_BORDER}`,
-                            color: selected ? OLIVE_DARK : TEXT_ON_DARK_MUTED,
-                            background: selected ? "rgba(112,130,56,0.16)" : NAVY_SURFACE,
-                          }}
-                        >
-                          {agent.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {(aiMode === "agent" || aiMode === "rag") && (
-                <label className="flex items-center justify-between text-[8px] font-medium" style={{ color: TEXT_ON_DARK_MUTED }}>
-                  답변 심층도
-                  <select
-                    value={thinkingLevel}
-                    onChange={event => setThinkingLevel(event.target.value as ThinkingLevel)}
-                    disabled={aiTyping}
-                    title={THINKING_LEVEL_OPTIONS.find(opt => opt.value === thinkingLevel)?.description}
-                    className="rounded-lg px-2 py-1 text-[9px] outline-none"
-                    style={{ border: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG, color: TEXT_ON_DARK }}
-                  >
-                    {THINKING_LEVEL_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
-                </label>
-              )}
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: CHAT_CANVAS }}>
@@ -2253,11 +2567,23 @@ export function ChatPage({
                   <Bot className="mx-auto mb-2 h-5 w-5" style={{ color: OLIVE_DARK }} />
                   <p className="text-[10px] font-semibold" style={{ color: TEXT_ON_DARK }}>실제 AI 응답만 표시됩니다</p>
                   <p className="mt-1 text-[9px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>
-                    모드를 고르고 질문을 입력하세요. 단일 AI와 토론 모드에서는 에이전트별 역할과 모델도 함께 확인할 수 있습니다.
+                    입력창 옆에서 RAG 지식비서 · 단일 AI · AI 토론 중 하나를 고르고 질문하세요. 대화 도중 모드를 바꿔도 같은 대화로 이어지고, 답변마다 어떤 모드와 모델이 답했는지 표시됩니다.
                   </p>
                 </div>
               )}
-              {aiMessages.map(msg => <AIMessageBubble key={msg.id} msg={msg} />)}
+              {aiMessages.map((msg, index) => {
+                let switchedLabel: string | null = null;
+                if (msg.role === "user" && msg.modeKey) {
+                  const prevUser = aiMessages.slice(0, index).reverse().find(m => m.role === "user" && m.modeKey);
+                  if (prevUser && prevUser.modeKey !== msg.modeKey) switchedLabel = msg.badge ?? null;
+                }
+                return (
+                  <div key={msg.id}>
+                    {switchedLabel && <AIModeSwitchDivider label={switchedLabel} />}
+                    <AIMessageBubble msg={msg} />
+                  </div>
+                );
+              })}
               {aiTyping && (
                 <div className="flex gap-2.5 items-start mb-4">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: OLIVE_DARK }}>
@@ -2279,14 +2605,16 @@ export function ChatPage({
 
             <div className="shrink-0 p-3" style={{ borderTop: `1px solid ${NAVY_BORDER}`, background: CONTENT_BG }}>
               <div
-                className="flex items-end gap-2 rounded-2xl px-3 py-2"
+                className="flex flex-col gap-1.5 rounded-2xl px-3 py-2"
                 style={{ background: NAVY_SURFACE, border: `1.5px solid rgba(112,130,56,0.35)` }}
               >
-                <Bot className="w-4 h-4 shrink-0 mb-1.5" style={{ color: OLIVE_DARK, opacity: 0.5 }} />
                 <textarea
+                  data-testid="ai-input"
                   value={aiInput}
                   onChange={e => setAIInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAISend(); } }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleAISend(); }
+                  }}
                   disabled={isLoadingRooms}
                   placeholder={
                     aiMode === "rag"
@@ -2296,17 +2624,42 @@ export function ChatPage({
                         : `${selectedAgents.length}명의 AI에게 토론시킬 주제를 입력하세요...`
                   }
                   rows={2}
-                  className="flex-1 resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
+                  className="w-full resize-none outline-none text-[11px] leading-relaxed disabled:opacity-50"
                   style={{ background: "transparent", color: TEXT_ON_DARK }}
                 />
-                <button
-                  onClick={handleAISend}
-                  disabled={!aiInput.trim() || aiTyping || isLoadingRooms}
-                  className="w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0 mb-0.5 disabled:opacity-50"
-                  style={{ background: aiInput.trim() && !aiTyping ? OLIVE_DARK : NAVY_SURFACE }}
-                >
-                  <Send className="w-3.5 h-3.5" style={{ color: aiInput.trim() && !aiTyping ? "white" : TEXT_ON_DARK_MUTED }} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline text-[8px] truncate" style={{ color: TEXT_TERTIARY }}>
+                    Enter 전송 · Shift+Enter 줄바꿈
+                  </span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <AiModePicker
+                      mode={aiMode}
+                      singleAgent={singleAgent}
+                      agents={availableAgents}
+                      selectedAgents={selectedAgents}
+                      maxRounds={maxRounds}
+                      thinkingLevel={thinkingLevel}
+                      onSelectRag={() => setAiMode("rag")}
+                      onSelectAgent={agent => { setSingleAgent(agent); setAiMode("agent"); }}
+                      onSelectDebate={() => setAiMode("debate")}
+                      onToggleDebateAgent={toggleDebateAgent}
+                      onMaxRounds={setMaxRounds}
+                      onThinkingLevel={setThinkingLevel}
+                    />
+                    <button
+                      data-testid="ai-send"
+                      onClick={handleAISend}
+                      disabled={!aiInput.trim() || aiBusy || isLoadingRooms}
+                      title={aiBusy ? "이전 응답을 기다리는 중입니다" : "전송 (Enter)"}
+                      className="w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0 disabled:opacity-50"
+                      style={{ background: aiInput.trim() && !aiBusy ? OLIVE_DARK : NAVY_SURFACE }}
+                    >
+                      {aiBusy
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: TEXT_ON_DARK_MUTED }} />
+                        : <Send className="w-3.5 h-3.5" style={{ color: aiInput.trim() ? "white" : TEXT_ON_DARK_MUTED }} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </>
