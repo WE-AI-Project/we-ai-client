@@ -18,6 +18,7 @@ import {
   hideDailyStandupToday,
   type ProjectDepartment,
 } from "../lib/api";
+import { localDateKey } from "../lib/localDate";
 
 // ─────────────────────────────────────────────────────────────
 // 데이터 타입
@@ -102,7 +103,7 @@ const DISMISS_KEY = "weai_standup_dismissed";
 const DISMISS_1HOUR_PREFIX = "weai_standup_dismiss_1hour_";
 const LAST_ACCESS_PREFIX = "weai_last_access_time_";
 
-export function getTodayKey() { return new Date().toISOString().slice(0, 10); }
+export function getTodayKey() { return localDateKey(); }
 
 export function isDismissedToday(): boolean {
   return localStorage.getItem(DISMISS_KEY) === getTodayKey();

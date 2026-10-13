@@ -16,6 +16,7 @@ import {
   type ProjectDepartment,
 } from "../lib/api";
 import { DEPARTMENT_META } from "./DashboardPage";
+import { localDateKey } from "../lib/localDate";
 
 function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
@@ -146,7 +147,7 @@ export function TasksPage({ projectId }: { projectId: number | null }) {
     if (!projectId || !newTitle.trim()) return;
     setCreating(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateKey();
       const created = await createProjectSchedule(projectId, {
         title: newTitle.trim(),
         department: newDept,

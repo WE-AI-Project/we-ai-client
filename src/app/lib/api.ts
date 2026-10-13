@@ -80,6 +80,8 @@ export type MyProject = {
   projectName: string;
   description: string;
   projectCode: string;
+  repositoryUrl?: string | null;
+  localPath?: string | null;
   role: ProjectMemberRole;
   department: ProjectDepartment;
   status: ProjectStatus;

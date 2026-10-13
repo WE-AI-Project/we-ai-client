@@ -1,3 +1,4 @@
+import { localDateKey } from "../lib/localDate";
 // ── SynAIpse 개발 일정 스토어 ──
 // 부서별 기능 일정 관리 (localStorage 기반)
 
@@ -69,5 +70,5 @@ export function formatDateKR(date: string): string {
 }
 
 export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }

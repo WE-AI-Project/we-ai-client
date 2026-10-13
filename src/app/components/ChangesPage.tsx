@@ -584,7 +584,8 @@ export function ChangesPage({
         name: f.fileName,
         path: f.filePath,
         ext: f.extension || (f.fileName.includes(".") ? f.fileName.split(".").pop() ?? "" : ""),
-        status: (f.changeType || "MODIFIED").toLowerCase() as any,
+        // 새로 만든(미추적) 파일은 UI상 "추가"로 표시한다.
+        status: (f.changeType === "UNTRACKED" ? "added" : (f.changeType || "MODIFIED").toLowerCase()) as any,
         additions: 0,
         deletions: 0,
         diff: [],

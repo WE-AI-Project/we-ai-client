@@ -42,7 +42,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // 로컬 날짜 기준(toISOString은 UTC라 KST에서는 하루가 밀린다).
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function dateLabel(key: string): string {
@@ -78,7 +80,7 @@ export function AnalyticsPage({ projectId }: { projectId: number }) {
     // 커밋 데이터(SyncHub branch graph)와 일정 데이터는 독립적으로 불러온다 - 커밋 그래프가 실패해도
     // (SyncHub 미연결/서버 오류 등) 일정 분석은 그대로 보여주고, 커밋 지표만 "사용 불가"로 표시한다.
     Promise.allSettled([
-      fetchProjectBranchGraph(projectId, { maxCount: 300 }),
+      fetchProjectBranchGraph(projectId, { maxCount: 200 }),
       fetchProjectSchedules(projectId),
     ])
       .then(([graphResult, scheduleResult]) => {

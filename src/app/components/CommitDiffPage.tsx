@@ -833,11 +833,15 @@ export function CommitDiffPage({ projectId }: { projectId: number | null }) {
     let commitCount = 0;
     let additions = 0;
     let deletions = 0;
+    // SyncHub는 프로젝트당 저장소가 하나라 파트별 조회 결과에 같은 커밋이 반복된다 - 해시 기준으로 한 번만 센다.
+    const seen = new Set<string>();
 
     Object.values(repoStates).forEach((state) => {
       if (state && state.commits) {
-        commitCount += state.commits.length;
         state.commits.forEach((c) => {
+          if (seen.has(c.commitHash)) return;
+          seen.add(c.commitHash);
+          commitCount += 1;
           additions += c.additions;
           deletions += c.deletions;
         });

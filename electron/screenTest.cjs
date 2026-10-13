@@ -243,6 +243,15 @@ function waitForLoad(webContents, url, timeoutMs) {
   });
 }
 
+// 숨김 창에서는 capturePage / 세션 정리가 응답 없이 멈추는 경우가 있어 전체 실행이 끝나지 않는다 - 상한을 둔다.
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_resolve, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 function sleep(ms, token) {
   return new Promise((resolve) => {
     const t = setTimeout(resolve, ms);
@@ -363,7 +372,8 @@ async function runScreenTest(options = {}, hooks = {}) {
   ses.webRequest.onErrorOccurred(requestFilter, (details) => {
     const c = currentCollector;
     if (!c) return;
-    if (details.error === "net::ERR_ABORTED" || details.error === "net::ERR_BLOCKED_BY_CLIENT") return;
+    // ERR_CACHE_MISS: 캐시 전용(preload/only-if-cached) 요청이 캐시에 없을 때 나는 정상 동작 - 실제 실패가 아니다.
+    if (details.error === "net::ERR_ABORTED" || details.error === "net::ERR_BLOCKED_BY_CLIENT" || details.error === "net::ERR_CACHE_MISS") return;
     pushLimited(c.failedRequests, { url: details.url, resourceType: details.resourceType, error: details.error });
   });
 
@@ -558,7 +568,9 @@ async function runScreenTest(options = {}, hooks = {}) {
         // 스크린샷
         if (!collector.crashed && win && !win.isDestroyed()) {
           try {
-            const image = await wc.capturePage();
+            // 숨김 창은 그리기가 멈춰 있을 수 있으므로 캡처 전에 다시 그리게 한다.
+            try { wc.invalidate(); } catch { /* ignore */ }
+            const image = await withTimeout(wc.capturePage(), 10000, "스크린샷 캡처 시간 초과");
             if (!image.isEmpty()) {
               const fileName = `${String(index).padStart(2, "0")}-${viewport.name}-${slugify(collector.path)}.png`;
               const filePath = path.join(outputDir, fileName);
@@ -595,8 +607,8 @@ async function runScreenTest(options = {}, hooks = {}) {
       ses.webRequest.onBeforeRequest(null);
       ses.webRequest.onCompleted(null);
       ses.webRequest.onErrorOccurred(null);
-      await ses.clearStorageData();
-      await ses.clearCache();
+      await withTimeout(ses.clearStorageData(), 5000, "세션 정리 시간 초과");
+      await withTimeout(ses.clearCache(), 5000, "캐시 정리 시간 초과");
     } catch { /* ignore */ }
   }
 

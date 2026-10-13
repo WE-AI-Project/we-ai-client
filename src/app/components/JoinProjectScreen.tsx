@@ -20,6 +20,7 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
+import { localDateKey } from "../lib/localDate";
 
 // 만들어둔 공통 알림창 컴포넌트 불러오기
 import {
@@ -488,7 +489,7 @@ function CreateProjectModal({
                   type="date"
                   value={deadline}
                   onChange={(event) => setDeadline(event.target.value)}
-                  min={new Date().toISOString().split("T")[0]}
+                  min={localDateKey()}
                   className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
                   style={{
                     background: deadline ? "rgba(112,130,56,0.04)" : "rgba(0,0,0,0.03)",
@@ -761,7 +762,8 @@ function StartModal({
   const handleSelect = (project: MyProject) => {
     setSelectedProjectId(project.projectId);
     setDetected(null);
-    setLocalPath("");
+    // 프로젝트에 저장된 로컬 경로가 있으면 미리 채워 둔다(사용자가 수정 가능).
+    setLocalPath(project.localPath ?? "");
   };
 
   const handleEnter = () => {

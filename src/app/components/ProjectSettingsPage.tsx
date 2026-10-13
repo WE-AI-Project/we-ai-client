@@ -70,6 +70,7 @@ import {
 import { loadSettings, saveSettings } from "../data/projectSettingsStore";
 import { ProjectSettingsSkeleton } from "./SkeletonLoader";
 import { formatRelativeAccessTime } from "./DailyStandupModal";
+import { localDateKey } from "../lib/localDate";
 
 const MEMBER_DEPARTMENTS: ProjectDepartment[] = [
   "BACKEND",
@@ -313,8 +314,8 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
   }>({
     title: "",
     description: "",
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    startDate: localDateKey(),
+    endDate: localDateKey(new Date(Date.now() + 7 * 86400000)),
     department: "BACKEND",
     priority: "MEDIUM",
     status: "TODO",
@@ -828,8 +829,8 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
       setNewScheduleForm({
         title: "",
         description: "",
-        startDate: new Date().toISOString().slice(0, 10),
-        endDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+        startDate: localDateKey(),
+        endDate: localDateKey(new Date(Date.now() + 7 * 86400000)),
         department: "BACKEND",
         priority: "MEDIUM",
         status: "TODO",
@@ -1754,7 +1755,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
                 schedules.map((schedule) => {
                   const statusTone = SCHEDULE_STATUS_COLORS[schedule.status] || SCHEDULE_STATUS_COLORS.TODO;
                   const isEditing = editingScheduleId === schedule.scheduleId;
-                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const todayStr = localDateKey();
                   const isDelayed =
                     schedule.endDate &&
                     schedule.endDate < todayStr &&
