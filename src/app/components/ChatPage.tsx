@@ -1116,8 +1116,8 @@ function DocUploadModal({
       onClick={(e) => { if (e.target === e.currentTarget && !uploading) onClose(); }}
     >
       <div
-        className="w-full max-w-md rounded-2xl p-5 shadow-2xl transition-all"
-        style={{ background: "#FCFCFB", border: `1px solid ${BORDER}` }}
+        className="w-full max-w-md rounded-2xl p-6 shadow-2xl transition-all"
+        style={{ background: "#FFFFFF", border: `1px solid ${BORDER}` }}
       >
         <div className="flex items-center justify-between pb-3 mb-4" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
           <div className="flex items-center gap-2">
@@ -1206,8 +1206,12 @@ function DocUploadModal({
               type="button"
               onClick={onClose}
               disabled={uploading}
-              className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
-              style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
+              className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-black/5 disabled:opacity-50"
+              style={{
+                border: "1px solid rgba(0,0,0,0.15)",
+                color: TEXT_PRIMARY,
+                background: "#FFFFFF",
+              }}
             >
               취소
             </button>
@@ -1562,10 +1566,10 @@ export function ChatPage({
   const currentMemberRole = projectMembers.find((member) => member.userId === currentUserId)?.role;
   const isLeader = currentMemberRole === "LEADER";
   const isDefaultRoom = Boolean(
-    activeRoom?.isDefault ||
+    activeRoom?.isDefault === true ||
+    activeRoom?.name === "프로젝트 전체" ||
     activeRoom?.name === "전체 채팅" ||
-    activeRoom?.name === "전체" ||
-    (Array.isArray(chatRooms) && chatRooms[0]?.chatRoomId === activeRoomId)
+    activeRoom?.name === "전체"
   );
   const canManageRoom = Boolean(activeRoom) && !isDefaultRoom;
   const roomActionLabel = isLeader ? "채팅방 삭제" : "채팅방 나가기";
@@ -2098,8 +2102,8 @@ export function ChatPage({
           onClick={(e) => { if (e.target === e.currentTarget && !isCreatingRoom) setIsCreateModalOpen(false); }}
         >
           <div
-            className="w-full max-w-sm rounded-2xl p-5 shadow-2xl transition-all"
-            style={{ background: "#FCFCFB", border: `1px solid ${BORDER}` }}
+            className="w-full max-w-sm rounded-2xl p-6 shadow-2xl transition-all"
+            style={{ background: "#FFFFFF", border: `1px solid ${BORDER}` }}
           >
             <div className="flex items-center justify-between pb-3 mb-4" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
               <div className="flex items-center gap-2">
@@ -2231,8 +2235,12 @@ export function ChatPage({
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
                   disabled={isCreatingRoom}
-                  className="px-3 py-2 text-xs font-semibold rounded-xl hover:bg-black/5 transition-all"
-                  style={{ color: TEXT_SECONDARY }}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl hover:bg-black/5 transition-all"
+                  style={{
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    color: TEXT_PRIMARY,
+                    background: "#FFFFFF",
+                  }}
                 >
                   취소
                 </button>

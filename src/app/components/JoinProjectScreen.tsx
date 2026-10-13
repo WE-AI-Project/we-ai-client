@@ -391,7 +391,7 @@ function CreateProjectModal({
         style={{
           maxWidth: 480,
           maxHeight: "92vh",
-          background: "rgba(255,255,255,0.97)",
+          background: "#FFFFFF",
           border: `1px solid ${BORDER}`,
           boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
         }}
@@ -667,8 +667,12 @@ function CreateProjectModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl py-2.5 text-xs font-semibold"
-              style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+              className="flex-1 rounded-xl py-2.5 text-xs font-semibold transition-all hover:bg-black/5"
+              style={{
+                border: "1px solid rgba(0,0,0,0.15)",
+                color: TEXT_PRIMARY,
+                background: "#FFFFFF",
+              }}
             >
               취소
             </button>
@@ -811,7 +815,7 @@ function StartModal({
         style={{
           maxWidth: 680,
           maxHeight: "88vh",
-          background: "rgba(255,255,255,0.97)",
+          background: "#FFFFFF",
           border: `1px solid ${BORDER}`,
           boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
         }}

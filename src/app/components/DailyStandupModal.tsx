@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Sun, CheckCircle2, Clock, AlertTriangle,
   ArrowRight, ChevronRight, GitPullRequest,
@@ -572,11 +572,12 @@ export function DailyStandupModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{
-        background: "rgba(12,14,2,0.72)",
-        backdropFilter: "blur(10px)",
+        background: visible ? "rgba(0,0,0,0.40)" : "rgba(0,0,0,0)",
+        backdropFilter: "blur(6px)",
         opacity: visible ? 1 : 0,
         transition: "opacity 0.28s ease",
       }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <style>{`
         @keyframes _su_shimmer {
@@ -593,7 +594,7 @@ export function DailyStandupModal({
         style={{
           maxWidth: 680,
           maxHeight: "90vh",
-          background: "#FAFAF7",
+          background: "#FFFFFF",
           border: `1px solid ${BORDER}`,
           boxShadow: "0 32px 80px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0.12)",
           transform: "translateY(0) scale(1)",
@@ -758,7 +759,7 @@ export function DailyStandupModal({
         {/* ══ 푸터 ══ */}
         <div
           className="shrink-0 px-5 py-3.5 flex items-center gap-3 flex-wrap"
-          style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.98)" }}
+          style={{ borderTop: `1px solid ${BORDER}`, background: "#FFFFFF" }}
         >
           {/* 1시간 동안 보지 않기 */}
           <label className="flex items-center gap-1.5 cursor-pointer select-none">

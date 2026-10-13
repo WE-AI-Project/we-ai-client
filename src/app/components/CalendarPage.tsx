@@ -207,13 +207,13 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,0.30)", backdropFilter: "blur(8px)" }}
+      style={{ background: "rgba(0,0,0,0.40)", backdropFilter: "blur(6px)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
         style={{
-          background: BRIGHT_BEIGE,
+          background: "#FFFFFF",
           border: `1px solid ${BORDER}`,
           boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
           maxHeight: "90vh",
@@ -462,7 +462,16 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
         </div>
 
         <div className="flex gap-2 px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
-          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: BEIGE, color: TEXT_SECONDARY }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-black/5"
+            style={{
+              border: "1px solid rgba(0,0,0,0.15)",
+              color: TEXT_PRIMARY,
+              background: "#FFFFFF",
+            }}
+          >
             작성 취소
           </button>
           <button
@@ -1310,64 +1319,126 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
       }
 
       {/* 일정 삭제 모달 */}
-      {
-        scheduleToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div
-              className="fixed inset-0 bg-black/30"
-              onClick={() => setScheduleToDelete(null)}
-            />
-            <div className="relative bg-white w-[320px] min-h-[180px] px-5 py-6 rounded-2xl shadow-lg flex flex-col justify-center">
-              <div className="text-sm font-semibold mb-4 text-center">
-                "{scheduleToDelete.title}" 삭제하시겠습니까?
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setScheduleToDelete(null)}
-                  className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold"
-                  style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
-                >
-                  취소
-                </button>
-                <button
-                  onClick={() => {
-                    handleDelete(scheduleToDelete.id);
-                    setScheduleToDelete(null);
-                  }}
-                  className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold text-white bg-red-500"
-                >
-                  삭제하기
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* 부서 삭제 확인 모달 */}
-      {deptToDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      {scheduleToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.40)", backdropFilter: "blur(6px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setScheduleToDelete(null); }}
+        >
           <div
-            className="fixed inset-0 bg-black/30"
-            onClick={() => setDeptToDelete(null)}
-          />
-          <div className="relative bg-white w-[320px] min-h-[180px] px-5 py-6 rounded-2xl shadow-lg flex flex-col justify-center z-10 animate-in fade-in zoom-in-95 duration-150">
-            <div className="text-sm font-semibold mb-4 text-center leading-relaxed text-gray-800">
-              "{deptToDelete}" 부서를 삭제하시겠습니까?
-            </div>
-            <div className="flex gap-2">
+            className="w-full max-w-sm rounded-2xl p-6 shadow-2xl transition-all"
+            style={{ background: "#FFFFFF", border: `1px solid ${BORDER}` }}
+          >
+            <div className="flex items-center justify-between pb-3 mb-4" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: "rgba(184,84,80,0.10)" }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" style={{ color: "#B85450" }} />
+                </div>
+                <h3 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+                  일정을 삭제할까요?
+                </h3>
+              </div>
               <button
-                onClick={() => setDeptToDelete(null)}
-                className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold"
-                style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+                type="button"
+                onClick={() => setScheduleToDelete(null)}
+                className="p-1 rounded-lg hover:bg-black/5 transition-colors"
+              >
+                <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
+              </button>
+            </div>
+
+            <p className="text-xs leading-relaxed mb-5" style={{ color: TEXT_SECONDARY }}>
+              ‘{scheduleToDelete.title}’ 일정을 삭제하면 되돌릴 수 없습니다.
+            </p>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setScheduleToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-black/5"
+                style={{
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  color: TEXT_PRIMARY,
+                  background: "#FFFFFF",
+                }}
               >
                 취소
               </button>
               <button
-                onClick={confirmDeleteDept}
-                className="flex-1 px-2 py-3 rounded-2xl text-[13px] font-bold text-white bg-red-500"
+                type="button"
+                onClick={() => {
+                  handleDelete(scheduleToDelete.id);
+                  setScheduleToDelete(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
+                style={{ background: "#B85450" }}
               >
-                삭제하기
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 부서 삭제 확인 모달 */}
+      {deptToDelete && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.40)", backdropFilter: "blur(6px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setDeptToDelete(null); }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 shadow-2xl transition-all"
+            style={{ background: "#FFFFFF", border: `1px solid ${BORDER}` }}
+          >
+            <div className="flex items-center justify-between pb-3 mb-4" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: "rgba(184,84,80,0.10)" }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" style={{ color: "#B85450" }} />
+                </div>
+                <h3 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+                  부서를 삭제할까요?
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeptToDelete(null)}
+                className="p-1 rounded-lg hover:bg-black/5 transition-colors"
+              >
+                <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
+              </button>
+            </div>
+
+            <p className="text-xs leading-relaxed mb-5" style={{ color: TEXT_SECONDARY }}>
+              ‘{deptToDelete}’ 부서를 삭제하시겠습니까? 관련 일정 표시에 영향을 줄 수 있습니다.
+            </p>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeptToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-black/5"
+                style={{
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  color: TEXT_PRIMARY,
+                  background: "#FFFFFF",
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteDept}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
+                style={{ background: "#B85450" }}
+              >
+                삭제
               </button>
             </div>
           </div>

@@ -92,11 +92,21 @@ function UploadModal({ projectId, onClose, onUploaded }: { projectId: number; on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div className="w-full max-w-md rounded-2xl p-5 space-y-3" style={{ background: "#FAFAF7" }}>
-        <div className="flex items-center justify-between">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.40)", backdropFilter: "blur(6px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+    >
+      <div className="w-full max-w-md rounded-2xl p-6 space-y-3.5 shadow-2xl transition-all" style={{ background: "#FFFFFF", border: `1px solid ${BORDER}` }}>
+        <div className="flex items-center justify-between pb-3" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
           <p className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>공유 자료 업로드</p>
-          <button onClick={onClose}><X className="w-4 h-4" style={{ color: TEXT_TERTIARY }} /></button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-black/5 transition-colors"
+          >
+            <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
+          </button>
         </div>
 
         <label className="block space-y-1">
@@ -143,15 +153,31 @@ function UploadModal({ projectId, onClose, onUploaded }: { projectId: number; on
           />
         </label>
 
-        <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-semibold"
-          style={{ background: ACCENT, color: "white" }}
-        >
-          {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-          업로드
-        </button>
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-black/5 disabled:opacity-50"
+            style={{
+              border: "1px solid rgba(0,0,0,0.15)",
+              color: TEXT_PRIMARY,
+              background: "#FFFFFF",
+            }}
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ background: ACCENT }}
+          >
+            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            업로드
+          </button>
+        </div>
       </div>
     </div>
   );

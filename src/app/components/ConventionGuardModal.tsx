@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ShieldAlert, X, AlertCircle, AlertTriangle, Info,
   CheckCircle2, ChevronDown, ChevronRight,
@@ -573,10 +573,11 @@ export function ConventionGuardModal({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
       style={{
-        background:     `rgba(12,14,2,${visible ? "0.68" : "0"})`,
-        backdropFilter: "blur(10px)",
+        background:     visible ? "rgba(0,0,0,0.40)" : "rgba(0,0,0,0)",
+        backdropFilter: "blur(6px)",
         transition:     "background 0.28s ease",
       }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <style>{`
         @keyframes _cg_scan { 0% { width: 0; } 100% { width: 100%; } }
@@ -590,7 +591,7 @@ export function ConventionGuardModal({
         style={{
           maxWidth:   660,
           maxHeight:  "92vh",
-          background: "#FAFAF7",
+          background: "#FFFFFF",
           border:     `1px solid ${errorCount > 0 ? "rgba(184,84,80,0.30)" : BORDER}`,
           boxShadow:  `0 28px 72px rgba(0,0,0,0.28), 0 4px 16px ${errorCount > 0 ? "rgba(184,84,80,0.12)" : "rgba(0,0,0,0.08)"}`,
           transform:  visible ? "translateY(0) scale(1)" : "translateY(24px) scale(0.97)",
@@ -682,7 +683,7 @@ export function ConventionGuardModal({
         {scanDone && (
           <div
             className="shrink-0 flex items-center px-5 gap-0"
-            style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.98)" }}
+            style={{ borderBottom: `1px solid ${BORDER}`, background: "#FFFFFF" }}
           >
             {[
               { id: "violations", label: `위반 목록 (${activeViolations.length})` },
@@ -815,7 +816,7 @@ export function ConventionGuardModal({
         {scanDone && (
           <div
             className="shrink-0 px-5 py-3.5 flex items-center gap-2.5"
-            style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(248,247,244,0.98)" }}
+            style={{ borderTop: `1px solid ${BORDER}`, background: "#FFFFFF" }}
           >
             {/* AI 메시지 */}
             <div className="flex items-center gap-2 flex-1 min-w-0">

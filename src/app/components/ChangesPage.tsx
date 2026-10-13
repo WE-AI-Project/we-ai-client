@@ -114,24 +114,25 @@ function QAModal({
   if (!show) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.40)", backdropFilter: "blur(6px)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="rounded-2xl overflow-hidden relative"
+        className="rounded-2xl overflow-hidden relative shadow-2xl transition-all"
         style={{
-          width: 360,
-          background: "rgba(255,255,255,0.97)",
+          width: 380,
+          background: "#FFFFFF",
           border: `1px solid ${BORDER}`,
-          boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
         }}
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 p-1 rounded-lg hover:bg-black/[0.06] transition-colors"
+          className="absolute top-3.5 right-3.5 p-1 rounded-lg hover:bg-black/[0.06] transition-colors"
           aria-label="닫기"
         >
-          <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+          <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
         </button>
         <div className="p-7 text-center">
           <div
@@ -157,8 +158,12 @@ function QAModal({
           <div className="flex gap-2.5">
             <button
               onClick={onQANo}
-              className="flex-1 py-2.5 rounded-xl text-xs font-semibold"
-              style={{ background: "rgba(0,0,0,0.06)", color: TEXT_SECONDARY }}
+              className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-black/5"
+              style={{
+                border: "1px solid rgba(0,0,0,0.15)",
+                color: TEXT_PRIMARY,
+                background: "#FFFFFF",
+              }}
             >
               아니오, 바로 커밋
             </button>
@@ -197,24 +202,25 @@ function CommittedModal({
   if (!show) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.24)", backdropFilter: "blur(6px)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.40)", backdropFilter: "blur(6px)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="rounded-2xl overflow-hidden"
+        className="rounded-2xl overflow-hidden shadow-2xl transition-all relative"
         style={{
-          width: 340,
-          background: "rgba(255,255,255,0.97)",
+          width: 360,
+          background: "#FFFFFF",
           border: `1px solid ${BORDER}`,
-          boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
         }}
       >
         <div className="p-7 text-center">
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 p-1 rounded-lg hover:bg-black/[0.06]"
+            className="absolute top-3.5 right-3.5 p-1 rounded-lg hover:bg-black/[0.06] transition-colors"
           >
-            <X className="w-3.5 h-3.5" style={{ color: TEXT_TERTIARY }} />
+            <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
           </button>
           <div
             className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"

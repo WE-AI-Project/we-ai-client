@@ -194,8 +194,8 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6 transition-all"
       style={{
-        background: visible ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0)",
-        backdropFilter: visible ? "blur(8px)" : "blur(0px)",
+        background: visible ? "rgba(0,0,0,0.40)" : "rgba(0,0,0,0)",
+        backdropFilter: visible ? "blur(6px)" : "blur(0px)",
         transition: "all 0.2s ease",
       }}
       onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
@@ -204,7 +204,7 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
       <div
         className="w-full max-w-xl flex flex-col overflow-hidden rounded-2xl"
         style={{
-          background: "rgba(252,252,251,0.98)",
+          background: "#FFFFFF",
           border: `1px solid ${BORDER}`,
           boxShadow: "0 24px 64px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.06)",
           transform: visible ? "translateY(0) scale(1)" : "translateY(16px) scale(0.97)",
@@ -481,8 +481,12 @@ export function ProfileEditModal({ profile, onSave, onClose }: Props) {
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold transition-all"
-            style={{ background: "rgba(0,0,0,0.05)", color: TEXT_SECONDARY }}
+            className="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-black/5"
+            style={{
+              border: "1px solid rgba(0,0,0,0.15)",
+              color: TEXT_PRIMARY,
+              background: "#FFFFFF",
+            }}
           >
             취소
           </button>
