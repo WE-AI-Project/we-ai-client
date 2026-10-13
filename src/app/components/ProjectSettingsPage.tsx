@@ -1968,7 +1968,7 @@ export function ProjectSettingsPage({ projectId, currentUserId }: Props) {
           </section>
         )}
 
-        {activeTab === "agents" && <AgentControlPage />}
+        {activeTab === "agents" && <AgentControlPage projectId={projectId} />}
           </div>
         </div>
       </div>

@@ -1,5 +1,4 @@
 import { ApiError, request, loadSession, buildApiUrl } from "../app/lib/api";
-import { callCustomEndpointIfEnabled } from "../app/lib/customEndpoint";
 
 export type DebateTurn = {
   round?: number;
@@ -113,8 +112,9 @@ export type AiChatRequest = {
 export type AiChatResponse = {
   answer: string;
   contexts?: string[];
-  /** "custom-endpoint"면 프로젝트 문서 RAG 검색을 거치지 않은 응답이라는 뜻 (contexts는 항상 빈 배열) */
-  source?: "backend" | "custom-endpoint";
+  /** 서버가 실제로 어떤 백엔드로 답변을 생성했는지: 기본 클러스터 / 개인 설정 / 프로젝트 공용 설정.
+   *  어느 쪽이든 프로젝트 문서 RAG 컨텍스트는 항상 적용된다. */
+  backendSource?: "DEFAULT" | "PERSONAL" | "PROJECT";
 };
 
 export class AiApiError extends Error {
@@ -197,14 +197,8 @@ export async function runAiQa(request: QaRequest): Promise<QaResponse> {
 }
 
 export async function runAiChat(request: AiChatRequest): Promise<AiChatResponse> {
-  // 커스텀 엔드포인트가 설정·활성화되어 있으면 우리 백엔드 대신 그쪽으로 직접 질의한다.
-  // 주의: 이 경로에서는 우리 백엔드가 해주는 프로젝트 문서 기반 RAG 컨텍스트 검색이
-  // 빠지므로 항상 contexts: []로 반환된다 — 호출부에서 이를 구분해 안내해야 한다.
-  const customResult = await callCustomEndpointIfEnabled(request.question);
-  if (customResult) {
-    return { answer: customResult.answer, contexts: [], source: "custom-endpoint" };
-  }
-
+  // 개인/프로젝트 커스텀 백엔드가 설정되어 있으면 서버가 알아서 그쪽으로 답변 생성을 보낸다
+  // (AgentControlPage의 AI 백엔드 설정 참고) — 어느 쪽이든 RAG 컨텍스트 검색은 항상 적용된다.
   return aiRequest<AiChatResponse>("/api/v1/ai/chat", {
     method: "POST",
     body: {

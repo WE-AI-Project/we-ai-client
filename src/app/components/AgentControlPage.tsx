@@ -7,13 +7,17 @@ import {
   TERM_BG, TERM_TEXT, TERM_MUTED, TERM_GREEN, UI_RED,
 } from "../colors";
 import {
-  loadCustomEndpointConfig,
-  saveCustomEndpointConfig,
-  testCustomEndpointConnection,
-  type CustomEndpointConfig,
-  type CustomEndpointDialect,
-  type CustomEndpointTestResult,
-} from "../lib/customEndpoint";
+  fetchPersonalAiBackend,
+  savePersonalAiBackend,
+  deletePersonalAiBackendApiKey,
+  fetchProjectAiBackend,
+  saveProjectAiBackend,
+  deleteProjectAiBackendApiKey,
+  testAiBackendConnection,
+  type AiBackendSetting,
+  type AiBackendDialect,
+  type AiBackendConnectionTestResult,
+} from "../../api/aiBackendApi";
 import {
   fetchAiAgents,
   fetchAgentMetrics,
@@ -47,40 +51,57 @@ function agentActivityMeta(metrics: AgentMetrics | undefined): { color: string; 
   return { color: "#5A8A4A", bg: "rgba(90,138,74,0.10)", label: "Active" };
 }
 
-const DIALECT_LABEL: Record<CustomEndpointDialect, string> = {
-  "ollama-native": "Ollama (네이티브)",
-  "openai-compatible": "OpenAI 호환 (vLLM, LM Studio 등)",
+const DIALECT_LABEL: Record<AiBackendDialect, string> = {
+  OLLAMA_NATIVE: "Ollama (네이티브)",
+  OPENAI_COMPATIBLE: "OpenAI 호환 (vLLM, LM Studio 등)",
 };
 
-// ── 커스텀 AI 엔드포인트 설정 카드 ──
-// 사용자가 기본 백엔드 대신 신뢰하는 다른 서버(팀원의 로컬 Ollama, ngrok 주소 등)로
-// 직접 AI 요청을 보낼 수 있게 하는 설정 UI. 실제 저장/헬스체크/호출 로직은
-// ../lib/customEndpoint.ts에 있으며, Electron 환경에서는 electron/main.cjs가
-// 메인 프로세스에서 안전하게 처리한다(API 키는 렌더러로 다시 노출되지 않음).
-function CustomEndpointCard() {
+type AiBackendCardProps = {
+  title: string;
+  description: string;
+  usageHint: string;
+  load: () => Promise<AiBackendSetting>;
+  save: (draft: {
+    enabled: boolean;
+    dialect: AiBackendDialect;
+    baseUrl: string;
+    modelName: string;
+    healthPath: string;
+    apiKey?: string;
+  }) => Promise<AiBackendSetting>;
+  deleteApiKey: () => Promise<void>;
+};
+
+// ── 커스텀 AI 백엔드 설정 카드 (개인 / 프로젝트 공용 공용 컴포넌트) ──
+// 사용자가 기본 Ollama 클러스터 대신 자신의 GPU나 타 서비스 API 키를 등록해 답변 생성
+// 단계만 그쪽으로 보내도록 서버에 저장하는 설정 UI. 실제 저장/헬스체크는 서버가 대행한다
+// (../../api/aiBackendApi.ts, 서버 AiBackendSettingController) — 그래서 CORS 제약이 없고
+// API 키가 이 렌더러 프로세스 밖으로 나가지 않으며, 프로젝트 문서 RAG 검색도 항상 유지된다.
+function AiBackendCard({ title, description, usageHint, load, save, deleteApiKey }: AiBackendCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const [loaded, setLoaded] = useState<CustomEndpointConfig | null>(null);
+  const [loaded, setLoaded] = useState<AiBackendSetting | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
-  const [dialect, setDialect] = useState<CustomEndpointDialect>("ollama-native");
+  const [dialect, setDialect] = useState<AiBackendDialect>("OLLAMA_NATIVE");
   const [model, setModel] = useState("llama3.1");
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<CustomEndpointTestResult | null>(null);
+  const [testResult, setTestResult] = useState<AiBackendConnectionTestResult | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadCustomEndpointConfig().then(cfg => {
+    load().then(cfg => {
       setLoaded(cfg);
       setEnabled(cfg.enabled);
-      setBaseUrl(cfg.baseUrl);
+      setBaseUrl(cfg.baseUrl ?? "");
       setDialect(cfg.dialect);
-      setModel(cfg.model);
+      setModel(cfg.modelName ?? "llama3.1");
       if (cfg.enabled || cfg.baseUrl) setExpanded(true);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const healthPath = dialect === "openai-compatible" ? "/v1/models" : "/api/tags";
+  const healthPath = dialect === "OPENAI_COMPATIBLE" ? "/v1/models" : "/api/tags";
 
   const handleTest = async () => {
     if (!baseUrl.trim()) {
@@ -90,8 +111,10 @@ function CustomEndpointCard() {
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await testCustomEndpointConnection({ baseUrl, healthPath, apiKey: apiKeyInput || undefined });
+      const result = await testAiBackendConnection({ baseUrl, dialect, healthPath, apiKey: apiKeyInput || undefined });
       setTestResult(result);
+    } catch (err) {
+      setTestResult({ ok: false, reason: err instanceof Error ? err.message : "연결 테스트에 실패했습니다." });
     } finally {
       setTesting(false);
     }
@@ -104,21 +127,10 @@ function CustomEndpointCard() {
     }
     setSaving(true);
     try {
-      const saved = await saveCustomEndpointConfig({
-        enabled,
-        baseUrl,
-        dialect,
-        healthPath,
-        model,
-        apiKey: apiKeyInput.length > 0 ? apiKeyInput : undefined,
-      });
+      const saved = await save({ enabled, baseUrl, dialect, modelName: model, healthPath, apiKey: apiKeyInput || undefined });
       setLoaded(saved);
       setApiKeyInput("");
-      if (saved.keySaveFailed) {
-        toast.error("다른 설정은 저장됐지만, 이 기기에서는 API 키를 안전하게 저장할 수 없어 키는 저장되지 않았습니다.");
-      } else {
-        toast.success("커스텀 엔드포인트 설정이 저장되었습니다.");
-      }
+      toast.success("AI 백엔드 설정이 저장되었습니다.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
     } finally {
@@ -129,9 +141,12 @@ function CustomEndpointCard() {
   const handleRemoveKey = async () => {
     setSaving(true);
     try {
-      const saved = await saveCustomEndpointConfig({ enabled, baseUrl, dialect, healthPath, model, apiKey: null });
-      setLoaded(saved);
+      await deleteApiKey();
+      const refreshed = await load();
+      setLoaded(refreshed);
       toast.success("저장된 API 키를 삭제했습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "키 삭제에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -150,9 +165,9 @@ function CustomEndpointCard() {
           <Plug className="w-4 h-4" style={{ color: ACCENT }} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>커스텀 AI 엔드포인트</p>
+          <p className="text-[11px] font-semibold" style={{ color: TEXT_PRIMARY }}>{title}</p>
           <p className="text-[10px] mt-0.5" style={{ color: TEXT_TERTIARY }}>
-            {loaded?.enabled && loaded.baseUrl ? `사용 중 · ${loaded.baseUrl}` : "기본 서버 대신 다른 AI 서버를 연결합니다"}
+            {loaded?.enabled && loaded.baseUrl ? `사용 중 · ${loaded.baseUrl}` : description}
           </p>
         </div>
         <span
@@ -171,8 +186,8 @@ function CustomEndpointCard() {
         <div className="px-4 pb-4 pt-1 space-y-3" style={{ borderTop: `1px solid ${BORDER_SUBTLE}` }}>
           <div className="flex items-center justify-between pt-3">
             <div>
-              <p className="text-[10.5px] font-semibold" style={{ color: TEXT_PRIMARY }}>이 엔드포인트 사용</p>
-              <p className="text-[9.5px]" style={{ color: TEXT_TERTIARY }}>켜면 AI 채팅 요청이 아래 서버로 직접 전송됩니다 (프로젝트 문서 검색은 지원되지 않습니다)</p>
+              <p className="text-[10.5px] font-semibold" style={{ color: TEXT_PRIMARY }}>이 백엔드 사용</p>
+              <p className="text-[9.5px]" style={{ color: TEXT_TERTIARY }}>{usageHint}</p>
             </div>
             <button
               onClick={() => setEnabled(v => !v)}
@@ -199,11 +214,11 @@ function CustomEndpointCard() {
               <span className="text-[9.5px] font-semibold" style={{ color: TEXT_LABEL }}>API 방언</span>
               <select
                 value={dialect}
-                onChange={e => setDialect(e.target.value as CustomEndpointDialect)}
+                onChange={e => setDialect(e.target.value as AiBackendDialect)}
                 className="w-full px-2.5 py-1.5 text-[11px] rounded-lg outline-none"
                 style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${BORDER}`, color: TEXT_PRIMARY }}
               >
-                {(Object.keys(DIALECT_LABEL) as CustomEndpointDialect[]).map(d => (
+                {(Object.keys(DIALECT_LABEL) as AiBackendDialect[]).map(d => (
                   <option key={d} value={d}>{DIALECT_LABEL[d]}</option>
                 ))}
               </select>
@@ -222,7 +237,7 @@ function CustomEndpointCard() {
 
             <label className="col-span-2 space-y-1">
               <span className="text-[9.5px] font-semibold flex items-center gap-1" style={{ color: TEXT_LABEL }}>
-                <KeyRound className="w-2.5 h-2.5" /> API 키 (선택 — 프록시/터널에 인증이 있는 경우만)
+                <KeyRound className="w-2.5 h-2.5" /> API 키 (선택 — 프록시/터널/서비스에 인증이 있는 경우만)
               </span>
               <div className="flex items-center gap-1.5">
                 <input
@@ -288,7 +303,33 @@ function CustomEndpointCard() {
   );
 }
 
-export function AgentControlPage() {
+function PersonalAiBackendCard() {
+  return (
+    <AiBackendCard
+      title="개인 AI 백엔드"
+      description="기본 서버 대신 내 GPU나 개인 API 키를 이 계정의 모든 채팅에 사용합니다"
+      usageHint="켜면 내 채팅 요청의 답변 생성 단계가 아래 서버로 전송됩니다 (프로젝트 문서 검색은 그대로 유지됩니다). 프로젝트 공용 설정보다 우선합니다."
+      load={fetchPersonalAiBackend}
+      save={savePersonalAiBackend}
+      deleteApiKey={deletePersonalAiBackendApiKey}
+    />
+  );
+}
+
+function ProjectAiBackendCard({ projectId }: { projectId: number }) {
+  return (
+    <AiBackendCard
+      title="프로젝트 공용 AI 백엔드"
+      description="이 프로젝트 멤버 전원이 함께 쓸 GPU나 API 키를 등록합니다 (팀 리더만 저장 가능)"
+      usageHint="켜면 개인 설정이 없는 멤버의 채팅 요청이 아래 서버로 전송됩니다 (프로젝트 문서 검색은 그대로 유지됩니다). 저장/삭제는 프로젝트 리더만 할 수 있습니다."
+      load={() => fetchProjectAiBackend(projectId)}
+      save={draft => saveProjectAiBackend(projectId, draft)}
+      deleteApiKey={() => deleteProjectAiBackendApiKey(projectId)}
+    />
+  );
+}
+
+export function AgentControlPage({ projectId }: { projectId?: number | null }) {
   const [agents, setAgents]           = useState<AiAgent[]>([]);
   const [metrics, setMetrics]         = useState<Record<string, AgentMetrics>>({});
   const [isLoading, setIsLoading]     = useState(true);
@@ -373,8 +414,9 @@ export function AgentControlPage() {
             </div>
           )}
 
-          {/* ── 커스텀 AI 엔드포인트 설정 ── */}
-          <CustomEndpointCard />
+          {/* ── 커스텀 AI 백엔드 설정 (개인 / 프로젝트 공용) ── */}
+          <PersonalAiBackendCard />
+          {projectId != null && <ProjectAiBackendCard projectId={projectId} />}
 
           {/* ── 에이전트 카드 목록 ── */}
           <div className="grid grid-cols-2 gap-3 shrink-0">
