@@ -1221,8 +1221,9 @@ export default function App() {
           </div>
 
           {/* 중앙: 글로벌 검색 — VS Code 커맨드 팔레트 진입점처럼 화면(탭) 빠른 이동 */}
-          <div className="flex justify-center min-w-0 px-3" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <div className="relative w-full max-w-[420px]" ref={searchRef}>
+          {/* 중앙 열 자체(1fr)는 드래그 영역으로 두고, 실제 검색 박스만 no-drag - 열 전체를 no-drag로 두면 창을 잡을 곳이 거의 없다 */}
+          <div className="flex justify-center min-w-0 px-3 h-full items-center">
+            <div className="relative w-full max-w-[420px]" ref={searchRef} style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: SIDEBAR_TEXT }} />
               <input
                 value={searchQuery}
