@@ -447,6 +447,7 @@ export type ChatRoom = {
   name: string;
   type?: string; 
   memberCount?: number;
+  isDefault?: boolean;
 };
 
 export type ChatMessageResponse = {
@@ -551,6 +552,47 @@ export async function createChatRoom(
     method: "POST",
     body: { name, type, department } as any,
   });
+}
+
+export type ChatRoomLeaveResponse = {
+  projectId: number;
+  chatRoomId: number;
+  chatRoomMemberId: number;
+  userId: number;
+  status: "LEFT";
+};
+
+export async function leaveChatRoom(  //채팅방 나가기
+  projectId: number | string,
+  chatRoomId: number | string
+): Promise<ChatRoomLeaveResponse> {
+  return request<ChatRoomLeaveResponse>(
+    `/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}/leave`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export type ChatRoomDeleteResponse = {
+  chatRoomId: number;
+  projectId: number;
+  name: string;
+  type: string;
+  department?: string | null;
+  deletedAt: string;
+};
+
+export async function deleteChatRoom(  //채팅방 삭제
+  projectId: number | string,
+  chatRoomId: number | string
+): Promise<ChatRoomDeleteResponse> {
+  return request<ChatRoomDeleteResponse>(
+    `/api/v1/projects/${projectId}/chat/rooms/${chatRoomId}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 // ── 채팅 문서 업로드 & AI 브리핑 ──
