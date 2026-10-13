@@ -61,6 +61,8 @@ import {
   startChatMeeting,
   endChatMeeting,
   fetchMeetingMinutes,
+  leaveChatRoom,
+  deleteChatRoom,
   type ChatRoom,
   type ChatMessageResponse,
   type Department,
@@ -928,6 +930,7 @@ export function ChatPage({
   const [isLoadingDepts, setIsLoadingDepts] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isProcessingRoomAction, setIsProcessingRoomAction] = useState(false);
 
   const [mainTab, setMainTab] = useState<"chat" | "ai" | "docs">("chat");
   const [docs, setDocs] = useState<MeetingDoc[]>([]);
@@ -1190,8 +1193,57 @@ export function ChatPage({
     ? chatRooms.find(r => r.chatRoomId === activeRoomId)
     : undefined;
   const currentMemberRole = projectMembers.find((member) => member.userId === currentUserId)?.role;
-  const canLeaveChatRoom = (currentMemberRole === "MEMBER" || currentMemberRole === "LEADER") && Boolean(activeRoom);
-  const canDeleteChatRoom = currentMemberRole === "LEADER" && Boolean(activeRoom);
+  const isLeader = currentMemberRole === "LEADER";
+  const isDefaultRoom = Boolean(
+    activeRoom?.isDefault ||
+    activeRoom?.name === "전체 채팅" ||
+    activeRoom?.name === "전체" ||
+    (Array.isArray(chatRooms) && chatRooms[0]?.chatRoomId === activeRoomId)
+  );
+  const canManageRoom = Boolean(activeRoom) && !isDefaultRoom;
+  const roomActionLabel = isLeader ? "채팅방 삭제" : "채팅방 나가기";
+
+  const handleLeaveOrDeleteChatRoom = async () => {
+    if (!projectId || !activeRoomId) return;
+    if (isDefaultRoom) {
+      toast.error("기본 전체 채팅방은 삭제하거나 나갈 수 없습니다.");
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+
+    setIsProcessingRoomAction(true);
+    try {
+      if (isLeader) {
+        await deleteChatRoom(projectId, activeRoomId);
+        toast.success("채팅방이 삭제되었습니다.");
+      } else {
+        await leaveChatRoom(projectId, activeRoomId);
+        toast.success("채팅방에서 나갔습니다.");
+      }
+      setIsDeleteDialogOpen(false);
+
+      const roomsRes = await fetchChatRooms(projectId);
+      const roomsArray = Array.isArray(roomsRes)
+        ? roomsRes
+        : (Array.isArray((roomsRes as any)?.data)
+          ? (roomsRes as any).data
+          : (Array.isArray((roomsRes as any)?.chatRooms)
+            ? (roomsRes as any).chatRooms
+            : []));
+      setChatRooms(roomsArray);
+
+      const nextRoom = roomsArray.find((r: ChatRoom) => r.chatRoomId !== activeRoomId) || roomsArray[0];
+      if (nextRoom) {
+        setActiveRoomId(nextRoom.chatRoomId);
+      } else {
+        setActiveRoomId(null);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || (isLeader ? "채팅방 삭제에 실패했습니다." : "채팅방 나가기에 실패했습니다."));
+    } finally {
+      setIsProcessingRoomAction(false);
+    }
+  };
 
   const addLocalMessage = useCallback((msg: Omit<ChatMessage, "id" | "time">) => {
     const full: ChatMessage = { ...msg, id: genId(), time: new Date().toISOString() };
@@ -1544,18 +1596,33 @@ export function ChatPage({
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>채팅방을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isLeader ? "채팅방을 삭제할까요?" : "채팅방을 나갈까요?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {activeRoom?.name ? `‘${activeRoom.name}’ 채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다.` : "채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다."}
+              {isLeader
+                ? (activeRoom?.name ? `‘${activeRoom.name}’ 채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다.` : "채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다.")
+                : (activeRoom?.name ? `‘${activeRoom.name}’ 채팅방을 나가시겠습니까?` : "채팅방을 나가시겠습니까?")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={isProcessingRoomAction}>취소</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => toast.info("채팅방 삭제 API 연동 후 삭제가 완료됩니다.")}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleLeaveOrDeleteChatRoom();
+              }}
+              disabled={isProcessingRoomAction}
               style={{ background: UI_RED, color: "#FFFFFF" }}
             >
-              삭제
+              {isProcessingRoomAction ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  {isLeader ? "삭제 중..." : "나가는 중..."}
+                </>
+              ) : (
+                isLeader ? "삭제" : "나가기"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1835,30 +1902,12 @@ export function ChatPage({
                 </button>
               )}
 
-              {canLeaveChatRoom && (
-                <div className="relative group shrink-0">
-                  <button
-                    type="button"
-                    aria-label="채팅방 나가기"
-                    className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:bg-red-50"
-                    style={{
-                      background: "rgba(184,84,80,0.08)",
-                      color: "#B85450",
-                      border: "1px solid rgba(184,84,80,0.18)",
-                    }}
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                  </button>
-                  <ActionTooltip label="채팅방 나가기" />
-                </div>
-              )}
-
-              {canDeleteChatRoom && (
+              {canManageRoom && (
                 <div className="relative group shrink-0">
                   <button
                     type="button"
                     onClick={() => setIsDeleteDialogOpen(true)}
-                    aria-label="채팅방 삭제"
+                    aria-label={roomActionLabel}
                     className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:bg-red-50"
                     style={{
                       background: "rgba(184,84,80,0.08)",
@@ -1866,9 +1915,13 @@ export function ChatPage({
                       border: "1px solid rgba(184,84,80,0.18)",
                     }}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    {isLeader ? (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <LogOut className="h-3.5 w-3.5" />
+                    )}
                   </button>
-                  <ActionTooltip label="채팅방 삭제" />
+                  <ActionTooltip label={roomActionLabel} />
                 </div>
               )}
 
