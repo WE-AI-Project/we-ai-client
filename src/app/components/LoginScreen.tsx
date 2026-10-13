@@ -26,7 +26,6 @@ import {
   BORDER,
 } from "../colors";
 import {
-  FolderGit2,
   Mail,
   Lock,
   Eye,
@@ -59,6 +58,7 @@ import {
   signUp,
   fetchSocialLoginUrl,
 } from "../lib/api";
+import { SynaipseAppIcon, SynaipseMark, SynaipseWordmark } from "./brand/SynaipseLogo";
 
 const KEYFRAMES = `
   @keyframes card-appear {
@@ -514,9 +514,7 @@ function LoginForm({
       }}
     >
       <div className="flex items-center gap-3 border-b border-black/5 pb-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
-          <FolderGit2 className="h-5 w-5" style={{ color: "white" }} />
-        </div>
+        <SynaipseAppIcon size={40} />
         <div>
           <h2 className="text-base font-bold" style={{ color: TEXT_PRIMARY }}>
             로그인
@@ -1546,12 +1544,10 @@ export function LoginScreen({ onAuthenticated }: Props) {
           
           {/* Logo & Title */}
           <div className="mb-8 flex items-center justify-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: OLIVE_DARK }}>
-              <FolderGit2 className="h-5.5 w-5.5" style={{ color: "white" }} />
-            </div>
+            <SynaipseMark size={48} variant="dark" pulse gapColor="transparent" />
             <div>
               <p className="text-xl font-bold" style={{ color: TEXT_ON_DARK }}>
-                SynAIpse
+                <SynaipseWordmark onDark />
               </p>
               <p className="text-[10px]" style={{ color: LOGIN_MUTED }}>
                 Project Office
@@ -1562,7 +1558,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           <h1 className="mb-4 text-center text-[44px] font-bold leading-tight tracking-tight sm:text-[52px]">
             <span style={{ color: TEXT_ON_DARK }}>Welcome to</span>
             <br />
-            <span style={{ color: OLIVE_DARK }}>SynAIpse</span>
+            <SynaipseWordmark onDark style={{ color: TEXT_ON_DARK }} />
           </h1>
 
           <p className="mb-8 text-center text-sm sm:text-base" style={{ color: LOGIN_OLIVE_TEXT, maxWidth: 360 }}>

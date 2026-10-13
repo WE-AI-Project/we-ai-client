@@ -110,8 +110,10 @@
   "build": {
     "appId": "com.synaipse.app",
     "productName": "SynAIpse",
+    "icon": "build/icon.png",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -122,7 +124,8 @@
       "category": "public.app-category.productivity"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,

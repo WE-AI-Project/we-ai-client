@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { localDateKey } from "../lib/localDate";
+import { SynaipseAppIcon, SynaipseWordmark } from "./brand/SynaipseLogo";
 
 // 만들어둔 공통 알림창 컴포넌트 불러오기
 import {
@@ -1127,14 +1128,9 @@ export function JoinProjectScreen({
 
         <div className="relative z-10 flex w-full max-w-[680px] flex-col items-center gap-7 px-6">
           <div className="text-center">
-            <div
-              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-              style={{ background: ACCENT, boxShadow: "0 8px 24px rgba(88,101,242,0.30)" }}
-            >
-              <Bot className="h-7 w-7" style={{ color: "white" }} />
-            </div>
+            <SynaipseAppIcon size={56} pulse style={{ margin: "0 auto 16px", boxShadow: "0 8px 24px rgba(10,14,23,0.35)" }} />
             <h1 className="mb-1.5 text-xl font-bold" style={{ color: TEXT_ON_DARK }}>
-              Welcome to SynAIpse Office
+              Welcome to <SynaipseWordmark onDark /> Office
             </h1>
             <p className="text-xs" style={{ color: TEXT_ON_DARK_MUTED }}>
               Intelligent Multi-Agent Project Office

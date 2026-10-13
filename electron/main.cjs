@@ -20,6 +20,8 @@ function createWindow() {
     // frame:false는 Windows/Linux/macOS 모두에서 타이틀바 자체를 없애므로, 최소화/최대화/닫기
     // 버튼도 우리가 직접 그려서 IPC로 실제 창 제어를 호출해야 한다 (아래 window:* 핸들러 참고).
     frame: false,
+    // 작업 표시줄/Alt+Tab 아이콘 (SynAIpse 마크). 패키징 시에는 build/icon.* 가 실행 파일 아이콘으로 쓰인다.
+    icon: path.join(__dirname, "assets", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

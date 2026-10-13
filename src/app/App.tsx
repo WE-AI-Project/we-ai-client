@@ -28,6 +28,7 @@ import {
   ArrowRight,
   Info,
 } from "lucide-react";
+import { SynaipseAppIcon, SynaipseWordmark } from "./components/brand/SynaipseLogo";
 
 // ── 페이지 컴포넌트 ──
 import { SynAIpseGalaxyPage } from "./components/SynAIpseGalaxyPage";
@@ -1025,14 +1026,12 @@ export default function App() {
                   animation: "_boot-spin 1.4s linear infinite",
                 }}
               />
-              <div
-                style={{ position: "absolute", inset: 8, borderRadius: "var(--radius-md)", background: GRADIENT_LOGO, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <FolderGit2 className="w-4.5 h-4.5" style={{ color: "rgba(255,255,255,0.92)" }} />
+              <div style={{ position: "absolute", inset: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <SynaipseAppIcon size={40} pulse />
               </div>
             </div>
             <div>
-              <p className="text-base font-bold tracking-tight" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse</p>
+              <p className="text-base font-bold tracking-tight" style={{ color: SIDEBAR_TEXT_ACTIVE }}><SynaipseWordmark onDark /></p>
               <p className="text-xs mt-1" style={{ color: SIDEBAR_TEXT }}>
                 저장된 세션을 불러오는 중입니다
               </p>
@@ -1131,9 +1130,7 @@ export default function App() {
         >
           {/* 좌측: 로고 + 햄버거 메뉴 + 뒤로/앞으로 + 프로젝트 코드/diff breadcrumb */}
           <div className="flex items-center gap-1 shrink-0" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 mr-1" style={{ background: GRADIENT_LOGO }}>
-              <FolderGit2 className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.90)" }} />
-            </div>
+            <SynaipseAppIcon size={24} style={{ marginRight: 4 }} />
 
             <div className="relative" ref={titlebarMenuRef}>
               <button
@@ -1534,8 +1531,8 @@ export default function App() {
               <div style={{ position: "relative", width: 80, height: 80 }}>
                 <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid rgba(112,130,56,0.08)", borderTopColor: "#A67B5B", borderRightColor: "#A67B5B", animation: "_spin 2s linear infinite" }} />
                 <div style={{ position: "absolute", inset: 7, borderRadius: "50%", border: "2px solid rgba(112,130,56,0.06)", borderBottomColor: "#708238", borderLeftColor: "#708238", animation: "_spinRev 1.2s linear infinite" }} />
-                <div style={{ position: "absolute", inset: 16, borderRadius: "var(--radius-md)", background: "#708238", display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(112,130,56,0.14)" }}>
-                  <FolderGit2 style={{ width: 22, height: 22, color: "white" }} />
+                <div style={{ position: "absolute", inset: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <SynaipseAppIcon size={48} pulse style={{ boxShadow: "0 4px 16px rgba(10,14,23,0.25)" }} />
                 </div>
               </div>
               <div style={{ textAlign: "center" }}>

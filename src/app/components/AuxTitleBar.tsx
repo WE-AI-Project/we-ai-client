@@ -1,6 +1,6 @@
-import { FolderGit2 } from "lucide-react";
-import { GRADIENT_LOGO, SIDEBAR_TEXT_ACTIVE } from "../colors";
+import { SIDEBAR_TEXT_ACTIVE } from "../colors";
 import { WindowControls } from "./WindowControls";
+import { SynaipseAppIcon, SynaipseWordmark } from "./brand/SynaipseLogo";
 
 // ── 보조 화면(부팅/로그인/참여) 전용 미니 타이틀바 ──
 // 메인 화면은 로고+메뉴+윈도우 컨트롤이 있는 전체 커스텀 타이틀바를 쓰지만, 로그인 전
@@ -16,10 +16,8 @@ export function AuxTitleBar() {
       className="flex items-center h-8 pl-2.5 gap-1.5 shrink-0"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
-      <div className="w-4 h-4 rounded flex items-center justify-center shrink-0" style={{ background: GRADIENT_LOGO }}>
-        <FolderGit2 className="w-2.5 h-2.5" style={{ color: "rgba(255,255,255,0.90)" }} />
-      </div>
-      <span className="text-[10.5px] font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }}>SynAIpse</span>
+      <SynaipseAppIcon size={16} />
+      <SynaipseWordmark onDark className="text-[10.5px] font-semibold" style={{ color: SIDEBAR_TEXT_ACTIVE }} />
       <div className="flex-1" />
       <WindowControls />
     </div>
