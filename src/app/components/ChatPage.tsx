@@ -12,16 +12,6 @@ import {
   ChatMessage, MeetingDoc, BriefingData,
   buildMeetingTranscript, formatTime, formatDate, genId,
 } from "../data/chatStore";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "./ui/alert-dialog";
 
 import { briefingSummaryToMeetingDoc, meetingMinuteSummaryToMeetingDoc } from "../lib/docMappers";
 import { subscribeToRoom } from "../lib/chatSocket";
@@ -2018,40 +2008,87 @@ export function ChatPage({
         />
       )}
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isLeader ? "채팅방을 삭제할까요?" : "채팅방을 나갈까요?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
+      {/* 채팅방 나가기 / 삭제 확인 모달 */}
+      {isDeleteDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isProcessingRoomAction) {
+              setIsDeleteDialogOpen(false);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-5 shadow-2xl transition-all"
+            style={{ background: "#FFFFFF", border: `1px solid ${BORDER}` }}
+          >
+            <div className="flex items-center justify-between pb-3 mb-4" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: "rgba(184,84,80,0.10)" }}
+                >
+                  {isLeader ? (
+                    <Trash2 className="w-3.5 h-3.5" style={{ color: UI_RED }} />
+                  ) : (
+                    <LogOut className="w-3.5 h-3.5" style={{ color: UI_RED }} />
+                  )}
+                </div>
+                <h3 className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>
+                  {isLeader ? "채팅방을 삭제할까요?" : "채팅방을 나갈까요?"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeleteDialogOpen(false)}
+                disabled={isProcessingRoomAction}
+                className="p-1 rounded-lg hover:bg-black/5 disabled:opacity-50 transition-colors"
+              >
+                <X className="w-4 h-4" style={{ color: TEXT_SECONDARY }} />
+              </button>
+            </div>
+
+            <p className="text-xs leading-relaxed mb-5" style={{ color: TEXT_SECONDARY }}>
               {isLeader
                 ? (activeRoom?.name ? `‘${activeRoom.name}’ 채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다.` : "채팅방을 삭제하면 대화 내용을 되돌릴 수 없습니다.")
                 : (activeRoom?.name ? `‘${activeRoom.name}’ 채팅방을 나가시겠습니까?` : "채팅방을 나가시겠습니까?")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isProcessingRoomAction}>취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleLeaveOrDeleteChatRoom();
-              }}
-              disabled={isProcessingRoomAction}
-              style={{ background: UI_RED, color: "#FFFFFF" }}
-            >
-              {isProcessingRoomAction ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                  {isLeader ? "삭제 중..." : "나가는 중..."}
-                </>
-              ) : (
-                isLeader ? "삭제" : "나가기"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </p>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteDialogOpen(false)}
+                disabled={isProcessingRoomAction}
+                className="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-black/5 disabled:opacity-50"
+                style={{
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  color: TEXT_PRIMARY,
+                  background: "#FFFFFF",
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleLeaveOrDeleteChatRoom()}
+                disabled={isProcessingRoomAction}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: UI_RED, color: "#FFFFFF" }}
+              >
+                {isProcessingRoomAction ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {isLeader ? "삭제 중..." : "나가는 중..."}
+                  </>
+                ) : (
+                  isLeader ? "삭제" : "나가기"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 채팅방 생성 모달 */}
       {isCreateModalOpen && (
