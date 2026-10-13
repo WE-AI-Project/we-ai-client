@@ -270,7 +270,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_LABEL }}>부서</label>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 gap-2">
               {[...DEPTS.filter(d => d !== "전체"), ...addedDepts].map(d => {
                 const c = deptColors[d as Dept] || { bg: "#f3f4f6", color: "#4b5563" };
                 const sel = !isCustomDept && form.department === d;
@@ -281,7 +281,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
                     <button
                       type="button"
                       onClick={() => { setIsCustomDept(false); set("department", d); }}
-                      className="w-full py-1.5 rounded-lg text-[10px] font-semibold transition-all overflow-hidden"
+                      className="w-full py-2 rounded-lg text-[10px] font-semibold transition-all overflow-hidden"
                       style={{
                         background: sel ? c.bg : "rgba(0,0,0,0.04)",
                         color: sel ? c.color : TEXT_TERTIARY,
@@ -310,7 +310,7 @@ function ScheduleModal({ initial, onSave, onClose, onColorChange, onDeptDelete, 
               <button
                 type="button"
                 onClick={() => { setIsCustomDept(true); set("department", "" as Dept); }}
-                className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                className="py-2 rounded-lg text-[10px] font-semibold transition-all"
                 style={{
                   background: isCustomDept ? ACCENT_BG : "rgba(0,0,0,0.04)",
                   color: isCustomDept ? ACCENT : TEXT_TERTIARY,
@@ -842,13 +842,13 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
 
           <div className="flex-1 min-h-0 overflow-y-auto">
           <div
-            className="flex flex-col gap-0 p-1.5"
+            className="flex flex-col gap-1.5 p-2"
             style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
           >
             {isLoading ? (
               /* [스켈레톤] 좌측 부서 목록 */
               Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-1.5 px-2 py-1">
+                <div key={i} className="flex items-center gap-2 px-2.5 py-1.5">
                   <Skeleton className="w-2 h-2 rounded-full shrink-0" />
                   <Skeleton className="h-3 w-16" />
                 </div>
@@ -865,7 +865,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                     <button
                       type="button"
                       onClick={() => setDeptFilter(d)}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-left transition-all w-full"
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-all w-full"
                       style={{
                         background: sel ? dc.bg : "transparent",
                         border: `1px solid ${sel ? dc.color + "40" : "transparent"}`,
@@ -1061,11 +1061,11 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
               오늘
             </button>
 
-            <div className="ml-auto flex items-center gap-3 flex-wrap">
+            <div className="ml-auto flex items-center gap-4.5 flex-wrap">
               {isLoading ? (
                 /* [스켈레톤] 우측 상단 부서 표시 점들 */
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-1">
+                  <div key={i} className="flex items-center gap-1.5">
                     <Skeleton className="w-2 h-2 rounded-full" />
                     <Skeleton className="w-8 h-2.5" />
                   </div>
@@ -1079,7 +1079,7 @@ export function CalendarPage({ projectId = 1 }: { projectId?: number | null }) {
                   if (cnt === 0 && deptFilter !== "전체" && deptFilter !== d) return null;
 
                   return (
-                    <div key={d} className="flex items-center gap-1">
+                    <div key={d} className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full" style={{ background: dc.color }} />
                       <span className="text-[9px]" style={{ color: TEXT_TERTIARY }}>{d}</span>
                     </div>
