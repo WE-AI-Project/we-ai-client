@@ -13,3 +13,6 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
+
+# oh-my-claudecode local state
+.omc/
