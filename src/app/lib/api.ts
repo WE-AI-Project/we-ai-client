@@ -2291,8 +2291,10 @@ export type QaReportSummary = {
   qaReportId: number;
   qaRunId: number | null;
   commitId: string;
+  commitHash?: string;
   commitMessage: string;
   status: QaReportStatus;
+  summary?: string;
   totalIssueCount: number;
   criticalCount: number;
   majorCount: number;
@@ -2300,6 +2302,7 @@ export type QaReportSummary = {
   testPassCount: number;
   testFailCount: number;
   createdAt: string;
+  finishedAt?: string;
 };
 
 export type QaReportListResult = {

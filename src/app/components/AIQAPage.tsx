@@ -504,6 +504,7 @@ export function AIQAPage({
 
       const summaryItem: QaReportSummary = {
         qaReportId: repId,
+        qaRunId: repId,
         commitId: currentCommitId,
         commitHash: commitInfo?.hash && commitInfo.hash !== "PENDING" ? commitInfo.hash : undefined,
         commitMessage: currentCommitMsg,
@@ -655,6 +656,7 @@ export function AIQAPage({
                 testType: "AUTOMATION",
                 status: result.status === "SUCCESS" ? "PASSED" : "FAILED",
                 message: (result.logs || []).slice(-3).join("\n"),
+                durationMs: null,
               }],
             },
           };
