@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
   GitCommit,
@@ -530,9 +530,20 @@ export function ChangesPage({
   // 컨벤션 가드
   const [showConvention, setShowConvention] = useState(false);
 
+  // 현재 선택된 파일을 백그라운드 재조회 콜백에서 최신값으로 읽기 위한 ref
+  // (useCallback 의존성에 selectedFile을 넣으면 매 선택마다 폴링 타이머가 재생성되므로 ref로 우회).
+  const selectedFileIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedFileIdRef.current = selectedFile?.id ?? null;
+  }, [selectedFile]);
+
   // 🌟 실제 Git 변경 파일 목록 조회
-  const loadCommitData = useCallback(async () => {
-    setIsLoading(true);
+  // silent=true면 포커스 복귀/폴링으로 인한 백그라운드 재조회라서, 전체 스켈레톤으로 화면을 갈아엎지 않고
+  // 현재 선택된 파일도 그대로 유지한다 (예전엔 매번 첫 파일로 리셋돼 보던 diff가 계속 날아갔음).
+  const loadCommitData = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     setLoadError(false);
 
     if (!projectId) {
@@ -601,29 +612,34 @@ export function ChangesPage({
       setChangedFiles(mappedFiles);
       setStaged(stagedSet);
 
-      // 첫 번째 파일의 diff 비동기 조회 (부가 정보라 실패해도 파일 목록 자체는 유지한다)
-      if (mappedFiles[0]) {
-        const isFirstStaged = stagedSet.has(mappedFiles[0].id);
+      // 이전에 선택돼 있던 파일이 새 목록에도 있으면 그걸 유지하고, 없으면 첫 파일로 fallback
+      const keepId = selectedFileIdRef.current;
+      const targetFile = (keepId && mappedFiles.find((f) => f.id === keepId)) || mappedFiles[0];
+
+      if (targetFile) {
+        const isTargetStaged = stagedSet.has(targetFile.id);
         try {
-          const diffRes = await fetchProjectChangedFileDiff(projectId, mappedFiles[0].path, isFirstStaged);
+          const diffRes = await fetchProjectChangedFileDiff(projectId, targetFile.path, isTargetStaged);
           if (diffRes && diffRes.diffContent) {
-            mappedFiles[0].diff = parseUnifiedDiff(diffRes.diffContent);
-            mappedFiles[0].additions = Number(diffRes.additions) || 0;
-            mappedFiles[0].deletions = Number(diffRes.deletions) || 0;
+            targetFile.diff = parseUnifiedDiff(diffRes.diffContent);
+            targetFile.additions = Number(diffRes.additions) || 0;
+            targetFile.deletions = Number(diffRes.deletions) || 0;
           }
         } catch (diffError) {
-          console.error("첫 파일의 diff 조회에 실패했습니다:", diffError);
+          console.error("선택된 파일의 diff 조회에 실패했습니다:", diffError);
         }
-        setSelectedFile(mappedFiles[0]);
+        setSelectedFile(targetFile);
       }
       setIsLoading(false);
     } catch (e) {
       console.error("로컬 Git 변경 파일 조회에 실패했습니다:", e);
-      toast.error(e instanceof Error && e.message ? e.message : "변경된 파일 목록을 불러오지 못했습니다.");
-      setChangedFiles([]);
-      setStaged(new Set());
-      setSelectedFile(null);
-      setLoadError(true);
+      if (!silent) {
+        toast.error(e instanceof Error && e.message ? e.message : "변경된 파일 목록을 불러오지 못했습니다.");
+        setChangedFiles([]);
+        setStaged(new Set());
+        setSelectedFile(null);
+        setLoadError(true);
+      }
       setIsLoading(false);
     }
   }, [projectId, repoType]);
@@ -631,6 +647,19 @@ export function ChangesPage({
   useEffect(() => {
     void loadCommitData();
   }, [loadCommitData]);
+
+  // 에디터에서 파일을 저장한 뒤 앱으로 돌아왔을 때, 그리고 일정 주기로
+  // 변경 파일 목록을 조용히(스켈레톤 없이) 다시 불러온다.
+  useEffect(() => {
+    if (!projectId || desktopOnly) return;
+    const onFocus = () => void loadCommitData(true);
+    window.addEventListener("focus", onFocus);
+    const interval = window.setInterval(() => void loadCommitData(true), 5000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(interval);
+    };
+  }, [projectId, desktopOnly, loadCommitData]);
 
   // 파일 선택 시 diff 로드
   const handleSelectFile = async (file: CommitFile) => {
