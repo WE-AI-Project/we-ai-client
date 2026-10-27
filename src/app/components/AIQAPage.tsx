@@ -152,15 +152,22 @@ function mapQaResponseToErrors(response: QaResponse, scanTargets: string[] = [])
 function CommitQARow({
   projectId,
   report,
+  localDetail,
 }: {
   projectId: number;
   report: QaReportSummary;
+  localDetail?: QaReportDetail;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [detail, setDetail] = useState<QaReportDetail | null>(null);
+  const [detail, setDetail] = useState<QaReportDetail | null>(localDetail || null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const sm  = QA_STATUS_META[report.status];
+
+  useEffect(() => {
+    if (localDetail) setDetail(localDetail);
+  }, [localDetail]);
+
+  const sm  = QA_STATUS_META[report.status] || QA_STATUS_META.PENDING;
   const Icon  = sm.icon;
   const totalTests = report.testPassCount + report.testFailCount;
   const createdLabel = (() => {
@@ -172,6 +179,10 @@ function CommitQARow({
     const next = !expanded;
     setExpanded(next);
     if (next && !detail && !detailLoading) {
+      if (localDetail) {
+        setDetail(localDetail);
+        return;
+      }
       setDetailLoading(true);
       setDetailError(null);
       fetchQaReportDetail(projectId, report.qaReportId)
@@ -180,6 +191,10 @@ function CommitQARow({
         .finally(() => setDetailLoading(false));
     }
   };
+
+  const displayCommitId = report.commitId && report.commitId !== "null"
+    ? report.commitId
+    : (report.commitHash ? report.commitHash.slice(0, 7) : "LATEST");
 
   return (
     <div style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}>
@@ -195,7 +210,7 @@ function CommitQARow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold" style={{ background:"rgba(0,0,0,0.05)", color:ACCENT }}>
-              #{report.commitId}
+              #{displayCommitId}
             </span>
           </div>
           <p className="text-[11px] mt-0.5 truncate font-medium" style={{ color:TEXT_PRIMARY }}>{report.commitMessage}</p>
@@ -244,6 +259,12 @@ function CommitQARow({
                     </p>
                   )}
                   {issue.description && <p className="text-[9px] mt-1" style={{ color:TEXT_SECONDARY }}>{issue.description}</p>}
+                  {issue.suggestion && (
+                    <div className="mt-1.5 pt-1.5 border-t border-black/5 flex items-start gap-1.5">
+                      <span className="text-[8px] font-semibold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded shrink-0">권장 조치</span>
+                      <p className="text-[9px] text-emerald-800 flex-1">{issue.suggestion}</p>
+                    </div>
+                  )}
                 </div>
               ))}
               {detail.testResults.map((t, i) => (
@@ -352,6 +373,8 @@ export function AIQAPage({
   const [commitReports, setCommitReports] = useState<QaReportSummary[]>([]);
   const [commitReportsLoading, setCommitReportsLoading] = useState(false);
   const [commitReportsError, setCommitReportsError] = useState<string | null>(null);
+  const [localReportDetails, setLocalReportDetails] = useState<Record<number, QaReportDetail>>({});
+  const [localSummaries, setLocalSummaries] = useState<QaReportSummary[]>([]);
 
   useEffect(() => {
     if (activeTab !== "commit" || !projectId) return;
@@ -359,11 +382,36 @@ export function AIQAPage({
     setCommitReportsLoading(true);
     setCommitReportsError(null);
     fetchQaReports(projectId, { size: 50 })
-      .then((res) => { if (!cancelled) setCommitReports(res.reports); })
-      .catch((err: any) => { if (!cancelled) setCommitReportsError(err?.message || "QA 리포트를 불러오지 못했습니다."); })
+      .then((res) => {
+        if (!cancelled) {
+          const serverReports = (res.reports || []).map((r) => {
+            const hasIssues = r.status === "FAILED" || r.criticalCount > 0 || r.majorCount > 0;
+            return {
+              ...r,
+              status: hasIssues ? ("FAILED" as QaReportStatus) : r.status,
+            };
+          });
+          const merged = [
+            ...localSummaries,
+            ...serverReports.filter(
+              (sr) => !localSummaries.some((ls) => ls.commitId === sr.commitId && ls.commitId !== "LATEST")
+            ),
+          ];
+          setCommitReports(merged);
+        }
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          if (localSummaries.length > 0) {
+            setCommitReports(localSummaries);
+          } else {
+            setCommitReportsError(err?.message || "QA 리포트를 불러오지 못했습니다.");
+          }
+        }
+      })
       .finally(() => { if (!cancelled) setCommitReportsLoading(false); });
     return () => { cancelled = true; };
-  }, [activeTab, projectId]);
+  }, [activeTab, projectId, localSummaries]);
 
   // ── 타이머 ──
   useEffect(() => {
@@ -437,7 +485,7 @@ export function AIQAPage({
     });
     const revealMs = scanTargets.length * 260;
 
-    const finishPhase1 = (errors: StaticError[]) => {
+    const finishPhase1 = (errors: StaticError[], rawResponse?: QaResponse) => {
       cancelled = true;
       revealTimers.forEach(clearTimeout);
       setScanFiles(scanTargets);
@@ -445,7 +493,66 @@ export function AIQAPage({
       setStaticErrors(errors);
       setPhase1Done(true);
       setPhase("phase2");
-      setTimeout(() => void runRealTestPhase(), 400);
+
+      // 동기화: 방금 QA 실행에서 감지된 오류를 커밋별 QA 리포트 데이터에 즉시 반영
+      const currentCommitId = (commitInfo?.hash && commitInfo.hash !== "PENDING")
+        ? commitInfo.hash.slice(0, 7)
+        : (commitInfo?.message ? commitInfo.message.slice(0, 15) : "LATEST");
+      const currentCommitMsg = commitInfo?.message || rawResponse?.commitMsg || rawResponse?.commit_msg || "현재 커밋 변경사항";
+      const hasIssues = errors.some((e) => e.severity === "critical" || e.severity === "warning");
+      const repId = Date.now();
+
+      const summaryItem: QaReportSummary = {
+        qaReportId: repId,
+        commitId: currentCommitId,
+        commitHash: commitInfo?.hash && commitInfo.hash !== "PENDING" ? commitInfo.hash : undefined,
+        commitMessage: currentCommitMsg,
+        status: hasIssues ? "FAILED" : "SUCCESS",
+        summary: rawResponse?.bugReport || rawResponse?.bug_report || (hasIssues ? `${errors.length}건의 코드 결함 및 개선사항이 검출되었습니다.` : "모든 QA 검사를 통과했습니다."),
+        totalIssueCount: errors.length,
+        criticalCount: errors.filter((e) => e.severity === "critical").length,
+        majorCount: errors.filter((e) => e.severity === "warning").length,
+        minorCount: 0,
+        testPassCount: 0,
+        testFailCount: 0,
+        createdAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+      };
+
+      const detailItem: QaReportDetail = {
+        qaReportId: repId,
+        qaRunId: repId,
+        projectId: projectId || 0,
+        commitId: currentCommitId,
+        commitMessage: currentCommitMsg,
+        status: hasIssues ? "FAILED" : "SUCCESS",
+        summary: summaryItem.summary || "",
+        totalIssueCount: errors.length,
+        criticalCount: summaryItem.criticalCount,
+        majorCount: summaryItem.majorCount,
+        minorCount: 0,
+        testPassCount: 0,
+        testFailCount: 0,
+        createdAt: summaryItem.createdAt,
+        finishedAt: summaryItem.finishedAt,
+        issues: errors.map((err, i) => ({
+          issueId: repId + i,
+          severity: err.severity === "critical" ? "CRITICAL" : "MAJOR",
+          title: err.type || "AI 검출 결함",
+          description: err.message,
+          filePath: err.file || "",
+          lineNumber: err.line || 1,
+          suggestion: err.fix || (err.type === "AI Bug Risk" ? "문법 오류 및 참조 변수 유효성을 점검하세요." : "코드 컨벤션을 검토하세요."),
+          status: "OPEN",
+        })),
+        testResults: [],
+      };
+
+      setLocalSummaries((prev) => [summaryItem, ...prev.filter((p) => p.commitId !== currentCommitId)]);
+      setLocalReportDetails((prev) => ({ ...prev, [repId]: detailItem }));
+      setCommitReports((prev) => [summaryItem, ...prev.filter((p) => p.commitId !== currentCommitId)]);
+
+      setTimeout(() => void runRealTestPhase(repId), 400);
     };
 
     try {
@@ -458,7 +565,10 @@ export function AIQAPage({
             scopedFiles.some((scoped) => scoped.path === file.path)
           );
       const diff = buildDiffFromCommitFiles(diffSourceFiles);
-      const response = await runAiQa({ projectId, diff });
+      const targetCommitId = (commitInfo?.hash && commitInfo.hash !== "PENDING")
+        ? commitInfo.hash.slice(0, 7)
+        : (commitInfo?.message ? commitInfo.message.slice(0, 20) : undefined);
+      const response = await runAiQa({ projectId, diff, commitId: targetCommitId });
 
       const errors = mapQaResponseToErrors(response, scanTargets);
       if (errors.length > 0) {
@@ -466,7 +576,7 @@ export function AIQAPage({
       }
       // 파일 스캔 애니메이션이 너무 짧게 끝나지 않도록 최소 재생 시간을 보장한다.
       await new Promise(resolve => setTimeout(resolve, Math.max(0, revealMs - 260)));
-      finishPhase1(errors);
+      finishPhase1(errors, response);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "AI QA 분석에 실패했습니다.");
       finishPhase1([]);
@@ -477,7 +587,7 @@ export function AIQAPage({
   // "Server & Build" 탭과 동일한 연결(로컬/링크/SSH)로 실제 test 태스크를 실행한다.
   // 화면을 대신 조작해주는 AI는 없다 - 실제 존재하는 자동화 테스트 스위트를 그대로 돌리고
   // 진짜 종료 코드/로그를 보여준다.
-  const runRealTestPhase = async () => {
+  const runRealTestPhase = async (repId?: number) => {
     setTestRunning(true);
     setTestError(null);
     try {
@@ -503,6 +613,52 @@ export function AIQAPage({
       setTestRun(result);
       if (result.status !== "SUCCESS") {
         toast.warning("자동화 테스트가 실패했습니다.");
+      }
+      if (repId) {
+        const testSuccess = result.status === "SUCCESS";
+        setLocalSummaries((prev) =>
+          prev.map((r) =>
+            r.qaReportId === repId
+              ? {
+                  ...r,
+                  status: (r.status === "FAILED" || !testSuccess) ? "FAILED" : "SUCCESS",
+                  testPassCount: testSuccess ? 1 : 0,
+                  testFailCount: testSuccess ? 0 : 1,
+                }
+              : r
+          )
+        );
+        setCommitReports((prev) =>
+          prev.map((r) =>
+            r.qaReportId === repId
+              ? {
+                  ...r,
+                  status: (r.status === "FAILED" || !testSuccess) ? "FAILED" : "SUCCESS",
+                  testPassCount: testSuccess ? 1 : 0,
+                  testFailCount: testSuccess ? 0 : 1,
+                }
+              : r
+          )
+        );
+        setLocalReportDetails((prev) => {
+          const target = prev[repId];
+          if (!target) return prev;
+          return {
+            ...prev,
+            [repId]: {
+              ...target,
+              status: (target.status === "FAILED" || !testSuccess) ? "FAILED" : "SUCCESS",
+              testPassCount: testSuccess ? 1 : 0,
+              testFailCount: testSuccess ? 0 : 1,
+              testResults: [{
+                testName: result.taskName || "build test",
+                testType: "AUTOMATION",
+                status: result.status === "SUCCESS" ? "PASSED" : "FAILED",
+                message: (result.logs || []).slice(-3).join("\n"),
+              }],
+            },
+          };
+        });
       }
     } catch (error) {
       setTestError(error instanceof Error ? error.message : "테스트 실행에 실패했습니다.");
@@ -1038,6 +1194,7 @@ export function AIQAPage({
                           key={r.qaReportId}
                           projectId={projectId ?? 0}
                           report={r}
+                          localDetail={localReportDetails[r.qaReportId]}
                         />
                       ))
                     )}

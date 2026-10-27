@@ -93,6 +93,7 @@ export type AiCommitResponse = {
 export type QaRequest = {
   projectId?: number | null;
   diff: string;
+  commitId?: string | null;
 };
 
 export type QaResponse = {

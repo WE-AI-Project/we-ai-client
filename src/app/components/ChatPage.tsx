@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   MessageCircle, Video, VideoOff, Send, Paperclip,
   FileText, X, CheckCircle2, Download, Mic, MicOff,
@@ -411,6 +413,41 @@ const FILE_COLOR: Record<string, { bg: string; color: string }> = {
   md: { bg: "rgba(139,92,246,0.10)", color: "#8b5cf6" },
 };
 
+// 채팅/AI 말풍선 공용 마크다운 렌더러 - 굵게/목록/코드/링크 등을 말풍선 색상에 맞춰 그린다.
+function MarkdownText({ content, color, mutedColor, dark }: { content: string; color: string; mutedColor: string; dark?: boolean }) {
+  const codeBg = dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.06)";
+  return (
+    <div className="text-[11px] leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0" style={{ color }}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="whitespace-pre-wrap my-1">{children}</p>,
+          a: ({ children, href }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="underline" style={{ color }}>
+              {children}
+            </a>
+          ),
+          ul: ({ children }) => <ul className="list-disc pl-4 my-1 space-y-0.5">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-4 my-1 space-y-0.5">{children}</ol>,
+          li: ({ children }) => <li>{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          code: ({ children }) => (
+            <code className="rounded px-1 py-0.5 text-[10px]" style={{ background: codeBg }}>{children}</code>
+          ),
+          pre: ({ children }) => (
+            <pre className="rounded-lg p-2 my-1 overflow-x-auto text-[10px]" style={{ background: codeBg }}>{children}</pre>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 pl-2 my-1" style={{ borderColor: mutedColor, color: mutedColor }}>{children}</blockquote>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 function MessageBubble({ msg, onViewDoc }: { msg: ChatMessage; onViewDoc?: () => void }) {
   const isMe = msg.role === "me";
 
@@ -516,9 +553,12 @@ function FileBubble({ msg, isMe }: { msg: ChatMessage; isMe: boolean }) {
             boxShadow: isMe ? "0 2px 8px rgba(112,130,56,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
           }}
         >
-          <p className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: isMe ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK }}>
-            {msg.content}
-          </p>
+          <MarkdownText
+            content={msg.content}
+            color={isMe ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK}
+            mutedColor={isMe ? "rgba(255,255,255,0.65)" : TEXT_ON_DARK_MUTED}
+            dark={isMe}
+          />
         </div>
         <span className="text-[8px] px-1" style={{ color: TEXT_ON_DARK_MUTED }}>{formatTime(msg.time)}</span>
       </div>
@@ -573,9 +613,12 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
             alignSelf: isUser ? "flex-end" : "flex-start",
           }}
         >
-          <p className="whitespace-pre-wrap text-[11px] leading-relaxed" style={{ color: isUser ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK }}>
-            {msg.content.replace(/\*\*/g, "")}
-          </p>
+          <MarkdownText
+            content={msg.content}
+            color={isUser ? "rgba(255,255,255,0.95)" : TEXT_ON_DARK}
+            mutedColor={isUser ? "rgba(255,255,255,0.65)" : TEXT_ON_DARK_MUTED}
+            dark={isUser}
+          />
         </div>
         {isUser && msg.withRecap && (
           <p className="mt-0.5 px-1 text-[8px]" style={{ color: TEXT_TERTIARY }}>이전 대화 맥락 포함</p>
@@ -603,7 +646,7 @@ function AIMessageBubble({ msg }: { msg: AIMsg }) {
                   <span>{turn.round}단계</span><span>·</span><span>{turn.agent}</span><span>·</span><span>{turn.role}</span>
                   <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(112,130,56,0.08)" }}>{turn.model}</span>
                 </div>
-                <p className="whitespace-pre-wrap text-[10px] leading-relaxed" style={{ color: TEXT_ON_DARK_MUTED }}>{compactAiAnswer(turn.message, 700)}</p>
+                <MarkdownText content={compactAiAnswer(turn.message, 700)} color={TEXT_ON_DARK_MUTED} mutedColor={TEXT_ON_DARK_MUTED} />
               </div>
             ))}
             {aiContextCount(msg) > 0 && (
@@ -1979,7 +2022,7 @@ export function ChatPage({
         id: m.messageId.toString(),
         sender: m.senderName,
         avatar: m.senderName?.[0] || "?",
-        role: ((m.isMine !== undefined ? m.isMine : m.senderId === currentUserId) ? "me" : "other") as "me" | "other",
+        role: (Number(m.senderId) === Number(currentUserId) ? "me" : "other") as "me" | "other",
         content: m.content || "",
         time: m.createdAt,
         type: isFile ? ("file" as const) : ("text" as const),
